@@ -1,4 +1,5 @@
-pub mod tcp;
+
+pub(crate) mod tcp;
 mod udp;
 #[cfg(unix)]
 mod unix;

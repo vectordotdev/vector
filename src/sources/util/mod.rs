@@ -46,7 +46,7 @@ pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 pub use unix_stream::build_unix_stream_source;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
-pub use wrappers::AfterReadExt;
+pub(crate) use wrappers::AfterReadExt;
 
 #[cfg(any(feature = "sources-http"))]
 pub use self::body_decoding::Encoding;
