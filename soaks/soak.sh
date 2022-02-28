@@ -108,7 +108,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${USE_BUILD_IMAGE}" \
+    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "baseline" \
                       --tag "${BASELINE}" \
@@ -117,7 +117,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${USE_BUILD_IMAGE}" \
+    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "baseline" \
                       --tag "${BASELINE}" \
@@ -126,7 +126,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${USE_BUILD_IMAGE}" \
+    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "comparison" \
                       --tag "${COMPARISON}" \
@@ -135,7 +135,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${USE_BUILD_IMAGE}" \
+    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "comparison" \
                       --tag "${COMPARISON}" \
@@ -144,7 +144,7 @@ for SOAK_NAME in ${SOAKS}; do
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${USE_BUILD_IMAGE}" \
+    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
                       --variant "comparison" \
                       --tag "${COMPARISON}" \

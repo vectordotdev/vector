@@ -1,11 +1,11 @@
-use lookup::lookup2::{BorrowedSegment, JitPath, Path};
+use lookup::lookup2::{BorrowedSegment, Path};
 use std::collections::BTreeMap;
 
 use super::Value;
 
 /// Checks whether a field specified by a given path is present.
 pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
-    let mut path_iter = JitPath::new(path).segment_iter();
+    let mut path_iter = path.segment_iter();
 
     match path_iter.next() {
         Some(BorrowedSegment::Field(key)) => match fields.get(key) {

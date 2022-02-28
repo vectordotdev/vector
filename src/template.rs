@@ -111,7 +111,6 @@ impl Template {
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
         let event = event.into();
-        println!("Render event {:?} with template {:?}", event, self);
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
