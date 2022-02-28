@@ -6,7 +6,7 @@ use crate::{http::HttpClient, sinks::HealthcheckError};
 #[cfg(feature = "sinks-datadog_events")]
 pub mod events;
 #[cfg(feature = "sinks-datadog_logs")]
-pub mod logs;
+pub(crate) mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
 
