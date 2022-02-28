@@ -37,7 +37,7 @@ pub struct ElasticsearchCommon {
     pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
     pub compression: Compression,
-    pub region: Region,
+    pub(crate) region: Region,
     pub request: RequestConfig,
     pub(crate) query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
