@@ -22,8 +22,8 @@ use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingError,
+        LokiEventUnlabeledError, LokiEventsProcessed, LokiOutOfOrderEventDroppedError,
+        LokiOutOfOrderEventRewrittenError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -65,11 +65,11 @@ impl Partitioner for KeyPartitioner {
 struct RecordPartitioner;
 
 impl Partitioner for RecordPartitioner {
-    type Item = LokiRecord;
-    type Key = PartitionKey;
+    type Item = Option<FilteredRecord>;
+    type Key = Option<PartitionKey>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.partition.clone()
+        item.as_ref().map(|inner| inner.partition())
     }
 }
 
@@ -223,7 +223,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
+            emit!(&LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -235,6 +235,46 @@ impl EventEncoder {
             partition,
             finalizers,
         }
+    }
+}
+
+enum FilteredRecord {
+    Rewritten(LokiRecord),
+    Valid(LokiRecord),
+}
+
+impl FilteredRecord {
+    pub fn partition(&self) -> PartitionKey {
+        self.inner().partition.clone()
+    }
+
+    const fn is_rewritten(&self) -> bool {
+        matches!(self, Self::Rewritten(_))
+    }
+
+    const fn inner(&self) -> &LokiRecord {
+        match self {
+            Self::Rewritten(value) => value,
+            Self::Valid(value) => value,
+        }
+    }
+
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
+    fn into_inner(self) -> LokiRecord {
+        match self {
+            Self::Rewritten(value) => value,
+            Self::Valid(value) => value,
+        }
+    }
+}
+
+impl ByteSizeOf for FilteredRecord {
+    fn allocated_bytes(&self) -> usize {
+        self.inner().allocated_bytes()
+    }
+
+    fn size_of(&self) -> usize {
+        self.inner().size_of()
     }
 }
 
@@ -253,28 +293,24 @@ impl RecordFilter {
 }
 
 impl RecordFilter {
-    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<LokiRecord> {
+    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<FilteredRecord> {
         if let Some(latest) = self.timestamps.get_mut(&record.partition) {
             if record.event.timestamp < *latest {
                 match self.out_of_order_action {
-                    OutOfOrderAction::Drop => {
-                        emit!(&LokiOutOfOrderEventDropped);
-                        None
-                    }
+                    OutOfOrderAction::Drop => None,
                     OutOfOrderAction::RewriteTimestamp => {
-                        emit!(&LokiOutOfOrderEventRewritten);
                         record.event.timestamp = *latest;
-                        Some(record)
+                        Some(FilteredRecord::Rewritten(record))
                     }
                 }
             } else {
                 *latest = record.event.timestamp;
-                Some(record)
+                Some(FilteredRecord::Valid(record))
             }
         } else {
             self.timestamps
                 .insert(record.partition.clone(), record.event.timestamp);
-            Some(record)
+            Some(FilteredRecord::Valid(record))
         }
     }
 }
@@ -323,11 +359,30 @@ impl LokiSink {
 
         let sink = input
             .map(|event| encoder.encode_event(event))
-            .filter_map(|record| {
-                let res = filter.filter_record(record);
-                async { res }
-            })
+            .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
+            .filter_map(|(partition, batch)| async {
+                if let Some(partition) = partition {
+                    let mut count: usize = 0;
+                    let result = batch
+                        .into_iter()
+                        .flatten()
+                        .map(|event| {
+                            if event.is_rewritten() {
+                                count += 1;
+                            }
+                            event.into_inner()
+                        })
+                        .collect::<Vec<_>>();
+                    if count > 0 {
+                        emit!(&LokiOutOfOrderEventRewrittenError { count });
+                    }
+                    Some((partition, result))
+                } else {
+                    emit!(&LokiOutOfOrderEventDroppedError { count: batch.len() });
+                    None
+                }
+            })
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {
