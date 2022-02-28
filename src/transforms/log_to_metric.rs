@@ -24,7 +24,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
-    pub metrics: Vec<MetricConfig>,
+    pub(crate) metrics: Vec<MetricConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
