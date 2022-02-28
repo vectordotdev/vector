@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct Heartbeat {
-    pub since: Instant,
+    pub(crate) since: Instant,
 }
 
 impl InternalEvent for Heartbeat {
