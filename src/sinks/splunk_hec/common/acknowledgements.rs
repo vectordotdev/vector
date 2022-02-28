@@ -23,7 +23,7 @@ use crate::{
 #[serde(default)]
 pub struct HecClientAcknowledgementsConfig {
     pub indexer_acknowledgements_enabled: bool,
-    pub query_interval: NonZeroU8,
+    pub(crate) query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
     pub max_pending_acks: NonZeroU64,
 }
