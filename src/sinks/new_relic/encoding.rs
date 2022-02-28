@@ -30,7 +30,7 @@ impl Encoder<Result<NewRelicApiModel, NewRelicSinkError>> for EncodingConfigFixe
     }
 }
 
-pub fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
+pub(crate) fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
     match serde_json::to_vec(model) {
         Ok(mut json) => {
             json.push(b'\n');

@@ -100,7 +100,7 @@ impl TransformConfig for KeyValueConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct KeyValue {
+pub(crate) struct KeyValue {
     conversions: HashMap<String, Conversion>,
     drop_field: bool,
     field: String,
