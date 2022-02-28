@@ -98,7 +98,7 @@ pub fn read_counter_value(metrics: &SplitMetrics, series: MetricSeries) -> Optio
         })
 }
 
-pub fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
+pub(crate) fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
         .and_then(|(data, _)| match data.value() {
