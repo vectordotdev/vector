@@ -111,7 +111,7 @@ impl<'a> StatusFieldStatistic<'a> {
 /// - `namespace` - the namespace to put the generated metrics in
 /// - `now` - the time the payload was fetched
 /// - `tags` - any base tags to apply to the metrics
-pub fn parse(
+pub(crate) fn parse(
     payload: &str,
     namespace: Option<&str>,
     now: DateTime<Utc>,
