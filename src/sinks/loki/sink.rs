@@ -34,7 +34,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct KeyPartitioner(Option<Template>);
+pub(crate) struct KeyPartitioner(Option<Template>);
 
 impl KeyPartitioner {
     pub const fn new(template: Option<Template>) -> Self {
