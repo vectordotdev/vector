@@ -42,7 +42,7 @@ enum StatsdSocketErrorType {
 }
 
 #[derive(Debug)]
-pub struct StatsdSocketError<T> {
+pub(crate) struct StatsdSocketError<T> {
     r#type: StatsdSocketErrorType,
     pub error: T,
 }
