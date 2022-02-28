@@ -23,7 +23,7 @@ pub struct S3Request {
     pub bucket: String,
     pub metadata: S3Metadata,
     pub content_encoding: Option<&'static str>,
-    pub options: S3Options,
+    pub(crate) options: S3Options,
 }
 
 impl Ackable for S3Request {
