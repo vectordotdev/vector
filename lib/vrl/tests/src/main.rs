@@ -146,10 +146,6 @@ fn main() {
         let mut state = vrl::state::Compiler::new();
         state.set_external_context(test_enrichment.clone());
 
-        dbg!(&state);
-
-        dbg!(state.get_external_context::<enrichment::TableRegistry>());
-
         let program = vrl::compile_with_state(&test.source, &functions, &mut state);
         test_enrichment.finish_load();
 
