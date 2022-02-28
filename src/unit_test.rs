@@ -56,7 +56,7 @@ impl Opts {
     }
 }
 
-pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();

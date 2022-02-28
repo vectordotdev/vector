@@ -34,7 +34,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_count()"))]
     pub count: usize,
     #[serde(flatten)]
-    pub format: OutputFormat,
+    pub(crate) format: OutputFormat,
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub(crate) framing: FramingConfig,
     #[derivative(Default(value = "default_decoding()"))]
