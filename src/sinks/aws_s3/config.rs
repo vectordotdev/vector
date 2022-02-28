@@ -36,7 +36,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 pub(crate) struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: Option<String>,
-    pub filename_time_format: Option<String>,
+    pub(crate) filename_time_format: Option<String>,
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]

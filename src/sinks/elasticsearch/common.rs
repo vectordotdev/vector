@@ -39,7 +39,7 @@ pub struct ElasticsearchCommon {
     pub compression: Compression,
     pub region: Region,
     pub request: RequestConfig,
-    pub query_params: HashMap<String, String>,
+    pub(crate) query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
 }
 
