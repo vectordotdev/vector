@@ -4,7 +4,7 @@
 #![deny(missing_docs)]
 
 pub mod decoding;
-pub mod encoding;
+pub(crate) mod encoding;
 mod ready_frames;
 
 pub(crate) use decoding::{

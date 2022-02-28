@@ -124,7 +124,7 @@ pub(crate) fn current_span() -> Span {
 }
 
 pub struct TraceSubscription {
-    pub buffer: Vec<LogEvent>,
+    pub(crate) buffer: Vec<LogEvent>,
     pub receiver: Receiver<LogEvent>,
 }
 
