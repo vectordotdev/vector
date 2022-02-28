@@ -110,7 +110,7 @@ impl Partitioner for EventPartitioner {
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct HecLogsProcessedEventMetadata {
     pub event_byte_size: usize,
-    pub sourcetype: Option<String>,
+    pub(crate) sourcetype: Option<String>,
     pub source: Option<String>,
     pub index: Option<String>,
     pub host: Option<Value>,

@@ -35,7 +35,7 @@ pub fn build_test_server(
     build_test_server_generic(addr, || Response::new(Body::empty()))
 }
 
-pub fn build_test_server_status(
+pub(crate) fn build_test_server_status(
     addr: SocketAddr,
     status: StatusCode,
 ) -> (
