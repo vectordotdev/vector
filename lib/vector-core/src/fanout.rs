@@ -543,7 +543,7 @@ mod tests {
         let events = make_event_array(2);
 
         let clones = events.clone();
-        fanout.send(clones.into()).await;
+        fanout.send(clones).await;
 
         for receiver in receivers {
             assert_eq!(collect_ready(receiver), &[events.clone()]);
