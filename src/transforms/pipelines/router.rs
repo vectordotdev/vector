@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum EventType {
+pub(crate) enum EventType {
     Log,
     Metric,
 }
