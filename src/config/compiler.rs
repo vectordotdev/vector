@@ -6,7 +6,7 @@ use super::{
     builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
 };
 
-pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+pub(crate) fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
     // component names should not have dots in the configuration file
