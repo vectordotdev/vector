@@ -90,7 +90,7 @@ impl Opts {
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
+pub(crate) async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
