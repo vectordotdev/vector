@@ -141,7 +141,7 @@ impl TcpConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct RawTcpSource {
+pub(crate) struct RawTcpSource {
     config: TcpConfig,
     decoder: codecs::Decoder,
 }
