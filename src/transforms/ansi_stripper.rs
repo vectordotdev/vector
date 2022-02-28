@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct AnsiStripperConfig {
+pub(crate) struct AnsiStripperConfig {
     field: Option<String>,
 }
 
