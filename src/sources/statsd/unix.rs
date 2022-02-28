@@ -18,7 +18,11 @@ pub struct UnixConfig {
     pub(crate) path: PathBuf,
 }
 
-pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: SourceSender) -> Source {
+pub(crate) fn statsd_unix(
+    config: UnixConfig,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
+) -> Source {
     let decoder = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
         Deserializer::Boxed(Box::new(StatsdDeserializer)),
