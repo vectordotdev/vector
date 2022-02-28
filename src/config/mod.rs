@@ -19,7 +19,6 @@ pub use vector_core::{
 use crate::{
     conditions,
     event::Metric,
-    schema,
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
@@ -41,6 +40,7 @@ mod id;
 mod loading;
 pub mod provider;
 mod recursive;
+mod schema;
 mod unit_test;
 mod validation;
 mod vars;
@@ -100,6 +100,7 @@ impl ConfigPath {
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub schema: schema::Options,
     pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
     pub datadog: Option<datadog::Options>,
@@ -128,7 +129,23 @@ impl Config {
             .unwrap_or_else(|| vec![identifier.clone()])
     }
 
-    pub fn propagate_acknowledgements(&mut self) {
+    pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        let errors: Vec<_> = self
+            .sinks
+            .iter()
+            .filter_map(|(name, sink)| {
+                (sink.acknowledgements.enabled() && !sink.inner.can_acknowledge()).then(|| {
+                    format!(
+                        "Sink `{}` has acknowledgements enabled but does not support them.",
+                        name,
+                    )
+                })
+            })
+            .collect();
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
         let inputs: Vec<_> = self
             .sinks
             .iter()
@@ -144,6 +161,7 @@ impl Config {
             })
             .collect();
         self.propagate_acks_rec(inputs);
+        Ok(())
     }
 
     fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
@@ -154,7 +172,7 @@ impl Config {
                     source.sink_acknowledgements = true;
                 } else {
                     warn!(
-                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Data loss could occur.",
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
                         source = component.id(),
                         sink = sink.id(),
                     );
@@ -267,7 +285,7 @@ pub struct SourceContext {
     ///
     /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
     /// that `Output`.
-    pub schema_ids: HashMap<Option<String>, schema::Id>,
+    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
 }
 
 impl SourceContext {
@@ -286,7 +304,7 @@ impl SourceContext {
                 out,
                 proxy: Default::default(),
                 acknowledgements: false,
-                schema_ids: HashMap::default(),
+                schema_definitions: HashMap::default(),
             },
             shutdown,
         )
@@ -295,7 +313,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(
         out: SourceSender,
-        schema_ids: Option<HashMap<Option<String>, schema::Id>>,
+        schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
     ) -> Self {
         Self {
             key: ComponentKey::from("default"),
@@ -304,7 +322,7 @@ impl SourceContext {
             out,
             proxy: Default::default(),
             acknowledgements: false,
-            schema_ids: schema_ids.unwrap_or_default(),
+            schema_definitions: schema_definitions.unwrap_or_default(),
         }
     }
 
@@ -472,6 +490,8 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
+
+    fn can_acknowledge(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -870,7 +890,7 @@ pub struct TestOutput<T = OutputId> {
     feature = "sinks-console",
     feature = "transforms-json_parser"
 ))]
-mod test {
+mod tests {
     use std::path::PathBuf;
 
     use indoc::indoc;
@@ -1196,9 +1216,21 @@ mod test {
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-file",
+    feature = "sinks-file",
+    feature = "transforms-json_parser"
+))]
+mod acknowledgements_tests {
+    use indoc::indoc;
+
+    use super::*;
 
     #[test]
-    fn propagates_acknowledgement_settings() {
+    fn propagates_settings() {
         // The topology:
         // in1 => out1
         // in2 => out2 (acks enabled)
@@ -1216,18 +1248,21 @@ mod test {
                     type = "json_parser"
                     inputs = ["in3"]
                 [sinks.out1]
-                    type = "console"
+                    type = "file"
                     inputs = ["in1"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out1"
                 [sinks.out2]
-                    type = "console"
+                    type = "file"
                     inputs = ["in2"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
-                    type = "console"
+                    type = "file"
                     inputs = ["parse3"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
             Format::Toml,

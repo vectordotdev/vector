@@ -110,6 +110,10 @@ impl SinkConfig for StackdriverConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 struct HttpEventSink {

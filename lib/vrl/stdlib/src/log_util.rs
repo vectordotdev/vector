@@ -10,7 +10,7 @@ use vrl::prelude::*;
 // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
 // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#common
 #[cfg(any(feature = "parse_apache_log", feature = "parse_common_log"))]
-pub static REGEX_APACHE_COMMON_LOG: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static REGEX_APACHE_COMMON_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
@@ -34,7 +34,7 @@ pub static REGEX_APACHE_COMMON_LOG: Lazy<Regex> = Lazy::new(|| {
 
 // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#combined
 #[cfg(feature = "parse_apache_log")]
-pub static REGEX_APACHE_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static REGEX_APACHE_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
@@ -66,7 +66,7 @@ pub static REGEX_APACHE_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
 // It is possible to customise the format output by apache. This function just handles the default defined here.
 // https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
 #[cfg(feature = "parse_apache_log")]
-pub static REGEX_APACHE_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static REGEX_APACHE_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                     # Ignore whitespace and comments in the regex expression.
         ^\s*                                        # Start with any number of whitespaces.
@@ -85,7 +85,7 @@ pub static REGEX_APACHE_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
 
 // - Nginx HTTP Server docs: http://nginx.org/en/docs/http/ngx_http_log_module.html
 #[cfg(feature = "parse_nginx_log")]
-pub static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
@@ -109,7 +109,7 @@ pub static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
 });
 
 #[cfg(feature = "parse_nginx_log")]
-pub static REGEX_NGINX_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
+pub(crate) static REGEX_NGINX_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                         # Ignore whitespace and comments in the regex expression.
         ^\s*                                            # Start with any number of whitespaces.
@@ -167,7 +167,7 @@ fn capture_value(
 }
 
 /// Extracts the log fields from the regex and adds them to a `Value::Object`.
-pub fn log_fields(
+pub(crate) fn log_fields(
     regex: &Regex,
     captures: &Captures,
     timestamp_format: &str,

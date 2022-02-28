@@ -196,7 +196,7 @@ impl Ingestor {
                 cx.shutdown.clone(),
                 acknowledgements,
             );
-            let fut = async move { process.run().await };
+            let fut = process.run();
             let handle = tokio::spawn(fut.in_current_span());
             handles.push(handle);
         }

@@ -348,6 +348,10 @@ impl SinkConfig for ElasticsearchConfig {
     fn sink_type(&self) -> &'static str {
         "elasticsearch"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
