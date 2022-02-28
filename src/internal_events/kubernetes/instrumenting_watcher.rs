@@ -6,7 +6,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct WatchRequestInvoked;
+pub(crate) struct WatchRequestInvoked;
 
 impl InternalEvent for WatchRequestInvoked {
     fn emit_metrics(&self) {

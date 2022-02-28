@@ -103,7 +103,7 @@ impl From<EncoderError> for RequestBuilderError {
 }
 
 /// Incremental request builder specific to Datadog metrics.
-pub struct DatadogMetricsRequestBuilder {
+pub(crate) struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: DatadogMetricsEncoder,
     sketches_encoder: DatadogMetricsEncoder,
