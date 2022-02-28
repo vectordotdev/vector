@@ -208,7 +208,7 @@ impl<'a> DnstapParser<'a> {
             if let Some(query_port) = dnstap_message.query_port {
                 self.insert(
                     self.event_schema.dnstap_message_schema().query_port(),
-                    query_port as i64,
+                    query_port,
                 );
             }
 
@@ -230,7 +230,7 @@ impl<'a> DnstapParser<'a> {
             if let Some(response_port) = dnstap_message.response_port {
                 self.insert(
                     self.event_schema.dnstap_message_schema().response_port(),
-                    response_port as i64,
+                    response_port,
                 );
             }
         }
@@ -253,7 +253,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dnstap_message_schema()
                 .dnstap_message_type_id(),
-            dnstap_message_type_id as i64,
+            dnstap_message_type_id,
         );
 
         self.insert(
@@ -490,7 +490,7 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(
             self.event_schema.dns_query_message_schema().response_code(),
-            msg.response_code as i64,
+            msg.response_code,
         );
 
         if let Some(response) = msg.response {
@@ -548,25 +548,19 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path
             .push(PathComponent::Key(parent_key.into()));
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().id(),
-            header.id as i64,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().id(), header.id);
 
         self.insert(
             self.event_schema.dns_query_header_schema().opcode(),
-            header.opcode as i64,
+            header.opcode,
         );
 
         self.insert(
             self.event_schema.dns_query_header_schema().rcode(),
-            header.rcode as i64,
+            u16::from(header.rcode),
         );
 
-        self.insert(
-            self.event_schema.dns_query_header_schema().qr(),
-            header.qr as i64,
-        );
+        self.insert(self.event_schema.dns_query_header_schema().qr(), header.qr);
 
         self.insert(
             self.event_schema.dns_query_header_schema().aa(),
@@ -600,26 +594,26 @@ impl<'a> DnstapParser<'a> {
 
         self.insert(
             self.event_schema.dns_query_header_schema().question_count(),
-            header.question_count as i64,
+            header.question_count,
         );
 
         self.insert(
             self.event_schema.dns_query_header_schema().answer_count(),
-            header.answer_count as i64,
+            header.answer_count,
         );
 
         self.insert(
             self.event_schema
                 .dns_query_header_schema()
                 .authority_count(),
-            header.authority_count as i64,
+            header.authority_count,
         );
 
         self.insert(
             self.event_schema
                 .dns_query_header_schema()
                 .additional_count(),
-            header.additional_count as i64,
+            header.additional_count,
         );
 
         self.parent_key_path.pop();
@@ -659,7 +653,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dns_query_question_schema()
                 .question_type_id(),
-            question.record_type_id as i64,
+            question.record_type_id,
         );
         self.insert(
             self.event_schema.dns_query_question_schema().class(),
@@ -681,7 +675,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dns_update_message_schema()
                 .response_code(),
-            msg.response_code as i64,
+            msg.response_code,
         );
 
         if let Some(response) = msg.response {
@@ -730,48 +724,42 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path
             .push(PathComponent::Key(key_prefix.into()));
 
-        self.insert(
-            self.event_schema.dns_update_header_schema().id(),
-            header.id as i64,
-        );
+        self.insert(self.event_schema.dns_update_header_schema().id(), header.id);
 
         self.insert(
             self.event_schema.dns_update_header_schema().opcode(),
-            header.opcode as i64,
+            header.opcode,
         );
 
         self.insert(
             self.event_schema.dns_update_header_schema().rcode(),
-            header.rcode as i64,
+            u16::from(header.rcode),
         );
 
-        self.insert(
-            self.event_schema.dns_update_header_schema().qr(),
-            header.qr as i64,
-        );
+        self.insert(self.event_schema.dns_update_header_schema().qr(), header.qr);
 
         self.insert(
             self.event_schema.dns_update_header_schema().zone_count(),
-            header.zone_count as i64,
+            header.zone_count,
         );
 
         self.insert(
             self.event_schema
                 .dns_update_header_schema()
                 .prerequisite_count(),
-            header.prerequisite_count as i64,
+            header.prerequisite_count,
         );
 
         self.insert(
             self.event_schema.dns_update_header_schema().update_count(),
-            header.update_count as i64,
+            header.update_count,
         );
 
         self.insert(
             self.event_schema
                 .dns_update_header_schema()
                 .additional_count(),
-            header.additional_count as i64,
+            header.additional_count,
         );
 
         self.parent_key_path.pop();
@@ -795,7 +783,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dns_update_zone_info_schema()
                 .zone_type_id(),
-            zone.zone_type_id as i64,
+            zone.zone_type_id,
         );
         self.insert(
             self.event_schema.dns_update_zone_info_schema().zone_class(),
@@ -814,13 +802,13 @@ impl<'a> DnstapParser<'a> {
                 self.event_schema
                     .dns_message_opt_pseudo_section_schema()
                     .extended_rcode(),
-                edns.extended_rcode as i64,
+                edns.extended_rcode,
             );
             self.insert(
                 self.event_schema
                     .dns_message_opt_pseudo_section_schema()
                     .version(),
-                edns.version as i64,
+                edns.version,
             );
             self.insert(
                 self.event_schema
@@ -832,7 +820,7 @@ impl<'a> DnstapParser<'a> {
                 self.event_schema
                     .dns_message_opt_pseudo_section_schema()
                     .udp_max_payload_size(),
-                edns.udp_max_payload_size as i64,
+                edns.udp_max_payload_size,
             );
             self.log_edns_options(
                 self.event_schema
@@ -861,7 +849,7 @@ impl<'a> DnstapParser<'a> {
     fn log_edns_opt(&mut self, opt: &EdnsOptionEntry) {
         self.insert(
             self.event_schema.dns_message_option_schema().opt_code(),
-            opt.opt_code as i64,
+            opt.opt_code,
         );
         self.insert(
             self.event_schema.dns_message_option_schema().opt_name(),
@@ -899,12 +887,9 @@ impl<'a> DnstapParser<'a> {
         }
         self.insert(
             self.event_schema.dns_record_schema().record_type_id(),
-            record.record_type_id as i64,
+            record.record_type_id,
         );
-        self.insert(
-            self.event_schema.dns_record_schema().ttl(),
-            record.ttl as i64,
-        );
+        self.insert(self.event_schema.dns_record_schema().ttl(), record.ttl);
         self.insert(
             self.event_schema.dns_record_schema().class(),
             record.class.clone(),
