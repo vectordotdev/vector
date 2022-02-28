@@ -63,7 +63,7 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 /// Configuration for the `kubernetes_logs` source.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct Config {
+pub(crate) struct Config {
     /// Specifies the label selector to filter `Pod`s with, to be used in
     /// addition to the built-in `vector.dev/exclude` filter.
     extra_label_selector: String,
