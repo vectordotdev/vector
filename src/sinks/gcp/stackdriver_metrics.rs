@@ -33,7 +33,7 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct StackdriverConfig {
+pub(crate) struct StackdriverConfig {
     pub project_id: String,
     pub resource: gcp::GcpTypedResource,
     pub credentials_path: Option<String>,
