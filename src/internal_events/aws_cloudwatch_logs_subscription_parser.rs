@@ -12,17 +12,15 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
         error!(
             message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             error = ?self.error,
-            error_code = "parsing_cloudwatch_logs",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30
+            internal_log_rate_secs = 10
         )
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "parsing_cloudwatch_logs",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -76,7 +74,6 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
         error!(
             message = "Error when encoding event.",
             error = %self.error,
-            error_code = "failed_encoding_event",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
@@ -86,13 +83,11 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "failed_encoding_event",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
-            "error_code" => "failed_encoding_event",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

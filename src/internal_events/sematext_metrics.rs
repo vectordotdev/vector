@@ -42,7 +42,6 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
         error!(
             message = "Failed to encode event; dropping event.",
             error = %self.error,
-            error_code = "sematext_metrics_encoding_failed",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
@@ -52,7 +51,6 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "sematext_metrics_encoding_failed",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

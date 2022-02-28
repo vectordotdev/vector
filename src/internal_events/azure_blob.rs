@@ -40,7 +40,6 @@ impl InternalEvent for AzureBlobHttpError {
         error!(
             message = "Error processing request.",
             error = %self.error,
-            error_code = "processing_request",
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10
@@ -50,7 +49,6 @@ impl InternalEvent for AzureBlobHttpError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "processing_request",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );

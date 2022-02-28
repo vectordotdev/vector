@@ -21,7 +21,6 @@ impl InternalEvent for RemapMappingError {
         error!(
             message,
             error = ?self.error,
-            error_code = "remap",
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
@@ -31,7 +30,6 @@ impl InternalEvent for RemapMappingError {
     fn emit_metrics(&self) {
         counter!(
             "processing_errors_total", 1,
-            "error_code" => "remap",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         );

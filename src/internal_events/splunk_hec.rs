@@ -25,7 +25,7 @@ mod sink {
             error!(
                 message = "Error encoding Splunk HEC event to JSON.",
                 error = ?self.error,
-                error_code = "failed_serializing_json",
+                error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
                 stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 30,
@@ -35,7 +35,7 @@ mod sink {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "failed_serializing_json",
+                "error_code" => "serializing_json",
                 "error_type" => error_type::ENCODER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
@@ -54,7 +54,6 @@ mod sink {
             error!(
                 message = "Invalid metric received.",
                 error = ?self.error,
-                error_code = "invalid_metric",
                 error_type = error_type::INVALID_METRIC,
                 stage = error_stage::PROCESSING,
                 value = ?self.value,
@@ -66,13 +65,11 @@ mod sink {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "invalid_metric",
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
             );
             counter!(
                 "component_discarded_events_total", 1,
-                "error_code" => "invalid_metric",
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
             );
@@ -241,7 +238,6 @@ mod source {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
-                error_code = "processing",
                 error_type = error_type::REQUEST_FAILED,
                 stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 10
@@ -251,7 +247,6 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "processing",
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
