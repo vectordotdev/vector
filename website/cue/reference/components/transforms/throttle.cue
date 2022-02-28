@@ -102,8 +102,8 @@ components: transforms: throttle: {
 			]
 
 			configuration: {
-				threshold: 1
-				window_secs:    60
+				threshold:   1
+				window_secs: 60
 			}
 
 			output: [
