@@ -24,7 +24,7 @@ use crate::{
 pub(crate) struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(crate) overwrite: bool,
 }
 
 #[derive(Clone)]
