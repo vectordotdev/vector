@@ -16,7 +16,7 @@ const fn default_print_interval_secs() -> u64 {
 pub struct BlackholeConfig {
     #[derivative(Default(value = "1"))]
     #[serde(default = "default_print_interval_secs")]
-    pub print_interval_secs: u64,
+    pub(crate) print_interval_secs: u64,
     pub rate: Option<usize>,
 }
 
