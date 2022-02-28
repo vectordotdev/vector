@@ -129,23 +129,11 @@ macro_rules! assert_buffer_usage_metrics {
             $($tail)*
         );
     }};
-    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), recv_events => $recv_events:expr) => {{
-        assert_buffer_usage_metrics!(
-            $usage,
-            @asserts ($($field => $expected,)* received_event_count => $recv_events)
-        );
-    }};
     ($usage:expr, @asserts ($($field:ident => $expected:expr),*), recv_bytes => $recv_bytes:expr, $($tail:tt)*) => {{
         assert_buffer_usage_metrics!(
             $usage,
             @asserts ($($field => $expected,)* received_byte_size => $recv_bytes),
             $($tail)*
-        );
-    }};
-    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), recv_bytes => $recv_bytes:expr) => {{
-        assert_buffer_usage_metrics!(
-            $usage,
-            @asserts ($($field => $expected,)* received_byte_size => $recv_bytes)
         );
     }};
     ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_events => $sent_events:expr, $($tail:tt)*) => {{
@@ -155,12 +143,6 @@ macro_rules! assert_buffer_usage_metrics {
             $($tail)*
         );
     }};
-    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_events => $sent_events:expr) => {{
-        assert_buffer_usage_metrics!(
-            $usage,
-            @asserts ($($field => $expected,)* sent_event_count => $sent_events)
-        );
-    }};
     ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_bytes => $sent_bytes:expr, $($tail:tt)*) => {{
         assert_buffer_usage_metrics!(
             $usage,
@@ -168,23 +150,11 @@ macro_rules! assert_buffer_usage_metrics {
             $($tail)*
         );
     }};
-    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_bytes => $sent_bytes:expr) => {{
-        assert_buffer_usage_metrics!(
-            $usage,
-            @asserts ($($field => $expected,)* sent_byte_size => $sent_bytes)
-        );
-    }};
     ($usage:expr, @asserts ($($field:ident => $expected:expr),*), none_sent, $($tail:tt)*) => {{
         assert_buffer_usage_metrics!(
             $usage,
             @asserts ($($field => $expected,)* sent_event_count => 0, sent_byte_size => 0),
             $($tail)*
-        );
-    }};
-    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), none_sent) => {{
-        assert_buffer_usage_metrics!(
-            $usage,
-            @asserts ($($field => $expected,)* sent_event_count => 0, sent_byte_size => 0)
         );
     }};
     ($usage:expr, empty) => {{

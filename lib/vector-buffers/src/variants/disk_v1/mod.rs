@@ -220,14 +220,13 @@ struct BufferState {
     total_records: u64,
     total_events: u64,
     total_bytes: u64,
-    first_key: Option<usize>,
-    last_key: Option<usize>,
+    read_offset: Option<usize>,
     write_offset: Option<usize>,
 }
 
 impl BufferState {
     fn read_offset(&self) -> usize {
-        self.first_key.unwrap_or(0)
+        self.read_offset.unwrap_or(0)
     }
 
     fn write_offset(&self) -> usize {
@@ -250,24 +249,27 @@ where
         data_dir: path.parent().expect("always a parent"),
     })?;
 
+    let mut first_key = None;
+    let mut last_key = None;
     let mut state = BufferState::default();
     for (k, v) in db.iter(ReadOptions::new()) {
         state.total_bytes += v.len() as u64;
         state.total_records += 1;
 
-        if state.first_key.is_none() {
-            state.first_key = Some(k.0);
+        if first_key.is_none() {
+            first_key = Some(k.0);
         }
-        state.last_key = Some(k.0);
+        last_key = Some(k.0);
     }
 
     // Keys are assigned such that if we write an item that compromises 10 events, and that item has
     // key K, then the next key we generate will be K+10.  This lets us take the difference between
     // the last key and the first key to get the number of actual events in the buffer, minus the
     // events contained in the last key/value pair.  We decode it below to get that, too.
-    state.total_events = state.last_key.unwrap_or(0) as u64 - state.first_key.unwrap_or(0) as u64;
+    state.total_events = last_key.unwrap_or(0) as u64 - first_key.unwrap_or(0) as u64;
 
-    if let Some(last_key) = state.last_key.as_ref().copied() {
+    state.read_offset = first_key;
+    if let Some(last_key) = last_key {
         let iter = db.iter(ReadOptions::new());
         iter.seek_to_last();
         if iter.valid() {
@@ -296,15 +298,9 @@ where
                         "Detected undecodable record when querying initial state of buffer. Dropping record and continuing."
                     );
 
-                    // Set our write offset, and update the last key, to compensate for the fact
-                    // this record is going away.  Also update our buffer byte size value, too.
+                    // Since we're deleting it, we'll reuse the key for the writer by setting the
+                    // write offset to overwrite it.  Adjust our statistics, as well.
                     state.write_offset = Some(last_key);
-                    if state.first_key != state.last_key {
-                        // If this isn't the only record, then go back by one to get the end of the
-                        // previous record.  Otherwise, our last key shouldn't move at all.
-                        state.last_key = Some(last_key.wrapping_sub(1));
-                    }
-
                     state.total_records -= 1;
                     state.total_bytes -= val.len() as u64;
 
@@ -320,8 +316,8 @@ where
     }
 
     debug!(
-        first_key = ?state.first_key,
-        last_key = ?state.last_key,
+        ?first_key,
+        ?last_key,
         "Read {} records from database, with {} bytes total, comprising {} events total.",
         state.total_records,
         state.total_bytes,
