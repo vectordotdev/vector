@@ -5,7 +5,7 @@ use tokio::time::interval;
 use crate::internal_events::Heartbeat;
 
 /// Emits Heartbeat event every second.
-pub async fn heartbeat() {
+pub(crate) async fn heartbeat() {
     let since = Instant::now();
     let mut interval = interval(Duration::from_secs(1));
     loop {
