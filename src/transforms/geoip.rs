@@ -209,7 +209,7 @@ impl FunctionTransform for Geoip {
             serde_json::to_value(city)
         };
         if let Ok(json_value) = json_value {
-            event.as_mut_log().insert(target_field, json_value);
+            event.as_mut_log().insert(&target_field, json_value);
         }
 
         output.push(event);

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str};
 
+use lookup::lookup2::BorrowedSegment;
 use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
@@ -162,7 +163,7 @@ impl FunctionTransform for KeyValue {
             }
 
             for (mut key, val) in pairs {
-                println!("key={:?} value={:?}", key, val);
+                // println!("key={:?} value={:?}", key, val);
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
@@ -170,14 +171,14 @@ impl FunctionTransform for KeyValue {
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
-                            log.insert(key, value);
+                            log.insert(&[BorrowedSegment::Field(&key)], value);
                         }
                         Err(error) => {
                             emit!(&KeyValueParserError { key, error });
                         }
                     }
                 } else {
-                    log.insert(key, val);
+                    log.insert(&[BorrowedSegment::Field(&key)], val);
                 }
             }
 

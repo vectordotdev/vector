@@ -218,7 +218,7 @@ mod test {
 
         let make_event = |message, stream| {
             let mut event = LogEvent::from(message);
-            event.insert(stream_discriminant_field.clone(), stream);
+            event.insert(&stream_discriminant_field, stream);
             event
         };
 

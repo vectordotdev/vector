@@ -196,20 +196,24 @@ impl mlua::UserData for LuaEvent {
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key,
+                            &key,
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
                     Some(mlua::Value::Integer(integer)) => {
-                        this.inner.as_mut_log().insert(key, Value::Integer(integer));
+                        this.inner
+                            .as_mut_log()
+                            .insert(&key, Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) if !number.is_nan() => {
                         this.inner
                             .as_mut_log()
-                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
+                            .insert(&key, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
-                        this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
+                        this.inner
+                            .as_mut_log()
+                            .insert(&key, Value::Boolean(boolean));
                     }
                     Some(mlua::Value::Nil) | None => {
                         this.inner.as_mut_log().remove(key);

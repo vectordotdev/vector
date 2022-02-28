@@ -955,7 +955,7 @@ impl ContainerLogInfo {
             if is_partial {
                 // Only add partial event marker field if it's requested.
                 if let Some(partial_event_marker_field) = partial_event_marker_field {
-                    log_event.insert(partial_event_marker_field, true);
+                    log_event.insert(&partial_event_marker_field, true);
                 }
             }
             // Return the log event as is, partial or not. No merging here.

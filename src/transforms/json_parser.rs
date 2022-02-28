@@ -118,7 +118,7 @@ impl FunctionTransform for JsonParser {
                             log.remove(&self.field);
                         }
 
-                        log.insert(&target_field, Value::Object(object));
+                        log.insert(target_field, Value::Object(object));
                     }
                 }
                 None => {

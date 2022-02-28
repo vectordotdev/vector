@@ -113,7 +113,7 @@ impl FunctionTransform for Split {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert(name.clone(), value);
+                        event.as_mut_log().insert(name, value);
                     }
                     Err(error) => {
                         emit!(&ParserConversionError { name, error });

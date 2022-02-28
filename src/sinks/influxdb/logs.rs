@@ -171,7 +171,7 @@ impl HttpSink for InfluxDbLogsSink {
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
-        event.insert("metric_type".to_string(), "logs".to_string());
+        event.insert("metric_type", "logs".to_string());
         self.encoding.apply_rules(&mut event);
 
         // Timestamp
@@ -633,7 +633,7 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{}", i), format!("value{}", i));
+            event.insert(&format!("key{}", i), format!("value{}", i));
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.insert("timestamp", timestamp);

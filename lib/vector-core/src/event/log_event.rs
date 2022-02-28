@@ -132,12 +132,12 @@ impl LogEvent {
 
     // This is deprecated - use `insert_path` instead.
     #[instrument(level = "trace", skip(self, path))]
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        path: impl AsRef<str>,
+        path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), path.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), path, value.into())
     }
 
     // This will be renamed to `insert` once the current `insert` is fully removed
