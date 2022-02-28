@@ -41,7 +41,7 @@ pub struct ApplicationConfig {
 
 pub struct Application {
     opts: RootOpts,
-    pub config: ApplicationConfig,
+    pub(crate) config: ApplicationConfig,
     pub runtime: Runtime,
 }
 

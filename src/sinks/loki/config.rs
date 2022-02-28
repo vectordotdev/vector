@@ -28,7 +28,7 @@ pub struct LokiConfig {
     pub labels: HashMap<Template, Template>,
 
     #[serde(default = "crate::serde::default_false")]
-    pub remove_label_fields: bool,
+    pub(crate) remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
     #[serde(default)]
