@@ -17,7 +17,7 @@ pub struct Opts {
     pub root: RootOpts,
 
     #[clap(subcommand)]
-    pub sub_command: Option<SubCommand>,
+    pub(crate) sub_command: Option<SubCommand>,
 }
 
 impl Opts {
