@@ -57,7 +57,7 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) request: TowerRequestConfig,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
