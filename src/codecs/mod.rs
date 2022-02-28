@@ -7,7 +7,7 @@ pub mod decoding;
 pub mod encoding;
 mod ready_frames;
 
-pub use decoding::{
+pub(crate) use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, JsonDeserializer,
     JsonDeserializerConfig, LengthDelimitedDecoder, LengthDelimitedDecoderConfig,
