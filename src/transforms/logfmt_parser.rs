@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str};
 
+use lookup::lookup2::BorrowedSegment;
 use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
@@ -88,7 +89,9 @@ impl FunctionTransform for Logfmt {
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
-                            event.as_mut_log().insert(&key, value);
+                            event
+                                .as_mut_log()
+                                .insert(&[BorrowedSegment::Field(&key)], value);
                         }
                         Err(error) => {
                             emit!(&ParserConversionError {
@@ -98,7 +101,9 @@ impl FunctionTransform for Logfmt {
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(&key, val);
+                    event
+                        .as_mut_log()
+                        .insert(&[BorrowedSegment::Field(&key)], val);
                 }
             }
 
