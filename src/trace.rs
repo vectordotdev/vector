@@ -128,7 +128,7 @@ pub struct TraceSubscription {
     pub receiver: Receiver<LogEvent>,
 }
 
-pub fn subscribe() -> TraceSubscription {
+pub(crate) fn subscribe() -> TraceSubscription {
     let buffer = match early_buffer().as_mut() {
         Some(buffer) => buffer.drain(..).collect(),
         None => Vec::new(),
