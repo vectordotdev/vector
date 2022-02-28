@@ -93,10 +93,7 @@ async fn run(
         Err(e) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!(
-                    "[tap] Couldn't connect to Vector API via WebSockets: {:?}",
-                    e
-                );
+                eprintln!("[tap] Couldn't connect to Vector API via WebSockets: {}", e);
             }
             return exitcode::UNAVAILABLE;
         }
