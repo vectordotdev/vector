@@ -372,35 +372,40 @@ impl Future for SendOp {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
-        match this.state.as_mut().project() {
-            SendStateProj::Active(mut sink) => {
-                if let Some(event_array) = this.slot.take() {
-                    match sink.as_mut().poll_ready(cx) {
-                        Poll::Ready(Ok(())) => {
-                            sink.start_send(event_array).expect("unit error");
-                            Poll::Ready(())
+        loop {
+            match this.state.as_mut().project() {
+                SendStateProj::Active(mut sink) => {
+                    if let Some(event_array) = this.slot.take() {
+                        match sink.as_mut().poll_ready(cx) {
+                            Poll::Ready(Ok(())) => {
+                                sink.start_send(event_array).expect("unit error");
+                            }
+                            Poll::Ready(Err(())) => {
+                                panic!("unit error");
+                            }
+                            Poll::Pending => {
+                                *this.slot = Some(event_array);
+                                return Poll::Pending;
+                            }
                         }
-                        Poll::Ready(Err(())) => {
-                            panic!("unit error");
-                        }
-                        Poll::Pending => {
-                            *this.slot = Some(event_array);
-                            Poll::Pending
-                        }
+                    } else {
+                        return match sink.as_mut().poll_flush(cx) {
+                            Poll::Ready(Ok(())) => Poll::Ready(()),
+                            Poll::Ready(Err(())) => panic!("unit error"),
+                            Poll::Pending => Poll::Pending,
+                        };
                     }
-                } else {
-                    Poll::Ready(())
                 }
-            }
-            SendStateProj::Paused => {
-                // This likely isn't strictly necessary given how this future is used right now
-                // (i.e. only a single task, gets polled in the same select loop that wakes
-                // it), but it would be a bit of a footgun to leave out this part of the
-                // `Future` contract. Basically, this ensure that even if the future is spawned
-                // some other way, we'll get woken up to make progress when the sink is added
-                // back.
-                this.waker.register(cx.waker());
-                Poll::Pending
+                SendStateProj::Paused => {
+                    // This likely isn't strictly necessary given how this future is used right now
+                    // (i.e. only a single task, gets polled in the same select loop that wakes
+                    // it), but it would be a bit of a footgun to leave out this part of the
+                    // `Future` contract. Basically, this ensure that even if the future is spawned
+                    // some other way, we'll get woken up to make progress when the sink is added
+                    // back.
+                    this.waker.register(cx.waker());
+                    return Poll::Pending;
+                }
             }
         }
     }
@@ -423,7 +428,7 @@ mod tests {
 
     use super::{ControlMessage, Fanout};
     use crate::config::ComponentKey;
-    use crate::event::{Event, EventArray, EventContainer, LogEvent};
+    use crate::event::{Event, EventArray, LogEvent};
     use crate::test_util::{collect_ready, collect_ready_events};
 
     async fn build_sender_pair(
@@ -588,14 +593,12 @@ mod tests {
 
         // Send in the last event which all three senders will now get:
         fanout.send(events[2].clone().into()).await;
-        fanout.send(events[2].clone().into()).await;
 
         // Make sure the first two senders got all three events, but the third sender only got the
         // last event:
-        let expected_events = [&events, &events, &events[2..]];
-        for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready_events(receiver), expected_events[i]);
-        }
+        assert_eq!(collect_ready_events(&mut receivers[0]), &events[..]);
+        assert_eq!(collect_ready_events(&mut receivers[1]), &events[..]);
+        assert_eq!(collect_ready_events(&mut receivers[2]), &events[2..]);
     }
 
     #[tokio::test]
@@ -723,7 +726,7 @@ mod tests {
         // Now do an empty replace on the second sender, which we'll test to make sure that `Fanout`
         // doesn't let any writes through until we replace it properly.  We get back the receiver
         // we've replaced, but also the sender that we want to eventually install:
-        let (_old_first_receiver, new_first_sender) =
+        let (old_first_receiver, new_first_sender) =
             start_sender_replace(&control, &mut receivers, 0, 4).await;
 
         // Third send should return pending because now we have an in-flight replacement:
@@ -738,10 +741,9 @@ mod tests {
 
         // Make sure the original first sender got the first two events, the new first sender got
         // the last event, and the second sender got all three:
-        let expected_events = [&events[2..], &events];
-        for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready_events(receiver), expected_events[i]);
-        }
+        assert_eq!(collect_ready_events(old_first_receiver), &events[0..2]);
+        assert_eq!(collect_ready_events(&mut receivers[0]), &events[2..]);
+        assert_eq!(collect_ready_events(&mut receivers[1]), &events[..]);
     }
 
     fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {
@@ -754,16 +756,5 @@ mod tests {
 
     fn make_event_array(count: usize) -> EventArray {
         _make_events(count).collect::<Vec<_>>().into()
-    }
-
-    fn flatten(events: EventArray) -> Vec<Event> {
-        events.into_events().collect()
-    }
-
-    fn flatten_all(events: impl IntoIterator<Item = EventArray>) -> Vec<Event> {
-        events
-            .into_iter()
-            .flat_map(EventArray::into_events)
-            .collect()
     }
 }
