@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
-pub struct TokenizerConfig {
+pub(crate) struct TokenizerConfig {
     pub field_names: Vec<String>,
     pub field: Option<String>,
     pub(crate) drop_field: bool,

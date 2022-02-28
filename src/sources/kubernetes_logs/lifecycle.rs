@@ -107,7 +107,7 @@ impl<'bound> Lifecycle<'bound> {
 
 /// Represents an unbounded slot at the lifecycle.
 #[derive(Debug)]
-pub struct Slot<'bound, 'lc> {
+pub(crate) struct Slot<'bound, 'lc> {
     lifecycle: &'lc mut Lifecycle<'bound>,
     shutdown_trigger: oneshot::Sender<()>,
 }
