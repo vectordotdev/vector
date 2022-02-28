@@ -23,7 +23,7 @@ use crate::{api::tap::TapController, topology::WatchRx};
 #[derive(Debug)]
 pub struct TapPatterns {
     pub for_outputs: HashSet<String>,
-    pub for_inputs: HashSet<String>,
+    pub(crate) for_inputs: HashSet<String>,
 }
 
 impl TapPatterns {
