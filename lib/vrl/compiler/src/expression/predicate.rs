@@ -9,7 +9,7 @@ use crate::{
     Context, Expression, Span, State, TypeDef, Value,
 };
 
-pub type Result = std::result::Result<Predicate, Error>;
+pub(crate) type Result = std::result::Result<Predicate, Error>;
 
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
@@ -129,7 +129,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("non-boolean predicate")]
     NonBoolean(Kind),
     #[error("fallible predicate")]

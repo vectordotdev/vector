@@ -109,7 +109,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("unhandled fallible expression")]
     FallibleExpr,
     #[error("non-string abort message")]
