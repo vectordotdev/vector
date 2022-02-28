@@ -10,7 +10,55 @@ include!(concat!(env!("OUT_DIR"), "/event.rs"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 
-use super::metric::MetricSketch;
+use super::{array, metric::MetricSketch};
+
+impl event_array::Events {
+    // We can't use the standard `From` traits here because the actual
+    // type of `LogArray` and `TraceArray` are the same.
+    fn from_logs(logs: array::LogArray) -> Self {
+        let logs = logs.into_iter().map(Into::into).collect();
+        Self::Logs(LogArray { logs })
+    }
+
+    fn from_metrics(metrics: array::MetricArray) -> Self {
+        let metrics = metrics.into_iter().map(Into::into).collect();
+        Self::Metrics(MetricArray { metrics })
+    }
+
+    fn from_traces(traces: array::TraceArray) -> Self {
+        let traces = traces.into_iter().map(Into::into).collect();
+        Self::Traces(TraceArray { traces })
+    }
+}
+
+impl From<array::EventArray> for EventArray {
+    fn from(events: array::EventArray) -> Self {
+        let events = Some(match events {
+            array::EventArray::Logs(array) => event_array::Events::from_logs(array),
+            array::EventArray::Metrics(array) => event_array::Events::from_metrics(array),
+            array::EventArray::Traces(array) => event_array::Events::from_traces(array),
+        });
+        Self { events }
+    }
+}
+
+impl From<EventArray> for array::EventArray {
+    fn from(events: EventArray) -> Self {
+        let events = events.events.unwrap();
+
+        match events {
+            event_array::Events::Logs(logs) => {
+                array::EventArray::Logs(logs.logs.into_iter().map(Into::into).collect())
+            }
+            event_array::Events::Metrics(metrics) => {
+                array::EventArray::Metrics(metrics.metrics.into_iter().map(Into::into).collect())
+            }
+            event_array::Events::Traces(traces) => {
+                array::EventArray::Traces(traces.traces.into_iter().map(Into::into).collect())
+            }
+        }
+    }
+}
 
 impl From<Event> for EventWrapper {
     fn from(event: Event) -> Self {

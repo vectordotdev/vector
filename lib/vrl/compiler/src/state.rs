@@ -111,7 +111,9 @@ impl Compiler {
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
         if let Some(snapshot) = self.snapshot.take() {
+            let external_context = self.swap_external_context(AnyMap::new());
             *self = *snapshot;
+            self.external_context = external_context;
         }
     }
 
@@ -135,7 +137,7 @@ impl Compiler {
 
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
-    pub(crate) fn swap_external_contexts(&mut self, ctx: AnyMap) -> AnyMap {
+    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
         std::mem::replace(&mut self.external_context, ctx)
     }
 }

@@ -127,6 +127,10 @@ impl SinkConfig for AzureMonitorLogsConfig {
     fn sink_type(&self) -> &'static str {
         "azure_monitor_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone)]
