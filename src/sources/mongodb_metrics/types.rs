@@ -404,7 +404,7 @@ pub struct CommandServerStatusWiredTigerSession {
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusWiredTigerTransaction {
     #[serde(rename = "transaction begins")]
-    pub begins: i32,
+    pub(crate) begins: i32,
     #[serde(rename = "transaction checkpoints")]
     pub checkpoints: i32,
     #[serde(rename = "transaction checkpoint currently running")]
