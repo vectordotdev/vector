@@ -589,18 +589,21 @@ impl Metric {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.series.name.name = name.into();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
@@ -610,23 +613,27 @@ impl Metric {
         self.metadata.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
@@ -647,6 +654,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
@@ -656,6 +664,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             series: self.series,
@@ -840,6 +849,7 @@ impl MetricSeries {
 
 impl MetricData {
     /// Rewrite this data to mark it as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -849,6 +859,7 @@ impl MetricData {
     }
 
     /// Rewrite this data to mark it as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,

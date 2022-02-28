@@ -436,7 +436,7 @@ mod tests {
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             assert!(
-                !self.permit.is_some(),
+                self.permit.is_none(),
                 "should not call poll_ready again after a successful call"
             );
 

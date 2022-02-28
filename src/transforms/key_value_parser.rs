@@ -383,7 +383,7 @@ mod tests {
         .await;
         assert!(log.contains("foo"));
         assert!(log.contains("bop"));
-        assert!(log.contains(&"({score})".to_string()));
+        assert!(log.contains("({score})"));
     }
 
     #[tokio::test]
