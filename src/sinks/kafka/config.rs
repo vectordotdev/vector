@@ -36,7 +36,7 @@ pub(crate) struct KafkaSinkConfig {
     #[serde(default = "default_socket_timeout_ms")]
     pub socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
-    pub message_timeout_ms: u64,
+    pub(crate) message_timeout_ms: u64,
     #[serde(default)]
     pub librdkafka_options: HashMap<String, String>,
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
