@@ -6,7 +6,7 @@ pub mod error_stage {
 }
 
 // Set of `error_type` tags to use when emiting error events.
-pub mod error_type {
+pub(crate) mod error_type {
     // When the event acknowledgment failed.
     pub const ACKNOWLEDGMENT_FAILED: &str = "acknowledgment_failed";
     // When the external command called by the component failed.

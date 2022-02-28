@@ -4,7 +4,7 @@ use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct JsonParserError<'a> {
+pub(crate) struct JsonParserError<'a> {
     pub field: &'a str,
     pub value: &'a str,
     pub error: Error,
