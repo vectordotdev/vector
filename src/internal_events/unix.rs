@@ -67,7 +67,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct UnixSocketFileDeleteError<'a> {
+pub(crate) struct UnixSocketFileDeleteError<'a> {
     pub path: &'a Path,
     pub error: Error,
 }
