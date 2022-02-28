@@ -88,7 +88,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
 
 pub(crate) struct NginxMetricsStubStatusParseError<'a> {
     pub error: ParseError,
-    pub endpoint: &'a str,
+    pub(crate) endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
