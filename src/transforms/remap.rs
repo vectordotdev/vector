@@ -77,7 +77,7 @@ impl RemapConfig {
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let mut state = vrl::state::Compiler::new_with_kind(merged_schema_definition.into());
-        state.set_external_context(Some(Box::new(enrichment_tables)));
+        state.set_external_context(enrichment_tables);
 
         vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| {
@@ -1185,10 +1185,10 @@ mod tests {
     }
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
-        let mut out = collect_outputs(ft, event);
+        let out = collect_outputs(ft, event);
         assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
         assert!(out.primary.len() <= 1);
-        out.primary.pop()
+        out.primary.into_events().next()
     }
 
     fn transform_one_fallible(

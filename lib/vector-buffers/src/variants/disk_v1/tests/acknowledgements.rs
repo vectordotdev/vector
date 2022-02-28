@@ -62,7 +62,7 @@ async fn acking_single_event_advances_delete_offset() {
 
             tokio::time::pause();
 
-            let mut staged_read = spawn(async { reader.next().await });
+            let mut staged_read = spawn(reader.next());
             assert_pending!(staged_read.poll());
             drop(staged_read);
 
@@ -70,7 +70,7 @@ async fn acking_single_event_advances_delete_offset() {
 
             tokio::time::advance(FLUSH_INTERVAL).await;
 
-            let mut staged_read = spawn(async { reader.next().await });
+            let mut staged_read = spawn(reader.next());
             assert_pending!(staged_read.poll());
             drop(staged_read);
 
@@ -127,7 +127,7 @@ async fn acking_multi_event_advances_delete_offset() {
 
             tokio::time::pause();
 
-            let mut staged_read = spawn(async { reader.next().await });
+            let mut staged_read = spawn(reader.next());
             assert_pending!(staged_read.poll());
             drop(staged_read);
 
@@ -135,7 +135,7 @@ async fn acking_multi_event_advances_delete_offset() {
 
             tokio::time::advance(FLUSH_INTERVAL).await;
 
-            let mut staged_read = spawn(async { reader.next().await });
+            let mut staged_read = spawn(reader.next());
             assert_pending!(staged_read.poll());
             drop(staged_read);
 
@@ -297,7 +297,7 @@ async fn acking_when_undecodable_records_present() {
                 // Now drive reads against the reader until we've at least read all input records,
                 // to ensure all data has been processed and accounted for before our final read
                 // which ensures that all flushing has been handled and is quiesced:
-                let mut staged_read = spawn(async { reader.next().await });
+                let mut staged_read = spawn(reader.next());
                 while !read_all_records.try_assert() {
                     assert_pending!(staged_read.poll());
                 }

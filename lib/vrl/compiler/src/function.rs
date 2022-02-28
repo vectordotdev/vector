@@ -136,7 +136,7 @@ impl FunctionCompileContext {
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
-    pub fn into_external_contexts(self) -> AnyMap {
+    pub fn into_external_context(self) -> AnyMap {
         self.external_context
     }
 }

@@ -70,29 +70,21 @@ pub(crate) fn evaluate_condition<'a>(
 
 /// Add an index for the given condition to the given enrichment table.
 pub(crate) fn add_index(
-    state: &mut state::Compiler,
+    registry: &mut TableRegistry,
     tablename: &str,
     case: Case,
     condition: &BTreeMap<String, expression::Expr>,
 ) -> std::result::Result<IndexHandle, ExpressionError> {
-    let mut registry = state.get_external_context_mut::<TableRegistry>();
+    let fields = condition
+        .iter()
+        .filter_map(|(field, value)| match value {
+            expression::Expr::Container(expression::Container {
+                variant: expression::Variant::Object(map),
+            }) if map.contains_key("from") && map.contains_key("to") => None,
+            _ => Some(field.as_ref()),
+        })
+        .collect::<Vec<_>>();
+    let index = registry.add_index(tablename, case, &fields)?;
 
-    match registry {
-        Some(ref mut table) => {
-            let fields = condition
-                .iter()
-                .filter_map(|(field, value)| match value {
-                    expression::Expr::Container(expression::Container {
-                        variant: expression::Variant::Object(map),
-                    }) if map.contains_key("from") && map.contains_key("to") => None,
-                    _ => Some(field.as_ref()),
-                })
-                .collect::<Vec<_>>();
-            let index = table.add_index(tablename, case, &fields)?;
-
-            Ok(index)
-        }
-        // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
-        None => unreachable!("enrichment tables aren't loaded"),
-    }
+    Ok(index)
 }

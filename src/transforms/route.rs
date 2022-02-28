@@ -223,7 +223,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
@@ -258,7 +258,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);

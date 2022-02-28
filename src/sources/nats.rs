@@ -94,15 +94,15 @@ impl SourceConfig for NatsSourceConfig {
 }
 
 impl NatsSourceConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
+    fn to_nats_options(&self) -> nats::asynk::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
+    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
         self.to_nats_options()
             .connect(&self.url)
             .await
@@ -110,17 +110,17 @@ impl NatsSourceConfig {
     }
 }
 
-impl From<NatsSourceConfig> for async_nats::Options {
+impl From<NatsSourceConfig> for nats::asynk::Options {
     fn from(config: NatsSourceConfig) -> Self {
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&config.connection_name)
             .reconnect_buffer_size(0)
     }
 }
 
 fn get_subscription_stream(
-    subscription: async_nats::Subscription,
-) -> impl Stream<Item = async_nats::Message> {
+    subscription: nats::asynk::Subscription,
+) -> impl Stream<Item = nats::asynk::Message> {
     stream::unfold(subscription, |subscription| async move {
         subscription.next().await.map(|msg| (msg, subscription))
     })
@@ -128,8 +128,8 @@ fn get_subscription_stream(
 
 async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: async_nats::Connection,
-    subscription: async_nats::Subscription,
+    _connection: nats::asynk::Connection,
+    subscription: nats::asynk::Subscription,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
@@ -180,7 +180,7 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> crate::Result<(async_nats::Connection, async_nats::Subscription)> {
+) -> crate::Result<(nats::asynk::Connection, nats::asynk::Subscription)> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {

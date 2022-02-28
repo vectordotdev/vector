@@ -121,6 +121,10 @@ impl SinkConfig for PubsubConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 struct PubsubSink {

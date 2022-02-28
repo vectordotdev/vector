@@ -255,6 +255,10 @@ mod test_sink {
         fn sink_type(&self) -> &'static str {
             "test-backpressure-sink"
         }
+
+        fn can_acknowledge(&self) -> bool {
+            false
+        }
     }
 }
 
