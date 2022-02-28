@@ -1352,7 +1352,7 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
+        assert!(log.get(&format!("label.{}", label)).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
@@ -1495,7 +1495,7 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
+        assert!(log.get(&format!("label.{}", label)).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],

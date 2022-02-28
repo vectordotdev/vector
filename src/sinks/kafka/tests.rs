@@ -284,7 +284,7 @@ mod integration_test {
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.for_each_log(move |log| {
-                log.insert(headers_key.clone(), header_values.clone());
+                log.insert(&headers_key, header_values.clone());
             });
             events
         });
