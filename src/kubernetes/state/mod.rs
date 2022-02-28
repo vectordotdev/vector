@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
-pub mod delayed_delete;
+pub(crate) mod delayed_delete;
 pub mod evmap;
 pub mod instrumenting;
 pub mod mock;
