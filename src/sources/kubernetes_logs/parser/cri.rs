@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-pub const MULTILINE_TAG: &str = "multiline_tag";
+pub(crate) const MULTILINE_TAG: &str = "multiline_tag";
 pub(crate) const NEW_LINE_TAG: &str = "new_line_tag";
 
 /// Parser for the CRI log format.
