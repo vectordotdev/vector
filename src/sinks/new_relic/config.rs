@@ -72,7 +72,7 @@ pub struct NewRelicConfig {
     )]
     pub encoding: EncodingConfigFixed<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
