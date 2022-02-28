@@ -20,7 +20,7 @@ pub const LOG: &str = "log";
 ///
 /// Normalizes parsed data for consistency.
 #[derive(Clone, Debug)]
-pub struct Docker;
+pub(crate) struct Docker;
 
 impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
