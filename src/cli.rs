@@ -134,7 +134,7 @@ pub struct RootOpts {
 
     /// Set the logging format
     #[clap(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
-    pub log_format: LogFormat,
+    pub(crate) log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
     ///
