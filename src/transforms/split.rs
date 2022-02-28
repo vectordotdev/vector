@@ -133,7 +133,7 @@ impl FunctionTransform for Split {
 
 // Splits the given input by a separator.
 // If the separator is `None`, then it will split on whitespace.
-pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
+pub(crate) fn split(input: &str, separator: Option<String>) -> Vec<&str> {
     match separator {
         Some(separator) => input.split(&separator).collect(),
         None => input.split_whitespace().collect(),
