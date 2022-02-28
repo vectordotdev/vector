@@ -234,7 +234,7 @@ impl FileSystemMetrics {
     }
 }
 
-pub struct DiskMetrics(Vec<Metric>);
+pub(crate) struct DiskMetrics(Vec<Metric>);
 
 #[Object]
 impl DiskMetrics {
