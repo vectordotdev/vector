@@ -360,7 +360,7 @@ fn win_main(arguments: Vec<OsString>) {
     if let Err(_e) = run_service(arguments) {}
 }
 
-pub fn run() -> Result<()> {
+pub(crate) fn run() -> Result<()> {
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)
 }
 
