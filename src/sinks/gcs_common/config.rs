@@ -43,7 +43,7 @@ pub(crate) enum GcsStorageClass {
 }
 
 #[derive(Debug, Snafu)]
-pub enum GcsError {
+pub(crate) enum GcsError {
     #[snafu(display("Bucket {:?} not found", bucket))]
     BucketNotFound { bucket: String },
 }
