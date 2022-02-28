@@ -11,7 +11,7 @@ pub mod ansi_stripper;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
-pub mod aws_ec2_metadata;
+pub(crate) mod aws_ec2_metadata;
 #[cfg(feature = "transforms-coercer")]
 pub mod coercer;
 #[cfg(feature = "transforms-compound")]
