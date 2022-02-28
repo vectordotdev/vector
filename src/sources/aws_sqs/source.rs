@@ -32,7 +32,7 @@ pub(crate) struct SqsSource {
     pub queue_url: String,
     pub decoder: Decoder,
     pub poll_secs: u32,
-    pub concurrency: u32,
+    pub(crate) concurrency: u32,
     pub(super) acknowledgements: bool,
 }
 
