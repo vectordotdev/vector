@@ -10,26 +10,26 @@ static SOURCE: [(&str, &str); 2] = [
     (
         "parse_json",
         indoc! {r#"
-	x = parse_json!(s'{"noog": "nork"}')
-        x.noog
-    "#},
+            x = parse_json!(s'{"noog": "nork"}')
+            x.noog
+        "#},
     ),
     (
         "simple",
         indoc! {r#"
-	.hostname = "vector"
+            .hostname = "vector"
 
-	if .status == "warning" {
-	.thing = upcase(.hostname)
-	} else if .status == "notice" {
-	.thung = downcase(.hostname)
-	} else {
-	.nong = upcase(.hostname)
-	}
+            if .status == "warning" {
+            .thing = upcase(.hostname)
+            } else if .status == "notice" {
+            .thung = downcase(.hostname)
+            } else {
+            .nong = upcase(.hostname)
+            }
 
-	.matches = { "name": .message, "num": "2" }
-	.origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
-	"#},
+            .matches = { "name": .message, "num": "2" }
+            .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+        "#},
     ),
 ];
 
