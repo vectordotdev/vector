@@ -6,7 +6,7 @@ use serde_json::Value;
 pub const GZIP_NONE: u32 = 0;
 pub const GZIP_FAST: u32 = 1;
 pub const GZIP_DEFAULT: u32 = 6;
-pub const GZIP_BEST: u32 = 9;
+pub(crate) const GZIP_BEST: u32 = 9;
 
 #[derive(Debug, Derivative, Copy, Clone, Eq, PartialEq)]
 #[derivative(Default)]
