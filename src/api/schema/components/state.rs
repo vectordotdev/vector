@@ -29,7 +29,7 @@ pub fn get_components() -> Vec<Component> {
 }
 
 /// Filters components, and returns a clone of sources
-pub fn get_sources() -> Vec<source::Source> {
+pub(crate) fn get_sources() -> Vec<source::Source> {
     filter_components(|(_, components)| match components {
         Component::Source(s) => Some(s.clone()),
         _ => None,
