@@ -15,7 +15,7 @@ use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 use super::{handler, schema, ShutdownTx};
 use crate::{config, topology};
 
-pub struct Server {
+pub(crate) struct Server {
     _shutdown: ShutdownTx,
     addr: SocketAddr,
 }
