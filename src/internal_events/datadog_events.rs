@@ -15,7 +15,7 @@ impl InternalEvent for DatadogEventsProcessed {
 }
 
 #[derive(Debug)]
-pub struct DatadogEventsFieldInvalid {
+pub(crate) struct DatadogEventsFieldInvalid {
     pub field: &'static str,
 }
 

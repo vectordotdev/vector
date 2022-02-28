@@ -25,7 +25,7 @@ pub(crate) struct S3RequestOptions {
     pub filename_time_format: String,
     pub filename_append_uuid: bool,
     pub filename_extension: Option<String>,
-    pub api_options: S3Options,
+    pub(crate) api_options: S3Options,
     pub encoding: EncodingConfig<StandardEncodings>,
     pub(crate) compression: Compression,
 }
