@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RemoveFieldsConfig {
+pub(crate) struct RemoveFieldsConfig {
     fields: Vec<String>,
     drop_empty: Option<bool>,
 }
