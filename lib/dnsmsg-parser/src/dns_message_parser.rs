@@ -34,6 +34,8 @@ pub enum DnsMessageParserError {
     TrustDnsError { source: ProtoError },
     #[error("UTF8Error: {}", source)]
     Utf8ParsingError { source: Utf8Error },
+    #[error("Unknown Edns option: {:?}, please report", option)]
+    UnknownEdnsOption { option: EdnsOption },
 }
 
 /// Result alias for parsing
@@ -68,7 +70,7 @@ impl DnsMessageParser {
         let msg = TrustDnsMessage::from_vec(&self.raw_message)
             .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
         let header = parse_dns_query_message_header(&msg);
-        let edns_section = parse_edns(&msg);
+        let edns_section = parse_edns(&msg)?;
         let rcode_high = edns_section.as_ref().map_or(0, |edns| edns.extended_rcode);
         let response_code = (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
 
@@ -820,28 +822,35 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
     }
 }
 
-fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    dns_message.edns().map(|edns| OptPseudoSection {
-        extended_rcode: edns.rcode_high(),
-        version: edns.version(),
-        dnssec_ok: edns.dnssec_ok(),
-        udp_max_payload_size: edns.max_payload(),
-        options: parse_edns_options(edns),
-    })
+fn parse_edns(dns_message: &TrustDnsMessage) -> DnsParserResult<Option<OptPseudoSection>> {
+    dns_message
+        .edns()
+        .map(|edns| {
+            parse_edns_options(edns).map(|options| OptPseudoSection {
+                extended_rcode: edns.rcode_high(),
+                version: edns.version(),
+                dnssec_ok: edns.dnssec_ok(),
+                udp_max_payload_size: edns.max_payload(),
+                options,
+            })
+        })
+        .transpose()
 }
 
-fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
+fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
     edns.options()
         .as_ref()
         .iter()
-        .flat_map(|(code, option)| match option {
+        .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
             | EdnsOption::N3U(algorithms) => {
-                Some(parse_edns_opt_dnssec_algorithms(*code, *algorithms))
+                Ok(parse_edns_opt_dnssec_algorithms(*code, *algorithms))
             }
-            EdnsOption::Unknown(_, opt_data) => Some(parse_edns_opt(*code, opt_data)),
-            _ => None,
+            EdnsOption::Unknown(_, opt_data) => Ok(parse_edns_opt(*code, opt_data)),
+            option => Err(DnsMessageParserError::UnknownEdnsOption {
+                option: option.clone(),
+            }),
         })
         .collect()
 }
