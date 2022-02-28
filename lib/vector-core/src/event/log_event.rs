@@ -9,7 +9,6 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -20,16 +19,25 @@ use super::{
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
     fields: Arc<Value>,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
     metadata: EventMetadata,
+}
+
+impl LogEvent {
+    pub fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        &mut self.metadata
+    }
 }
 
 impl Default for LogEvent {

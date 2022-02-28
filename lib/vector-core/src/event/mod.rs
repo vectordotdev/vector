@@ -19,6 +19,7 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use trace::TraceEvent;
 pub use util::log::{PathComponent, PathIter};
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
@@ -37,14 +38,12 @@ pub mod proto;
 mod ser;
 #[cfg(test)]
 mod test;
+mod trace;
 pub mod util;
 #[cfg(feature = "vrl")]
 mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
-
-// Traces are `LogEvent`
-pub type TraceEvent = LogEvent;
 
 #[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
@@ -277,8 +276,9 @@ impl Event {
 impl EventDataEq for Event {
     fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Log(a), Self::Log(b)) | (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
+            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
+            (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
@@ -319,8 +319,9 @@ impl TryInto<serde_json::Value> for Event {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Event::Log(fields) | Event::Trace(fields) => serde_json::to_value(fields),
+            Event::Log(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
+            Event::Trace(fields) => serde_json::to_value(fields),
         }
     }
 }
@@ -418,6 +419,12 @@ impl From<Metric> for Event {
     }
 }
 
+impl From<TraceEvent> for Event {
+    fn from(trace: TraceEvent) -> Self {
+        Event::Trace(trace)
+    }
+}
+
 pub trait MaybeAsLogMut {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent>;
 }
@@ -512,11 +519,18 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
+impl<'a> From<&'a TraceEvent> for EventRef<'a> {
+    fn from(trace: &'a TraceEvent) -> Self {
+        Self::Trace(trace)
+    }
+}
+
 impl<'a> EventDataEq<Event> for EventRef<'a> {
     fn event_data_eq(&self, that: &Event) -> bool {
         match (self, that) {
-            (Self::Log(a), Event::Log(b)) | (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
+            (Self::Log(a), Event::Log(b)) => a.event_data_eq(b),
             (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
+            (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
