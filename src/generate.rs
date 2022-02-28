@@ -63,7 +63,7 @@ pub struct Opts {
 pub struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Value,
+    pub(crate) inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
     pub buffer: BufferConfig,
 }
