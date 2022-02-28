@@ -4,7 +4,7 @@ use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
 
 #[derive(Debug)]
-pub struct KafkaEventsReceived {
+pub(crate) struct KafkaEventsReceived {
     pub(crate) byte_size: usize,
     pub count: usize,
 }
