@@ -61,7 +61,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
