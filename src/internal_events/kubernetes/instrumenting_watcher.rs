@@ -45,7 +45,7 @@ impl<E: Debug> InternalEvent for WatchStreamFailed<E> {
 }
 
 #[derive(Debug)]
-pub struct WatchStreamItemObtained;
+pub(crate) struct WatchStreamItemObtained;
 
 impl InternalEvent for WatchStreamItemObtained {
     fn emit_metrics(&self) {

@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SematextLogsConfig {
+pub(crate) struct SematextLogsConfig {
     region: Option<Region>,
     // Deprecated name
     #[serde(alias = "host")]
