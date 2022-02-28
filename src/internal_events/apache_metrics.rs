@@ -40,7 +40,7 @@ impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
 
 #[derive(Debug)]
 pub struct ApacheMetricsRequestCompleted {
-    pub start: Instant,
+    pub(crate) start: Instant,
     pub end: Instant,
 }
 
