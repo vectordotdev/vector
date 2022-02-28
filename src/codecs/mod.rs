@@ -21,4 +21,4 @@ pub use encoding::{
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
     RawMessageSerializer, RawMessageSerializerConfig,
 };
-pub use ready_frames::ReadyFrames;
+pub(crate) use ready_frames::ReadyFrames;
