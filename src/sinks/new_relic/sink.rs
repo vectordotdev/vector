@@ -121,7 +121,7 @@ pub struct NewRelicSink<S> {
     pub encoding: EncodingConfigFixed<Encoding>,
     pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
-    pub batcher_settings: BatcherSettings,
+    pub(crate) batcher_settings: BatcherSettings,
 }
 
 impl<S> NewRelicSink<S>
