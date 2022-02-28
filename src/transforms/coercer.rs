@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct CoercerConfig {
+pub(crate) struct CoercerConfig {
     types: HashMap<String, String>,
     drop_unspecified: bool,
     timezone: Option<TimeZone>,
