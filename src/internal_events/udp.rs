@@ -35,7 +35,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct UdpSocketError {
+pub(crate) struct UdpSocketError {
     pub error: std::io::Error,
 }
 

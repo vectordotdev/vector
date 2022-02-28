@@ -37,7 +37,7 @@ impl std::str::FromStr for Format {
 }
 
 #[derive(Serialize)]
-pub struct EncodedList {
+pub(crate) struct EncodedList {
     sources: Vec<&'static str>,
     transforms: Vec<&'static str>,
     sinks: Vec<&'static str>,
