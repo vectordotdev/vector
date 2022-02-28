@@ -60,7 +60,7 @@ pub struct TapResource {
 
 // Watcher types for topology changes.
 type WatchTx = watch::Sender<TapResource>;
-pub type WatchRx = watch::Receiver<TapResource>;
+pub(crate) type WatchRx = watch::Receiver<TapResource>;
 
 pub async fn start_validated(
     config: Config,
