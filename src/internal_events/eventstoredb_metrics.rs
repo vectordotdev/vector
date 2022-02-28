@@ -53,7 +53,7 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
 }
 
 #[derive(Debug)]
-pub struct EventStoreDbStatsParsingError {
+pub(crate) struct EventStoreDbStatsParsingError {
     pub error: serde_json::Error,
 }
 
