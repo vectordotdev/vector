@@ -54,7 +54,7 @@ pub struct RemoteWriteConfig {
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
-    pub quantiles: Vec<f64>,
+    pub(crate) quantiles: Vec<f64>,
 
     #[serde(default)]
     pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
