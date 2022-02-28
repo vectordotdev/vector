@@ -17,7 +17,7 @@ mod host;
 
 use async_graphql::{Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
-pub use errors::{ComponentErrorsTotal, ErrorsTotal};
+pub(crate) use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::EventsInTotal;
 pub use events_out::EventsOutTotal;
 pub use filter::*;
