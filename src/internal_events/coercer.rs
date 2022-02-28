@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct CoercerConversionError<'a> {
     pub field: &'a str,
-    pub error: crate::types::Error,
+    pub(crate) error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for CoercerConversionError<'a> {
