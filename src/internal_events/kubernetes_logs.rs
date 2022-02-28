@@ -46,7 +46,7 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
 const ANNOTATION_FAILED: &str = "annotation_failed";
 
 #[derive(Debug)]
-pub struct KubernetesLogsEventAnnotationError<'a> {
+pub(crate) struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
 }
 
