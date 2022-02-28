@@ -120,7 +120,7 @@ impl SinkConfig for HumioMetricsConfig {
     }
 }
 
-pub struct HumioMetricsSink {
+pub(crate) struct HumioMetricsSink {
     inner: VectorSink,
     transform: Transform,
 }
