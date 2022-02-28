@@ -40,7 +40,7 @@ pub(super) struct LogdnaConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,
     default_env: Option<String>,
