@@ -3,7 +3,7 @@ package metadata
 components: sinks: redis: {
 	title: "Redis"
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    false
 		delivery:         "best_effort"
 		development:      "beta"

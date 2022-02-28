@@ -4,7 +4,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	title: "AWS Cloudwatch Metrics"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    false
 		delivery:         "at_least_once"
 		development:      "stable"

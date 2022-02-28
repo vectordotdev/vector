@@ -4,7 +4,7 @@ components: sinks: sematext_metrics: {
 	title: "Sematext Metrics"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    false
 		delivery:         "at_least_once"
 		development:      "beta"

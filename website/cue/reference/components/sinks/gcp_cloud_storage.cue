@@ -4,7 +4,7 @@ components: sinks: gcp_cloud_storage: {
 	title: "GCP Cloud Storage (GCS)"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    true
 		delivery:         "at_least_once"
 		development:      "beta"

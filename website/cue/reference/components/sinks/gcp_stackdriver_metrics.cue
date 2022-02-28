@@ -4,7 +4,7 @@ components: sinks: gcp_stackdriver_metrics: {
 	title: "GCP Cloud Monitoring (formerly Stackdrive) Metrics"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    true
 		delivery:         "at_least_once"
 		development:      "beta"

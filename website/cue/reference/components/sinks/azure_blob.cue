@@ -4,7 +4,7 @@ components: sinks: azure_blob: {
 	title: "Azure Blob Storage"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    true
 		delivery:         "at_least_once"
 		development:      "beta"

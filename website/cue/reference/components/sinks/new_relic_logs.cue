@@ -4,7 +4,7 @@ components: sinks: new_relic_logs: {
 	title: "New Relic Logs"
 
 	classes: {
-		acknowledgements: false
+		acknowledgements: true
 		commonly_used:    false
 		delivery:         "at_least_once"
 		development:      "deprecated"
