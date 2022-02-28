@@ -34,7 +34,7 @@ pub struct HecLogsSinkConfig {
     pub default_token: String,
     pub endpoint: String,
     #[serde(default = "host_key")]
-    pub host_key: String,
+    pub(crate) host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<String>,
     pub index: Option<Template>,

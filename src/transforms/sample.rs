@@ -91,7 +91,7 @@ impl TransformConfig for SampleCompatConfig {
 }
 
 #[derive(Clone)]
-pub struct Sample {
+pub(crate) struct Sample {
     rate: u64,
     key_field: Option<String>,
     exclude: Option<Condition>,
