@@ -23,7 +23,7 @@ pub use schema::DnstapEventSchema;
 pub struct DnstapConfig {
     #[serde(default = "default_max_frame_length")]
     pub max_frame_length: usize,
-    pub host_key: Option<String>,
+    pub(crate) host_key: Option<String>,
     pub socket_path: PathBuf,
     raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
