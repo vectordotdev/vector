@@ -26,7 +26,7 @@ pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
-pub mod console;
+pub(crate) mod console;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
