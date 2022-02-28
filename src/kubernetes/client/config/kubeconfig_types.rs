@@ -136,7 +136,7 @@ pub struct NamedContext {
 /// Context stores tuple of cluster and user information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Context {
-    pub cluster: String,
+    pub(crate) cluster: String,
     pub user: String,
     pub namespace: Option<String>,
     pub extensions: Option<Vec<NamedExtension>>,
