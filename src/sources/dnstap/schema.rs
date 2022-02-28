@@ -440,7 +440,7 @@ impl DnsUpdateMessageSchema {
 }
 
 #[derive(Debug, Clone)]
-pub struct DnsMessageHeaderCommonSchema {
+pub(crate) struct DnsMessageHeaderCommonSchema {
     id: &'static str,
     opcode: &'static str,
     rcode: &'static str,
