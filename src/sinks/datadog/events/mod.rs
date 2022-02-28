@@ -1,4 +1,3 @@
-
 pub(crate) mod config;
 pub mod request_builder;
 pub mod service;
