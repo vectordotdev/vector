@@ -38,7 +38,7 @@ impl Finalizable for AzureBlobRequest {
 pub struct AzureBlobMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub finalizers: EventFinalizers,
 }
 
