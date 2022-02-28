@@ -23,7 +23,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
-    pub path: PathBuf,
+    pub(crate) path: PathBuf,
     pub max_length: Option<usize>,
     pub host_key: Option<String>,
     #[serde(default)]

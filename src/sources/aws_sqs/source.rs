@@ -27,7 +27,7 @@ use crate::{
 const MAX_BATCH_SIZE: i32 = 10;
 
 #[derive(Clone)]
-pub struct SqsSource {
+pub(crate) struct SqsSource {
     pub client: SqsClient,
     pub queue_url: String,
     pub decoder: Decoder,
