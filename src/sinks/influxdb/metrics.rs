@@ -69,7 +69,7 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
-    pub tls: Option<TlsOptions>,
+    pub(crate) tls: Option<TlsOptions>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 }
