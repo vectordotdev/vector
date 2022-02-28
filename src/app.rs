@@ -34,7 +34,7 @@ pub struct ApplicationConfig {
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
-    pub api: config::api::Options,
+    pub(crate) api: config::api::Options,
     pub signal_handler: signal::SignalHandler,
     pub signal_rx: signal::SignalRx,
 }
