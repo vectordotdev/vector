@@ -19,7 +19,7 @@ pub struct AzureBlobRequest {
     pub blob_data: Bytes,
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
-    pub metadata: AzureBlobMetadata,
+    pub(crate) metadata: AzureBlobMetadata,
 }
 
 impl Ackable for AzureBlobRequest {
