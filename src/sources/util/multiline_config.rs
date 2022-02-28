@@ -9,7 +9,7 @@ use crate::line_agg;
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MultilineConfig {
-    pub start_pattern: String,
+    pub(crate) start_pattern: String,
     pub condition_pattern: String,
     pub mode: line_agg::Mode,
     pub timeout_ms: u64,
