@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfig {
+pub(crate) struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
