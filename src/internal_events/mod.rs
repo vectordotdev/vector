@@ -1,4 +1,5 @@
-pub mod prelude;
+
+pub(crate) mod prelude;
 
 mod adaptive_concurrency;
 mod add_fields;
