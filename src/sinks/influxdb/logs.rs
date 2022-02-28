@@ -158,6 +158,10 @@ impl SinkConfig for InfluxDbLogsConfig {
     fn sink_type(&self) -> &'static str {
         "influxdb_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]
@@ -167,7 +171,7 @@ impl HttpSink for InfluxDbLogsSink {
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
-        event.insert("metric_type".to_string(), "logs".to_string());
+        event.insert("metric_type", "logs".to_string());
         self.encoding.apply_rules(&mut event);
 
         // Timestamp

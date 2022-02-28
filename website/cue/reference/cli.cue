@@ -335,7 +335,7 @@ cli: {
 
 			flags: _default_flags & {
 				"human-metrics": {
-					_short: "h"
+					_short: "H"
 					description: """
 						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
 						1,000,000 = 1.00 M

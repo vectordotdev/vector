@@ -143,6 +143,10 @@ impl SinkConfig for RedisSinkConfig {
     fn sink_type(&self) -> &'static str {
         "redis"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl RedisSinkConfig {

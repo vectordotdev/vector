@@ -1033,7 +1033,7 @@ fn parse_character_string(decoder: &mut BinDecoder<'_>) -> DnsParserResult<Strin
                 "Unexpected data length: expected {}, got {}. Raw data {}",
                 len,
                 raw_data.len(),
-                format_bytes_as_hex_string(&raw_data.to_vec())
+                format_bytes_as_hex_string(raw_data)
             ),
         }),
     }
@@ -1106,7 +1106,7 @@ fn parse_domain_name(decoder: &mut BinDecoder<'_>) -> DnsParserResult<Name> {
 }
 
 fn escape_string_for_text_representation(original_string: String) -> String {
-    original_string.replace("\\", "\\\\").replace("\"", "\\\"")
+    original_string.replace('\\', "\\\\").replace('\"', "\\\"")
 }
 
 fn parse_unknown_record_type(rtype: u16) -> Option<String> {

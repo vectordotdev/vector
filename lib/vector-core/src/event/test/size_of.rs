@@ -68,7 +68,7 @@ fn size_greater_than_allocated_size() {
 
 /// The action that our model interpreter loop will take.
 #[derive(Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     Contains {
         key: String,
     },
