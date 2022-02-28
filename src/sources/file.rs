@@ -71,7 +71,7 @@ pub struct FileConfig {
     pub(crate) file_key: Option<String>,
     pub start_at_beginning: Option<bool>,
     pub ignore_checkpoints: Option<bool>,
-    pub read_from: Option<ReadFromConfig>,
+    pub(crate) read_from: Option<ReadFromConfig>,
     // Deprecated name
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
