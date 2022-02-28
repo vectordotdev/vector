@@ -11,7 +11,7 @@ use crate::line_agg;
 pub struct MultilineConfig {
     pub(crate) start_pattern: String,
     pub condition_pattern: String,
-    pub mode: line_agg::Mode,
+    pub(crate) mode: line_agg::Mode,
     pub timeout_ms: u64,
 }
 
