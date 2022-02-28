@@ -67,6 +67,10 @@ impl SinkConfig for ConsoleSinkConfig {
     fn sink_type(&self) -> &'static str {
         "console"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

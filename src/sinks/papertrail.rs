@@ -81,6 +81,10 @@ impl SinkConfig for PapertrailConfig {
     fn sink_type(&self) -> &'static str {
         "papertrail"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 fn encode_event(

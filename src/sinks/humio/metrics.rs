@@ -114,6 +114,10 @@ impl SinkConfig for HumioMetricsConfig {
     fn sink_type(&self) -> &'static str {
         "humio_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 pub struct HumioMetricsSink {

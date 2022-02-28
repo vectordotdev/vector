@@ -23,7 +23,7 @@ use crate::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
-            sink, BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, VectorSink,
     },
@@ -122,6 +122,10 @@ impl SinkConfig for SematextMetricsConfig {
     fn sink_type(&self) -> &'static str {
         "sematext_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn write_uri(endpoint: &str) -> Result<Uri> {
@@ -162,7 +166,6 @@ impl SematextMetricsService {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({

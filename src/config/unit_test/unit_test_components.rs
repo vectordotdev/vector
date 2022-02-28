@@ -112,6 +112,10 @@ impl SinkConfig for UnitTestSinkConfig {
     fn input(&self) -> Input {
         Input::all()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 pub struct UnitTestSink {

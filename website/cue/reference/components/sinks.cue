@@ -36,37 +36,31 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != _|_ {
-								max_bytes: {
-									common:      true
-									description: "The maximum size of a batch, in bytes, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_bytes
-										unit:    "bytes"
-									}
+							max_bytes: {
+								common:      true
+								description: "The maximum size of a batch, in bytes, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_bytes | *null
+									unit:    "bytes"
 								}
 							}
-							if features.send.batch.max_events != _|_ {
-								max_events: {
-									common:      true
-									description: "The maximum size of a batch, in events, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_events
-										unit:    "events"
-									}
+							max_events: {
+								common:      true
+								description: "The maximum size of a batch, in events, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_events | *null
+									unit:    "events"
 								}
 							}
-							if features.send.batch.timeout_secs != null {
-								timeout_secs: {
-									common:      true
-									description: "The maximum age of a batch before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.timeout_secs
-										unit:    "seconds"
-									}
+							timeout_secs: {
+								common:      true
+								description: "The maximum age of a batch before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.timeout_secs
+									unit:    "seconds"
 								}
 							}
 						}
@@ -176,8 +170,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    false
-					common:      true
+					required:    features.send.encoding.codec.enabled
+					if !features.send.encoding.codec.enabled {common: true}
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
