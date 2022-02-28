@@ -346,7 +346,7 @@ fn generate_example(
     }
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_example(!opts.fragment, &opts.expression, &opts.file) {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
