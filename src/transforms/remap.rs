@@ -292,8 +292,6 @@ impl Clone for Remap {
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
             vm: self.vm.clone(),
-            default_schema_id: self.default_schema_id,
-            dropped_schema_id: self.dropped_schema_id,
             default_schema_definition: Arc::clone(&self.default_schema_definition),
             dropped_schema_definition: Arc::clone(&self.dropped_schema_definition),
         }
