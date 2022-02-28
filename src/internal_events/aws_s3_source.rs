@@ -64,7 +64,7 @@ impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
 }
 
 #[derive(Debug)]
-pub struct SqsMessageReceiveSucceeded {
+ pub(crate) struct SqsMessageReceiveSucceeded {
     pub count: usize,
 }
 
