@@ -21,7 +21,7 @@ use crate::sinks::util::{
 /// normalization type `N: MetricNormalize`. Further, distribution
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
-pub struct MetricsBuffer {
+pub(crate) struct MetricsBuffer {
     metrics: Option<MetricSet>,
     max_events: usize,
 }

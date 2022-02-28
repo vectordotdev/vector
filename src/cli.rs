@@ -94,7 +94,7 @@ pub struct RootOpts {
         env = "VECTOR_CONFIG_TOML",
         use_value_delimiter(true)
     )]
-    pub config_paths_toml: Vec<PathBuf>,
+    pub(crate) config_paths_toml: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// JSON file format is expected.
