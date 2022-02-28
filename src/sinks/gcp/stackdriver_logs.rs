@@ -40,7 +40,7 @@ pub struct StackdriverConfig {
     pub log_name: StackdriverLogName,
     pub log_id: Template,
 
-    pub resource: StackdriverResource,
+    pub(crate) resource: StackdriverResource,
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
