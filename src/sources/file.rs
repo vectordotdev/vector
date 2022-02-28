@@ -76,7 +76,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
-    pub max_line_bytes: usize,
+    pub(crate) max_line_bytes: usize,
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     #[serde(alias = "glob_minimum_cooldown")]
