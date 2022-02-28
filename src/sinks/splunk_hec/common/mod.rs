@@ -1,6 +1,6 @@
 pub mod acknowledgements;
 pub mod request;
-pub mod response;
+pub(crate) mod response;
 pub mod service;
 pub mod util;
 
