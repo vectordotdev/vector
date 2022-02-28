@@ -335,7 +335,7 @@ where
     }
 }
 
-pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+pub(crate) fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
