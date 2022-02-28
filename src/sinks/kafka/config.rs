@@ -54,7 +54,7 @@ const fn default_message_timeout_ms() -> u64 {
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
 /// unique options, they use the same struct, and the error if given the wrong options.
 #[derive(Debug, PartialOrd, PartialEq)]
-pub enum KafkaRole {
+pub(crate) enum KafkaRole {
     Consumer,
     Producer,
 }
