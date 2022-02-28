@@ -7,7 +7,7 @@ pub use vector_core::config::ComponentKey;
 // use the derive. They should really only be triggered by our hacky roundtrip-through-serde clone.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct OutputId {
-    pub component: ComponentKey,
+    pub(crate) component: ComponentKey,
     pub port: Option<String>,
 }
 
