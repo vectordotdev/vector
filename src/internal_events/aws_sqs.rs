@@ -58,7 +58,7 @@ impl InternalEvent for SqsS3EventsReceived {
 
 #[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
-pub struct SqsMessageReceiveError<'a> {
+pub(crate) struct SqsMessageReceiveError<'a> {
     pub error: &'a RusotoError<ReceiveMessageError>,
 }
 
