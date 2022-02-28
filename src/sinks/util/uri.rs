@@ -168,7 +168,7 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
 
 /// Simplify the URI into a protocol and endpoint by removing the
 /// "query" portion of the `path_and_query`.
-pub fn protocol_endpoint(uri: Uri) -> (String, String) {
+pub(crate) fn protocol_endpoint(uri: Uri) -> (String, String) {
     let mut parts = uri.into_parts();
 
     // Drop any username and password
