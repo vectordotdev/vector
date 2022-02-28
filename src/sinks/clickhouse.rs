@@ -174,7 +174,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
             format!(
                 "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
                 database,
-                table.replace("\"", "\\\"")
+                table.replace('\"', "\\\"")
             )
             .as_str(),
         )

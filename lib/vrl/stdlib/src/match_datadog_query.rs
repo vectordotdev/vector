@@ -410,7 +410,7 @@ impl Filter<Value> for VrlFilter {
             Field::Tag(_) => resolve_value(
                 buf,
                 Run::boxed(move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(':') {
                         Some((_, lhs)) => {
                             let lhs = Cow::from(lhs);
 

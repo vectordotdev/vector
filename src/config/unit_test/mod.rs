@@ -103,7 +103,7 @@ pub async fn build_unit_tests(
             Err(errors) => {
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
-                test_error = test_error.replace("\n", "\n  ");
+                test_error = test_error.replace('\n', "\n  ");
                 test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
                 build_errors.push(test_error);
             }
@@ -183,7 +183,7 @@ impl UnitTestBuildMetadata {
                     key.clone(),
                     format!(
                         "{}-{}-{}",
-                        key.to_string().replace(".", "-"),
+                        key.to_string().replace('.', "-"),
                         "sink",
                         random_id
                     ),
@@ -375,7 +375,7 @@ async fn build_unit_test(
         .iter()
         .filter_map(|component| {
             component
-                .split_once(".")
+                .split_once('.')
                 .map(|(original_name, _)| original_name.to_string())
         })
         .collect::<Vec<_>>();
@@ -566,7 +566,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.as_mut_log().insert(path.to_owned(), value);
+                    event.as_mut_log().insert(path, value);
                 }
                 Ok(event)
             } else {

@@ -91,7 +91,7 @@ impl LimitParams {
             self.knee_start
                 .map(|knee| {
                     self.knee_exp
-                        .unwrap_or_else(|| self.scale + 1.0)
+                        .unwrap_or(self.scale + 1.0)
                         .powf(level.saturating_sub(knee) as f64)
                         - 1.0
                 })
