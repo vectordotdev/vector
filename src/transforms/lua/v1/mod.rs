@@ -21,7 +21,7 @@ enum BuildError {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct LuaConfig {
+pub(crate) struct LuaConfig {
     source: String,
     #[serde(default)]
     search_dirs: Vec<String>,
