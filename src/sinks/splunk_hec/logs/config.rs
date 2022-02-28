@@ -39,7 +39,7 @@ pub struct HecLogsSinkConfig {
     pub indexed_fields: Vec<String>,
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
+    pub(crate) source: Option<Template>,
     pub encoding: EncodingConfig<HecLogsEncoder>,
     #[serde(default)]
     pub compression: Compression,
