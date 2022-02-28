@@ -5,16 +5,20 @@ mod recorder;
 
 use std::sync::Arc;
 
-use crate::event::Metric;
-pub use crate::metrics::ddsketch::{AgentDDSketch, BinMap};
-pub use crate::metrics::handle::{Counter, Handle};
-use crate::metrics::label_filter::VectorLabelFilter;
-use crate::metrics::recorder::VectorRecorder;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked};
 use once_cell::sync::OnceCell;
 use snafu::Snafu;
+
+pub use crate::metrics::{
+    ddsketch::{AgentDDSketch, BinMap, Config},
+    handle::{Counter, Handle},
+};
+use crate::{
+    event::Metric,
+    metrics::{label_filter::VectorLabelFilter, recorder::VectorRecorder},
+};
 
 pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
 
@@ -129,7 +133,7 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
-    pub fn capture_metrics(&self) -> impl Iterator<Item = Metric> {
+    pub fn capture_metrics(&self) -> Vec<Metric> {
         let mut metrics: Vec<Metric> = Vec::new();
         self.recorder.with_registry(|registry| {
             registry.visit(|_kind, (key, handle)| {
@@ -149,7 +153,7 @@ impl Controller {
         let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
         metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
 
-        metrics.into_iter()
+        metrics
     }
 }
 

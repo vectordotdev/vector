@@ -1,12 +1,13 @@
+use std::{convert::Infallible, error::Error, future::Future, time::Duration};
+
 use file_source::{
     paths_provider::PathsProvider, Checkpointer, FileServer, FileServerShutdown,
     FileSourceInternalEvents, Line,
 };
-use futures::future::{select, Either};
-use futures::{pin_mut, Sink};
-use std::convert::Infallible;
-use std::error::Error;
-use std::{future::Future, time::Duration};
+use futures::{
+    future::{select, Either},
+    pin_mut, Sink,
+};
 use tokio::task::spawn_blocking;
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]

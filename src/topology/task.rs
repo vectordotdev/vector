@@ -1,27 +1,31 @@
-use crate::config::ComponentKey;
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
-use vector_core::buffers::Acker;
 
-use super::EventStream;
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
+use vector_core::{
+    buffers::{topology::channel::BufferReceiver, Acker},
+    event::EventArray,
+};
 
-pub enum TaskOutput {
+use crate::{config::ComponentKey, utilization::Utilization};
+
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiver<EventArray>>, Acker),
     Healthcheck,
 }
 
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
     key: ComponentKey,
@@ -39,10 +43,6 @@ impl Task {
             key,
             typetag: typetag.into(),
         }
-    }
-
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
     }
 
     pub fn id(&self) -> &str {

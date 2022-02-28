@@ -119,7 +119,11 @@ components: {
 		if Kind != "sink" {
 			// `output` documents output of the component. This is very important
 			// as it communicate which events and fields are emitted.
-			output: #Output
+			output: #OutputData
+		}
+
+		if Kind != "sink" {
+			outputs: #Outputs
 		}
 
 		// `support` communicates the varying levels of support of the component.
@@ -186,7 +190,7 @@ components: {
 		if Args.kind == "sink" {
 			// `buffer` describes how the component buffers data.
 			buffer: {
-				enabled: bool | string
+				enabled: true
 			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.
@@ -439,10 +443,22 @@ components: {
 		default_namespace: string
 	}
 
-	#Output: {
+	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
 	}
+
+	#Output: {
+		name:        string
+		description: string
+	}
+
+	_default_output: #Output & {
+		name:        "<component_id>"
+		description: "Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks."
+	}
+
+	#Outputs: *[_default_output] | [#Output, ...#Output]
 
 	#IAM: {
 		#Policy: {
@@ -531,15 +547,15 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
-			_acknowledgements: {
+			_source_acknowledgements: {
 				common:      true
-				description: "Controls how acknowledgements are handled by this source."
+				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
 				required:    false
 				type: object: options: {
 					enabled: {
 						common:      true
 						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
-						warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+						warnings: ["This setting is deprecated in favor of enabling `acknowledgements` in the destination sink.", "Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
 						required: false
 						type: bool: default: false
 					}
@@ -625,7 +641,7 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming connections."
+				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
 					if Args.can_enable {

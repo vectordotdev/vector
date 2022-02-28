@@ -1,14 +1,14 @@
-use crate::{
-    event::{metric::MetricValue, Event, Metric, MetricKind},
-    Result,
-};
+use std::{collections::BTreeMap, sync::Arc};
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use prost::Message;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use vector_core::config::log_schema;
-use vector_core::metrics::AgentDDSketch;
+use vector_core::{config::log_schema, metrics::AgentDDSketch};
+
+use crate::{
+    event::{metric::MetricValue, Event, Metric, MetricKind},
+    schema, Result,
+};
 
 mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
@@ -16,7 +16,11 @@ mod dd_proto {
 
 use dd_proto::SketchPayload;
 
-pub(crate) fn decode_ddsketch(frame: Bytes, api_key: &Option<Arc<str>>) -> Result<Vec<Event>> {
+pub(crate) fn decode_ddsketch(
+    frame: Bytes,
+    api_key: &Option<Arc<str>>,
+    schema_definition: &Arc<schema::Definition>,
+) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
@@ -61,6 +65,11 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: &Option<Arc<str>>) -> Resul
                         .metadata_mut()
                         .set_datadog_api_key(Some(Arc::clone(k)));
                 }
+
+                metric
+                    .metadata_mut()
+                    .set_schema_definition(schema_definition);
+
                 metric.into()
             })
         })

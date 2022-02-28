@@ -13,7 +13,6 @@ components: sinks: kafka: {
 	}
 
 	features: {
-		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -121,6 +120,7 @@ components: sinks: kafka: {
 			required:    true
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+				syntax: "template"
 			}
 		}
 		headers_key: {

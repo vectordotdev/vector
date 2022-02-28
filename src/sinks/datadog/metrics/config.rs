@@ -1,17 +1,5 @@
 use std::num::NonZeroU64;
 
-use crate::{
-    config::{DataType, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::{
-        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
-        util::{
-            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
-        },
-        Healthcheck, UriParseError, VectorSink,
-    },
-};
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use serde::{Deserialize, Serialize};
@@ -23,6 +11,18 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder,
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
+};
+use crate::{
+    config::{Input, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
+        util::{
+            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
+        },
+        Healthcheck, UriParseSnafu, VectorSink,
+    },
 };
 
 // TODO: revisit our concurrency and batching defaults
@@ -126,12 +126,16 @@ impl SinkConfig for DatadogMetricsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -207,14 +211,14 @@ impl DatadogMetricsConfig {
 
         let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
     let result = format!("{}{}", host, endpoint)
         .parse::<Uri>()
-        .context(UriParseError)?;
+        .context(UriParseSnafu)?;
     Ok(result)
 }
 

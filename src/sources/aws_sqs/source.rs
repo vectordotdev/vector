@@ -1,28 +1,27 @@
-use crate::codecs::Decoder;
-use crate::config::log_schema;
-use crate::event::BatchStatus;
-use crate::event::{BatchNotifier, Event};
-use crate::shutdown::ShutdownSignal;
-use crate::sources::util::StreamDecodingError;
-use crate::Pipeline;
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName};
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Cursor, panic, str::FromStr};
 
-use super::events::*;
-use crate::vector_core::ByteSizeOf;
 use async_stream::stream;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_sqs::{
+    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
+    Client as SqsClient,
+};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, TryStreamExt};
-use futures::{SinkExt, Stream, StreamExt};
-use std::io::Cursor;
-use std::panic;
-use std::str::FromStr;
-use tokio::time::Duration;
-use tokio::{pin, select};
+use futures::{FutureExt, Stream, StreamExt};
+use tokio::{pin, select, time::Duration};
 use tokio_util::codec::FramedRead;
-use vector_core::internal_event::EventsReceived;
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_core::{self, internal_event::EventsReceived};
+
+use super::events::*;
+use crate::{
+    codecs::Decoder,
+    config::log_schema,
+    event::{BatchNotifier, BatchStatus, Event},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    SourceSender,
+};
 
 // This is the maximum SQS supports in a single batch request
 const MAX_BATCH_SIZE: i32 = 10;
@@ -34,11 +33,11 @@ pub struct SqsSource {
     pub decoder: Decoder,
     pub poll_secs: u32,
     pub concurrency: u32,
-    pub acknowledgements: bool,
+    pub(super) acknowledgements: bool,
 }
 
 impl SqsSource {
-    pub async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
 
         for _ in 0..self.concurrency {
@@ -68,14 +67,16 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut Pipeline, acknowledgements: bool) {
+    async fn run_once(&self, out: &mut SourceSender, acknowledgements: bool) {
         let result = self
             .client
             .receive_message()
             .queue_url(&self.queue_url)
             .max_number_of_messages(MAX_BATCH_SIZE)
             .wait_time_seconds(self.poll_secs as i32)
-            .attribute_names(MessageSystemAttributeName::SentTimestamp.as_str())
+            // I think this should be a known attribute
+            // https://github.com/awslabs/aws-sdk-rust/issues/411
+            .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
             .send()
             .await;
 
@@ -103,11 +104,11 @@ impl SqsSource {
                     pin!(stream);
                     let send_result = if acknowledgements {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         batch_receiver = Some(receiver);
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     } else {
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     };
 
                     match send_result {
@@ -165,17 +166,17 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
     }
 }
 
-fn decode_message<E>(
+fn decode_message(
     decoder: Decoder,
     message: &str,
     sent_time: Option<DateTime<Utc>>,
-) -> impl Stream<Item = Result<Event, E>> {
+) -> impl Stream<Item = Event> {
     let schema = log_schema();
 
     let payload = Cursor::new(Bytes::copy_from_slice(message.as_bytes()));
     let mut stream = FramedRead::new(payload, decoder);
 
-    let stream = stream! {
+    stream! {
         loop {
             match stream.next().await {
                 Some(Ok((events, _))) => {
@@ -206,26 +207,25 @@ fn decode_message<E>(
                 None => break,
             }
         }
-    };
-    stream.map(Ok)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::SecondsFormat;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_decode() {
         let message = "test";
         let now = Utc::now();
-        let stream = decode_message::<()>(Decoder::default(), "test", Some(now));
+        let stream = decode_message(Decoder::default(), "test", Some(now));
         let events: Vec<_> = stream.collect().await;
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0]
                 .clone()
-                .unwrap()
                 .as_log()
                 .get(log_schema().message_key())
                 .unwrap()
@@ -235,7 +235,6 @@ mod tests {
         assert_eq!(
             events[0]
                 .clone()
-                .unwrap()
                 .as_log()
                 .get(log_schema().timestamp_key())
                 .unwrap()

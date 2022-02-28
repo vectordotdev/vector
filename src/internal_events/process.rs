@@ -1,6 +1,7 @@
-use crate::{built_info, config};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use crate::{built_info, config};
 
 #[derive(Debug)]
 pub struct VectorStarted;

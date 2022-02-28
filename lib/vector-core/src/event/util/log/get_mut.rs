@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
+
+use super::{PathComponent, PathIter, Value};
 
 /// Returns a mutable reference to field value specified by the given path.
 pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Option<&'a mut Value> {
@@ -21,12 +22,14 @@ where
     loop {
         match (path_iter.next(), value) {
             (None, value) => return Some(value),
-            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get_mut(key.as_ref()) {
-                None => return None,
-                Some(nested_value) => {
-                    value = nested_value;
+            (Some(PathComponent::Key(key)), Value::Object(map)) => {
+                match map.get_mut(key.as_ref()) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
                 }
-            },
+            }
             (Some(PathComponent::Index(index)), Value::Array(array)) => {
                 match array.get_mut(index) {
                     None => return None,
@@ -42,9 +45,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn get_mut_simple() {

@@ -9,15 +9,16 @@ use std::{
     },
 };
 
+use azure_storage_blobs::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
+use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, Finalizable},
@@ -31,13 +32,9 @@ use super::util::{
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
-    serde::to_string,
-};
-
-use crate::{
-    config::GenerateConfig,
-    config::{DataType, SinkConfig, SinkContext},
+    serde::json::to_string,
     sinks::{
         azure_common::{
             self,
@@ -49,8 +46,7 @@ use crate::{
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::GcsMetadata,
-            service::{GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -61,15 +57,12 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::partitioner::KeyPartitioner,
-        util::{ServiceBuilderExt, TowerRequestConfig},
+        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use azure_storage::blob::prelude::ContainerClient;
-use goauth::scopes::Scope;
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
@@ -100,7 +93,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }
@@ -203,10 +196,7 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                 )?;
                 let svc = self
-                    .build_azure_sink(
-                        Arc::<azure_storage::blob::prelude::ContainerClient>::clone(&client),
-                        cx,
-                    )
+                    .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
                     .map_err(|error| format!("{}", error))?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
@@ -281,7 +271,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_gcs_sink(
@@ -337,7 +327,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     fn build_azure_sink(
@@ -364,7 +354,7 @@ impl DatadogArchivesSinkConfig {
 
         let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_partitioner() -> KeyPartitioner {
@@ -702,12 +692,16 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Ok(sink_and_healthcheck)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -723,11 +717,13 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
+    use std::{collections::BTreeMap, io::Cursor};
+
+    use chrono::DateTime;
+    use vector_core::partition::Partitioner;
+
     use super::*;
     use crate::event::LogEvent;
-    use chrono::DateTime;
-    use std::{collections::BTreeMap, io::Cursor};
-    use vector_core::partition::Partitioner;
 
     #[test]
     fn generate_config() {

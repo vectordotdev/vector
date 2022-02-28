@@ -1,30 +1,19 @@
-use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, LogEvent, Value},
-    internal_events::{
-        EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
-        SplunkHecRequestReceived,
-    },
-    serde::bool_or_struct,
-    tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
-};
-use bytes::{Buf, Bytes};
-use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt};
-use http::StatusCode;
-use serde::{Deserialize, Serialize};
-use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
-use snafu::Snafu;
 use std::{
     collections::HashMap,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use vector_core::{event::BatchNotifier, ByteSizeOf};
 
+use bytes::{Buf, Bytes};
+use chrono::{DateTime, TimeZone, Utc};
+use flate2::read::MultiGzDecoder;
+use futures::FutureExt;
+use http::StatusCode;
+use serde::{Deserialize, Serialize};
+use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
+use snafu::Snafu;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -33,6 +22,20 @@ use self::{
         IndexerAcknowledgement,
     },
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
+};
+use crate::{
+    config::{
+        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
+    event::{Event, LogEvent, Value},
+    internal_events::{
+        EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
+        SplunkHecRequestReceived,
+    },
+    serde::bool_or_struct,
+    source_sender::ClosedError,
+    tls::{MaybeTlsSettings, TlsConfig},
+    SourceSender,
 };
 
 mod acknowledgements;
@@ -46,7 +49,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct SplunkConfig {
+pub(self) struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
@@ -68,16 +71,6 @@ inventory::submit! {
 
 impl_generate_config_from_default!(SplunkConfig);
 
-impl SplunkConfig {
-    #[cfg(test)]
-    pub fn on(address: SocketAddr) -> Self {
-        SplunkConfig {
-            address,
-            ..Self::default()
-        }
-    }
-}
-
 impl Default for SplunkConfig {
     fn default() -> Self {
         SplunkConfig {
@@ -85,7 +78,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: HecAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             store_hec_token: false,
         }
     }
@@ -148,8 +141,8 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -158,6 +151,10 @@ impl SourceConfig for SplunkConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -171,6 +168,7 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
+        let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
@@ -178,7 +176,7 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = config.acknowledgements.inner.enabled.then(|| {
+        let idx_ack = acknowledgements.then(|| {
             Arc::new(IndexerAcknowledgement::new(
                 config.acknowledgements.clone(),
                 shutdown,
@@ -195,7 +193,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
         let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
@@ -226,9 +224,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -241,10 +237,14 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let reader: Box<dyn Read + Send> = if gzip {
-                            Box::new(MultiGzDecoder::new(body.reader()))
+                        let mut data = Vec::new();
+                        let body = if gzip {
+                            MultiGzDecoder::new(body.reader())
+                                .read_to_end(&mut data)
+                                .map_err(|_| Rejection::from(ApiError::BadRequest))?;
+                            String::from_utf8_lossy(data.as_slice())
                         } else {
-                            Box::new(body.reader())
+                            String::from_utf8_lossy(body.as_ref())
                         };
 
                         let (batch, receiver) =
@@ -258,19 +258,43 @@ impl SplunkSource {
                             }
                             _ => None,
                         };
-                        let mut events = stream::iter(EventIterator::new(
-                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
+
+                        let mut error = None;
+                        let mut events = Vec::new();
+                        let iter = EventIterator::new(
+                            Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
                             xff,
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
-                        ));
+                        );
+                        for result in iter {
+                            match result {
+                                Ok(event) => events.push(event),
+                                Err(err) => {
+                                    error = Some(err);
+                                    break;
+                                }
+                            }
+                        }
 
-                        let res = out.send_all(&mut events).await;
+                        if !events.is_empty() {
+                            emit!(&EventsReceived {
+                                count: events.len(),
+                                byte_size: events.size_of(),
+                            });
 
-                        out.flush().await?;
-                        res.map(|_| maybe_ack_id)
+                            if let Err(ClosedError) = out.send_batch(events).await {
+                                return Err(Rejection::from(ApiError::ServerShutdown));
+                            }
+                        }
+
+                        if let Some(error) = error {
+                            Err(error)
+                        } else {
+                            Ok(maybe_ack_id)
+                        }
                     }
                 },
             )
@@ -278,7 +302,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
         let store_hec_token = self.store_hec_token;
@@ -301,9 +325,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -329,6 +351,7 @@ impl SplunkSource {
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
+                            .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
             )
@@ -617,10 +640,6 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             event.add_batch_notifier(batch);
         }
 
-        emit!(&EventsReceived {
-            count: 1,
-            byte_size: event.size_of(),
-        });
         self.events += 1;
 
         Ok(event)
@@ -956,6 +975,14 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
+    use std::{net::SocketAddr, num::NonZeroU64};
+
+    use chrono::{TimeZone, Utc};
+    use futures_util::Stream;
+    use reqwest::{RequestBuilder, Response};
+    use serde::Deserialize;
+    use vector_core::event::EventStatus;
+
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
@@ -971,15 +998,8 @@ mod tests {
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
         },
-        Pipeline,
+        SourceSender,
     };
-    use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
-    use futures_util::Stream;
-    use reqwest::{RequestBuilder, Response};
-    use serde::Deserialize;
-    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
-    use vector_core::event::EventStatus;
 
     #[test]
     fn generate_config() {
@@ -1003,11 +1023,11 @@ mod tests {
         store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
                 address,
@@ -1072,7 +1092,7 @@ mod tests {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run(stream::iter(messages).map(|x| x.into()))
+            sink.run_events(messages.into_iter().map(Into::into))
                 .await
                 .unwrap();
         });
@@ -1251,7 +1271,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()["greeting"], "hello".into());
@@ -1270,7 +1290,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(vec![event]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
@@ -1575,6 +1595,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn handles_non_utf8() {
+        let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
+        let (source, address) = source(None).await;
+
+        let b = reqwest::Client::new()
+            .post(&format!(
+                "http://{}/{}",
+                address, "services/collector/event"
+            ))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .body::<&[u8]>(message);
+
+        assert_eq!(200, b.send().await.unwrap().status().as_u16());
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()["non"], "A non UTF8 character �".into());
+        assert_eq!(event.as_log()["number"], 2.into());
+        assert_eq!(event.as_log()["bool"], true.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+    }
+
+    #[tokio::test]
     async fn default() {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
         let (source, address) = source(None).await;
@@ -1640,7 +1687,7 @@ mod tests {
     /// This test will fail once `warp` crate fixes support for
     /// custom connection listener, at that point this test can be
     /// modified to pass.
-    /// https://github.com/timberio/vector/issues/7097
+    /// https://github.com/vectordotdev/vector/issues/7097
     /// https://github.com/seanmonstar/warp/issues/830
     /// https://github.com/seanmonstar/warp/pull/713
     #[tokio::test]

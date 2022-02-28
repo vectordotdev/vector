@@ -1,5 +1,7 @@
 # Using defaults.
 # Not stable yet.
 # indent_style = "Block"
+# group_imports = "StdExternalCrate"
+# imports_granularity = "Crate"
 reorder_imports = true
 edition = "2021"

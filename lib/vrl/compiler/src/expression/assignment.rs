@@ -1,13 +1,18 @@
-use crate::expression::{Expr, Literal, Resolved};
-use crate::parser::{
-    ast::{self, Ident},
-    Node,
-};
-use crate::{Context, Expression, Span, State, TypeDef, Value};
+use std::{convert::TryFrom, fmt};
+
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
-use std::convert::TryFrom;
-use std::fmt;
+
+use crate::{
+    expression::{Expr, Literal, Resolved},
+    parser::{
+        ast::{self, Ident},
+        Node,
+    },
+    value::kind::DefaultValue,
+    vm::OpCode,
+    Context, Expression, Span, State, TypeDef, Value,
+};
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
@@ -104,7 +109,7 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.infallible();
-                let default = type_def.kind().default_value();
+                let default_value = type_def.default_value();
                 let value = match &expr {
                     Expr::Literal(v) => Some(v.to_value()),
                     _ => None,
@@ -115,7 +120,7 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
-                let type_def = TypeDef::new().bytes().add_null().infallible();
+                let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(state, type_def, None);
 
@@ -123,7 +128,7 @@ impl Assignment {
                     ok,
                     err,
                     expr: Box::new(expr),
-                    default,
+                    default: default_value,
                 }
             }
         };
@@ -147,6 +152,10 @@ impl Expression for Assignment {
 
     fn type_def(&self, state: &State) -> TypeDef {
         self.variant.type_def(state)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.variant.compile_to_vm(vm)
     }
 }
 
@@ -206,7 +215,7 @@ impl Target {
             Internal(ident, path) => {
                 let td = match path {
                     None => type_def,
-                    Some(path) => type_def.for_path(path.clone()),
+                    Some(path) => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match state.variable(ident) {
@@ -222,7 +231,7 @@ impl Target {
             External(path) => {
                 let td = match path {
                     None => type_def,
-                    Some(path) => type_def.for_path(path.clone()),
+                    Some(path) => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match state.target() {
@@ -263,7 +272,7 @@ impl Target {
             External(path) => {
                 let _ = ctx
                     .target_mut()
-                    .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
+                    .target_insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
             }
         }
     }
@@ -336,7 +345,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Variant<T, U> {
+pub(crate) enum Variant<T, U> {
     Single {
         target: T,
         expr: Box<U>,
@@ -395,6 +404,45 @@ where
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
     }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        match self {
+            Variant::Single { target, expr } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+
+                vm.write_opcode(OpCode::SetPath);
+
+                // Add the target to the list of targets, write its index as a primitive for the
+                //  `SetPath` opcode to retrieve.
+                let target = vm.get_target(&target.into());
+                vm.write_primitive(target);
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                // Compile the expression which will leave the result at the top of the stack.
+                expr.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::SetPathInfallible);
+
+                // Write the target for the `Ok` path.
+                let target = vm.get_target(&ok.into());
+                vm.write_primitive(target);
+
+                // Write the target for the `Error` path.
+                let target = vm.get_target(&err.into());
+                vm.write_primitive(target);
+
+                // Add the default value (the value to set to the `Ok` target should we have an error).
+                let default = vm.add_constant(default.clone());
+                vm.write_primitive(default);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<T, U> fmt::Display for Variant<T, U>
@@ -416,8 +464,8 @@ where
 
 #[derive(Debug, Clone)]
 pub(crate) struct Details {
-    pub type_def: TypeDef,
-    pub value: Option<Value>,
+    pub(crate) type_def: TypeDef,
+    pub(crate) value: Option<Value>,
 }
 
 // -----------------------------------------------------------------------------
@@ -430,7 +478,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
 

@@ -1,5 +1,16 @@
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    num::NonZeroU64,
+};
+
+use bytes::{Bytes, BytesMut};
+use futures::SinkExt;
+use http::{Request, Uri};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -15,14 +26,6 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
-};
-use futures::SinkExt;
-use http::{Request, Uri};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    num::NonZeroU64,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -145,22 +148,26 @@ impl SinkConfig for InfluxDbLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "influxdb_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
@@ -184,7 +191,7 @@ impl HttpSink for InfluxDbLogsSink {
             }
         });
 
-        let mut output = String::new();
+        let mut output = BytesMut::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
@@ -197,14 +204,14 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes())
+        Some(output)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
-            .body(events)
+            .body(events.freeze())
             .map_err(Into::into)
     }
 }
@@ -246,7 +253,7 @@ impl InfluxDbLogsConfig {
 fn to_field(value: &Value) -> Field {
     match value {
         Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
+        Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
         _ => Field::String(value.to_string_lossy()),
     }
@@ -254,20 +261,23 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
-        sinks::util::{
-            http::HttpSink,
-            test::{build_test_server_status, load_sink},
-        },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
-    };
     use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{channel::mpsc, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
+    use super::*;
+    use crate::{
+        sinks::{
+            influxdb::test_util::{assert_fields, split_line_protocol, ts},
+            util::{
+                http::HttpSink,
+                test::{build_test_server_status, load_sink},
+            },
+        },
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+    };
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -634,7 +644,7 @@ mod tests {
         drop(batch);
 
         components::init_test();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }
@@ -701,23 +711,25 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use chrono::Utc;
+    use futures::stream;
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
     use super::*;
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
             logs::InfluxDbLogsConfig,
-            test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+            test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
         test_util::components::{self, HTTP_SINK_TAGS},
     };
-    use chrono::Utc;
-    use futures::stream;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
-        onboarding_v2().await;
+        let endpoint = address_v2();
+        onboarding_v2(&endpoint).await;
 
         let measure = format!("vector-{}", Utc::now().timestamp_nanos());
 
@@ -726,7 +738,7 @@ mod integration_tests {
         let config = InfluxDbLogsConfig {
             namespace: None,
             measurement: Some(measure.clone()),
-            endpoint: "http://localhost:9999".to_string(),
+            endpoint: endpoint.clone(),
             tags: Default::default(),
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDb2Settings {
@@ -756,7 +768,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        components::run_sink_events(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -770,7 +782,7 @@ mod integration_tests {
             .unwrap();
 
         let res = client
-            .post("http://localhost:9999/api/v2/query?org=my-org")
+            .post(format!("{}/api/v2/query?org=my-org", endpoint))
             .json(&body)
             .header("accept", "application/json")
             .header("Authorization", "Token my-token")

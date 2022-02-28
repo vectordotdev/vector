@@ -1,11 +1,12 @@
 #![cfg(test)]
 
-use crate::{
-    event::{Event, LogEvent},
-    transforms::Transform,
-};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+
+use crate::{
+    event::{Event, LogEvent},
+    transforms::{OutputBuffer, Transform},
+};
 
 /// Build a log event for test purposes.
 ///
@@ -34,7 +35,7 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event_with_byte_message(
+pub(crate) fn make_log_event_with_byte_message(
     message: Bytes,
     timestamp: &str,
     stream: &str,
@@ -70,11 +71,11 @@ where
         let mut parser = (builder)();
         let parser = parser.as_function();
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         parser.transform(&mut output, input);
 
         let expected = expected.into_iter().map(Event::Log).collect::<Vec<_>>();
 
-        shared::assert_event_data_eq!(expected, output, "expected left, actual right");
+        vector_common::assert_event_data_eq!(output, expected, "expected left, actual right");
     }
 }

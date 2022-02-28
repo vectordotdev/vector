@@ -343,7 +343,7 @@ make test-integration-<name>
 ### Blackbox tests
 
 Vector also offers blackbox testing via
-[Vector's test harness](https://github.com/timberio/vector-test-harness). This
+[Vector's test harness](https://github.com/vectordotdev/vector-test-harness). This
 is a complex testing suite that tests Vector's performance in real-world
 environments. It is typically used for benchmarking, but also correctness
 testing.
@@ -422,7 +422,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make bench` command. In addition, Vector
-maintains a full [test harness](https://github.com/timberio/vector-test-harness)
+maintains a full [test harness](https://github.com/vectordotdev/vector-test-harness)
 for complex end-to-end integration and performance testing.
 
 ## Profiling

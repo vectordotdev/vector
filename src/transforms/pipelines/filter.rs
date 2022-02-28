@@ -1,10 +1,13 @@
-use super::expander::ExpanderConfig;
-use crate::conditions::{not::NotConfig, AnyCondition};
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::transforms::filter::FilterConfig;
-use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use super::expander::ExpanderConfig;
+use crate::{
+    conditions::{not::NotConfig, AnyCondition},
+    config::{ExpandType, Input, Output, TransformConfig, TransformContext},
+    schema,
+    transforms::{filter::FilterConfig, Transform},
+};
 
 /// This transform is made to do the following trick
 ///
@@ -58,12 +61,12 @@ impl TransformConfig for PipelineFilterConfig {
         Ok(Some((result, ExpandType::Parallel { aggregates: true })))
     }
 
-    fn input_type(&self) -> DataType {
-        self.inner.input_type()
+    fn input(&self) -> Input {
+        self.inner.input()
     }
 
-    fn output_type(&self) -> DataType {
-        self.inner.output_type()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.inner.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {

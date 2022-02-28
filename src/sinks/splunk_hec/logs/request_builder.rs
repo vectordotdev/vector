@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
+use bytes::Bytes;
 use vector_core::event::{EventFinalizers, Finalizable};
 
+use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
     util::{encoding::EncodingConfig, Compression, RequestBuilder},
 };
-
-use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 
 pub struct HecLogsRequestBuilder {
     pub compression: Compression,
@@ -18,7 +18,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecLogsReque
     type Metadata = (usize, usize, EventFinalizers, Option<Arc<str>>);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = EncodingConfig<HecLogsEncoder>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = HecRequest;
     type Error = std::io::Error;
 

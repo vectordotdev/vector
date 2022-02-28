@@ -1,17 +1,20 @@
-use crate::event::PathComponent;
-use crate::event::{EventFinalizers, Finalizable, LogEvent};
-use crate::internal_events::DatadogEventsProcessed;
-use crate::sinks::util::encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat};
-use crate::sinks::util::{Compression, ElementCount, RequestBuilder};
-use std::io;
-use std::sync::Arc;
+use bytes::Bytes;
+use std::{io, sync::Arc};
 
-use vector_core::buffers::Ackable;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Ackable, ByteSizeOf};
+
+use crate::{
+    event::{EventFinalizers, Finalizable, LogEvent, PathComponent},
+    internal_events::DatadogEventsProcessed,
+    sinks::util::{
+        encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
+        Compression, ElementCount, RequestBuilder,
+    },
+};
 
 #[derive(Clone)]
 pub struct DatadogEventsRequest {
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub metadata: Metadata,
 }
 
@@ -62,7 +65,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     type Metadata = Metadata;
     type Events = LogEvent;
     type Encoder = EncodingConfigFixed<StandardJsonEncoding>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = DatadogEventsRequest;
     type Error = io::Error;
 

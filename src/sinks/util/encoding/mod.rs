@@ -57,30 +57,28 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+#[cfg(feature = "codecs")]
+mod adapter;
 mod codec;
-
-pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
-
 mod config;
-
-pub use config::EncodingConfig;
-
 mod fixed;
-
-pub use fixed::EncodingConfigFixed;
-
 mod with_default;
 
-pub use codec::as_tracked_write;
-pub use with_default::EncodingConfigWithDefault;
+use std::{fmt::Debug, io, sync::Arc};
 
-use crate::event::{LogEvent, MaybeAsLogMut};
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, LogEvent, MaybeAsLogMut, PathComponent, PathIter, Value},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io, sync::Arc};
+
+#[cfg(feature = "codecs")]
+pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
+pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use config::EncodingConfig;
+pub use fixed::EncodingConfigFixed;
+pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -89,6 +87,17 @@ pub trait Encoder<T> {
     ///
     /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
+
+    /// Encodes the input into a String.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
+    fn encode_input_to_string(&self, input: T) -> io::Result<String> {
+        let mut buffer = vec![];
+        self.encode_input(input, &mut buffer)?;
+        Ok(String::from_utf8_lossy(&buffer).to_string())
+    }
 }
 
 impl<E, T> Encoder<T> for Arc<E>
@@ -263,12 +272,32 @@ pub enum TimestampFormat {
     Rfc3339,
 }
 
+fn deserialize_path_components<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<Vec<PathComponent<'static>>>>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let fields: Option<Vec<String>> = serde::de::Deserialize::deserialize(deserializer)?;
+    Ok(fields.map(|fields| {
+        fields
+            .iter()
+            .map(|only| {
+                PathIter::new(only)
+                    .map(|component| component.into_static())
+                    .collect()
+            })
+            .collect()
+    }))
+}
+
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+    use vector_common::btreemap;
+
     use super::*;
     use crate::config::log_schema;
-    use indoc::indoc;
-    use shared::btreemap;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {

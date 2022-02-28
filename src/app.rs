@@ -1,3 +1,17 @@
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+
+use futures::StreamExt;
+use once_cell::race::OnceNonZeroUsize;
+use tokio::{
+    runtime::{self, Runtime},
+    sync::mpsc,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
+#[cfg(windows)]
+use crate::service;
+#[cfg(feature = "api")]
+use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, graph, heartbeat, list, metrics,
@@ -5,21 +19,10 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::mpsc,
-};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
-#[cfg(windows)]
-use crate::service;
+pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
@@ -44,7 +47,12 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
-        let opts = Opts::get_matches();
+        let opts = Opts::get_matches().map_err(|error| {
+            // Printing to stdout/err can itself fail; ignore it.
+            let _ = error.print();
+            exitcode::USAGE
+        })?;
+
         Self::prepare_from_opts(opts)
     }
 
@@ -68,6 +76,7 @@ impl Application {
                     "runtime=trace".to_owned(),
                     "tokio=trace".to_owned(),
                     format!("rdkafka={}", level),
+                    format!("buffers={}", level),
                 ]
                 .join(","),
                 #[cfg(not(feature = "tokio-console"))]
@@ -78,6 +87,7 @@ impl Application {
                     format!("file_source={}", level),
                     "tower_limit=trace".to_owned(),
                     format!("rdkafka={}", level),
+                    format!("buffers={}", level),
                 ]
                 .join(","),
             });
@@ -110,6 +120,9 @@ impl Application {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             } else {
+                WORKER_THREADS
+                    .set(NonZeroUsize::new(threads).expect("already checked"))
+                    .expect("double thread initialization");
                 rt_builder.worker_threads(threads);
             }
         }
@@ -240,12 +253,13 @@ impl Application {
             #[cfg(feature = "api")]
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
+                use std::sync::{Arc, atomic::AtomicBool};
                 emit!(&ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), topology.watch()))
+                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

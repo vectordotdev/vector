@@ -73,7 +73,7 @@ the internal types without needing to know the implementation details.
 
 ```rust
 pub type LogVec = SmallVec<[LogEvent; 1]>;
-pub type MetricVec = SmallVec<[LogEvent; 1]>;
+pub type MetricVec = SmallVec<[Metric; 1]>;
 
 pub enum EventVec {
     Logs(LogVec),
@@ -95,8 +95,8 @@ expected to be trivial wrappers around existing iterators.
 
 ```rust
 trait EventContainer: ByteSizeOf {
-    type Iter;
-    fn into_events(self) -> Self::EventIter;
+    type Iter: Iterator<Item = Event>;
+    fn into_events(self) -> Self::Iter;
 }
 
 impl EventContainer for Event { … }

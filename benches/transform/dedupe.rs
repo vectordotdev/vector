@@ -1,14 +1,14 @@
-use crate::common::{consume, FixedLogStream};
 use core::fmt;
-use criterion::BenchmarkId;
+use std::{num::NonZeroUsize, time::Duration};
+
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
-    Throughput,
+    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    SamplingMode, Throughput,
 };
-use std::num::NonZeroUsize;
-use std::time::Duration;
 use vector::transforms::dedupe::{CacheConfig, Dedupe, DedupeConfig, FieldMatchConfig};
 use vector_core::transform::Transform;
+
+use crate::common::{consume, FixedLogStream};
 
 #[derive(Debug)]
 struct Param {
@@ -91,11 +91,11 @@ fn dedupe(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let dedupe =
-                        Transform::task(Dedupe::new(param.dedupe_config.clone())).into_task();
+                        Transform::event_task(Dedupe::new(param.dedupe_config.clone())).into_task();
                     (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {
-                    let output = dedupe.transform(input);
+                    let output = dedupe.transform_events(input);
                     consume(output)
                 },
                 BatchSize::SmallInput,

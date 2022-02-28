@@ -60,14 +60,20 @@ mod expander;
 mod filter;
 mod router;
 
-use crate::conditions::AnyCondition;
-use crate::config::{
-    DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
-};
-use crate::transforms::Transform;
+use std::collections::HashSet;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::{
+    conditions::AnyCondition,
+    config::{
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    schema,
+    transforms::Transform,
+};
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -79,6 +85,7 @@ inventory::submit! {
 pub struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
+    #[serde(default)]
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
@@ -237,12 +244,12 @@ impl TransformConfig for PipelinesConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -290,17 +297,18 @@ impl GenerateConfig for PipelinesConfig {
 #[cfg(test)]
 impl PipelinesConfig {
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
+    use indexmap::IndexMap;
+
     use super::{GenerateConfig, PipelinesConfig};
     use crate::config::{ComponentKey, TransformOuter};
-    use indexmap::IndexMap;
-    use std::collections::HashSet;
 
     #[test]
     fn generate_config() {

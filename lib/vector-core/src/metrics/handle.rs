@@ -1,6 +1,12 @@
+use std::{
+    slice,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
+};
+
 use metrics::GaugeValue;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::{slice, sync::Arc};
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -206,7 +212,7 @@ impl Gauge {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)] // see https://github.com/timberio/vector/pull/7341#discussion_r626693005
+    #[allow(clippy::needless_pass_by_value)] // see https://github.com/vectordotdev/vector/pull/7341#discussion_r626693005
     pub(crate) fn record(&self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
@@ -227,8 +233,9 @@ impl Gauge {
 
 #[cfg(test)]
 mod test {
-    use crate::metrics::handle::{Counter, Histogram};
     use quickcheck::{QuickCheck, TestResult};
+
+    use crate::metrics::handle::{Counter, Histogram};
 
     // Adapted from https://users.rust-lang.org/t/assert-eq-for-float-numbers/7034/4?u=blt
     fn nearly_equal(a: f64, b: f64) -> bool {

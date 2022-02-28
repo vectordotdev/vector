@@ -1,10 +1,11 @@
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt,
+};
+
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

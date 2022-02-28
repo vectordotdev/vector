@@ -1,21 +1,25 @@
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::sinks::{Healthcheck, VectorSink};
-
-use crate::http::HttpClient;
-use crate::sinks::datadog::events::service::{DatadogEventsResponse, DatadogEventsService};
-use crate::sinks::datadog::events::sink::DatadogEventsSink;
-use crate::sinks::datadog::{
-    get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
-};
-use crate::sinks::util::http::HttpStatusRetryLogic;
-use crate::sinks::util::ServiceBuilderExt;
-use crate::sinks::util::TowerRequestConfig;
-use crate::tls::TlsConfig;
 use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
+
+use crate::{
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{
+            events::{
+                service::{DatadogEventsResponse, DatadogEventsService},
+                sink::DatadogEventsSink,
+            },
+            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+        },
+        util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
+        Healthcheck, VectorSink,
+    },
+    tls::TlsConfig,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -27,7 +31,7 @@ pub struct DatadogEventsConfig {
     pub default_api_key: String,
 
     // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
-    pub tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsConfig>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -80,7 +84,7 @@ impl DatadogEventsConfig {
             acker: cx.acker(),
         };
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }
 
@@ -95,12 +99,16 @@ impl SinkConfig for DatadogEventsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_events"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

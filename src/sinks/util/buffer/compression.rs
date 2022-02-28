@@ -1,6 +1,7 @@
+use std::fmt;
+
 use serde::{de, ser};
 use serde_json::Value;
-use std::fmt;
 
 pub const GZIP_NONE: u32 = 0;
 pub const GZIP_FAST: u32 = 1;

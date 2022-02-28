@@ -1,5 +1,6 @@
-use super::{err_event_too_large, Batch, BatchSize, PushResult};
 use bytes::Bytes;
+
+use super::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub trait EncodedLength {
     fn encoded_length(&self) -> usize;

@@ -1,16 +1,26 @@
-use crate::expression::{
-    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
 };
-use crate::parser::Node;
-use crate::value::Kind;
-use crate::{Span, Value};
+
 use diagnostic::{DiagnosticError, Label, Note};
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
+use value::kind::Collection;
+
+use crate::{
+    expression::{
+        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+    },
+    parser::Node,
+    value::{kind, Kind},
+    vm::VmArgumentList,
+    Context, ExpressionError, Span, Value,
+};
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type CompiledArgument =
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
 
-pub trait Function: Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -53,6 +63,31 @@ pub trait Function: Sync + fmt::Debug {
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }
+
+    /// Implement this function if you need to manipulate and store any function parameters
+    /// at compile time.
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _info: &FunctionCompileContext,
+        _name: &str,
+        _expr: Option<&Expr>,
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+        Ok(None)
+    }
+
+    /// This function is called by the VM.
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        _args: &mut VmArgumentList,
+    ) -> Result<Value, ExpressionError> {
+        Err(ExpressionError::Error {
+            message: "unimplemented".to_string(),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        })
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -93,8 +128,49 @@ pub struct Parameter {
 }
 
 impl Parameter {
+    #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        Kind::new(self.kind)
+        let mut kind = Kind::empty();
+
+        let n = self.kind;
+
+        if (n & kind::BYTES) == kind::BYTES {
+            kind.add_bytes();
+        }
+
+        if (n & kind::INTEGER) == kind::INTEGER {
+            kind.add_integer();
+        }
+
+        if (n & kind::FLOAT) == kind::FLOAT {
+            kind.add_float();
+        }
+
+        if (n & kind::BOOLEAN) == kind::BOOLEAN {
+            kind.add_boolean();
+        }
+
+        if (n & kind::OBJECT) == kind::OBJECT {
+            kind.add_object(Collection::any());
+        }
+
+        if (n & kind::ARRAY) == kind::ARRAY {
+            kind.add_array(Collection::any());
+        }
+
+        if (n & kind::TIMESTAMP) == kind::TIMESTAMP {
+            kind.add_timestamp();
+        }
+
+        if (n & kind::REGEX) == kind::REGEX {
+            kind.add_regex();
+        }
+
+        if (n & kind::NULL) == kind::NULL {
+            kind.add_null();
+        }
+
+        kind
     }
 }
 
@@ -117,7 +193,7 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
+                    match var.value().unwrap().clone().into() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -271,7 +347,7 @@ impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
         Self(
             map.into_iter()
-                .map(|(k, v)| (k, v.into_expr()))
+                .map(|(k, v)| (k, v.into()))
                 .collect::<HashMap<_, _>>(),
         )
     }
@@ -362,7 +438,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid enum variant for argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
@@ -393,7 +469,7 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
         }
@@ -407,5 +483,49 @@ impl diagnostic::DiagnosticError for Error {
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parameter_kind() {
+        struct TestCase {
+            parameter_kind: u16,
+            kind: Kind,
+        }
+
+        for (
+            title,
+            TestCase {
+                parameter_kind,
+                kind,
+            },
+        ) in HashMap::from([
+            (
+                "bytes",
+                TestCase {
+                    parameter_kind: kind::BYTES,
+                    kind: Kind::bytes(),
+                },
+            ),
+            (
+                "integer",
+                TestCase {
+                    parameter_kind: kind::INTEGER,
+                    kind: Kind::integer(),
+                },
+            ),
+        ]) {
+            let parameter = Parameter {
+                keyword: "",
+                kind: parameter_kind,
+                required: false,
+            };
+
+            assert_eq!(parameter.kind(), kind, "{}", title);
+        }
     }
 }

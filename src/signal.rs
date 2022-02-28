@@ -1,6 +1,7 @@
-use super::config::ConfigBuilder;
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::{Stream, StreamExt};
+
+use super::config::ConfigBuilder;
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = mpsc::Sender<SignalTo>;
@@ -136,7 +137,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {

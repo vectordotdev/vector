@@ -1,6 +1,10 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
+
+use crate::{
+    expression::{Expr, Resolved},
+    vm::OpCode,
+    Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
@@ -38,9 +42,28 @@ impl Expression for Block {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the block.
-        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
 
         type_def.with_fallibility(fallible)
+    }
+
+    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        let mut jumps = Vec::new();
+
+        for expr in &self.inner {
+            // Write each of the inner expressions
+            expr.compile_to_vm(vm)?;
+
+            // If there is an error, we need to jump to the end of the block.
+            jumps.push(vm.emit_jump(OpCode::JumpIfErr));
+        }
+
+        // Update all the jumps to jump to the end of the block.
+        for jump in jumps {
+            vm.patch_jump(jump);
+        }
+
+        Ok(())
     }
 }
 

@@ -70,5 +70,14 @@ components: sinks: _splunk_hec: {
 				(5 minutes) per `ackID`.
 				"""
 		}
+		splunk_channel: {
+			title: "Splunk HEC Channel Header"
+			body:  """
+				Splunk HEC requests will include the `X-Splunk-Request-Channel` header with a randomly generated UUID as the channel value.
+				Splunk requires [a channel value](\(urls.splunk_hec_channel_header)) when using indexer acknowledgements, but also accepts
+				channel values when indexer acknowledgements is disabled. Thus, this channel value is included regardless of indexer
+				acknowledgement settings.
+				"""
+		}
 	}
 }

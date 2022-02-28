@@ -1,8 +1,12 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
+    event::Event,
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum EventType {
@@ -37,7 +41,7 @@ impl EventType {
 /// and then propagate them to the series of pipeline.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventRouterConfig {
+pub(super) struct EventRouterConfig {
     filter: EventType,
     // This inner field contains a list of pipelines that will be expanded.
     inner: Option<Box<dyn TransformConfig>>,
@@ -84,12 +88,12 @@ impl TransformConfig for EventRouterConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        self.filter.data_type()
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(self.filter.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -111,12 +115,12 @@ impl TransformConfig for EventFilterConfig {
         Ok(Transform::function(self.clone()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        self.inner.data_type()
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(self.inner.data_type())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -125,7 +129,7 @@ impl TransformConfig for EventFilterConfig {
 }
 
 impl FunctionTransform for EventFilterConfig {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.inner.validate(&event) {
             output.push(event);
         }

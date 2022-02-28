@@ -16,7 +16,6 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: false
 		exposes: {
 			tls: {
@@ -113,6 +112,17 @@ components: sinks: prometheus_exporter: {
 				default: [0.5, 0.75, 0.9, 0.95, 0.99]
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
 			}
+		}
+		distributions_as_summaries: {
+			common:      false
+			description: """
+				Whether or not to render [distributions](\(urls.vector_data_model)/metric#distribution) as a
+				[histogram](\(urls.vector_data_model)/metric#histogram) or
+				[summary](\(urls.vector_data_model)/metric#summary), which map one-to-one with the Prometheus
+				metric types of the same name.
+				"""
+			required:    false
+			type: bool: default: false
 		}
 	}
 

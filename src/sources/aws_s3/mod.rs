@@ -1,12 +1,5 @@
-use super::util::MultilineConfig;
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::{self, RegionOrEndpoint};
-use crate::config::AcknowledgementsConfig;
-use crate::serde::bool_or_struct;
-use crate::{
-    config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    line_agg,
-};
+use std::convert::TryInto;
+
 use async_compression::tokio::bufread;
 use futures::{stream, stream::StreamExt};
 use rusoto_core::Region;
@@ -14,7 +7,20 @@ use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
+
+use super::util::MultilineConfig;
+use crate::{
+    aws::{
+        auth::AwsAuthentication,
+        rusoto::{self, RegionOrEndpoint},
+    },
+    config::{
+        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    line_agg,
+    serde::bool_or_struct,
+};
 
 pub mod sqs;
 
@@ -85,12 +91,16 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -102,13 +112,13 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
-        let region: Region = (&self.region).try_into().context(RegionParse {})?;
+        let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|| Client {})?;
+        let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
-            .context(Credentials {})?
+            .context(CredentialsSnafu {})?
             .into();
         let s3_client = S3Client::new_with(
             client.clone(),
@@ -133,7 +143,7 @@ impl AwsS3Config {
                     multiline,
                 )
                 .await
-                .context(Initialize {})
+                .context(InitializeSnafu {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
@@ -244,8 +254,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use super::{s3_object_decoder, Compression};
     use tokio::io::AsyncReadExt;
+
+    use super::{s3_object_decoder, Compression};
 
     #[test]
     fn determine_compression() {
@@ -299,22 +310,30 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::{sqs, AwsS3Config, Compression, Strategy};
-    use crate::aws::rusoto::RegionOrEndpoint;
-    use crate::{
-        config::{SourceConfig, SourceContext},
-        event::EventStatus::{self, *},
-        line_agg,
-        sources::util::MultilineConfig,
-        test_util::{
-            collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
-        },
-        Pipeline,
-    };
+    use std::fs::File;
+    use std::io::{self, BufRead};
+    use std::path::Path;
+
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
     use rusoto_sqs::{Sqs, SqsClient};
+
+    use super::{sqs, AwsS3Config, Compression, Strategy};
+    use crate::{
+        aws::rusoto::RegionOrEndpoint,
+        config::{SourceConfig, SourceContext},
+        event::EventStatus::{self, *},
+        line_agg,
+        sources::util::MultilineConfig,
+        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
+        SourceSender,
+    };
+
+    fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
+        let file = io::BufReader::new(File::open(path).unwrap());
+        file.lines().map(|x| x.unwrap()).collect()
+    }
 
     #[tokio::test]
     async fn s3_process_message() {
@@ -338,7 +357,7 @@ mod integration_tests {
     async fn s3_process_message_special_characters() {
         trace_init();
 
-        let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
+        let key = format!("special:{}", uuid::Uuid::new_v4());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
@@ -396,7 +415,7 @@ mod integration_tests {
 
         trace_init();
 
-        let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
+        let logs = lines_from_plaintext("tests/data/multipart-zst.log");
 
         let buffer = {
             let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
@@ -471,9 +490,13 @@ mod integration_tests {
         .await;
     }
 
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
+
     fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
@@ -522,8 +545,8 @@ mod integration_tests {
 
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
-        let (tx, rx) = Pipeline::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
+        let cx = SourceContext::new_test(tx, None);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
 
@@ -624,7 +647,7 @@ mod integration_tests {
     fn s3_client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         S3Client::new(region)
@@ -633,7 +656,7 @@ mod integration_tests {
     fn sqs_client() -> SqsClient {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         SqsClient::new(region)

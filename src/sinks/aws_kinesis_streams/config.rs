@@ -1,25 +1,32 @@
-use std::convert::TryInto;
-use std::num::NonZeroU64;
+use std::{convert::TryInto, num::NonZeroU64};
 
-use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::sinks::aws_kinesis_streams::service::KinesisService;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
 use serde::{Deserialize, Serialize};
-
-use super::service::KinesisResponse;
-use crate::aws::rusoto;
-use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequestBuilder;
-use crate::sinks::aws_kinesis_streams::sink::KinesisSink;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::ServiceBuilderExt;
-use crate::sinks::{Healthcheck, VectorSink};
 use snafu::Snafu;
 use tower::ServiceBuilder;
+
+use super::service::KinesisResponse;
+use crate::{
+    aws::{
+        rusoto,
+        rusoto::{AwsAuthentication, RegionOrEndpoint},
+    },
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    sinks::{
+        aws_kinesis_streams::{
+            request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
+        },
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            retries::RetryLogic,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -59,6 +66,7 @@ pub struct KinesisSinkConfig {
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -91,7 +99,8 @@ impl KinesisSinkConfig {
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -131,15 +140,19 @@ impl SinkConfig for KinesisSinkConfig {
             request_builder,
             partition_key_field: self.partition_key_field.clone(),
         };
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_streams"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

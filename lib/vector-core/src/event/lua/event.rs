@@ -1,5 +1,6 @@
-use crate::event::{Event, LogEvent, Metric};
 use mlua::prelude::*;
+
+use crate::event::{Event, LogEvent, Metric};
 
 impl<'a> ToLua<'a> for Event {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
@@ -8,6 +9,13 @@ impl<'a> ToLua<'a> for Event {
         match self {
             Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
             Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+            Event::Trace(_) => {
+                return Err(LuaError::ToLuaConversionError {
+                    from: "Event",
+                    to: "table",
+                    message: Some("Trace are not supported".to_string()),
+                })
+            }
         }
         Ok(LuaValue::Table(table))
     }
@@ -139,7 +147,7 @@ mod test {
         ));
 
         let event = Lua::new().load(lua_event).eval::<Event>().unwrap();
-        shared::assert_event_data_eq!(event, expected);
+        vector_common::assert_event_data_eq!(event, expected);
     }
 
     #[test]

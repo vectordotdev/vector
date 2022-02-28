@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
+use vrl::prelude::*;
+
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
-use std::collections::BTreeMap;
-use vrl_core::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -123,7 +125,7 @@ impl Expression for GetEnrichmentTableRecordFn {
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Array,
+                    expected: Kind::array(Collection::any()),
                 }),
             })
             .transpose()?;
@@ -154,21 +156,21 @@ impl Expression for GetEnrichmentTableRecordFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .add_object::<(), Kind>(map! { (): Kind::all() })
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use chrono::{TimeZone as _, Utc};
+    use vector_common::{btreemap, TimeZone};
+
     use super::*;
     use crate::test_util::{
         get_table_registry, get_table_registry_with_tables, DummyEnrichmentTable,
     };
-    use chrono::{TimeZone as _, Utc};
-    use shared::{btreemap, TimeZone};
-    use std::sync::{Arc, Mutex};
 
     #[test]
     fn find_table_row() {
@@ -186,7 +188,7 @@ mod tests {
 
         let tz = TimeZone::default();
         let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_core::state::Runtime::default();
+        let mut runtime_state = vrl::state::Runtime::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
         registry.finish_load();

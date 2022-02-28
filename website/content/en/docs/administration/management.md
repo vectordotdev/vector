@@ -230,7 +230,7 @@ Running Vector instances accept the IPC [signals](#signals) and produce the [exi
 
 [apt]: /docs/setup/installation/package-managers/apt
 [brew_services]: https://github.com/Homebrew/homebrew-services
-[bug]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
+[bug]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+bug
 [configuration]: /docs/reference/configuration
 [docker]: /docs/setup/installation/platforms/docker
 [dpkg]: /docs/setup/installation/package-managers/dpkg

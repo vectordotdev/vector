@@ -1,4 +1,4 @@
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetMetadataField;
@@ -55,6 +55,6 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes().add_null()
+        TypeDef::bytes().add_null().infallible()
     }
 }

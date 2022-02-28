@@ -1,7 +1,27 @@
-use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::{self, RegionOrEndpoint};
+use std::{
+    collections::BTreeMap,
+    convert::TryInto,
+    num::NonZeroU64,
+    task::{Context, Poll},
+};
+
+use chrono::{DateTime, SecondsFormat, Utc};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
+use rusoto_cloudwatch::{
+    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
+};
+use rusoto_core::{Region, RusotoError};
+use serde::{Deserialize, Serialize};
+use tower::Service;
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 use crate::{
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    aws::{
+        auth::AwsAuthentication,
+        rusoto::{self, RegionOrEndpoint},
+    },
+    config::{Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -13,24 +33,8 @@ use crate::{
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
-use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use rusoto_cloudwatch::{
-    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
-};
-use rusoto_core::{Region, RusotoError};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    convert::TryInto,
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tower::Service;
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
@@ -59,6 +63,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -84,12 +89,16 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_cloudwatch_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -123,7 +132,8 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -157,7 +167,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event).map(|mut metric| {
+                    normalizer.apply(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -170,7 +180,7 @@ impl CloudWatchMetricsSvc {
                 })
             });
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
@@ -221,10 +231,11 @@ impl CloudWatchMetricsSvc {
     }
 }
 
+#[derive(Default)]
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
@@ -291,10 +302,11 @@ fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn generate_config() {
@@ -438,19 +450,24 @@ mod tests {
 #[cfg(feature = "aws-cloudwatch-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use chrono::offset::TimeZone;
+    use futures::StreamExt;
+    use rand::seq::SliceRandom;
+
     use super::*;
     use crate::{
-        event::metric::StatisticKind,
-        event::{Event, MetricKind},
+        event::{metric::StatisticKind, Event, MetricKind},
         test_util::random_string,
     };
-    use chrono::offset::TimeZone;
-    use rand::seq::SliceRandom;
+
+    fn cloudwatch_address() -> String {
+        std::env::var("CLOUDWATCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
             ..Default::default()
         }
     }
@@ -519,7 +536,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 
@@ -548,7 +565,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events);
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 }

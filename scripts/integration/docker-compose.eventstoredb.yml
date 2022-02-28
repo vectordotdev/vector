@@ -1,0 +1,41 @@
+version: "2"
+
+services:
+  eventstoredb:
+    image: eventstore/eventstore
+    command: --insecure --stats-period-sec=1
+    network_mode: host
+    volumes:
+      - ${PWD}/tests/data:/etc/vector:ro
+
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    network_mode: host
+    command:
+      - "cargo"
+      - "test"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "eventstoredb_metrics-integration-tests"
+      - "--lib"
+      - "::eventstoredb_metrics::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - eventstoredb
+    volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - ${PWD}:/code
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
+

@@ -1,11 +1,14 @@
-use super::EventEncodingType;
-use crate::config::OutputId;
-use crate::event::{self, Value};
-
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+use vector_common::encode_logfmt;
 
-#[derive(Debug)]
+use super::EventEncodingType;
+use crate::{
+    config::OutputId,
+    event::{self, Value},
+};
+
+#[derive(Debug, Clone)]
 pub struct Log {
     output_id: OutputId,
     event: event::LogEvent,
@@ -50,6 +53,8 @@ impl Log {
                 .expect("JSON serialization of log event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
+            EventEncodingType::Logfmt => encode_logfmt::to_string(self.event.as_map())
+                .expect("logfmt serialization of log event failed. Please report."),
         }
     }
 

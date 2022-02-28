@@ -1,3 +1,10 @@
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 mod util;
 
 #[cfg(feature = "append")]
@@ -611,7 +618,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
-        // https://github.com/timberio/vector/issues/5607
+        // https://github.com/vectordotdev/vector/issues/5607
         //#[cfg(feature = "only_fields")]
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]

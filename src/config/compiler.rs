@@ -1,6 +1,10 @@
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
-use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
+
+use indexmap::{IndexMap, IndexSet};
+
+use super::{
+    builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
+};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -30,6 +34,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(output_errors) = validation::check_outputs(&builder) {
+        errors.extend(output_errors);
+    }
+
     #[cfg(feature = "datadog-pipelines")]
     let version = Some(builder.sha256_hash());
 
@@ -40,6 +48,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         global,
         #[cfg(feature = "api")]
         api,
+        schema,
         #[cfg(feature = "datadog-pipelines")]
         datadog,
         healthchecks,
@@ -83,12 +92,17 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, transform.with_inputs(inputs))
         })
         .collect();
+    let tests = tests
+        .into_iter()
+        .map(|test| test.resolve_outputs(&graph))
+        .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
-        let config = Config {
+        let mut config = Config {
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             version,
@@ -100,6 +114,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             expansions,
         };
+
+        config.propagate_acknowledgements()?;
 
         let warnings = validation::warnings(&config);
 
@@ -139,21 +155,26 @@ pub(super) fn expand_macros(
 }
 
 /// Expand globs in input lists
-fn expand_globs(config: &mut ConfigBuilder) {
+pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
-        .keys()
-        .chain(config.transforms.keys())
-        .map(ToString::to_string)
-        .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.named_outputs().into_iter().map(move |port| {
-                OutputId {
-                    component: key.clone(),
-                    port: Some(port),
-                }
-                .to_string()
+        .iter()
+        .flat_map(|(key, s)| {
+            s.inner.outputs().into_iter().map(|output| OutputId {
+                component: key.clone(),
+                port: output.port,
             })
+        })
+        .chain(config.transforms.iter().flat_map(|(key, t)| {
+            t.inner
+                .outputs(&schema::Definition::empty())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         }))
+        .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
 
     for (id, transform) in config.transforms.iter_mut() {
@@ -207,18 +228,19 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 
 #[cfg(test)]
 mod test {
+    use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
+
     use super::*;
     use crate::{
         config::{
-            DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
-            TransformContext,
+            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
         transforms::Transform,
     };
-    use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MockSourceConfig;
@@ -240,8 +262,12 @@ mod test {
             "mock"
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self) -> Vec<Output> {
+            vec![Output::default(DataType::all())]
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
         }
     }
 
@@ -256,12 +282,12 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::all()
         }
 
-        fn output_type(&self) -> DataType {
-            DataType::Any
+        fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+            vec![Output::default(DataType::all())]
         }
     }
 
@@ -276,8 +302,12 @@ mod test {
             "mock"
         }
 
-        fn input_type(&self) -> DataType {
-            DataType::Any
+        fn input(&self) -> Input {
+            Input::all()
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
         }
     }
 

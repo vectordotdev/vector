@@ -2,7 +2,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AddFieldsFieldOverwritten<'a> {
-    pub field: &'a str,
+    pub(crate) field: &'a str,
 }
 
 impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {

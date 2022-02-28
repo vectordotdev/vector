@@ -1,13 +1,17 @@
-use crate::lex::Error;
+use std::{
+    collections::BTreeMap,
+    fmt,
+    hash::{Hash, Hasher},
+    iter::IntoIterator,
+    ops::Deref,
+    str::FromStr,
+};
+
 use diagnostic::Span;
 use lookup::LookupBuf;
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::iter::IntoIterator;
-use std::ops::Deref;
-use std::str::FromStr;
+
+use crate::lex::Error;
 
 // -----------------------------------------------------------------------------
 // node
@@ -211,7 +215,7 @@ pub enum Expr {
     FunctionCall(Node<FunctionCall>),
     Variable(Node<Ident>),
     Unary(Node<Unary>),
-    Abort(Node<()>),
+    Abort(Node<Abort>),
 }
 
 impl fmt::Debug for Expr {
@@ -228,7 +232,7 @@ impl fmt::Debug for Expr {
             FunctionCall(v) => format!("{:?}", v),
             Variable(v) => format!("{:?}", v),
             Unary(v) => format!("{:?}", v),
-            Abort(_) => "abort".to_owned(),
+            Abort(v) => format!("{:?}", v),
         };
 
         write!(f, "Expr({})", value)
@@ -249,7 +253,7 @@ impl fmt::Display for Expr {
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
-            Abort(_) => f.write_str("abort"),
+            Abort(v) => v.fmt(f),
         }
     }
 }
@@ -1070,6 +1074,33 @@ impl fmt::Display for Not {
 impl fmt::Debug for Not {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Not({:?})", self.1)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// abort
+// -----------------------------------------------------------------------------
+
+#[derive(Clone, PartialEq)]
+pub struct Abort {
+    pub message: Option<Box<Node<Expr>>>,
+}
+
+impl fmt::Display for Abort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(
+            &self
+                .message
+                .as_ref()
+                .map(|m| format!("abort: {}", m))
+                .unwrap_or_else(|| "abort".to_owned()),
+        )
+    }
+}
+
+impl fmt::Debug for Abort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Abort({:?})", self.message)
     }
 }
 

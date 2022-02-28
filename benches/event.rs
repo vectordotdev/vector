@@ -6,7 +6,7 @@ use vector::{
     event::{Event, LogEvent},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
-        FunctionTransform,
+        FunctionTransform, OutputBuffer,
     },
 };
 
@@ -98,15 +98,15 @@ fn create_event(json: Value) -> LogEvent {
     event.as_mut_log().insert(log_schema().message_key(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
-    let mut output = Vec::with_capacity(1);
+    let mut output = OutputBuffer::with_capacity(1);
     parser.transform(&mut output, event);
-    output.into_iter().next().unwrap().into_log()
+    output.into_events().next().unwrap().into_log()
 }
 
 criterion_group!(
     name = benches;
     // encapsulates inherent CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_event_create, benchmark_event_iterate
 );

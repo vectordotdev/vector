@@ -1,13 +1,5 @@
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequestBuilder;
-use crate::sinks::aws_kinesis_firehose::service::{KinesisResponse, KinesisService};
-use crate::sinks::aws_kinesis_firehose::sink::KinesisSink;
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::{
-    BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
-};
+use std::num::NonZeroU64;
+
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
@@ -15,12 +7,27 @@ use rusoto_firehose::{
     KinesisFirehoseClient, PutRecordBatchError,
 };
 use serde::{Deserialize, Serialize};
-use std::num::NonZeroU64;
-
-use crate::aws::rusoto;
-use crate::sinks::{Healthcheck, VectorSink};
 use snafu::Snafu;
 use tower::ServiceBuilder;
+
+use crate::{
+    aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
+    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    sinks::{
+        aws_kinesis_firehose::{
+            request_builder::KinesisRequestBuilder,
+            service::{KinesisResponse, KinesisService},
+            sink::KinesisSink,
+        },
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            retries::RetryLogic,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+};
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
@@ -49,6 +56,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -126,15 +134,19 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             service,
             request_builder,
         };
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_firehose"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -163,8 +175,9 @@ impl KinesisFirehoseSinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
 
-        let client = rusoto::client(proxy)?;
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

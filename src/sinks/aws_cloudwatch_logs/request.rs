@@ -1,4 +1,9 @@
-use super::CloudwatchError;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use futures::{future::BoxFuture, ready, FutureExt};
 use rusoto_core::{RusotoError, RusotoResult};
 use rusoto_logs::{
@@ -7,12 +12,9 @@ use rusoto_logs::{
     DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
     PutLogEventsRequest, PutLogEventsResponse,
 };
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
 use tokio::sync::oneshot;
+
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
 
 pub struct CloudwatchFuture {
     client: Client,

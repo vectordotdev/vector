@@ -1,14 +1,6 @@
-use crate::sinks::util::adaptive_concurrency::{
-    AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
-};
-use crate::sinks::util::retries::{FixedRetryPolicy, RetryLogic};
-pub use crate::sinks::util::service::concurrency::{concurrency_is_none, Concurrency};
-pub use crate::sinks::util::service::map::Map;
-use crate::sinks::util::service::map::MapLayer;
-use crate::sinks::util::sink::{Response, ServiceLogic};
-use crate::sinks::util::{Batch, BatchSink, Partition, PartitionBatchSink};
-use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Duration};
+
+use serde::{Deserialize, Serialize};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -17,14 +9,28 @@ use tower::{
     util::BoxService,
     Service, ServiceBuilder,
 };
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
+
+pub use crate::sinks::util::service::{
+    concurrency::{concurrency_is_none, Concurrency},
+    map::Map,
+};
+use crate::sinks::util::{
+    adaptive_concurrency::{
+        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+    },
+    retries::{FixedRetryPolicy, RetryLogic},
+    service::map::MapLayer,
+    sink::Response,
+    Batch, BatchSink, Partition, PartitionBatchSink,
+};
 
 mod concurrency;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
-pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
-pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
+pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
+pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -195,15 +201,14 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, RL, S, K, SL>(
+    pub fn partition_sink<B, RL, S, K>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-        service_logic: SL,
-    ) -> TowerPartitionSink<S, B, RL, K, SL>
+    ) -> TowerPartitionSink<S, B, RL, K>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -214,26 +219,23 @@ impl TowerRequestSettings {
         B::Input: Partition<K>,
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        PartitionBatchSink::new_with_logic(
+        PartitionBatchSink::new(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
-            service_logic,
         )
     }
 
-    pub fn batch_sink<B, RL, S, SL>(
+    pub fn batch_sink<B, RL, S>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-        service_logic: SL,
-    ) -> TowerBatchedSink<S, B, RL, SL>
+    ) -> TowerBatchedSink<S, B, RL>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -242,14 +244,12 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
         B: Batch,
         B::Output: Send + Clone + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        BatchSink::new_with_logic(
+        BatchSink::new(
             self.service(retry_logic, service),
             batch,
             batch_timeout,
             acker,
-            service_logic,
         )
     }
 
@@ -313,18 +313,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sinks::util::{
-        retries::{RetryAction, RetryLogic},
-        sink::StdServiceLogic,
-        BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
-    };
-    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use std::sync::{
         atomic::{AtomicBool, Ordering::AcqRel},
         Arc, Mutex,
     };
+
+    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use tokio::time::Duration;
+
+    use super::*;
+    use crate::sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -370,7 +371,7 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
@@ -398,7 +399,6 @@ mod tests {
             PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
             acker,
-            StdServiceLogic::default(),
         );
         sink.ordered();
 

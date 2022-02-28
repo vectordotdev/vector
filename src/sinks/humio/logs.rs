@@ -1,18 +1,21 @@
+use serde::{Deserialize, Serialize};
+
 use super::{host_key, Encoding};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::logs::config::HecLogsSinkConfig,
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     sinks::{
-        splunk_hec::common::{
-            acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+        splunk_hec::{
+            common::{
+                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+            },
+            logs::config::HecLogsSinkConfig,
         },
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsOptions,
 };
-use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -78,12 +81,16 @@ impl SinkConfig for HumioLogsConfig {
         self.build_hec_config().build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "humio_logs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -126,6 +133,12 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use chrono::{TimeZone, Utc};
+    use indoc::indoc;
+    use serde_json::{json, Value as JsonValue};
+    use std::{collections::HashMap, convert::TryFrom};
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
@@ -133,16 +146,15 @@ mod integration_tests {
         sinks::util::Compression,
         test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
-    use chrono::{TimeZone, Utc};
-    use indoc::indoc;
-    use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
 
-    // matches humio container address
-    const HOST: &str = "http://localhost:8080";
+    fn humio_address() -> String {
+        std::env::var("HUMIO_ADDRESS").unwrap_or_else(|_| "http://localhost:8080".into())
+    }
 
     #[tokio::test]
     async fn humio_insert_message() {
+        wait_ready().await;
+
         let cx = SinkContext::new_test();
 
         let repo = create_repository().await;
@@ -186,6 +198,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn humio_insert_source() {
+        wait_ready().await;
+
         let cx = SinkContext::new_test();
 
         let repo = create_repository().await;
@@ -213,6 +227,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn humio_type() {
+        wait_ready().await;
+
         let repo = create_repository().await;
 
         // sets type
@@ -268,7 +284,7 @@ mod integration_tests {
 
         HumioLogsConfig {
             token: token.to_string(),
-            endpoint: Some(HOST.to_string()),
+            endpoint: Some(humio_address()),
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
@@ -283,12 +299,32 @@ mod integration_tests {
         }
     }
 
+    async fn wait_ready() {
+        crate::test_util::retry_until(
+            || async {
+                reqwest::get(format!("{}/api/v1/status", humio_address()))
+                    .await
+                    .map_err(|err| err.to_string())
+                    .and_then(|res| {
+                        if res.status().is_success() {
+                            Ok(())
+                        } else {
+                            Err("server not ready...".into())
+                        }
+                    })
+            },
+            Duration::from_secs(1),
+            Duration::from_secs(30),
+        )
+        .await;
+    }
+
     /// create a new test humio repository to publish to
     async fn create_repository() -> HumioRepository {
         let client = reqwest::Client::builder().build().unwrap();
 
         // https://docs.humio.com/api/graphql/
-        let graphql_url = format!("{}/graphql", HOST);
+        let graphql_url = format!("{}/graphql", humio_address());
 
         let name = random_string(50);
 
@@ -338,7 +374,11 @@ mod integration_tests {
         let client = reqwest::Client::builder().build().unwrap();
 
         // https://docs.humio.com/api/using-the-search-api-with-humio
-        let search_url = format!("{}/api/v1/repositories/{}/query", HOST, repository_name);
+        let search_url = format!(
+            "{}/api/v1/repositories/{}/query",
+            humio_address(),
+            repository_name
+        );
         let search_query = format!(r#"message="{}""#, message);
 
         // events are not available to search API immediately

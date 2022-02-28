@@ -1,17 +1,18 @@
 #![allow(clippy::type_complexity)]
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use async_trait::async_trait;
-use futures::{future, FutureExt, Sink, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use async_trait::async_trait;
+use futures::{future, FutureExt, Sink, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
-    config::{self, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{self, Input, SinkConfig, SinkContext, SourceConfig, SourceContext},
     event::Event,
     sinks::{self, Healthcheck, VectorSink},
     sources,
@@ -26,17 +27,21 @@ struct PanicSink;
 impl SinkConfig for PanicSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Sink(Box::new(PanicSink)),
+            VectorSink::from_event_sink(PanicSink),
             future::ok(()).boxed(),
         ))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "panic"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -112,17 +117,21 @@ struct ErrorSink;
 impl SinkConfig for ErrorSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Sink(Box::new(ErrorSink)),
+            VectorSink::from_event_sink(ErrorSink),
             future::ok(()).boxed(),
         ))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "panic"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -198,12 +207,16 @@ impl SourceConfig for ErrorSourceConfig {
         Ok(Box::pin(future::err(())))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn outputs(&self) -> Vec<config::Output> {
+        vec![config::Output::default(config::DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "tcp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -259,12 +272,16 @@ impl SourceConfig for PanicSourceConfig {
         Ok(Box::pin(async { panic!() }))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn outputs(&self) -> Vec<config::Output> {
+        vec![config::Output::default(config::DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "tcp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

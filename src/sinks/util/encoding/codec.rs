@@ -1,10 +1,10 @@
 use std::io;
 
 use serde::{Deserialize, Serialize};
-use vector_core::{config::log_schema, event::Event};
+use vector_core::config::log_schema;
+use vector_core::event::{Event, LogEvent, TraceEvent};
 
 use super::Encoder;
-use crate::event::LogEvent;
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -168,6 +168,7 @@ impl Encoder<Event> for StandardJsonEncoding {
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
+            Event::Trace(trace) => self.encode_input(trace, writer),
         }
     }
 }
@@ -175,6 +176,14 @@ impl Encoder<Event> for StandardJsonEncoding {
 impl Encoder<LogEvent> for StandardJsonEncoding {
     fn encode_input(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
         as_tracked_write(writer, &log, |writer, item| {
+            serde_json::to_writer(writer, item)
+        })
+    }
+}
+
+impl Encoder<TraceEvent> for StandardJsonEncoding {
+    fn encode_input(&self, trace: TraceEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        as_tracked_write(writer, &trace, |writer, item| {
             serde_json::to_writer(writer, item)
         })
     }
@@ -195,7 +204,7 @@ impl Encoder<Event> for StandardTextEncoding {
             Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
-                    .map(|v| v.as_bytes())
+                    .map(|v| v.coerce_to_bytes())
                     .unwrap_or_default();
                 writer.write_all(&message[..]).map(|()| message.len())
             }
@@ -203,6 +212,7 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
+            Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
         }
     }
 }

@@ -1,3 +1,4 @@
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -35,16 +36,16 @@ impl InternalEvent for JournaldInvalidRecordError {
             message = "Invalid record from journald, discarding.",
             error = ?self.error,
             text = %self.text,
-            stage = "processing",
-            error_type = "parse_failed",
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "stage" => "processing",
-            "error_type" => "parse_failed",
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
         );
         counter!("invalid_record_total", 1); // deprecated
         counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
