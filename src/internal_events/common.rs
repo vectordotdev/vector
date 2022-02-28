@@ -47,7 +47,7 @@ impl InternalEvent for HttpClientBytesReceived<'_> {
 
 #[derive(Debug)]
 pub struct EndpointBytesSent<'a> {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub protocol: &'a str,
     pub endpoint: &'a str,
 }

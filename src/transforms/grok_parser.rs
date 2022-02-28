@@ -32,7 +32,7 @@ pub struct GrokParserConfig {
     pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub(crate) types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
 }
 
