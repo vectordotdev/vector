@@ -89,7 +89,7 @@ impl TransformConfig for GrokParserConfig {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct GrokParser {
+pub(crate) struct GrokParser {
     #[derivative(Debug = "ignore")]
     pattern_built: Pattern,
     pattern: String,

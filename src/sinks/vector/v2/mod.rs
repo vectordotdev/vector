@@ -4,7 +4,7 @@ mod config;
 mod service;
 mod sink;
 
-pub use config::VectorConfig;
+pub(crate) use config::VectorConfig;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
