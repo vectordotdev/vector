@@ -19,7 +19,7 @@ use crate::{
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub(crate) host_tag: Option<String>,
-    pub timezone: Option<TimeZone>,
+    pub(crate) timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
