@@ -90,7 +90,7 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub aws_s3: Option<S3Config>,
     #[serde(default)]
-    pub azure_blob: Option<AzureBlobConfig>,
+    pub(crate) azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
     tls: Option<TlsOptions>,
