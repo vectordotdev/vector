@@ -17,7 +17,7 @@ pub enum NodeType {
 #[serde(rename_all = "camelCase")]
 pub struct CommandIsMaster {
     pub msg: Option<String>,
-    pub set_name: Option<String>,
+    pub(crate) set_name: Option<String>,
     pub hosts: Option<Vec<String>>,
 }
 
