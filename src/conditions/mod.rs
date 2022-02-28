@@ -6,7 +6,7 @@ mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(self) mod is_metric;
-pub mod not;
+pub(crate) mod not;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
