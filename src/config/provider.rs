@@ -16,7 +16,7 @@ pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
 dyn_clone::clone_trait_object!(ProviderConfig);
 
 /// Describes a provider plugin storing its type name and an optional example config.
-pub struct ProviderDescription {
+pub(crate) struct ProviderDescription {
     pub type_str: &'static str,
     example_value: fn() -> Option<Value>,
 }
