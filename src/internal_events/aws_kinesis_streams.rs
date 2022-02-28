@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AwsKinesisStreamsEventSent {
+pub(crate) struct AwsKinesisStreamsEventSent {
     pub byte_size: usize,
 }
 
