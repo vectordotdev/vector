@@ -24,7 +24,7 @@ pub struct S3Options {
     pub grant_full_control: Option<String>,
     pub grant_read: Option<String>,
     pub grant_read_acp: Option<String>,
-    pub grant_write_acp: Option<String>,
+    pub(crate) grant_write_acp: Option<String>,
     pub server_side_encryption: Option<S3ServerSideEncryption>,
     pub ssekms_key_id: Option<String>,
     pub storage_class: Option<S3StorageClass>,
