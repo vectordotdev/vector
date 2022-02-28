@@ -32,7 +32,7 @@ pub struct AwsSqsConfig {
 
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    pub framing: FramingConfig,
+    pub(crate) framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
