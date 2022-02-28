@@ -215,7 +215,7 @@ impl InternalEvent for SqsMessageDeleteBatchError {
 pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
     pub bucket: &'a str,
     pub key: &'a str,
-    pub kind: &'a str,
+     pub(crate) kind: &'a str,
     pub name: &'a str,
 }
 
