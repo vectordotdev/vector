@@ -69,7 +69,7 @@ impl GenerateConfig for LogdnaConfig {
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub enum Encoding {
+pub(crate) enum Encoding {
     #[derivative(Default)]
     Default,
 }
