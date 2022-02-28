@@ -56,7 +56,7 @@ where
     }
 }
 
-pub async fn complete_with_deadline_on_signal<F, S>(
+pub(crate) async fn complete_with_deadline_on_signal<F, S>(
     future: F,
     signal: S,
     deadline: Duration,
