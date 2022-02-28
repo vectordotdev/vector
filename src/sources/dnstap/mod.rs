@@ -30,7 +30,7 @@ pub struct DnstapConfig {
     pub max_frame_handling_tasks: Option<u32>,
     pub(self) socket_file_mode: Option<u32>,
     pub socket_receive_buffer_size: Option<usize>,
-    pub socket_send_buffer_size: Option<usize>,
+    pub(crate) socket_send_buffer_size: Option<usize>,
 }
 
 fn default_max_frame_length() -> usize {
