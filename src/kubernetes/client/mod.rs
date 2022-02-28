@@ -33,7 +33,7 @@ use crate::{
 
 pub(crate) mod config;
 
-pub use config::Config;
+pub(crate) use config::Config;
 
 /// A client to the k8s API.
 ///
