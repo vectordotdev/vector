@@ -59,7 +59,7 @@ impl InternalEvent for VectorStopped {
 }
 
 #[derive(Debug)]
-pub struct VectorQuit;
+pub(crate) struct VectorQuit;
 
 impl InternalEvent for VectorQuit {
     fn emit_logs(&self) {
