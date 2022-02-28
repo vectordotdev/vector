@@ -17,7 +17,7 @@ pub enum ParseError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NginxStubStatus {
     pub active: usize,
-    pub accepts: usize,
+    pub(crate) accepts: usize,
     pub handled: usize,
     pub requests: usize,
     pub reading: usize,
