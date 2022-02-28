@@ -27,7 +27,7 @@ pub(crate) struct S3RequestOptions {
     pub filename_extension: Option<String>,
     pub api_options: S3Options,
     pub encoding: EncodingConfig<StandardEncodings>,
-    pub compression: Compression,
+    pub(crate) compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
