@@ -165,7 +165,7 @@ impl ComponentTester {
 }
 
 /// Convenience wrapper for running sink tests
-pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
+pub(crate) async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = EventArray> + Send,
 {
