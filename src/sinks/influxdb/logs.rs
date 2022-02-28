@@ -48,7 +48,7 @@ pub struct InfluxDbLogsConfig {
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
     #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDb2Settings>,
+    pub(crate) influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
