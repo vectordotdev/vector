@@ -157,7 +157,7 @@ where
 /// lifetimes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct OwnedWatchOptional {
-    pub allow_watch_bookmarks: Option<bool>,
+    pub(crate) allow_watch_bookmarks: Option<bool>,
     pub field_selector: Option<String>,
     pub label_selector: Option<String>,
     pub pretty: Option<String>,

@@ -31,7 +31,7 @@ use crate::{
     tls::TlsSettings,
 };
 
-pub mod config;
+pub(crate) mod config;
 
 pub use config::Config;
 
