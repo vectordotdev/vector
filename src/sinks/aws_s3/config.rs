@@ -33,7 +33,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct S3SinkConfig {
+pub(crate) struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: Option<String>,
     pub filename_time_format: Option<String>,
