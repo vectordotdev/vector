@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
 
 #[derive(Debug)]
-pub enum NewRelicApiModel {
+pub(crate) enum NewRelicApiModel {
     Metrics(MetricsApiModel),
     Events(EventsApiModel),
     Logs(LogsApiModel),

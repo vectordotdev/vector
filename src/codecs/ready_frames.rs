@@ -12,7 +12,7 @@ const DEFAULT_CAPACITY: usize = 1024;
 /// This is similar in spirit to `StreamExt::ready_chunks`, but built specifically for the
 /// particular result tuple returned by decoding streams. The more general `FoldReady` is left as
 /// an exercise to the reader.
-pub struct ReadyFrames<T, U, E> {
+pub(crate) struct ReadyFrames<T, U, E> {
     inner: T,
     enqueued: Vec<U>,
     enqueued_size: usize,
