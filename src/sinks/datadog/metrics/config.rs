@@ -103,7 +103,7 @@ pub struct DatadogMetricsConfig {
     pub endpoint: Option<String>,
     // Deprecated, replaced by the site option
     pub region: Option<Region>,
-    pub site: Option<String>,
+    pub(crate) site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
     default_api_key: String,
