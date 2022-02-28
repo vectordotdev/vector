@@ -44,7 +44,7 @@ pub struct HecLogsSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
