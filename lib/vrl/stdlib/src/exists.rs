@@ -79,7 +79,7 @@ impl Function for Exists {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExistsFn {
+pub(crate) struct ExistsFn {
     query: expression::Query,
 }
 

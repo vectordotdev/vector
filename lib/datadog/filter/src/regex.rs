@@ -1,6 +1,7 @@
 use regex::Regex;
 
 /// Returns compiled word boundary regex.
+#[must_use]
 pub fn word_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         r#"\b{}\b"#,
@@ -10,6 +11,7 @@ pub fn word_regex(to_match: &str) -> Regex {
 }
 
 /// Returns compiled wildcard regex.
+#[must_use]
 pub fn wildcard_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         "^{}$",
