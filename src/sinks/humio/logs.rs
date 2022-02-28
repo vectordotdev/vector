@@ -49,7 +49,7 @@ inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
 
-pub fn timestamp_nanos_key() -> Option<String> {
+pub(crate) fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
 
