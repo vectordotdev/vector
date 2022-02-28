@@ -834,13 +834,14 @@ fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
     edns.options()
         .as_ref()
         .iter()
-        .map(|(code, option)| match option {
+        .flat_map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
-            | EdnsOption::N3U(algorithms) => parse_edns_opt_dnssec_algorithms(*code, *algorithms),
-            EdnsOption::Unknown(_, opt_data) => parse_edns_opt(*code, opt_data),
-
-            _ => panic!("TODO"),
+            | EdnsOption::N3U(algorithms) => {
+                Some(parse_edns_opt_dnssec_algorithms(*code, *algorithms))
+            }
+            EdnsOption::Unknown(_, opt_data) => Some(parse_edns_opt(*code, opt_data)),
+            _ => None,
         })
         .collect()
 }
