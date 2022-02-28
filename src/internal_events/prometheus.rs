@@ -168,7 +168,7 @@ impl InternalEvent for PrometheusHttpError {
 }
 
 #[derive(Debug)]
-pub struct PrometheusRemoteWriteParseError {
+pub(crate) struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
