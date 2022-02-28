@@ -46,7 +46,7 @@ pub struct HecAckStatusRequest {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct HecAckStatusResponse {
-    pub acks: HashMap<u64, bool>,
+    pub(crate) acks: HashMap<u64, bool>,
 }
 
 #[derive(Debug)]
