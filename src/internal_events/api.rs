@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 #[derive(Debug)]
 pub struct ApiStarted {
     pub addr: SocketAddr,
-    pub playground: bool,
+    pub(crate) playground: bool,
 }
 
 impl InternalEvent for ApiStarted {
