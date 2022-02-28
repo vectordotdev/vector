@@ -1,6 +1,6 @@
 pub(crate) mod config;
 pub mod request_builder;
-pub mod service;
+pub(crate) mod service;
 pub(crate) mod sink;
 
 #[cfg(test)]
