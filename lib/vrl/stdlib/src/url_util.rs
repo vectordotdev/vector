@@ -2,12 +2,12 @@ use url::form_urlencoded::Parse;
 use vrl::prelude::*;
 
 /// Inner kind for a parsed query string.
-pub fn query_inner_kind() -> Collection<Field> {
+pub(super) fn query_inner_kind() -> Collection<Field> {
     Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
 }
 
 /// Parse a query string into a map of String -> Value.
-pub fn parse_query(query: Parse) -> BTreeMap<String, Value> {
+pub(super) fn parse_query(query: Parse) -> BTreeMap<String, Value> {
     let mut result = BTreeMap::new();
 
     for (k, value) in query {
