@@ -24,7 +24,7 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct FluentConfig {
+pub(crate) struct FluentConfig {
     address: SocketListenAddr,
     tls: Option<TlsConfig>,
     keepalive: Option<TcpKeepaliveConfig>,

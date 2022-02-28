@@ -29,7 +29,7 @@ use crate::{
 
 mod parser;
 
-pub use parser::ParseError;
+pub(crate) use parser::ParseError;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct ApacheMetricsConfig {
