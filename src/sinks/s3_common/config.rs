@@ -92,7 +92,7 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Healthcheck> {
+pub(crate) fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let req = client
             .head_bucket(HeadBucketRequest {
