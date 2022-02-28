@@ -43,7 +43,7 @@ pub struct CounterConfig {
 pub struct GaugeConfig {
     pub field: String,
     pub name: Option<String>,
-    pub namespace: Option<String>,
+    pub(crate) namespace: Option<String>,
     pub tags: Option<IndexMap<String, String>>,
 }
 

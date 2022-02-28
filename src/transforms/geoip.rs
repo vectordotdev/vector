@@ -30,7 +30,7 @@ pub struct Geoip {
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub(crate) database: String,
     pub source: String,
-    pub target: String,
+    pub(crate) target: String,
 }
 
 impl Clone for Geoip {
