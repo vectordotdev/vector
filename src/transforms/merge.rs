@@ -29,7 +29,7 @@ pub struct MergeConfig {
     /// merged in, producing the resulting merged event.
     // Deprecated name is merge_fields
     #[serde(alias = "merge_fields")]
-    pub fields: Vec<String>,
+    pub(crate) fields: Vec<String>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
