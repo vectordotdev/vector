@@ -194,7 +194,7 @@ impl<'a> InternalEvent for DockerLogsTimestampParseError<'a> {
 
 #[derive(Debug)]
 pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
-    pub container_id: &'a str,
+    pub(crate) container_id: &'a str,
     pub error: Error,
 }
 
