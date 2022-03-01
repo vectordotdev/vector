@@ -12,7 +12,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
     config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
@@ -20,8 +19,9 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -142,12 +142,12 @@ struct AzureMonitorLogsSink {
     default_headers: HeaderMap,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for AzureMonitorLogsSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+struct AzureMonitorLogsEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
         self.encoding.apply_rules(&mut event);
 
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
@@ -169,6 +169,19 @@ impl HttpSink for AzureMonitorLogsSink {
         );
 
         Some(entry)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for AzureMonitorLogsSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = AzureMonitorLogsEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        AzureMonitorLogsEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
@@ -340,7 +353,8 @@ mod tests {
         let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
         let event = Event::from(log);
-        let json = sink.encode_event(event).unwrap();
+        let mut encoder = sink.build_encoder();
+        let json = encoder.encode_event(event).unwrap();
         let expected_json = serde_json::json!({
             timestamp_key: timestamp_value,
             "message": "hello world"
@@ -362,6 +376,7 @@ mod tests {
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
+        let mut encoder = sink.build_encoder();
 
         let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
@@ -369,8 +384,8 @@ mod tests {
         let mut log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
         let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
 
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = encoder.encode_event(Event::from(log1)).unwrap();
+        let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();
