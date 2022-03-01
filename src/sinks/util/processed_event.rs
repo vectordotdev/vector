@@ -7,7 +7,7 @@ use vector_core::{
 /// like Splunk HEC that process events prior to encoding.
 pub struct ProcessedEvent<E, M> {
     pub event: E,
-    pub metadata: M,
+    pub(crate) metadata: M,
 }
 
 impl<E, M> MaybeAsLogMut for ProcessedEvent<E, M>
