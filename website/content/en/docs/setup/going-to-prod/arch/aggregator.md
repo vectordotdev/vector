@@ -45,13 +45,13 @@ See the [high availability document](/docs/setup/going-to-prod/high-availability
 
 ### Hardening
 
-- [Secure Vector’s data](/docs/setup/going-to-prod/arch/hardening/#securing-the-data).
-- [Secure the Vector process](/docs/setup/going-to-prod/arch/hardening/#securing-the-vector-process).
-- [Secure the host](/docs/setup/going-to-prod/arch/hardening/#securing-the-host).
-- [Secure the network](/docs/setup/going-to-prod/arch/hardening/#securing-the-network).
+- [Secure Vector’s data](/docs/setup/going-to-prod/hardening/#securing-the-data).
+- [Secure the Vector process](/docs/setup/going-to-prod/hardening/#securing-the-vector-process).
+- [Secure the host](/docs/setup/going-to-prod/hardening/#securing-the-host).
+- [Secure the network](/docs/setup/going-to-prod/hardening/#securing-the-network).
 
 {{< info >}}
-See the [hardening recommendations](/docs/setup/going-to-prod/arch/hardening/) for more detail.
+See the [hardening recommendations](/docs/setup/going-to-prod/hardening/) for more detail.
 {{< /info >}}
 
 ### Sizing, Scaling, & Capacity Planning

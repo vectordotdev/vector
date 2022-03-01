@@ -47,7 +47,7 @@ See the [architecting document](/docs/setup/going-to-prod/architecting/) for mor
 
 - If the [failure of a single Vector agent](/docs/setup/going-to-prod/high-availability/#vector-process-failure) is unacceptable, consider the [aggregator architecture](/docs/setup/going-to-prod/arch/aggregator/), which deploys Vector across multiple nodes in a [highly available manner](/docs/setup/going-to-prod/high-availability/).
 - Enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/) to mitigate [data receive failures](/docs/setup/going-to-prod/high-availability/#data-receive-failure).
-- Route dropped events to mitigate [data processing failures](/docs/setup/going-to-prod/high-availability/#data-processing-failures).
+- Route dropped events to mitigate [data processing failures](/docs/setup/going-to-prod/high-availability/#data-processing-failure).
 
 {{< info >}}
 See the [high availability document](/docs/setup/going-to-prod/high-availability/) for more detail.
@@ -55,13 +55,13 @@ See the [high availability document](/docs/setup/going-to-prod/high-availability
 
 ### Hardening
 
-- [Secure Vector’s data](/docs/setup/going-to-prod/arch/hardening/#securing-the-data).
-- [Secure the Vector process](/docs/setup/going-to-prod/arch/hardening/#securing-the-vector-process).
-- [Secure the host](/docs/setup/going-to-prod/arch/hardening/#securing-the-host).
-- [Secure the network](/docs/setup/going-to-prod/arch/hardening/#securing-the-network).
+- [Secure Vector’s data](/docs/setup/going-to-prod/hardening/#securing-the-data).
+- [Secure the Vector process](/docs/setup/going-to-prod/hardening/#securing-the-vector-process).
+- [Secure the host](/docs/setup/going-to-prod/hardening/#securing-the-host).
+- [Secure the network](/docs/setup/going-to-prod/hardening/#securing-the-network).
 
 {{< info >}}
-See the [hardening recommendations](/docs/setup/going-to-prod/arch/hardening/) for more detail.
+See the [hardening recommendations](/docs/setup/going-to-prod/hardening/) for more detail.
 {{< /info >}}
 
 ### Sizing, Scaling, & Capacity Planning

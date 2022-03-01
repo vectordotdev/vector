@@ -43,7 +43,7 @@ Follow this plan for each deployment within each network partition.
 
 ### 1. Deploy a Black Hole
 
-- [Identify a single network partition](#boundaries) (i.e., cluster or VPC) for your Vector deployment.
+- [Identify a single network partition](/docs/setup/going-to-prod/architecting/#boundaries) (i.e., cluster or VPC) for your Vector deployment.
 - [Deploy Vector](/docs/setup/deployment/) with a single `blackhole` sink (the default) within that network partition.
 - [Size and scale](/docs/setup/going-to-prod/sizing/) Vector’s instances for the [conservative estimate of 10 MiB/s/vCPU](/docs/setup/going-to-prod/sizing/#estimations).
 
