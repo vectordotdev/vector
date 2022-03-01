@@ -15,7 +15,7 @@ see which components support specific guarantees.
 
 Vector supports end-to-end acknowledgement for the majority of its
 sources and sinks. This is a system which tracks the delivery status of
-an event through the lifetime of that event is it travels from the
+an event through the lifetime of that event as it travels from the
 originating source to any number of destination sinks. Support for this
 feature is indicated by the "acknowledgements" badge at the top of the
 relevant sink or source configuration reference page.
