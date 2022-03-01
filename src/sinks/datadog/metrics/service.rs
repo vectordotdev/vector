@@ -52,7 +52,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
 #[derive(Debug, Clone)]
-pub struct DatadogMetricsRequest {
+pub(crate) struct DatadogMetricsRequest {
     pub payload: Bytes,
     pub(crate) uri: Uri,
     pub content_type: &'static str,
