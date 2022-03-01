@@ -37,7 +37,7 @@ impl Transform {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum TransformsSortFieldName {
+pub(crate) enum TransformsSortFieldName {
     ComponentKey,
     ComponentType,
 }

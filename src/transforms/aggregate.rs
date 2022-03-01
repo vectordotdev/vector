@@ -21,7 +21,7 @@ use crate::{
 pub struct AggregateConfig {
     /// The interval between flushes in milliseconds.
     #[serde(default = "default_interval_ms")]
-    pub interval_ms: u64,
+    pub(crate) interval_ms: u64,
 }
 
 const fn default_interval_ms() -> u64 {
