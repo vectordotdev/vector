@@ -383,7 +383,6 @@ async fn tap_handler(
                 // Notifications to send to the client.
                 let mut notifications = Vec::new();
 
-
                 // Matched notifications.
                 for pattern in matched.difference(&last_matches) {
                     notifications.push(send_matched(tx.clone(), pattern.clone()).boxed());
