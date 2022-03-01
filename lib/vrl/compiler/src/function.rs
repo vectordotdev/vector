@@ -176,7 +176,7 @@ impl Parameter {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ArgumentList(HashMap<&'static str, Expr>);
 
 impl ArgumentList {
@@ -207,6 +207,19 @@ impl ArgumentList {
                     expected: "literal",
                     expr,
                 }),
+            })
+            .transpose()
+    }
+
+    /// Returns the argument if it is a literal, an object or an array.
+    pub fn optional_value(&mut self, keyword: &'static str) -> Result<Option<Value>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| {
+                expr.try_into().map_err(|err| Error::UnexpectedExpression {
+                    keyword,
+                    expected: "literal",
+                    expr: err,
+                })
             })
             .transpose()
     }
@@ -368,6 +381,23 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
             .collect::<HashMap<_, _>>();
 
         Self(arguments)
+    }
+}
+
+impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+    fn from(args: ArgumentList) -> Self {
+        args.0
+            .iter()
+            .map(|(key, expr)| {
+                (
+                    *key,
+                    Some(FunctionArgument::new(
+                        None,
+                        Node::new(Span::default(), expr.clone()),
+                    )),
+                )
+            })
+            .collect()
     }
 }
 
