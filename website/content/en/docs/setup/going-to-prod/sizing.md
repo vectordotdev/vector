@@ -20,7 +20,7 @@ The following numbers are starting points for estimating your instance sizes. Th
 
 `*` - These numbers are conservative for estimation purposes.
 
-`*` - 1 vCPU = 1 ARM physical CPU or 0.5 Intel physical CPU. 
+`*` - 1 vCPU = 1 ARM physical CPU or 0.5 Intel physical CPU.
 
 ### Recommendations
 

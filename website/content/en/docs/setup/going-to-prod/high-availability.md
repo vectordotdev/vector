@@ -80,8 +80,6 @@ ARC automatically scales down the number of outgoing connections when Vector can
 
 Buffers absorb back pressure when a service cannot accept data, insulating upstream clients from backpressure, and durably persisting data. Buffers replay data to the destination upon recovery.
 
-Finally, circuit breaking allows Vector to failover to a standby destination for business continuity.
-
 ![Failure](/img/going-to-prod/ha/send-failure.png)
 
 ### Total System Failures

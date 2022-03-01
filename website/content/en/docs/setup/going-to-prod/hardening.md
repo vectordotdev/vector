@@ -36,7 +36,7 @@ Vector will not serialize events on disk unless you’ve configured Vector to us
 
 #### Securing Data in Transit
 
-- **Encrypt or redact sensitive attributes.** Event attributes that hold sensitive data, such as PII, can be encrypted (i.e., the VRL `encrypt` function) or redacted (i.e., the VRL `redact` function). If encrypted, use an encryption standard that is supported by your destination. This allows JIT decryption of data during analysis.
+- **Redact sensitive attributes.** Event attributes that hold sensitive data, such as PII, can be redacted (i.e., the VRL `redact` function).
 - **Disable core dumps.** A user who can force a core dump could access Vector’s in-flight data. Preventing core dumps is specific to your platform. On Linux setting the resource limit `RLIMIT_CORE` to `0` disables core dumps. In the systemd service unit file, setting `LimitCORE=0` will enforce this setting for the Vector service (this is done automatically when installing Vector through `apt` or `yum`).
 
 {{< info >}}
@@ -54,7 +54,6 @@ Vector implements an affine type system via Rust that achieves memory safety and
 #### Securing Vector’s Artifacts
 
 - **Download over encrypted channels.** Vector does not allow unencrypted downloads of its artifacts. All download channels require industry-standard TLS for all connections. When downloading Vector be sure to enable SSL verification (the default for most clients).
-- **Verify Vector’s download.** All Vector artifacts are stored with a matching checksum that should be used to verify the authenticity of the artifact immediately after download.
 
 #### Securing Vector’s Configuration
 

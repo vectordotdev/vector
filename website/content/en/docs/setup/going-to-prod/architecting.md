@@ -35,7 +35,7 @@ Vector's agent role deploys Vector directly on each node for local data collecti
 
 ![Deployed as an agent](/img/going-to-prod/agent-overview.png)
 
-It can directly collect data from the node, indirectly through another agent, or both. Data processing can happen locally in the agent or remotely in an aggregator. 
+It can directly collect data from the node, indirectly through another agent, or both. Data processing can happen locally in the agent or remotely in an aggregator.
 
 {{< info >}}
 Deploying Vector as an agent is demonstrated in the [agent architecture](/docs/setup/going-to-prod/arch/agent/).
@@ -149,7 +149,7 @@ If you decide to integrate with an agent, you should configure Vector to receive
 
 ![From other agents](/img/going-to-prod/from-other-agents.png)
 
-Sources such as the `datadog_agent` source or `open_telemetry` source can be used to receive data from your agents.
+Sources such as the `datadog_agent` source can be used to receive data from your agents.
 
 Alternatively, you can deploy Vector [on separate nodes as an aggregator](/docs/setup/going-to-prod/arch/aggregator/). This strategy is covered in more detail in the [where to process data section](#choosing-where-to-process-data).
 
@@ -219,7 +219,7 @@ Finally, you can combine the above strategies to get the best of both worlds, cr
 
 ![Unified processing](/img/going-to-prod/unified.png)
 
-We recommend evolving towards this strategy after starting with [remote processing](#remote-processing). 
+We recommend evolving towards this strategy after starting with [remote processing](#remote-processing).
 
 {{< info >}}
 Unified processing is demonstrated in the [unified architecture document](/docs/setup/going-to-prod/arch/unified/).
