@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub(crate) struct JournaldEventsReceived {
-    pub count: usize,
+    pub(crate) count: usize,
     pub byte_size: usize,
 }
 
