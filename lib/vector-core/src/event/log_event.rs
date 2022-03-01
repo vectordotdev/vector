@@ -113,7 +113,7 @@ impl LogEvent {
     }
 
     pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.fields.get2(key)
+        self.fields.get_by_path_v2(key)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
@@ -121,7 +121,7 @@ impl LogEvent {
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        Arc::make_mut(&mut self.fields).get_mut2(key.as_ref())
+        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(key.as_ref())
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
