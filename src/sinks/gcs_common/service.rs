@@ -79,7 +79,7 @@ pub struct GcsRequestSettings {
 #[derive(Debug)]
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
-    pub count: usize,
+    pub(crate) count: usize,
     pub events_byte_size: usize,
 }
 

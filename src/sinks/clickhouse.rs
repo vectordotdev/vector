@@ -24,7 +24,7 @@ use crate::{
 pub struct ClickhouseConfig {
     // Deprecated name
     #[serde(alias = "host")]
-    pub endpoint: UriSerde,
+    pub(crate) endpoint: UriSerde,
     pub table: String,
     pub database: Option<String>,
     #[serde(default)]
