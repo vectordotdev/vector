@@ -56,36 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test: 'humio'
-          - test: 'kafka'
-    steps:
-      - uses: actions/checkout@v2.4.0
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.7
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-${{ matrix.test }}
-        env:
-          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-
-  # just keep both during migration
-  test-integration-docker-compose:
-    name: Integration - Linux, ${{ matrix.test }}
-    runs-on: ubuntu-20.04
-    if: |
-      !github.event.pull_request
-        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
           - test: 'aws'
           - test: 'azure'
           - test: 'clickhouse'
@@ -98,7 +68,9 @@ jobs:
           - test: 'eventstoredb'
           - test: 'fluent'
           - test: 'gcp'
+          - test: 'humio'
           - test: 'influxdb'
+          - test: 'kafka'
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongo'
@@ -113,6 +85,7 @@ jobs:
           - test: 'splunk'
     steps:
       - uses: actions/checkout@v2.4.0
+      - run: make ci-sweep
       - run: make test-integration-${{ matrix.test }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
@@ -125,7 +98,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test-integration
-      - test-integration-docker-compose
     steps:
       - name: validate
         run: echo "OK"

@@ -17,7 +17,7 @@ use crate::{
         Event,
     },
     http::HttpClient,
-    internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
+    internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
         util::{
@@ -210,7 +210,7 @@ impl MetricNormalize for SematextMetricNormalize {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(&SematextMetricsInvalidMetricReceived { metric: &metric });
+                emit!(&SematextMetricsInvalidMetricError { metric: &metric });
                 None
             }
         }
@@ -265,7 +265,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(&SematextMetricsEncodeEventFailed { error });
+            emit!(&SematextMetricsEncodeEventError { error });
         };
     }
 

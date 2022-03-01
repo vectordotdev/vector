@@ -258,6 +258,7 @@ impl Event {
         }
     }
 
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
@@ -266,6 +267,7 @@ impl Event {
         }
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier_option(batch).into(),

@@ -169,7 +169,7 @@ impl<'a> DnstapParser<'a> {
         if need_raw_data {
             self.insert(
                 self.event_schema.dnstap_root_data_schema().raw_data(),
-                base64::encode(&frame.to_vec()),
+                base64::encode(&frame),
             );
         }
 

@@ -23,7 +23,7 @@ use crate::{
         log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingError},
+    internal_events::{AwsSqsEventsSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -248,7 +248,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
             client
                 .send_message(request)
                 .inspect_ok(|result| {
-                    emit!(&AwsSqsEventSent {
+                    emit!(&AwsSqsEventsSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })

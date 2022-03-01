@@ -19,7 +19,9 @@ use crate::{
     config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{FileBytesSent, FileOpen, TemplateRenderingError},
+    internal_events::{
+        FileBytesSent, FileExpiringError, FileIoError, FileOpen, TemplateRenderingError,
+    },
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -212,7 +214,12 @@ impl FileSink {
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
-                                    error!(message = "Failed to close file.", path = ?path, %error);
+                                    emit!(&FileIoError {
+                                        error,
+                                        code: "failed_closing_file",
+                                        message: "Failed to close file.",
+                                        path: Some(path),
+                                    });
                                 } else{
                                     trace!(message = "Successfully closed file.", path = ?path);
                                 }
@@ -242,10 +249,9 @@ impl FileSink {
                                 count: self.files.len()
                             });
                         }
-                        Some(Err(error)) => error!(
-                            message = "An error occurred while expiring a file.",
-                            %error,
-                        ),
+                        Some(Err(error)) => {
+                            emit!(&FileExpiringError { error });
+                        },
                     }
                 }
             }
@@ -281,7 +287,12 @@ impl FileSink {
                     // We couldn't open the file for this event.
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
-                    error!(message = "Unable to open the file.", path = ?path, %error);
+                    emit!(&FileIoError {
+                        code: "failed_opening_file",
+                        message: "Unable to open the file.",
+                        error,
+                        path: Some(&path),
+                    });
                     event.metadata().update_status(EventStatus::Errored);
                     return;
                 }
@@ -314,7 +325,12 @@ impl FileSink {
             }
             Err(error) => {
                 finalizers.update_status(EventStatus::Errored);
-                error!(message = "Failed to write file.", path = ?path, %error);
+                emit!(&FileIoError {
+                    code: "failed_writing_file",
+                    message: "Failed to write the file.",
+                    error,
+                    path: Some(&path),
+                });
             }
         }
     }
