@@ -168,7 +168,7 @@ pub struct CommandServerStatusMetricsDocument {
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusMetricsGetLastError {
     pub wtime: CommandServerStatusMetricsGetLastErrorWtime,
-    pub wtimeouts: i64,
+    pub(crate) wtimeouts: i64,
 }
 
 #[derive(Debug, Deserialize)]
