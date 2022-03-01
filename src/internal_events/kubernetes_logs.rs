@@ -99,7 +99,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
 }
 
 #[derive(Debug)]
-pub struct KubernetesLogsFormatPickerEdgeCase {
+pub(crate) struct KubernetesLogsFormatPickerEdgeCase {
     pub what: &'static str,
 }
 
