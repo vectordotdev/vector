@@ -104,7 +104,7 @@ mod test {
     pub fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
         let mut buf = OutputBuffer::with_capacity(1);
         ft.transform(&mut buf, event);
-        assert!(buf.len() < 2);
-        buf.first().cloned()
+        assert!(buf.len() <= 1);
+        buf.into_events().next()
     }
 }

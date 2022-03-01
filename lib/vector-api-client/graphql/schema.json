@@ -2256,6 +2256,38 @@
               "deprecationReason": null
             },
             {
+              "name": "componentType",
+              "description": "Type of component associated with the log event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the log event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "message",
               "description": "Log message",
               "args": [],
@@ -2533,6 +2565,38 @@
             {
               "name": "componentId",
               "description": "Id of the component associated with the metric event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentType",
+              "description": "Type of component associated with the metric event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the metric event",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5746,11 +5810,43 @@
         {
           "kind": "OBJECT",
           "name": "Trace",
-          "description": "Log event with fields for querying log data",
+          "description": "Trace event with fields for querying trace data",
           "fields": [
             {
               "name": "componentId",
-              "description": "Id of the component associated with the log event",
+              "description": "Id of the component associated with the trace event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentType",
+              "description": "Type of component associated with the trace event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the trace event",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

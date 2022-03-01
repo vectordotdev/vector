@@ -1,6 +1,4 @@
-use crate::{config::ComponentKey, event::Event};
-use futures::Sink;
-use futures_util::SinkExt;
+use futures::{Sink, SinkExt};
 use std::{
     fmt,
     pin::Pin,
@@ -8,7 +6,9 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-type GenericEventSink = Pin<Box<dyn Sink<Event, Error = ()> + Send>>;
+use crate::{config::ComponentKey, event::EventArray};
+
+type GenericEventSink = Pin<Box<dyn Sink<EventArray, Error = ()> + Send>>;
 
 pub enum ControlMessage {
     Add(ComponentKey, GenericEventSink),
@@ -117,7 +117,7 @@ impl Fanout {
     ) -> Poll<Result<(), ()>>
     where
         F: Fn(
-            Pin<&mut (dyn Sink<Event, Error = ()> + Send)>,
+            Pin<&mut (dyn Sink<EventArray, Error = ()> + Send)>,
             &mut Context<'_>,
         ) -> Poll<Result<(), ()>>,
     {
@@ -144,7 +144,7 @@ impl Fanout {
     }
 }
 
-impl Sink<Event> for Fanout {
+impl Sink<EventArray> for Fanout {
     type Error = ();
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
@@ -171,9 +171,8 @@ impl Sink<Event> for Fanout {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), ()> {
+    fn start_send(mut self: Pin<&mut Self>, item: EventArray) -> Result<(), ()> {
         let mut items = vec![item; self.sinks.len()];
-
         let mut i = 1;
         while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink.as_mut() {
@@ -227,15 +226,19 @@ mod tests {
     };
 
     use super::{ControlMessage, Fanout};
-    use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
+    use crate::config::ComponentKey;
+    use crate::event::{Event, EventArray, EventContainer, LogEvent};
+    use crate::test_util::{collect_ready, collect_ready_events};
 
-    async fn build_sender_pair(capacity: usize) -> (BufferSender<Event>, BufferReceiver<Event>) {
+    async fn build_sender_pair(
+        capacity: usize,
+    ) -> (BufferSender<EventArray>, BufferReceiver<EventArray>) {
         TopologyBuilder::standalone_memory(capacity, WhenFull::Block).await
     }
 
     async fn build_sender_pairs(
         capacities: &[usize],
-    ) -> Vec<(BufferSender<Event>, BufferReceiver<Event>)> {
+    ) -> Vec<(BufferSender<EventArray>, BufferReceiver<EventArray>)> {
         let mut pairs = Vec::new();
         for capacity in capacities {
             pairs.push(build_sender_pair(*capacity).await);
@@ -248,7 +251,7 @@ mod tests {
     ) -> (
         Fanout,
         UnboundedSender<ControlMessage>,
-        Vec<BufferReceiver<Event>>,
+        Vec<BufferReceiver<EventArray>>,
     ) {
         let (mut fanout, control) = Fanout::new();
         let pairs = build_sender_pairs(capacities).await;
@@ -264,7 +267,7 @@ mod tests {
 
     async fn add_sender_to_fanout(
         fanout: &mut Fanout,
-        receivers: &mut Vec<BufferReceiver<Event>>,
+        receivers: &mut Vec<BufferReceiver<EventArray>>,
         sender_id: usize,
         capacity: usize,
     ) {
@@ -284,10 +287,10 @@ mod tests {
 
     async fn replace_sender_in_fanout(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<Event>>,
+        receivers: &mut Vec<BufferReceiver<EventArray>>,
         sender_id: usize,
         capacity: usize,
-    ) -> BufferReceiver<Event> {
+    ) -> BufferReceiver<EventArray> {
         let (sender, receiver) = build_sender_pair(capacity).await;
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
@@ -303,10 +306,10 @@ mod tests {
 
     async fn start_sender_replace(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<Event>>,
+        receivers: &mut Vec<BufferReceiver<EventArray>>,
         sender_id: usize,
         capacity: usize,
-    ) -> (BufferReceiver<Event>, BufferSender<Event>) {
+    ) -> (BufferReceiver<EventArray>, BufferSender<EventArray>) {
         let (sender, receiver) = build_sender_pair(capacity).await;
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
@@ -323,7 +326,7 @@ mod tests {
     fn finish_sender_replace(
         control: &UnboundedSender<ControlMessage>,
         sender_id: usize,
-        sender: BufferSender<Event>,
+        sender: BufferSender<EventArray>,
     ) {
         control
             .send(ControlMessage::Replace(
@@ -336,16 +339,15 @@ mod tests {
     #[tokio::test]
     async fn fanout_writes_to_all() {
         let (fanout, _, receivers) = fanout_from_senders(&[2, 2]).await;
-        let events = make_events(2);
+        let events = make_event_array(2);
 
-        stream::iter(events.clone())
-            .map(Ok)
+        stream::iter(vec![Ok(events.clone())])
             .forward(fanout)
             .await
             .expect("forward should not fail");
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver), events);
+            assert_eq!(collect_ready(receiver), &[events.clone()]);
         }
     }
 
@@ -355,18 +357,18 @@ mod tests {
         let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
-        let mut first_send = spawn(fanout.send(events[0].clone()));
+        let mut first_send = spawn(fanout.send(events[0].clone().into()));
         let first_send_result = assert_ready!(first_send.poll());
         assert!(first_send_result.is_ok());
         drop(first_send);
 
         // Second send should return pending because sender B is now full:
-        let mut second_send = spawn(fanout.send(events[1].clone()));
+        let mut second_send = spawn(fanout.send(events[1].clone().into()));
         assert_pending!(second_send.poll());
 
         // Now read an item from each receiver to free up capacity for the second sender:
         for receiver in &mut receivers {
-            assert_eq!(Some(events[0].clone()), receiver.next().await);
+            assert_eq!(Some(events[0].clone().into()), receiver.next().await);
         }
 
         // Now our second send should actually be able to complete:
@@ -376,7 +378,7 @@ mod tests {
 
         // And make sure the second item comes through:
         for receiver in &mut receivers {
-            assert_eq!(Some(events[1].clone()), receiver.next().await);
+            assert_eq!(Some(events[1].clone().into()), receiver.next().await);
         }
     }
 
@@ -387,11 +389,11 @@ mod tests {
 
         // Send in the first two events to our initial two senders:
         fanout
-            .send(events[0].clone())
+            .send(events[0].clone().into())
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send(events[1].clone().into())
             .await
             .expect("send should not fail");
 
@@ -400,7 +402,7 @@ mod tests {
 
         // Send in the last event which all three senders will now get:
         fanout
-            .send(events[2].clone())
+            .send(events[2].clone().into())
             .await
             .expect("send should not fail");
 
@@ -408,7 +410,7 @@ mod tests {
         // last event:
         let expected_events = [&events, &events, &events[2..]];
         for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready(receiver), expected_events[i]);
+            assert_eq!(collect_ready_events(receiver), expected_events[i]);
         }
     }
 
@@ -419,11 +421,11 @@ mod tests {
 
         // Send in the first two events to our initial two senders:
         fanout
-            .send(events[0].clone())
+            .send(events[0].clone().into())
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send(events[1].clone().into())
             .await
             .expect("send should not fail");
 
@@ -432,14 +434,14 @@ mod tests {
 
         // Send in the last event which only the first sender will get:
         fanout
-            .send(events[2].clone())
+            .send(events[2].clone().into())
             .await
             .expect("send should not fail");
 
         // Make sure the first sender got all three events, but the second sender only got the first two:
         let expected_events = [&events, &events[..2]];
         for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready(receiver), expected_events[i]);
+            assert_eq!(collect_ready_events(receiver), expected_events[i]);
         }
     }
 
@@ -454,18 +456,18 @@ mod tests {
             let events = make_events(2);
 
             // First send should immediately complete because all senders have capacity:
-            let mut first_send = spawn(fanout.send(events[0].clone()));
+            let mut first_send = spawn(fanout.send(events[0].clone().into()));
             let first_send_result = assert_ready!(first_send.poll());
             assert!(first_send_result.is_ok());
             drop(first_send);
 
             // Second send should return pending because sender B is now full:
-            let mut second_send = spawn(fanout.send(events[1].clone()));
+            let mut second_send = spawn(fanout.send(events[1].clone().into()));
             assert_pending!(second_send.poll());
 
             // Now read an item from each receiver to free up capacity:
             for receiver in &mut receivers {
-                assert_eq!(Some(events[0].clone()), receiver.next().await);
+                assert_eq!(Some(events[0].clone().into()), receiver.next().await);
             }
 
             // Drop the given sender before polling again:
@@ -478,9 +480,9 @@ mod tests {
             drop(second_send);
 
             let mut expected_next = [
-                Some(events[1].clone()),
-                Some(events[1].clone()),
-                Some(events[1].clone()),
+                Some(events[1].clone().into()),
+                Some(events[1].clone().into()),
+                Some(events[1].clone().into()),
             ];
             expected_next[sender_id] = None;
 
@@ -496,11 +498,11 @@ mod tests {
         let events = make_events(2);
 
         fanout
-            .send(events[0].clone())
+            .send(events[0].clone().into())
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send(events[1].clone().into())
             .await
             .expect("send should not fail");
     }
@@ -512,11 +514,11 @@ mod tests {
 
         // First two sends should immediately complete because all senders have capacity:
         fanout
-            .send(events[0].clone())
+            .send(events[0].clone().into())
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send(events[1].clone().into())
             .await
             .expect("send should not fail");
 
@@ -525,7 +527,7 @@ mod tests {
 
         // And do the third send which should also complete since all senders still have capacity:
         fanout
-            .send(events[2].clone())
+            .send(events[2].clone().into())
             .await
             .expect("send should not fail");
 
@@ -533,11 +535,11 @@ mod tests {
         // third sender got all three events:
         let expected_events = [&events[2..], &events, &events];
         for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready(receiver), expected_events[i]);
+            assert_eq!(collect_ready_events(receiver), expected_events[i]);
         }
 
         // And make sure our original "first" sender got the first two events:
-        assert_eq!(collect_ready(old_first_receiver), &events[..2]);
+        assert_eq!(collect_ready_events(old_first_receiver), &events[..2]);
     }
 
     #[tokio::test]
@@ -547,22 +549,22 @@ mod tests {
 
         // First two sends should immediately complete because all senders have capacity:
         fanout
-            .send(events[0].clone())
+            .send(events[0].clone().into())
             .await
             .expect("send should not fail");
         fanout
-            .send(events[1].clone())
+            .send(events[1].clone().into())
             .await
             .expect("send should not fail");
 
         // Now do an empty replace on the second sender, which we'll test to make sure that `Fanout`
         // doesn't let any writes through until we replace it properly.  We get back the receiver
         // we've replaced, but also the sender that we want to eventually install:
-        let (old_first_receiver, new_first_sender) =
+        let (_old_first_receiver, new_first_sender) =
             start_sender_replace(&control, &mut receivers, 0, 4).await;
 
         // Third send should return pending because now we have an in-flight replacement:
-        let mut third_send = spawn(fanout.send(events[2].clone()));
+        let mut third_send = spawn(fanout.send(events[2].clone().into()));
         assert_pending!(third_send.poll());
 
         // Finish our sender replacement, which should wake up the third send and allow it to
@@ -576,10 +578,8 @@ mod tests {
         // the last event, and the second sender got all three:
         let expected_events = [&events[2..], &events];
         for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready(receiver), expected_events[i]);
+            assert_eq!(collect_ready_events(receiver), expected_events[i]);
         }
-
-        assert_eq!(collect_ready(old_first_receiver), &events[..2]);
     }
 
     #[tokio::test]
@@ -642,8 +642,8 @@ mod tests {
 
         // Spawn a task to send the events into the `Fanout`.  We spawn a task so that we can await
         // the receivers while the forward task drives itself to completion:
-        let events = make_events(3);
-        let send = stream::iter(events.clone()).map(Ok).forward(fanout);
+        let events = make_event_array(3);
+        let send = stream::iter(vec![Ok(events.clone())]).forward(fanout);
         tokio::spawn(send);
 
         // Wait for all of our receivers for non-erroring-senders to complete, and make sure they
@@ -655,8 +655,9 @@ mod tests {
             .map(|rx| tokio::spawn(rx.collect::<Vec<_>>()))
             .collect::<Vec<_>>();
 
+        let events = flatten(events);
         for collector in collectors {
-            assert_eq!(collector.await.unwrap(), events);
+            assert_eq!(flatten_all(collector.await.unwrap()), events);
         }
     }
 
@@ -671,7 +672,7 @@ mod tests {
         when: ErrorWhen,
     }
 
-    impl Sink<Event> for AlwaysErrors {
+    impl Sink<EventArray> for AlwaysErrors {
         type Error = crate::Error;
 
         fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -681,7 +682,7 @@ mod tests {
             })
         }
 
-        fn start_send(self: Pin<&mut Self>, _: Event) -> Result<(), Self::Error> {
+        fn start_send(self: Pin<&mut Self>, _: EventArray) -> Result<(), Self::Error> {
             match self.when {
                 ErrorWhen::Poll => Err("Something failed".into()),
                 _ => Ok(()),
@@ -703,9 +704,26 @@ mod tests {
         }
     }
 
+    fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {
+        (0..count).map(|i| LogEvent::from(format!("line {}", i)))
+    }
+
     fn make_events(count: usize) -> Vec<Event> {
-        (0..count)
-            .map(|i| Event::from(format!("line {}", i)))
+        _make_events(count).map(Into::into).collect()
+    }
+
+    fn make_event_array(count: usize) -> EventArray {
+        _make_events(count).collect::<Vec<_>>().into()
+    }
+
+    fn flatten(events: EventArray) -> Vec<Event> {
+        events.into_events().collect()
+    }
+
+    fn flatten_all(events: impl IntoIterator<Item = EventArray>) -> Vec<Event> {
+        events
+            .into_iter()
+            .flat_map(EventArray::into_events)
             .collect()
     }
 }
