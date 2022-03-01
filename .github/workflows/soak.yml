@@ -447,6 +447,14 @@ jobs:
           name: soak-analysis
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
 
+      - name: Save PR number for subsequent workflow
+        run: |
+          echo ${{ github.event.number }} > /tmp/pr.txt
+      - uses: actions/upload-artifact@v2
+        with:
+          name: pr-number
+          path: /tmp/pr.txt
+
       - name: Read analysis file
         id: read-analysis
         uses: juliangruber/read-file-action@v1
