@@ -61,7 +61,7 @@ impl<'a> InternalEvent for FileIoError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.code.to_string(),
+            "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
         );
