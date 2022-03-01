@@ -9,7 +9,7 @@ use super::BoxedFramingError;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
     /// Options for the character delimited decoder.
-    pub character_delimited: CharacterDelimitedDecoderOptions,
+    pub(crate) character_delimited: CharacterDelimitedDecoderOptions,
 }
 
 impl CharacterDelimitedDecoderConfig {
