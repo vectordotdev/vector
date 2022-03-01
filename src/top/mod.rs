@@ -5,7 +5,7 @@ mod metrics;
 mod state;
 
 use clap::Parser;
-pub use cmd::cmd;
+pub(crate) use cmd::cmd;
 use url::Url;
 
 #[derive(Parser, Debug, Clone)]
