@@ -65,7 +65,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub tls: Option<TlsConfig>,
+    pub(crate) tls: Option<TlsConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
