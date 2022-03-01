@@ -25,7 +25,7 @@ pub struct CloudwatchSink {
     pub batcher_settings: BatcherSettings,
     pub(super) request_builder: CloudwatchRequestBuilder,
     pub acker: Acker,
-    pub service: Svc<CloudwatchLogsPartitionSvc, CloudwatchRetryLogic<CloudwatchResponse>>,
+    pub(crate) service: Svc<CloudwatchLogsPartitionSvc, CloudwatchRetryLogic<CloudwatchResponse>>,
 }
 
 impl CloudwatchSink {
