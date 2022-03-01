@@ -34,7 +34,7 @@ pub struct FirehoseResponse {
     pub request_id: String,
 
     #[serde(with = "ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
+    pub(crate) timestamp: DateTime<Utc>,
 
     pub error_message: Option<String>,
 }
