@@ -39,7 +39,7 @@ pub use config::Config;
 ///
 /// Wraps our in-house [`HttpClient`].
 #[derive(Debug, Clone)]
-pub struct Client {
+pub(crate) struct Client {
     inner: HttpClient,
     uri_scheme: uri::Scheme,
     uri_authority: uri::Authority,
