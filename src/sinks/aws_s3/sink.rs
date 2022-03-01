@@ -22,7 +22,7 @@ use crate::{
 #[derive(Clone)]
 pub struct S3RequestOptions {
     pub bucket: String,
-    pub filename_time_format: String,
+    pub(crate) filename_time_format: String,
     pub filename_append_uuid: bool,
     pub filename_extension: Option<String>,
     pub api_options: S3Options,

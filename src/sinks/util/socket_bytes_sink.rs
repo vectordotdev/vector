@@ -16,7 +16,7 @@ use crate::internal_events::{SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
 
-pub enum ShutdownCheck {
+pub(crate) enum ShutdownCheck {
     Error(IoError),
     Close(&'static str),
     Alive,

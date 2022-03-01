@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DatadogEventsProcessed {
+pub(crate) struct DatadogEventsProcessed {
     pub byte_size: usize,
 }
 
