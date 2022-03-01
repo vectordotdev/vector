@@ -186,7 +186,7 @@ where
 }
 
 /// Convenience wrapper for running a sink with a single event
-pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
+pub(crate) async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
     init_test();
     run_sink(sink, stream::once(std::future::ready(event.into())), tags).await
 }
