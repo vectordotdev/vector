@@ -37,7 +37,7 @@ impl<E: std::fmt::Debug> InternalEvent for StreamDesyncReceived<E> {
 
 pub struct InvocationHttpErrorReceived<E> {
     /// The underlying error.
-    pub error: E,
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationHttpErrorReceived<E> {

@@ -8,7 +8,7 @@ pub(crate) mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
 pub mod aws_cloudwatch_metrics;
 #[cfg(feature = "sinks-aws_kinesis_firehose")]
-pub mod aws_kinesis_firehose;
+pub(crate) mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
