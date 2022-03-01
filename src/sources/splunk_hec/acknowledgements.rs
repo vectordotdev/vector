@@ -28,7 +28,7 @@ pub struct HecAcknowledgementsConfig {
     pub inner: AcknowledgementsConfig,
     pub max_pending_acks: NonZeroU64,
     pub max_number_of_ack_channels: NonZeroU64,
-    pub max_pending_acks_per_channel: NonZeroU64,
+    pub(crate) max_pending_acks_per_channel: NonZeroU64,
     pub ack_idle_cleanup: bool,
     pub max_idle_time: NonZeroU64,
 }
