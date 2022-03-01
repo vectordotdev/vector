@@ -132,7 +132,7 @@ pub struct S3Options {
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobConfig {
-    pub connection_string: String,
+    pub(crate) connection_string: String,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
