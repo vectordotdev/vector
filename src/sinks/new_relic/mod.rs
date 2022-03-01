@@ -11,7 +11,7 @@ pub use config::*;
 pub use encoding::*;
 pub use model::*;
 pub(crate) use service::*;
-pub use sink::*;
+pub(crate) use sink::*;
 
 pub use super::{Healthcheck, VectorSink};
 
