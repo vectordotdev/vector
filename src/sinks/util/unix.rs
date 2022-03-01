@@ -35,7 +35,7 @@ pub(crate) enum UnixError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct UnixSinkConfig {
-    pub path: PathBuf,
+    pub(crate) path: PathBuf,
 }
 
 impl UnixSinkConfig {

@@ -58,7 +58,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(alias = "namespace")]
     pub default_namespace: String,
     #[serde(flatten)]
-    pub region: RegionOrEndpoint,
+    pub(crate) region: RegionOrEndpoint,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
