@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct StateItemAdded;
+pub(crate) struct StateItemAdded;
 
 #[derive(Debug)]
 pub(crate) struct StateItemUpdated;
