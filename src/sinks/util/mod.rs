@@ -42,7 +42,7 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 use serde::{Deserialize, Serialize};
-pub use service::{
+pub(crate) use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
 };
