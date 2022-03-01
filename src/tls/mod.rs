@@ -23,7 +23,7 @@ pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 #[cfg(test)]
 pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
-pub type Result<T> = std::result::Result<T, TlsError>;
+pub(crate) type Result<T> = std::result::Result<T, TlsError>;
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 

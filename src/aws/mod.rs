@@ -1,5 +1,5 @@
 pub(crate) mod auth;
-pub mod region;
+pub(crate) mod region;
 
 pub use auth::AwsAuthentication;
 pub use region::RegionOrEndpoint;
