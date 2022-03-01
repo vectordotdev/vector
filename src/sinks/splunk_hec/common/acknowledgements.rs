@@ -49,7 +49,7 @@ impl Default for HecClientAcknowledgementsConfig {
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Debug)]
-pub struct HecAckStatusRequest {
+pub(crate) struct HecAckStatusRequest {
     pub acks: Vec<u64>,
 }
 

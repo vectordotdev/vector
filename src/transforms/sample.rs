@@ -16,7 +16,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
     pub rate: u64,
-    pub key_field: Option<String>,
+    pub(crate) key_field: Option<String>,
     pub exclude: Option<AnyCondition>,
 }
 
