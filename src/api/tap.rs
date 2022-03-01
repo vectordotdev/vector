@@ -149,7 +149,7 @@ impl Sink<Event> for TapSink {
 /// A tap sink spawns a process for listening for topology changes. If topology changes,
 /// sinks are rewired to accommodate matched/unmatched patterns.
 #[derive(Debug)]
-pub struct TapController {
+pub(crate) struct TapController {
     _shutdown: ShutdownTx,
 }
 
