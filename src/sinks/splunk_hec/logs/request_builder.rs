@@ -9,7 +9,7 @@ use crate::sinks::{
     util::{encoding::EncodingConfig, Compression, RequestBuilder},
 };
 
-pub struct HecLogsRequestBuilder {
+pub(crate) struct HecLogsRequestBuilder {
     pub(crate) compression: Compression,
     pub encoding: EncodingConfig<HecLogsEncoder>,
 }

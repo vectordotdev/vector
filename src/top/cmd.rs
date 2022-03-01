@@ -9,7 +9,7 @@ use crate::config;
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
-pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
+pub(crate) async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Exit early if the terminal is not a teletype
     if !is_tty() {
         #[allow(clippy::print_stderr)]
