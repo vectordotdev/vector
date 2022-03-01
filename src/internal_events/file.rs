@@ -10,7 +10,7 @@ pub use self::source::*;
 
 #[derive(Debug)]
 pub struct FileOpen {
-    pub count: usize,
+    pub(crate) count: usize,
 }
 
 impl InternalEvent for FileOpen {
