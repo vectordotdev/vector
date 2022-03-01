@@ -95,7 +95,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EventsApiModel(pub Vec<KeyValData>);
+pub struct EventsApiModel(pub(crate) Vec<KeyValData>);
 
 impl EventsApiModel {
     pub fn new(events_array: Vec<KeyValData>) -> Self {
