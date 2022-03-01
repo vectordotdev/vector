@@ -1,4 +1,5 @@
-pub mod config;
+
+pub(crate) mod config;
 mod encoder;
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests;
