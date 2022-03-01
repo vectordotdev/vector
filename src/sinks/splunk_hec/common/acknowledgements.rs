@@ -12,6 +12,7 @@ use vector_core::event::EventStatus;
 
 use super::service::HttpRequestBuilder;
 use crate::{
+    config::AcknowledgementsConfig,
     http::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
@@ -26,6 +27,13 @@ pub struct HecClientAcknowledgementsConfig {
     pub query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
     pub max_pending_acks: NonZeroU64,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        flatten,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub inner: AcknowledgementsConfig,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
@@ -35,6 +43,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
+            inner: Default::default(),
         }
     }
 }

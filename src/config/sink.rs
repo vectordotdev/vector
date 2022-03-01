@@ -5,10 +5,7 @@ use vector_buffers::{Acker, BufferConfig, BufferType};
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Input};
 
 use super::{component, ComponentKey, ProxyConfig, Resource};
-use crate::{
-    serde::bool_or_struct,
-    sinks::{self, util::UriSerde},
-};
+use crate::sinks::{self, util::UriSerde};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter<T> {
@@ -33,13 +30,6 @@ pub struct SinkOuter<T> {
 
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
-
-    #[serde(
-        default,
-        deserialize_with = "bool_or_struct",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl<T> SinkOuter<T> {
@@ -51,7 +41,6 @@ impl<T> SinkOuter<T> {
             healthcheck_uri: None,
             inner,
             proxy: Default::default(),
-            acknowledgements: Default::default(),
         }
     }
 
@@ -103,7 +92,6 @@ impl<T> SinkOuter<T> {
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
-            acknowledgements: self.acknowledgements,
         }
     }
 }
@@ -156,7 +144,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
         Vec::new()
     }
 
-    fn can_acknowledge(&self) -> bool;
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig>;
 }
 
 #[derive(Debug, Clone)]

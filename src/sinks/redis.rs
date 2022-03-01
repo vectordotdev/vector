@@ -13,7 +13,10 @@ use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     internal_events::{RedisEventsSent, RedisSendEventError, TemplateRenderingError},
     sinks::util::{
@@ -102,6 +105,12 @@ pub struct RedisSinkConfig {
     batch: BatchConfig<RedisDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for RedisSinkConfig {
@@ -144,8 +153,8 @@ impl SinkConfig for RedisSinkConfig {
         "redis"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -456,6 +465,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -514,6 +524,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -585,6 +596,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.

@@ -20,7 +20,8 @@ use super::util::SinkBatchSettings;
 use crate::{
     aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::{AwsSqsEventsSent, TemplateRenderingError},
@@ -85,6 +86,12 @@ pub struct SqsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -133,8 +140,8 @@ impl SinkConfig for SqsSinkConfig {
         "aws_sqs"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -436,6 +443,7 @@ mod integration_tests {
             tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();
