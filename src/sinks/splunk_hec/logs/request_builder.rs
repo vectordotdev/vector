@@ -10,7 +10,7 @@ use crate::sinks::{
 };
 
 pub struct HecLogsRequestBuilder {
-    pub compression: Compression,
+    pub(crate) compression: Compression,
     pub encoding: EncodingConfig<HecLogsEncoder>,
 }
 
