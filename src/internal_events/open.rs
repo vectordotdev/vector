@@ -21,7 +21,7 @@ impl InternalEvent for ConnectionOpen {
 }
 
 #[derive(Clone)]
-pub struct OpenGauge {
+pub(crate) struct OpenGauge {
     gauge: Arc<AtomicUsize>,
 }
 
