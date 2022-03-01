@@ -151,7 +151,7 @@ impl FunctionTransform for KeyValue {
             if let Some(target_field) = &self.target_field {
                 if log.contains(target_field.as_str()) {
                     if self.overwrite_target {
-                        log.remove(target_field);
+                        log.remove(target_field.as_str());
                     } else {
                         emit!(&ParserTargetExistsError { target_field });
                         return output.push(event);
@@ -184,7 +184,7 @@ impl FunctionTransform for KeyValue {
             }
 
             if self.drop_field {
-                log.remove(&self.field);
+                log.remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError {

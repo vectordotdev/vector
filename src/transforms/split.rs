@@ -124,7 +124,7 @@ impl FunctionTransform for Split {
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError { field: &self.field });

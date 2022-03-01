@@ -115,7 +115,7 @@ impl FunctionTransform for JsonParser {
                         emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
-                            log.remove(&self.field);
+                            log.remove(self.field.as_str());
                         }
 
                         log.insert(target_field.as_str(), Value::Object(object));
@@ -123,7 +123,7 @@ impl FunctionTransform for JsonParser {
                 }
                 None => {
                     if self.drop_field {
-                        log.remove(&self.field);
+                        log.remove(self.field.as_str());
                     }
 
                     for (key, value) in object {

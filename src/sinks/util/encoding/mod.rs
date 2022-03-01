@@ -148,7 +148,7 @@ pub trait EncodingConfiguration {
     fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = &self.except_fields() {
             for field in except_fields {
-                log.remove(field);
+                log.remove(field.as_str());
             }
         }
     }

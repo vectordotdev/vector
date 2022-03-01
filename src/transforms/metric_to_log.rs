@@ -96,7 +96,7 @@ impl MetricToLog {
                     }
 
                     let timestamp = log
-                        .remove(&self.timestamp_key)
+                        .remove(self.timestamp_key.as_str())
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
                                 .convert(value.coerce_to_bytes())

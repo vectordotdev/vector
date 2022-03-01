@@ -272,7 +272,7 @@ impl FunctionTransform for RegexParser {
                 if let Some(target_field) = target_field {
                     if log.contains(target_field.as_str()) {
                         if self.overwrite_target {
-                            log.remove(target_field);
+                            log.remove(target_field.as_str());
                         } else {
                             emit!(&ParserTargetExistsError { target_field });
                             output.push(event);
@@ -288,7 +288,7 @@ impl FunctionTransform for RegexParser {
                     (name, value)
                 }));
                 if self.drop_field {
-                    log.remove(&self.field);
+                    log.remove(self.field.as_str());
                 }
                 output.push(event);
                 return;

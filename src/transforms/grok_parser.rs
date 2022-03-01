@@ -139,7 +139,7 @@ impl FunctionTransform for GrokParser {
                 }
 
                 if drop_field {
-                    event.remove(&self.field);
+                    event.remove(self.field.as_str());
                 }
             } else {
                 emit!(&ParserMatchError {

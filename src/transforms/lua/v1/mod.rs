@@ -216,7 +216,7 @@ impl mlua::UserData for LuaEvent {
                             .insert(key.as_str(), Value::Boolean(boolean));
                     }
                     Some(mlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(key);
+                        this.inner.as_mut_log().remove(key.as_str());
                     }
                     _ => {
                         info!(
@@ -225,7 +225,7 @@ impl mlua::UserData for LuaEvent {
                             field = key.as_str(),
                             internal_log_rate_secs = 30
                         );
-                        this.inner.as_mut_log().remove(key);
+                        this.inner.as_mut_log().remove(key.as_str());
                     }
                 }
 

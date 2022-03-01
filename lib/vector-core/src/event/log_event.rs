@@ -188,8 +188,8 @@ impl LogEvent {
         }
     }
 
-    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        self.remove_prune(key.as_ref(), false)
+    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+        self.remove_prune(path, false)
     }
 
     pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
@@ -228,7 +228,7 @@ impl LogEvent {
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field) {
+            let incoming_val = match incoming.remove(field.as_ref()) {
                 None => continue,
                 Some(val) => val,
             };

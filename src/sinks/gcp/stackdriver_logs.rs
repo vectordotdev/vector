@@ -198,7 +198,7 @@ impl HttpSink for StackdriverSink {
         let severity = self
             .severity_key
             .as_ref()
-            .and_then(|key| log.remove(key))
+            .and_then(|key| log.remove(key.as_str()))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
