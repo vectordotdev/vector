@@ -59,7 +59,7 @@ impl filter::CustomFilter<Sink> for SinksFilter {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum SinksSortFieldName {
+pub(crate) enum SinksSortFieldName {
     ComponentKey,
     ComponentType,
 }
