@@ -17,7 +17,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
-    pub source: String,
+    pub(crate) source: String,
     pub database: String,
     #[serde(default = "default_geoip_target_field")]
     pub target: String,
