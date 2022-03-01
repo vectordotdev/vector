@@ -301,9 +301,9 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("name", "\"sandbox0-name\"");
-                    log.insert("ns", "\"sandbox0-ns\"");
-                    log.insert("uid", "\"sandbox0-uid\"");
+                    log.insert("name", "sandbox0-name");
+                    log.insert("ns", "sandbox0-ns");
+                    log.insert("uid", "sandbox0-uid");
                     log.insert("labels.\"sandbox0-label0\"", "val0");
                     log.insert("labels.\"sandbox0-label1\"", "val1");
                     log

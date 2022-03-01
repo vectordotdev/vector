@@ -102,6 +102,7 @@ pub struct JitLookup<'a> {
 // TODO: maybe support whitespace around an index?
 enum JitState {
     Start,
+    Continue,
     Dot,
     IndexStart,
     Index { value: usize },
@@ -118,7 +119,8 @@ impl<'a> Iterator for JitLookup<'a> {
             match self.chars.next() {
                 None => {
                     let result = match self.state {
-                        JitState::Start => None,
+                        JitState::Start => Some(BorrowedSegment::Invalid),
+                        JitState::Continue => None,
                         JitState::Dot => None,
                         JitState::IndexStart => Some(BorrowedSegment::Invalid),
                         JitState::Index { .. } => Some(BorrowedSegment::Invalid),
@@ -133,7 +135,7 @@ impl<'a> Iterator for JitLookup<'a> {
                 }
                 Some((index, c)) => {
                     let (result, state) = match self.state {
-                        JitState::Start => match c {
+                        JitState::Start | JitState::Continue => match c {
                             '.' => (None, JitState::Dot),
                             'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
                                 (None, JitState::Field { start: index })
@@ -166,7 +168,7 @@ impl<'a> Iterator for JitLookup<'a> {
                         JitState::Quote { start } => match c {
                             '\"' => (
                                 Some(Some(BorrowedSegment::Field(&self.path[start..index]))),
-                                JitState::Start,
+                                JitState::Continue,
                             ),
                             _ => (None, JitState::Quote { start }),
                         },
@@ -189,7 +191,10 @@ impl<'a> Iterator for JitLookup<'a> {
                                     },
                                 )
                             }
-                            ']' => (Some(Some(BorrowedSegment::Index(value))), JitState::Start),
+                            ']' => (
+                                Some(Some(BorrowedSegment::Index(value))),
+                                JitState::Continue,
+                            ),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::End => (Some(None), JitState::End),
@@ -245,7 +250,7 @@ mod test {
     #[test]
     fn parsing() {
         let test_cases: Vec<(_, Vec<BorrowedSegment>)> = vec![
-            ("", vec![]),
+            ("", vec![BorrowedSegment::Invalid]),
             (".", vec![]),
             ("]", vec![BorrowedSegment::Invalid]),
             ("]foo", vec![BorrowedSegment::Invalid]),
