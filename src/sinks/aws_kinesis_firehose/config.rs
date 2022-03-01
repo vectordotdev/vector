@@ -55,7 +55,7 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) request: TowerRequestConfig,
     pub(crate) tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
