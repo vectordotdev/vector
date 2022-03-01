@@ -63,7 +63,7 @@ pub struct NewRelicConfig {
     pub license_key: String,
     pub account_id: String,
     pub region: Option<NewRelicRegion>,
-    pub api: NewRelicApi,
+    pub(crate) api: NewRelicApi,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
