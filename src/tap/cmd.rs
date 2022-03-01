@@ -1,3 +1,6 @@
+use std::{borrow::Cow, collections::BTreeMap};
+
+use colored::{ColoredString, Colorize};
 use tokio_stream::StreamExt;
 use url::Url;
 use vector_api_client::{
@@ -7,7 +10,7 @@ use vector_api_client::{
             EventNotificationType,
             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         },
-        TapSubscriptionExt,
+        TapEncodingFormat, TapSubscriptionExt,
     },
     Client,
 };
@@ -80,6 +83,8 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
         let stream = res.stream();
     };
 
+    let formatter = EventFormatter::new(opts.meta, opts.format);
+
     // Loop over the returned results, printing out tap events.
     loop {
         tokio::select! {
@@ -90,13 +95,13 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
                     for tap_event in d.output_events_by_component_id_patterns.iter() {
                         match tap_event {
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                                println!("{}", ev.string);
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if !opts.quiet {
@@ -115,4 +120,79 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     }
 
     exitcode::OK
+}
+
+struct EventFormatter {
+    meta: bool,
+    format: TapEncodingFormat,
+    component_id_label: ColoredString,
+    component_kind_label: ColoredString,
+    component_type_label: ColoredString,
+}
+
+impl EventFormatter {
+    fn new(meta: bool, format: TapEncodingFormat) -> Self {
+        Self {
+            meta,
+            format,
+            component_id_label: "component_id".green(),
+            component_kind_label: "component_kind".green(),
+            component_type_label: "component_type".green(),
+        }
+    }
+
+    fn format<'a>(
+        &self,
+        component_id: &str,
+        component_kind: &str,
+        component_type: &str,
+        event: &'a str,
+    ) -> Cow<'a, str> {
+        if self.meta {
+            match self.format {
+                TapEncodingFormat::Json => format!(
+                    r#"{{"{}":"{}","{}":"{}","{}":"{}","event":{}}}"#,
+                    self.component_id_label,
+                    component_id.green(),
+                    self.component_kind_label,
+                    component_kind.green(),
+                    self.component_type_label,
+                    component_type.green(),
+                    event
+                )
+                .into(),
+                TapEncodingFormat::Yaml => {
+                    let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
+                    value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
+                    // We interpolate to include component_id rather than
+                    // include it in the map to correctly preserve color
+                    // formatting
+                    format!(
+                        "{}{}: {}\n{}: {}\n{}: {}\n",
+                        serde_yaml::to_string(&value).unwrap(),
+                        self.component_id_label,
+                        component_id.green(),
+                        self.component_kind_label,
+                        component_kind.green(),
+                        self.component_type_label,
+                        component_type.green()
+                    )
+                    .into()
+                }
+                TapEncodingFormat::Logfmt => format!(
+                    "{}={} {}={} {}={} {}",
+                    self.component_id_label,
+                    component_id.green(),
+                    self.component_kind_label,
+                    component_kind.green(),
+                    self.component_type_label,
+                    component_type.green(),
+                    event
+                )
+                .into(),
+            }
+        } else {
+            event.into()
+        }
+    }
 }

@@ -18,7 +18,7 @@ mod task;
 mod test;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
@@ -48,14 +48,24 @@ type BuiltBuffer = (
     Acker,
 );
 
+/// A tappable output consisting of an output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: &'static str,
+    pub component_type: String,
+}
+
 /// Resources used by the `tap` API to monitor component inputs and outputs,
 /// updated alongside the topology
 #[derive(Debug, Default, Clone)]
 pub struct TapResource {
     // Outputs and their corresponding Fanout control
-    pub outputs: HashMap<OutputId, fanout::ControlChannel>,
+    pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Components removed on a reload (used to drop TapSinks)
+    pub removals: HashSet<ComponentKey>,
 }
 
 // Watcher types for topology changes.

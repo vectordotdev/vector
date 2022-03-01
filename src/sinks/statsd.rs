@@ -20,7 +20,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
     },
-    internal_events::StatsdInvalidMetricReceived,
+    internal_events::StatsdInvalidMetricError,
     sinks::util::{
         buffer::metrics::compress_distribution,
         encode_namespace,
@@ -227,7 +227,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMu
             }
         }
         _ => {
-            emit!(&StatsdInvalidMetricReceived {
+            emit!(&StatsdInvalidMetricError {
                 value: metric.value(),
                 kind: &metric.kind(),
             });

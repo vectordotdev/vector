@@ -43,7 +43,7 @@ jobs:
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: /tmp/${{ github.event.workflow_run.event.number }}-${{ github.event.workflow_run.run_attempt }}-analysis
+          path: /tmp/${{ github.event.workflow_run.run_number }}-${{ github.event.workflow_run.run_attempt }}-analysis
 
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1

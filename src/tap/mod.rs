@@ -39,4 +39,8 @@ pub struct Opts {
     /// Quiet output includes only events
     #[clap(short, long)]
     quiet: bool,
+
+    /// Include metadata such as the event's associated component ID
+    #[clap(short, long)]
+    meta: bool,
 }

@@ -13,6 +13,7 @@ use std::any::Any;
 
 pub use compiler::{
     function, state, value, vm::Vm, Context, Expression, Function, Program, Target, Value,
+    VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
