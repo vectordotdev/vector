@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 pub struct TagCardinalityLimitRejectingEvent<'a> {
-    pub tag_key: &'a str,
+    pub(crate) tag_key: &'a str,
     pub(crate) tag_value: &'a str,
 }
 

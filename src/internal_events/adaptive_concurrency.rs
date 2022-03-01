@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit {
-    pub concurrency: u64,
+    pub(crate) concurrency: u64,
     pub(crate) reached_limit: bool,
     pub had_back_pressure: bool,
     pub current_rtt: Option<Duration>,
