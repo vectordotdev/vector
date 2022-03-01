@@ -128,7 +128,7 @@ impl Function for Del {
 }
 
 #[derive(Debug, Clone)]
-pub struct DelFn {
+pub(crate) struct DelFn {
     query: expression::Query,
 }
 

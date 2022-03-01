@@ -28,8 +28,8 @@ pub enum OutputEventsPayload {
 impl From<TapPayload> for OutputEventsPayload {
     fn from(t: TapPayload) -> Self {
         match t {
-            TapPayload::Log(output_id, ev) => Self::Log(Log::new(output_id, ev)),
-            TapPayload::Metric(output_id, ev) => Self::Metric(Metric::new(output_id, ev)),
+            TapPayload::Log(output, ev) => Self::Log(Log::new(output, ev)),
+            TapPayload::Metric(output, ev) => Self::Metric(Metric::new(output, ev)),
             TapPayload::Notification(component_key, n) => match n {
                 TapNotification::Matched => Self::Notification(EventNotification::new(
                     component_key,
@@ -40,7 +40,7 @@ impl From<TapPayload> for OutputEventsPayload {
                     EventNotificationType::NotMatched,
                 )),
             },
-            TapPayload::Trace(output_id, ev) => Self::Trace(Trace::new(output_id, ev)),
+            TapPayload::Trace(output, ev) => Self::Trace(Trace::new(output, ev)),
         }
     }
 }

@@ -178,7 +178,7 @@ impl Function for ParseKeyValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Whitespace {
+pub(crate) enum Whitespace {
     Strict,
     Lenient,
 }

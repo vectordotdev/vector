@@ -22,6 +22,7 @@ use crate::{
     aws::rusoto::AwsCredentialsProvider,
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
+    internal_events::ElasticsearchResponseError,
     sinks::util::{
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
@@ -230,20 +231,29 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
 }
 
 fn get_event_status(response: &Response<Bytes>) -> EventStatus {
-    if response.status().is_success() {
+    let status = response.status();
+    if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            error!(message = "Response contained errors.", ?response);
+            emit!(&ElasticsearchResponseError {
+                response,
+                message: "Response containerd errors.",
+            });
             EventStatus::Rejected
         } else {
-            trace!(message = "Response successful.", ?response);
             EventStatus::Delivered
         }
-    } else if response.status().is_server_error() {
-        error!(message = "Response wasn't successful.", ?response);
+    } else if status.is_server_error() {
+        emit!(&ElasticsearchResponseError {
+            response,
+            message: "Response wasn't successful.",
+        });
         EventStatus::Errored
     } else {
-        error!(message = "Response failed.", ?response);
+        emit!(&ElasticsearchResponseError {
+            response,
+            message: "Response failed.",
+        });
         EventStatus::Rejected
     }
 }

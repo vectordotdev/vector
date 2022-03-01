@@ -9,9 +9,9 @@ impl fmt::Display for Value {
                 f,
                 r#""{}""#,
                 String::from_utf8_lossy(val)
-                    .replace(r#"\"#, r#"\\"#)
-                    .replace(r#"""#, r#"\""#)
-                    .replace("\n", r#"\n"#)
+                    .replace('\\', r#"\\"#)
+                    .replace('"', r#"\""#)
+                    .replace('\n', r#"\n"#)
             ),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
