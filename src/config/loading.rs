@@ -426,9 +426,7 @@ where
 #[cfg(all(
     test,
     feature = "sinks-elasticsearch",
-    feature = "transforms-pipelines",
-    feature = "transforms-regex_parser",
-    feature = "transforms-sample",
+    feature = "transforms",
     feature = "sources-demo_logs",
     feature = "sinks-console"
 ))]

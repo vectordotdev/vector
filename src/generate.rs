@@ -381,7 +381,7 @@ fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
+    #[cfg(all(feature = "transforms", feature = "sinks-console"))]
     use indoc::indoc;
 
     use super::*;
@@ -425,7 +425,7 @@ mod tests {
 
     #[cfg(all(
         feature = "sources-stdin",
-        feature = "transforms-json_parser",
+        feature = "transforms",
         feature = "sinks-console"
     ))]
     #[test]
@@ -447,9 +447,7 @@ mod tests {
 
     #[cfg(all(
         feature = "sources-stdin",
-        feature = "transforms-add_fields",
-        feature = "transforms-json_parser",
-        feature = "transforms-remove_fields",
+        feature = "transforms",
         feature = "sinks-console"
     ))]
     #[test]

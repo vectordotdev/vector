@@ -216,7 +216,7 @@ impl FunctionTransform for Geoip {
     }
 }
 
-#[cfg(feature = "transforms-json_parser")]
+#[cfg(feature = "transforms")]
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

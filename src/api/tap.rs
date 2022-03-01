@@ -353,8 +353,7 @@ async fn tap_handler(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-log_to_metric",
-    feature = "transforms-remap",
+    feature = "transforms",
 ))]
 mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};

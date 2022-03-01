@@ -121,7 +121,7 @@ mod tests {
     #[cfg(all(
         feature = "enrichment-tables-file",
         feature = "sources-socket",
-        feature = "transforms-sample",
+        feature = "transforms",
         feature = "sinks-socket"
     ))]
     #[test]

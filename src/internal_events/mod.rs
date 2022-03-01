@@ -9,12 +9,9 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
-))]
+#[cfg(any(feature = "sinks-aws_cloudwatch_logs", feature = "transforms",))]
 mod aws_cloudwatch_logs_subscription_parser;
-#[cfg(feature = "transforms-aws_ec2_metadata")]
+#[cfg(feature = "transforms")]
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 mod aws_ecs_metrics;
@@ -28,10 +25,10 @@ mod aws_sqs;
 pub(crate) mod azure_blob;
 mod batch;
 mod blackhole;
-#[cfg(feature = "transforms-coercer")]
+#[cfg(feature = "transforms")]
 mod coercer;
 mod common;
-#[cfg(feature = "transforms-concat")]
+#[cfg(feature = "transforms")]
 mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
@@ -42,7 +39,7 @@ mod datadog_events;
 mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms")]
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
@@ -56,11 +53,11 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
-#[cfg(feature = "transforms-filter")]
+#[cfg(feature = "transforms")]
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
-#[cfg(feature = "transforms-geoip")]
+#[cfg(feature = "transforms")]
 mod geoip;
 mod heartbeat;
 mod http;
@@ -69,22 +66,22 @@ pub mod http_client;
 mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
-#[cfg(feature = "transforms-json_parser")]
+#[cfg(feature = "transforms")]
 mod json_parser;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 mod kafka;
-#[cfg(feature = "transforms-key_value_parser")]
+#[cfg(feature = "transforms")]
 mod key_value_parser;
 #[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
-#[cfg(feature = "transforms-log_to_metric")]
+#[cfg(feature = "transforms")]
 mod log_to_metric;
 mod logplex;
 #[cfg(feature = "sinks-loki")]
 mod loki;
-#[cfg(feature = "transforms-lua")]
+#[cfg(feature = "transforms")]
 mod lua;
-#[cfg(feature = "transforms-metric_to_log")]
+#[cfg(feature = "transforms")]
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
@@ -93,18 +90,7 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
-#[cfg(any(
-    feature = "sinks-datadog_events",
-    feature = "transforms-geoip",
-    feature = "transforms-log_to_metric",
-    feature = "transforms-grok_parser",
-    feature = "transforms-json_parser",
-    feature = "transforms-key_value_parser",
-    feature = "transforms-logfmt_parser",
-    feature = "transforms-regex_parser",
-    feature = "transforms-split",
-    feature = "transforms-tokenizer",
-))]
+#[cfg(any(feature = "sinks-datadog_events", feature = "transforms",))]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
@@ -114,14 +100,14 @@ mod prometheus;
 mod pulsar;
 #[cfg(feature = "sinks-redis")]
 mod redis;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms")]
 mod reduce;
 mod remap;
-#[cfg(feature = "transforms-remove_fields")]
+#[cfg(feature = "transforms")]
 mod remove_fields;
-#[cfg(feature = "transforms-rename_fields")]
+#[cfg(feature = "transforms")]
 mod rename_fields;
-#[cfg(feature = "transforms-route")]
+#[cfg(feature = "transforms")]
 mod route;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
@@ -135,11 +121,11 @@ mod statsd_sink;
 mod statsd_source;
 mod stdin;
 mod syslog;
-#[cfg(feature = "transforms-tag_cardinality_limit")]
+#[cfg(feature = "transforms")]
 mod tag_cardinality_limit;
 mod tcp;
 mod template;
-#[cfg(feature = "transforms-throttle")]
+#[cfg(feature = "transforms")]
 mod throttle;
 mod udp;
 mod unix;
@@ -158,24 +144,21 @@ pub mod kubernetes;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
-#[cfg(feature = "transforms-add_fields")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::add_fields::*;
-#[cfg(feature = "transforms-add_tags")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::add_tags::*;
-#[cfg(feature = "transforms-aggregate")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::aggregate::*;
-#[cfg(feature = "transforms-ansi_stripper")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::ansi_stripper::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub(crate) use self::api::*;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
-))]
+#[cfg(any(feature = "sinks-aws_cloudwatch_logs", feature = "transforms",))]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
-#[cfg(feature = "transforms-aws_ec2_metadata")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) use self::aws_ecs_metrics::*;
@@ -187,9 +170,9 @@ pub(crate) use self::aws_kinesis_streams::*;
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sinks-blackhole")]
 pub(crate) use self::blackhole::*;
-#[cfg(feature = "transforms-coercer")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::coercer::*;
-#[cfg(feature = "transforms-concat")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::concat::*;
 #[cfg(feature = "sinks-console")]
 pub(crate) use self::console::*;
@@ -199,7 +182,7 @@ pub(crate) use self::datadog_events::*;
 pub(crate) use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
 pub(crate) use self::decoder::*;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
@@ -219,11 +202,11 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
-#[cfg(feature = "transforms-filter")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]
 pub(crate) use self::fluent::*;
-#[cfg(feature = "transforms-geoip")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::geoip::*;
 #[cfg(any(
     feature = "sources-utils-http",
@@ -238,40 +221,29 @@ pub(crate) use self::http::*;
 pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
-#[cfg(feature = "transforms-json_parser")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::json_parser::*;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) use self::kafka::*;
-#[cfg(feature = "transforms-key_value_parser")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::key_value_parser::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
-#[cfg(feature = "transforms-log_to_metric")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::log_to_metric::*;
 #[cfg(feature = "sources-heroku_logs")]
 pub(crate) use self::logplex::*;
 #[cfg(feature = "sinks-loki")]
 pub(crate) use self::loki::*;
-#[cfg(feature = "transforms-lua")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::lua::*;
-#[cfg(feature = "transforms-metric_to_log")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::metric_to_log::*;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
-#[cfg(any(
-    feature = "sinks-datadog_events",
-    feature = "transforms-geoip",
-    feature = "transforms-log_to_metric",
-    feature = "transforms-grok_parser",
-    feature = "transforms-json_parser",
-    feature = "transforms-key_value_parser",
-    feature = "transforms-logfmt_parser",
-    feature = "transforms-regex_parser",
-    feature = "transforms-split",
-    feature = "transforms-tokenizer",
-))]
+#[cfg(any(feature = "sinks-datadog_events", feature = "transforms",))]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
@@ -281,17 +253,17 @@ pub(crate) use self::prometheus::*;
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sinks-redis")]
 pub(crate) use self::redis::*;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::reduce::*;
-#[cfg(feature = "transforms-remap")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::remap::*;
-#[cfg(feature = "transforms-remove_fields")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::remove_fields::*;
-#[cfg(feature = "transforms-rename_fields")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::rename_fields::*;
-#[cfg(feature = "transforms-route")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::route::*;
-#[cfg(feature = "transforms-sample")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub(crate) use self::sematext_metrics::*;
@@ -305,9 +277,9 @@ pub(crate) use self::statsd_source::*;
 pub(crate) use self::stdin::*;
 #[cfg(feature = "sources-syslog")]
 pub(crate) use self::syslog::*;
-#[cfg(feature = "transforms-tag_cardinality_limit")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::tag_cardinality_limit::*;
-#[cfg(feature = "transforms-throttle")]
+#[cfg(feature = "transforms")]
 pub(crate) use self::throttle::*;
 #[cfg(all(
     any(

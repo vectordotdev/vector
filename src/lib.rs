@@ -95,6 +95,7 @@ pub mod top;
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
+#[cfg(feature = "transforms")]
 pub mod transforms;
 pub mod trigger;
 pub mod types;
