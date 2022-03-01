@@ -131,7 +131,7 @@ impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerLogsContainerMetadataFetchError<'a> {
+pub(crate) struct DockerLogsContainerMetadataFetchError<'a> {
     pub error: Error,
     pub container_id: &'a str,
 }
