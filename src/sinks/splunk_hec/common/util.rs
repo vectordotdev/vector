@@ -93,7 +93,7 @@ pub fn host_key() -> String {
     crate::config::log_schema().host_key().to_string()
 }
 
-pub fn render_template_string<'a>(
+pub(crate) fn render_template_string<'a>(
     template: &Template,
     event: impl Into<EventRef<'a>>,
     field_name: &str,
