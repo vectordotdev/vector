@@ -21,7 +21,7 @@ impl InternalEvent for FileOpen {
 
 #[derive(Debug)]
 pub struct FileBytesSent<'a> {
-    pub byte_size: usize,
+    pub(crate) byte_size: usize,
     pub file: Cow<'a, str>,
 }
 
