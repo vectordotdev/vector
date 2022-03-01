@@ -292,7 +292,8 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) =
+            TopologyBuilder::standalone_memory(10_000, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 

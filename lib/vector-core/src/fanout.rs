@@ -633,7 +633,7 @@ mod tests {
                 let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
                 BufferSender::new(tx, WhenFull::Block)
             } else {
-                let (tx, rx) = TopologyBuilder::standalone_memory(1, WhenFull::Block).await;
+                let (tx, rx) = TopologyBuilder::standalone_memory(10_000, WhenFull::Block).await;
                 receivers.push(rx);
                 tx
             };
