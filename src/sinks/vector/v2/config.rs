@@ -123,7 +123,7 @@ async fn healthcheck(
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
 /// specified in the address.
-pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
+pub(crate) fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     let uri: Uri = address.parse()?;
     if uri.scheme().is_none() {
         // Default the scheme to http or https.
