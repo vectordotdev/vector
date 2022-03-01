@@ -108,7 +108,7 @@ pub struct DatadogMetricsConfig {
     #[serde(alias = "api_key")]
     default_api_key: String,
     #[serde(default)]
-    pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
