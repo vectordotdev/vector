@@ -37,7 +37,7 @@ const EXPECTED_STRING: &str = "expected_string";
 
 #[derive(Debug)]
 pub struct AnsiStripperFieldInvalidError<'a> {
-    pub field: &'a str,
+    pub(crate) field: &'a str,
 }
 
 impl InternalEvent for AnsiStripperFieldInvalidError<'_> {
