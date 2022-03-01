@@ -28,7 +28,7 @@ enum BuildError {
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct GrokParserConfig {
-    pub pattern: String,
+    pub(crate) pattern: String,
     pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
