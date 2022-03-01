@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use tokio_util::codec::Decoder;
 
 #[derive(Debug)]
-pub struct SizedBytesCodec {
+pub(crate) struct SizedBytesCodec {
     max_length: usize,
 }
 
