@@ -13,7 +13,7 @@ impl<'a> InternalEvent for AddTagsTagOverwritten<'a> {
 
 #[derive(Debug)]
 pub struct AddTagsTagNotOverwritten<'a> {
-    pub tag: &'a str,
+    pub(crate) tag: &'a str,
 }
 
 impl<'a> InternalEvent for AddTagsTagNotOverwritten<'a> {
