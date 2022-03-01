@@ -137,7 +137,7 @@ enum NormalizationError {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(crate) mod tests {
     use super::{super::test_util, *};
     use crate::{test_util::trace_init, transforms::Transform};
 
