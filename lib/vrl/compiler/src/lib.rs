@@ -1,3 +1,10 @@
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 mod compiler;
 mod context;
 mod program;
@@ -46,7 +53,7 @@ pub fn compile_with_state(
 
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
-    pub use ::parser::{
+    pub(crate) use ::parser::{
         ast::{self, Ident, Node},
         Program,
     };

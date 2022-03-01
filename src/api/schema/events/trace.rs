@@ -3,28 +3,38 @@ use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
-    config::OutputId,
     event::{self, Value},
+    topology::TapOutput,
 };
 
 #[derive(Debug, Clone)]
 pub struct Trace {
-    output_id: OutputId,
+    output: TapOutput,
     event: event::TraceEvent,
 }
 
 impl Trace {
-    pub const fn new(output_id: OutputId, event: event::TraceEvent) -> Self {
-        Self { output_id, event }
+    pub const fn new(output: TapOutput, event: event::TraceEvent) -> Self {
+        Self { output, event }
     }
 }
 
 #[Object]
-/// Log event with fields for querying log data
+/// Trace event with fields for querying trace data
 impl Trace {
-    /// Id of the component associated with the log event
+    /// Id of the component associated with the trace event
     async fn component_id(&self) -> &str {
-        self.output_id.component.id()
+        self.output.output_id.component.id()
+    }
+
+    /// Type of component associated with the trace event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the trace event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind
     }
 
     /// Trace event as an encoded string format

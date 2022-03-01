@@ -81,7 +81,7 @@ impl fmt::Display for Variable {
 }
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     variant: ErrorVariant,
     ident: Ident,
     span: Span,
@@ -98,7 +98,7 @@ impl Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("call to undefined variable")]
     Undefined { idents: Vec<Ident> },
 }

@@ -312,7 +312,7 @@ async fn handle_stream<T>(
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
 
-                        let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+                        let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
                         emit!(&SocketEventsReceived {

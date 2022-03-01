@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -21,14 +20,13 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    #[set = "pub"]
     tls: Option<TlsConfig>,
     receive_buffer_bytes: Option<usize>,
 }
@@ -38,6 +36,13 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
+    #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our cargo-hack run
+    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+        self.tls = config;
+    }
+
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,

@@ -642,7 +642,7 @@ fn into_vector_metric(
         .unwrap_or_default()
         .iter()
         .map(|tag| {
-            let kv = tag.split_once(":").unwrap_or((tag, ""));
+            let kv = tag.split_once(':').unwrap_or((tag, ""));
             (kv.0.trim().into(), kv.1.trim().into())
         })
         .collect();
