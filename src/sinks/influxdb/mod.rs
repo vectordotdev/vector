@@ -1,5 +1,5 @@
 pub mod logs;
-pub mod metrics;
+pub(crate) mod metrics;
 
 use std::collections::{BTreeMap, HashMap};
 

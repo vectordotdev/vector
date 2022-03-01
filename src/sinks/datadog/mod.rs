@@ -8,7 +8,7 @@ pub mod events;
 #[cfg(feature = "sinks-datadog_logs")]
 pub mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
-pub mod metrics;
+pub(crate) mod metrics;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
