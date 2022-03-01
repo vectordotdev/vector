@@ -80,7 +80,7 @@ pub fn outputs_by_component_key(component_key: &ComponentKey, outputs: &[String]
         .collect::<Vec<_>>()
 }
 
-pub fn filter_output_metric(metrics: &[Metric], output_name: &str) -> Option<Metric> {
+pub(crate) fn filter_output_metric(metrics: &[Metric], output_name: &str) -> Option<Metric> {
     sum_metrics(
         metrics
             .iter()
