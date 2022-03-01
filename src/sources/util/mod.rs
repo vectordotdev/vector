@@ -60,6 +60,6 @@ pub use self::http::decode;
 #[cfg(feature = "sources-utils-http-error")]
 pub(crate) use self::http::ErrorMessage;
 #[cfg(feature = "sources-utils-http-prelude")]
-pub use self::http::HttpSource;
+pub(crate) use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
 pub(crate) use self::http::HttpSourceAuthConfig;

@@ -55,7 +55,7 @@ where
 ///
 /// Note: the only action available in the [`super::Write`] is to just continue
 /// and return.
-pub struct Writer<T>
+pub(crate) struct Writer<T>
 where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
