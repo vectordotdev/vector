@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct StackdriverMetricsDefaultBatchSettings;
+pub(crate) struct StackdriverMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
