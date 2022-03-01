@@ -108,17 +108,12 @@ fn parse_tz_id_or_name(tz: &str) -> Result<FixedOffset, String> {
 }
 
 fn parse_offset(tz: &str) -> Result<FixedOffset, String> {
-    let offset_format;
     if tz.len() <= 3 {
         // +5, -12
         let hours_diff = tz.parse::<i32>().map_err(|e| e.to_string())?;
         return Ok(FixedOffset::east(hours_diff * 3600));
     }
-    if tz.contains(':') {
-        offset_format = "%:z";
-    } else {
-        offset_format = "%z";
-    }
+    let offset_format = if tz.contains(':') { "%:z" } else { "%z" };
     // apparently the easiest way to parse tz offset is parsing the complete datetime
     let date_str = format!("2020-04-12 22:10:57 {}", tz);
     let datetime =

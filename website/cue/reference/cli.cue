@@ -271,6 +271,10 @@ cli: {
 					_short:      "q"
 					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
 				}
+				"meta": {
+					_short:      "m"
+					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
+				}
 			}
 
 			options: {
