@@ -87,7 +87,7 @@ pub(crate) struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
-    pub journal_directory: Option<PathBuf>,
+    pub(crate) journal_directory: Option<PathBuf>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
     /// Deprecated
