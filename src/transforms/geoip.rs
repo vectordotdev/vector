@@ -29,7 +29,7 @@ pub struct Geoip {
     #[derivative(Debug = "ignore")]
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub database: String,
-    pub source: String,
+    pub(crate) source: String,
     pub target: String,
 }
 
