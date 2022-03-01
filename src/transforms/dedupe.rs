@@ -28,7 +28,7 @@ pub enum FieldMatchConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
-    pub num_events: usize,
+    pub(crate) num_events: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
