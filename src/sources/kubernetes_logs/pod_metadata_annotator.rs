@@ -23,7 +23,7 @@ pub struct FieldsSpec {
     pub pod_uid: String,
     pub pod_ip: String,
     pub pod_ips: String,
-    pub pod_labels: String,
+    pub(crate) pod_labels: String,
     pub pod_annotations: String,
     pub(crate) pod_node_name: String,
     pub pod_owner: String,
