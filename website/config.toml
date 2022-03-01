@@ -220,7 +220,7 @@ weight = 4
 
 [[languages.en.menus.footer]]
 name = "Going to Prod"
-url = "/docs/going-to-prod"
+url = "/docs/setup/going-to-prod"
 parent = "setup"
 weight = 5
 

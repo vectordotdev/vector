@@ -44,7 +44,7 @@ Follow this plan for each deployment within each network partition.
 ### 1. Deploy a Black Hole
 
 - [Identify a single network partition](#boundaries) (i.e., cluster or VPC) for your Vector deployment.
-- [Deploy](https://www.notion.so/Deploying-86f94ff1cf7a4e94b9f0c7118d510f30) Vector with a single `blackhole` sink (the default) within that network partition.
+- [Deploy Vector](/docs/setup/deployment/) with a single `blackhole` sink (the default) within that network partition.
 - [Size and scale](/docs/setup/going-to-prod/sizing/) Vector’s instances for the [conservative estimate of 10 MiB/s/vCPU](/docs/setup/going-to-prod/sizing/#estimations).
 
 ### 2. Stream a Copy of Your Data

@@ -137,7 +137,7 @@ These actions mitigate [individual node failure](#node-failure) and [data center
 
 Mitigate software failures by configuring your Vector instances as follows:
 
-1. Able sources should enable [end-to-end acknowledgements](/docs/about/under-the-hood/networking/arc/).
+1. Able sources should enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/).
 2. Sinks should implement disk or memory buffers that overflow to disk.
 3. Transforms should implement dropped event routing to your system of record.
 
