@@ -62,7 +62,7 @@ pub struct SqsSink {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SqsSinkDefaultBatchSettings;
+pub(crate) struct SqsSinkDefaultBatchSettings;
 
 impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
