@@ -185,7 +185,7 @@ fn sign_request(
 pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
-    pub batch_size: usize,
+    pub(crate) batch_size: usize,
     pub events_byte_size: usize,
 }
 
