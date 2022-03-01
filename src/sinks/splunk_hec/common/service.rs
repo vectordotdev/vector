@@ -29,7 +29,7 @@ use crate::{
     },
 };
 
-pub struct HecService<S> {
+pub(crate) struct HecService<S> {
     pub inner: S,
     ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
     ack_slots: PollSemaphore,

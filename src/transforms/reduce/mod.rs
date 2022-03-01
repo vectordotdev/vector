@@ -147,7 +147,7 @@ impl ReduceState {
 
 //------------------------------------------------------------------------------
 
-pub struct Reduce {
+pub(crate) struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
     group_by: Vec<String>,
