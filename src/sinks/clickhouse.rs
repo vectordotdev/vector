@@ -40,7 +40,7 @@ pub struct ClickhouseConfig {
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     pub auth: Option<Auth>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub(crate) request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
     #[serde(
         default,

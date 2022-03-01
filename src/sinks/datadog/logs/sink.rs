@@ -90,7 +90,7 @@ impl<S> LogSinkBuilder<S> {
     }
 }
 
-pub struct LogSink<S> {
+pub(crate) struct LogSink<S> {
     /// The default Datadog API key to use
     ///
     /// In some instances an `Event` will come in on the stream with an
