@@ -66,7 +66,7 @@ pub(crate) fn make_log_event_with_byte_message(
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<LogEvent>)>)
+pub(crate) fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<LogEvent>)>)
 where
     B: Fn() -> Transform,
     L: Fn(S) -> Event,
