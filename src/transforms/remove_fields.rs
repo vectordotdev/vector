@@ -19,7 +19,7 @@ pub struct RemoveFieldsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct RemoveFields {
+pub(crate) struct RemoveFields {
     fields: Vec<String>,
     drop_empty: bool,
 }
