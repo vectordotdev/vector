@@ -60,7 +60,7 @@ enum BuildError {
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct PrometheusExporterConfig {
+pub(crate) struct PrometheusExporterConfig {
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
