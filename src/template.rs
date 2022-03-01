@@ -418,7 +418,7 @@ mod tests {
         event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
-        let template = Template::try_from("nested {{ %F }} %T").unwrap();
+        let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),

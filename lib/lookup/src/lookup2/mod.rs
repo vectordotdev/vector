@@ -84,6 +84,22 @@ impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
     }
 }
 
+impl<'a, 'b: 'a> Path<'a> for &'b [BorrowedSegment<'a>] {
+    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.iter().cloned()
+    }
+}
+
+impl<'a, 'b: 'a, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.iter().cloned()
+    }
+}
+
 impl<'a> Path<'a> for &'a str {
     type Iter = JitLookup<'a>;
 

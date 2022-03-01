@@ -368,7 +368,6 @@ where
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
-        println!("event: {:?}", self);
         self.get(key.as_ref())
             .expect(&*format!("Key is not found: {:?}", key.as_ref()))
     }
