@@ -124,8 +124,8 @@ impl LogEvent {
         Arc::make_mut(&mut self.fields).get_mut2(key.as_ref())
     }
 
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.as_map(), key.as_ref())
+    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+        util::log::contains(self.as_map(), path)
     }
 
     // This is deprecated - use `insert_path` instead.

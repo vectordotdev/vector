@@ -270,7 +270,7 @@ impl FunctionTransform for RegexParser {
             if let Some(captures) = pattern.captures(value) {
                 // Handle optional overwriting of the target field
                 if let Some(target_field) = target_field {
-                    if log.contains(target_field) {
+                    if log.contains(target_field.as_str()) {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {

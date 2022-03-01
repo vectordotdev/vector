@@ -109,7 +109,7 @@ impl FunctionTransform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    let contains_target = log.contains(&target_field);
+                    let contains_target = log.contains(target_field.as_str());
 
                     if contains_target && !self.overwrite_target {
                         emit!(&ParserTargetExistsError { target_field })
