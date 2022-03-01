@@ -28,7 +28,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct HecLogsSinkConfig {
+pub(crate) struct HecLogsSinkConfig {
     // Deprecated name
     #[serde(alias = "token")]
     pub default_token: String,
