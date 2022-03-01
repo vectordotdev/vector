@@ -180,7 +180,7 @@ pub fn assert_gauge(metrics: &SplitMetrics, series: MetricSeries, expected: f64)
     );
 }
 
-pub fn assert_distribution(
+pub(crate) fn assert_distribution(
     metrics: &SplitMetrics,
     series: MetricSeries,
     expected_sum: f64,
