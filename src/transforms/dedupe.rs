@@ -35,7 +35,7 @@ pub struct CacheConfig {
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
     #[serde(default)]
-    pub fields: Option<FieldMatchConfig>,
+    pub(crate) fields: Option<FieldMatchConfig>,
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 }
