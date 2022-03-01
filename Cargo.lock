@@ -8646,6 +8646,7 @@ name = "vrl"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
+ "criterion",
  "indoc",
  "lookup",
  "ordered-float",
@@ -8655,6 +8656,7 @@ dependencies = [
  "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
+ "vrl-stdlib",
 ]
 
 [[package]]
