@@ -103,7 +103,10 @@ impl Split {
 
 impl FunctionTransform for Split {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             for ((name, conversion), value) in self

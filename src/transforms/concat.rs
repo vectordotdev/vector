@@ -141,7 +141,7 @@ impl FunctionTransform for Concat {
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 
         for substring in self.items.iter() {
-            if let Some(value) = event.as_log().get(&substring.source) {
+            if let Some(value) = event.as_log().get(substring.source.as_str()) {
                 let b = value.coerce_to_bytes();
                 let start = match substring.start {
                     None => 0,

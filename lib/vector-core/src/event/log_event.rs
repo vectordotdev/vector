@@ -112,8 +112,8 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get2(key.as_ref())
+    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
+        self.fields.get2(key)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {

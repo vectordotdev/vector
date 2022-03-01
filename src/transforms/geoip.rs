@@ -136,7 +136,7 @@ impl FunctionTransform for Geoip {
         let target_field = self.target.clone();
         let ipaddress = event
             .as_log()
-            .get(&self.source)
+            .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             match FromStr::from_str(ipaddress) {

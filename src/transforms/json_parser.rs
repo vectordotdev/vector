@@ -82,7 +82,7 @@ impl From<JsonParserConfig> for JsonParser {
 impl FunctionTransform for JsonParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field);
+        let value = log.get(self.field.as_str());
 
         let parsed = value
             .and_then(|value| {

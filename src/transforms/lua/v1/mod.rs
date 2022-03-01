@@ -230,7 +230,7 @@ impl mlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
-            if let Some(value) = this.inner.as_log().get(key) {
+            if let Some(value) = this.inner.as_log().get(key.as_str()) {
                 let string = lua.create_string(&value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {
@@ -251,7 +251,10 @@ impl mlua::UserData for LuaEvent {
                     let keys: mlua::Table = state.raw_get("keys")?;
                     let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key.clone().and_then(|k| event.inner.as_log().get(k)) {
+                    match key
+                        .clone()
+                        .and_then(|k| event.inner.as_log().get(k.as_str()))
+                    {
                         Some(value) => {
                             Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
                         }

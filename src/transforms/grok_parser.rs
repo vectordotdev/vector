@@ -117,7 +117,7 @@ impl Clone for GrokParser {
 impl FunctionTransform for GrokParser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = event.into_log();
-        let value = event.get(&self.field).map(|s| s.to_string_lossy());
+        let value = event.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {

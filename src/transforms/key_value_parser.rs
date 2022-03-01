@@ -141,7 +141,7 @@ impl KeyValue {
 impl FunctionTransform for KeyValue {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.to_string_lossy());
+        let value = log.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             let pairs = value

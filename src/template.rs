@@ -154,7 +154,7 @@ fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateR
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
                 EventRef::Metric(metric) => render_metric_field(key, metric),
                 EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
