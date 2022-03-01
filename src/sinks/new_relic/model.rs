@@ -16,7 +16,7 @@ type KeyValData = HashMap<String, Value>;
 type DataStore = HashMap<String, Vec<KeyValData>>;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MetricsApiModel(pub Vec<DataStore>);
+pub struct MetricsApiModel(pub(crate) Vec<DataStore>);
 
 impl MetricsApiModel {
     pub fn new(metric_array: Vec<(Value, Value, Value)>) -> Self {
