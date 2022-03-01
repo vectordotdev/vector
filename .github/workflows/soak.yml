@@ -253,8 +253,8 @@ jobs:
 
       - name: Run baseline experiment
         run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
+          mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
                                   --variant "baseline" \
@@ -262,14 +262,14 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
                                   --warmup-seconds 30
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
 
       - name: Clear up unused images
         run: |
@@ -300,15 +300,15 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v2
         with:
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Detect erratic
         run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                      --warmup-seconds 30 \
                                      --variant baseline \
@@ -339,8 +339,8 @@ jobs:
 
       - name: Run comparison experiment
         run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
+          mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
                                   --variant "comparison" \
@@ -348,14 +348,14 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
                                   --warmup-seconds 30
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
 
       - name: Clear up unused images
         run: |
@@ -386,15 +386,15 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v2
         with:
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Detect erratic
         run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                      --warmup-seconds 30 \
                                      --variant comparison \
@@ -426,32 +426,32 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v2
         with:
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/analyze_experiment --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                          --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                          --warmup-seconds 30 \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+                                         --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
       - uses: actions/upload-artifact@v2
         with:
           name: soak-analysis
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
 
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
@@ -486,15 +486,15 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v2
         with:
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Detect regressions
         run: |
-          ./soaks/bin/detect_regressions --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --p-value 0.1
@@ -524,21 +524,21 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v2
         with:
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
       - name: Plot analysis
         run: |
-          mkdir -p ${{ github.event.number }}-${{ github.run_attempt }}-captures/plots/
-          ./soaks/bin/plot_analysis --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
-                                    --output-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/plots/ \
+          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
+          ./soaks/bin/plot_analysis --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+                                    --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
 
       - name: Upload plots
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures-plots
-          path: "${{ github.event.number }}-${{ github.run_attempt }}-captures/plots"
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-captures-plots
+          path: "${{ github.run_id }}-${{ github.run_attempt }}-captures/plots"
