@@ -15,7 +15,7 @@ use crate::{
 #[derive(Clone)]
 pub struct DatadogEventsRequest {
     pub(crate) body: Bytes,
-    pub metadata: Metadata,
+    pub(crate) metadata: Metadata,
 }
 
 impl Finalizable for DatadogEventsRequest {
