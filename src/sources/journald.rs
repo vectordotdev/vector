@@ -78,7 +78,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub(crate) struct JournaldConfig {
-    pub current_boot_only: Option<bool>,
+    pub(crate) current_boot_only: Option<bool>,
     pub units: Vec<String>,
     pub include_units: Vec<String>,
     pub exclude_units: Vec<String>,
