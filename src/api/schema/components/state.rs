@@ -63,7 +63,7 @@ pub fn get_component_keys() -> HashSet<ComponentKey> {
 }
 
 /// Gets a component by component_key
-pub fn component_by_component_key(component_key: &ComponentKey) -> Option<Component> {
+pub(crate) fn component_by_component_key(component_key: &ComponentKey) -> Option<Component> {
     Some(
         COMPONENTS
             .read()

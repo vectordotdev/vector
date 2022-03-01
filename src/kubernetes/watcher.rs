@@ -27,7 +27,7 @@ pub trait Watcher {
     ) -> BoxFuture<'a, Result<Self::Stream, invocation::Error<Self::InvocationError>>>;
 }
 
-pub mod stream {
+pub(crate) mod stream {
     //! Stream errors.
     use super::*;
 
