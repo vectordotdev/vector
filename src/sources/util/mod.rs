@@ -58,7 +58,7 @@ pub use self::http::add_query_parameters;
 ))]
 pub use self::http::decode;
 #[cfg(feature = "sources-utils-http-error")]
-pub use self::http::ErrorMessage;
+pub(crate) use self::http::ErrorMessage;
 #[cfg(feature = "sources-utils-http-prelude")]
 pub use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
