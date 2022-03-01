@@ -32,4 +32,3 @@ path = "../stdlib"
 [features]
 default = ["repl"]
 repl = ["once_cell", "prettytable-rs", "regex", "rustyline", "webbrowser"]
-vrl-vm = []
