@@ -34,7 +34,7 @@ fn default_host() -> String {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct AzureMonitorLogsConfig {
+pub(crate) struct AzureMonitorLogsConfig {
     pub customer_id: String,
     pub shared_key: String,
     pub log_type: String,
