@@ -316,7 +316,7 @@ pub(in crate::sinks) fn encode_uri(
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub mod test_util {
+pub(crate) mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
