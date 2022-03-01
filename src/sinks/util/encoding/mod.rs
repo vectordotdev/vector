@@ -141,7 +141,7 @@ pub trait EncodingConfiguration {
             to_remove.sort_by(|a, b| b.cmp(a));
 
             for removal in to_remove {
-                log.remove_prune(removal, true);
+                log.remove_prune(removal.as_str(), true);
             }
         }
     }

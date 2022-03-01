@@ -189,11 +189,11 @@ impl LogEvent {
     }
 
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        self.remove_prune(key, false)
+        self.remove_prune(key.as_ref(), false)
     }
 
-    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(Arc::make_mut(&mut self.fields), key.as_ref(), prune)
+    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+        util::log::remove(Arc::make_mut(&mut self.fields), path, prune)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
