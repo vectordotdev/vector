@@ -1833,6 +1833,14 @@ bench_function! {
         ],
         want: Ok("hello [REDACTED] world"),
     }
+
+    email_address {
+        args: func_args![
+            value: "hello@example.com",
+            filters: vec!["email_address"],
+        ],
+        want: Ok("[REDACTED]"),
+    }
 }
 
 bench_function! {

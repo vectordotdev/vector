@@ -19,6 +19,16 @@ static US_SOCIAL_SECURITY_NUMBER: Lazy<regex::Regex> = Lazy::new(|| {
     "#).unwrap()
 });
 
+static EMAIL_ADDRESS: Lazy<regex::Regex> = Lazy::new(|| {
+    regex::Regex::new(
+        r#"(?x)           # Ignore whitespace and comments in the regex expression.
+    (?:[A-Za-z0-9_.-]+)@  # Local-part of email address
+    (?:[A-Za-z0-9.-]+)    # Email domain
+    "#,
+    )
+    .unwrap()
+});
+
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
 
@@ -153,6 +163,7 @@ impl Expression for RedactFn {
 enum Filter {
     Pattern(Vec<Pattern>),
     UsSocialSecurityNumber,
+    EmailAddress,
 }
 
 #[derive(Debug, Clone)]
@@ -177,6 +188,7 @@ impl TryFrom<Value> for Filter {
 
                 match r#type.as_ref() {
                     b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
+                    b"email_address" => Ok(Filter::EmailAddress),
                     b"pattern" => {
                         let patterns = match object
                             .get("patterns")
@@ -202,6 +214,7 @@ impl TryFrom<Value> for Filter {
             Value::Bytes(bytes) => match bytes.as_ref() {
                 b"pattern" => Err("pattern cannot be used without arguments"),
                 b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
+                b"email_address" => Ok(Filter::EmailAddress),
                 _ => Err("unknown filter name"),
             },
             Value::Regex(regex) => Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())])),
@@ -229,6 +242,7 @@ impl Filter {
             Filter::UsSocialSecurityNumber => {
                 US_SOCIAL_SECURITY_NUMBER.replace_all(input, redactor.pattern())
             }
+            Filter::EmailAddress => EMAIL_ADDRESS.replace_all(input, redactor.pattern()),
         }
     }
 }
