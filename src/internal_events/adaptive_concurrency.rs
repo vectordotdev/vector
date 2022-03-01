@@ -62,7 +62,7 @@ impl InternalEvent for AdaptiveConcurrencyObservedRtt {
 }
 
 #[derive(Debug)]
-pub struct AdaptiveConcurrencyAveragedRtt {
+pub(crate) struct AdaptiveConcurrencyAveragedRtt {
     pub rtt: Duration,
 }
 
