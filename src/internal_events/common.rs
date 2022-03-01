@@ -4,7 +4,7 @@ pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct BytesReceived {
+pub(crate) struct BytesReceived {
     pub byte_size: usize,
     pub protocol: &'static str,
 }
