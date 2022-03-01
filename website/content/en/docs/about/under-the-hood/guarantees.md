@@ -20,13 +20,14 @@ originating source to any number of destination sinks. Support for this
 feature is indicated by the "acknowledgements" badge at the top of the
 relevant sink or source configuration reference page.
 
-For a source that supports end-to-end acknowledgements and has the
-`acknowledgements` option enabled, this will cause it to wait for _all_
-connected sinks to either mark the event as delivered or to persist the
-events to a durable buffer before acknowledging receipt of the event. If
-the sink signals the event was rejected and the source can provide an
-error response (ie through an HTTP error code), then the source will
-provide an appropriate error to the sending agent.
+For a source that supports end-to-end acknowledgements and is
+connected to a sink that has the `acknowledgements` option enabled,
+this will cause it to wait for _all_ connected sinks to either mark
+the event as delivered, or to persist the events to a durable buffer
+before acknowledging receipt of the event. If a sink signals the event
+was rejected and the source can provide an error response (ie through
+an HTTP error code), then the source will provide an appropriate error
+to the sending agent.
 
 Sinks support end-to-end acknowledgements by providing an indicator of
 the final status of each event after delivery has completed. This
@@ -37,6 +38,12 @@ that Vector will continue to retry the event even after restarts. If the
 sink does not support acknowledgements, events will be marked as having
 been delivered when they are handed off to the sink component, before
 any deliveries are attempted.
+
+Some transforms will drop events as part of their normal
+operation. For example, the `dedupe` transform will drop events that
+duplicate another recent event in order to reduce data volume. When
+this happens, the event will be considered as having been delivered
+with no error.
 
 ## Delivery guarantees
 
