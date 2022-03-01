@@ -146,7 +146,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
 const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
 #[derive(Debug)]
-pub struct KubernetesLifecycleError<E> {
+pub(crate) struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
 }
