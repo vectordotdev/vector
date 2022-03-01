@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct VrlConditionExecutionError<'a> {
-    pub error: &'a str,
+    pub(crate) error: &'a str,
 }
 
 impl<'a> InternalEvent for VrlConditionExecutionError<'a> {

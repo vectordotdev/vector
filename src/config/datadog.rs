@@ -50,7 +50,7 @@ const fn default_reporting_interval_secs() -> u64 {
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config) -> bool {
+pub(crate) fn try_attach(config: &mut Config) -> bool {
     // Only valid if a [datadog] section is present in config.
     let datadog = match config.datadog.as_ref() {
         Some(datadog) => datadog,
