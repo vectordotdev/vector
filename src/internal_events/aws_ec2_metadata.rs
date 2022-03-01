@@ -17,7 +17,7 @@ impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
 
 #[derive(Debug)]
 pub struct AwsEc2MetadataRefreshError {
-    pub error: crate::Error,
+    pub(crate) error: crate::Error,
 }
 
 impl InternalEvent for AwsEc2MetadataRefreshError {
