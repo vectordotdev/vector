@@ -8,7 +8,7 @@ pub struct ConfigDiff {
     pub sources: Difference,
     pub(crate) transforms: Difference,
     pub sinks: Difference,
-    pub enrichment_tables: Difference,
+    pub(crate) enrichment_tables: Difference,
 }
 
 impl ConfigDiff {
