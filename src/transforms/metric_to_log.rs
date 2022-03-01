@@ -103,10 +103,10 @@ impl MetricToLog {
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
-                    log.insert(&log_schema().timestamp_key(), timestamp);
+                    log.insert(log_schema().timestamp_key(), timestamp);
 
                     if let Some(host) = log.remove_prune(&self.host_tag, true) {
-                        log.insert(&log_schema().host_key(), host);
+                        log.insert(log_schema().host_key(), host);
                     }
 
                     Some(log)

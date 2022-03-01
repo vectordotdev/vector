@@ -114,7 +114,7 @@ impl FunctionTransform for Tokenizer {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert_path(path, value);
+                        event.as_mut_log().insert(path, value);
                     }
                     Err(error) => {
                         emit!(&ParserConversionError { name, error });

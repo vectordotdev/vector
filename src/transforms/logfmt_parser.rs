@@ -94,7 +94,7 @@ impl FunctionTransform for Logfmt {
                         Ok(value) => {
                             event
                                 .as_mut_log()
-                                .insert_path(&[BorrowedSegment::Field(key.as_str())], value);
+                                .insert(&[BorrowedSegment::Field(key.as_str())], value);
                         }
                         Err(error) => {
                             emit!(&ParserConversionError {
@@ -106,7 +106,7 @@ impl FunctionTransform for Logfmt {
                 } else {
                     event
                         .as_mut_log()
-                        .insert_path(&[BorrowedSegment::Field(key.as_str())], val);
+                        .insert(&[BorrowedSegment::Field(key.as_str())], val);
                 }
             }
 

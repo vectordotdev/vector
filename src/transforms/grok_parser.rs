@@ -127,11 +127,11 @@ impl FunctionTransform for GrokParser {
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path, value);
+                                event.insert(path, value);
                             } else {
                                 let path = parse_path(name);
                                 self.paths.insert(name.to_string(), path.clone());
-                                event.insert_path(&path, value);
+                                event.insert(&path, value);
                             }
                         }
                         Err(error) => emit!(&ParserConversionError { name, error }),

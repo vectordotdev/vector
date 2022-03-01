@@ -119,7 +119,7 @@ fn annotate_from_file_info(
     file_info: &LogFileInfo<'_>,
 ) {
     log.insert(
-        &fields_spec.container_name,
+        fields_spec.container_name.as_str(),
         file_info.container_name.to_owned(),
     );
 }
@@ -133,13 +133,13 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     .iter()
     {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 
     if let Some(owner_references) = &metadata.owner_references {
         log.insert(
-            &fields_spec.pod_owner,
+            fields_spec.pod_owner.as_str(),
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
         );
     }
@@ -150,7 +150,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
             path.push(OwnedSegment::Field(key.clone().into()));
-            log.insert_path(&path, val.to_owned());
+            log.insert(&path, val.to_owned());
         }
     }
 
@@ -159,7 +159,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         for (key, val) in annotations.iter() {
             let mut path = prefix_path.clone();
             path.push(OwnedSegment::Field(key.clone().into()));
-            log.insert_path(&path, val.to_owned());
+            log.insert(&path, val.to_owned());
         }
     }
 }
@@ -167,7 +167,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
     for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }
@@ -175,7 +175,7 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
 fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
     for (ref key, ref val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 
@@ -185,7 +185,7 @@ fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_st
                 .iter()
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
-            log.insert(key, inner);
+            log.insert(key.as_str(), inner);
         }
     }
 }
@@ -197,7 +197,7 @@ fn annotate_from_container_status(
 ) {
     for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }
@@ -205,7 +205,7 @@ fn annotate_from_container_status(
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
     for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }

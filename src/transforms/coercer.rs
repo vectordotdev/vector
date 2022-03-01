@@ -80,7 +80,7 @@ impl FunctionTransform for Coercer {
                 if let Some(value) = log.remove(field) {
                     match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            new_log.insert(field, converted);
+                            new_log.insert(field.as_str(), converted);
                         }
                         Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
@@ -93,7 +93,7 @@ impl FunctionTransform for Coercer {
                 if let Some(value) = log.remove(field) {
                     match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            log.insert(field, converted);
+                            log.insert(field.as_str(), converted);
                         }
                         Err(error) => emit!(&CoercerConversionError { field, error }),
                     }

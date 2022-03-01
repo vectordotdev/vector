@@ -128,17 +128,7 @@ impl LogEvent {
         util::log::contains(self.as_map(), path)
     }
 
-    // This is deprecated - use `insert_path` instead.
-    pub fn insert(
-        &mut self,
-        path: impl AsRef<str>,
-        value: impl Into<Value> + Debug,
-    ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), path.as_ref(), value.into())
-    }
-
-    // This will be renamed to `insert` once the current `insert` is fully removed
-    pub fn insert_path<'a>(
+    pub fn insert<'a>(
         &mut self,
         path: impl Path<'a>,
         value: impl Into<Value> + Debug,
@@ -152,15 +142,6 @@ impl LogEvent {
             self.insert(key, value);
         }
     }
-
-    // /// This is deprecated -- use `insert` instead
-    // #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
-    // pub fn insert_path<V>(&mut self, key: Vec<BorrowedSegment>, value: V) -> Option<Value>
-    // where
-    //     V: Into<Value> + Debug,
-    // {
-    //     util::log::insert_path2(self.as_map_mut(), key, value.into())
-    // }
 
     /// Rename a key in place without reference to pathing
     ///

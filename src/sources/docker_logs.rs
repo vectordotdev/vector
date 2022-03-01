@@ -902,7 +902,7 @@ impl ContainerLogInfo {
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone();
                     path.push(OwnedSegment::Field(key.clone().into()));
-                    log_event.insert_path(&path, value.clone());
+                    log_event.insert(&path, value.clone());
                 }
             }
 
@@ -955,7 +955,7 @@ impl ContainerLogInfo {
             if is_partial {
                 // Only add partial event marker field if it's requested.
                 if let Some(partial_event_marker_field) = partial_event_marker_field {
-                    log_event.insert(partial_event_marker_field, true);
+                    log_event.insert(partial_event_marker_field.as_str(), true);
                 }
             }
             // Return the log event as is, partial or not. No merging here.

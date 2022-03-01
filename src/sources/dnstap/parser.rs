@@ -103,7 +103,7 @@ impl<'a> DnstapParser<'a> {
     {
         let mut node_path = self.parent_key_path.clone();
         node_path.push(OwnedSegment::Field(key.into()));
-        self.log_event.insert_path(&node_path, value)
+        self.log_event.insert(&node_path, value)
     }
 
     pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {

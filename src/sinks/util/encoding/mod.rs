@@ -163,7 +163,7 @@ pub trait EncodingConfiguration {
                         }
                     }
                     for (k, v) in unix_timestamps {
-                        log.insert(k, v);
+                        log.insert(k.as_str(), v);
                     }
                 }
                 // RFC3339 is the default serialization of a timestamp.
