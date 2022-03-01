@@ -25,7 +25,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct LogstashConfig {
+pub(crate) struct LogstashConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
