@@ -15,7 +15,7 @@ pub enum HecFieldValue<'a> {
     Str(&'a str),
 }
 
-pub type HecFieldMap<'a> = BTreeMap<&'a str, HecFieldValue<'a>>;
+pub(crate) type HecFieldMap<'a> = BTreeMap<&'a str, HecFieldValue<'a>>;
 
 #[derive(Serialize, Debug)]
 struct HecData<'a> {

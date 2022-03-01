@@ -22,7 +22,7 @@ use crate::{
     template::Template,
 };
 
-pub struct HecMetricsSink<S> {
+pub(crate) struct HecMetricsSink<S> {
     pub context: SinkContext,
     pub service: S,
     pub batch_settings: BatcherSettings,
