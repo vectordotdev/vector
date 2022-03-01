@@ -11,7 +11,7 @@ use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AboutToSendHttpRequest<'a, T> {
+pub(crate) struct AboutToSendHttpRequest<'a, T> {
     pub request: &'a Request<T>,
 }
 

@@ -94,7 +94,7 @@ pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-pub fn default_namespace() -> String {
+pub(crate) fn default_namespace() -> String {
     "mongodb".to_string()
 }
 
