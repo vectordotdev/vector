@@ -136,7 +136,7 @@ impl InternalEvent for HttpEventMissingMessageError {
 }
 
 #[derive(Debug)]
-pub struct HttpEventEncoded {
+pub(crate) struct HttpEventEncoded {
     pub byte_size: usize,
 }
 

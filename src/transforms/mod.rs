@@ -52,7 +52,7 @@ pub mod regex_parser;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-remove_fields")]
-pub mod remove_fields;
+pub(crate) mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
 pub mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]

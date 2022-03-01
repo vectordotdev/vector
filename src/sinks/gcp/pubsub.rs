@@ -48,7 +48,7 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
-    pub endpoint: Option<String>,
+    pub(crate) endpoint: Option<String>,
     #[serde(default = "default_skip_authentication")]
     pub skip_authentication: bool,
     #[serde(flatten)]
