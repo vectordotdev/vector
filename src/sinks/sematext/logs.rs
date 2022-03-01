@@ -32,7 +32,7 @@ pub(crate) struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub(crate) encoding: EncodingConfigFixed<ElasticsearchEncoder>,
 
     #[serde(default)]
     request: TowerRequestConfig,
