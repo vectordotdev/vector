@@ -265,7 +265,7 @@ pub(crate) fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
-pub async fn init_components(client: &Client) -> Result<state::State, ()> {
+pub(crate) async fn init_components(client: &Client) -> Result<state::State, ()> {
     // Execute a query to get the latest components, and aggregate metrics for each resource.
     // Since we don't know currently have a mechanism for scrolling/paging through results,
     // we're using an artificially high page size to capture all likely component configurations.
