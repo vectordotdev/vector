@@ -105,7 +105,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
 
 #[derive(Debug)]
 pub struct PrometheusHttpResponseError {
-    pub code: hyper::StatusCode,
+    pub(crate) code: hyper::StatusCode,
     pub url: http::Uri,
 }
 
