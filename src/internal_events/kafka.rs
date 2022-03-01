@@ -60,7 +60,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
 
 #[derive(Debug)]
 pub struct KafkaReadError {
-    pub error: rdkafka::error::KafkaError,
+    pub(crate) error: rdkafka::error::KafkaError,
 }
 
 impl InternalEvent for KafkaReadError {

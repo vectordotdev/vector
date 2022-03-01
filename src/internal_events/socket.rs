@@ -67,7 +67,7 @@ impl InternalEvent for SocketEventsSent {
 #[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SocketReceiveError<'a> {
-    pub mode: SocketMode,
+    pub(crate) mode: SocketMode,
     pub error: &'a crate::codecs::decoding::Error,
 }
 
