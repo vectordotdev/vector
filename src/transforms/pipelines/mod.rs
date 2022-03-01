@@ -91,6 +91,7 @@ pub(crate) struct PipelineConfig {
 
 #[cfg(test)]
 impl PipelineConfig {
+    #[cfg(feature = "transforms-logs")]
     pub(crate) fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
         &self.transforms
     }
@@ -140,10 +141,12 @@ pub(crate) struct EventTypeConfig {
 
 #[cfg(test)]
 impl EventTypeConfig {
+    #[cfg(feature = "transforms-logs")]
     pub(crate) const fn order(&self) -> &Option<Vec<String>> {
         &self.order
     }
 
+    #[cfg(feature = "transforms-logs")]
     pub(crate) const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
         &self.pipelines
     }
@@ -194,10 +197,12 @@ pub(crate) struct PipelinesConfig {
 
 #[cfg(test)]
 impl PipelinesConfig {
+    #[cfg(feature = "transforms-logs")]
     pub(crate) const fn logs(&self) -> &EventTypeConfig {
         &self.logs
     }
 
+    #[cfg(feature = "transforms-logs")]
     pub(crate) const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
