@@ -32,7 +32,7 @@ impl ByteSizeOf for ProcessedEvent {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
-    pub doc_type: String,
+    pub(crate) doc_type: String,
     pub suppress_type_name: bool,
 }
 
