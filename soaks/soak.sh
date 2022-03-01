@@ -49,9 +49,10 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
-      --no-build-image)
-          BUILD_IMAGE="true"
+      --build-image)
+          BUILD_IMAGE="$2"
           shift # past argument
+          shift # past value
           ;;
       --vector-cpus)
           VECTOR_CPUS=$2
