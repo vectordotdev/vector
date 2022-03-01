@@ -23,7 +23,7 @@ pub struct Opts {
     #[clap(short = 'H', long)]
     human_metrics: bool,
 
-    /// Whether to reconnect if the underlying Vector API connection drops. By default, top will exit if the connection drops.
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops.
     #[clap(short, long)]
-    reconnect: bool,
+    no_reconnect: bool,
 }

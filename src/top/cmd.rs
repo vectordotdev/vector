@@ -97,7 +97,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
                     ConnectionStatus::Disconnected(RECONNECT_DELAY),
                 ))
                 .await;
-            if !opts_clone.reconnect {
+            if opts_clone.no_reconnect {
                 let _ = shutdown_tx.send(());
                 break;
             }

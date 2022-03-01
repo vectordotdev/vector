@@ -44,7 +44,7 @@ pub struct Opts {
     #[clap(short, long)]
     meta: bool,
 
-    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will exit if the connection drops.
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops.
     #[clap(short, long)]
-    reconnect: bool,
+    no_reconnect: bool,
 }

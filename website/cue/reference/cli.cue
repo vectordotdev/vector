@@ -275,9 +275,9 @@ cli: {
 					_short:      "m"
 					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
 				}
-				"reconnect": {
-					_short:      "r"
-					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will exit if the connection drops."
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
 				}
 			}
 
@@ -349,9 +349,9 @@ cli: {
 						1,000,000 = 1.00 M
 						"""
 				}
-				"reconnect": {
-					_short:      "r"
-					description: "Whether to reconnect if the underlying Vector API connection drops. By default, top will exit if the connection drops."
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops."
 				}
 			}
 
