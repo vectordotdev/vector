@@ -64,7 +64,7 @@ impl DriverResponse for NewRelicApiResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewRelicApiService {
+pub(crate) struct NewRelicApiService {
     pub client: HttpClient,
 }
 
