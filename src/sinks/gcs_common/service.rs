@@ -70,7 +70,7 @@ impl Finalizable for GcsRequest {
 #[derive(Clone, Debug)]
 pub struct GcsRequestSettings {
     pub acl: Option<HeaderValue>,
-    pub content_type: HeaderValue,
+    pub(crate) content_type: HeaderValue,
     pub content_encoding: Option<HeaderValue>,
     pub storage_class: HeaderValue,
     pub headers: Vec<(HeaderName, HeaderValue)>,
