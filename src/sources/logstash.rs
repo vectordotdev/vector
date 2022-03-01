@@ -195,7 +195,7 @@ impl LogstashDecoder {
 }
 
 #[derive(Debug, Snafu)]
-pub enum DecodeError {
+pub(crate) enum DecodeError {
     #[snafu(display("i/o error: {}", source))]
     IO { source: io::Error },
     #[snafu(display("Unknown logstash protocol version: {}", version))]

@@ -8,7 +8,7 @@ use vector_core::event::{
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
-pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
+pub(crate) type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
 pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 
 #[derive(Default)]
