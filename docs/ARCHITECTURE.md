@@ -53,7 +53,7 @@ a `SourceContext` as an argument, one field of which is the `SourceSender` built
 above. The result of the build function is wrapped in some simple shutdown
 handling before being inserted into the topology.
 
-**TODO: built source diagram**
+![image](https://user-images.githubusercontent.com/333505/156249003-ba6e31de-d296-42da-a9b6-2451e607df80.png)
 
 ### Transforms
 
@@ -95,7 +95,7 @@ simultaneously. Spawning new tasks allows Tokio's work-stealing scheduler to
 step in and spread the CPU work across multiple threads when there is a need and
 available capacity to do so.
 
-**TODO: built function style transform diagram**
+![image](https://user-images.githubusercontent.com/333505/156249361-9a91f61a-445a-403c-92eb-609f2249b3a9.png)
 
 #### Task
 
@@ -112,7 +112,7 @@ passed to the `transform` method. This results in an output stream, which is
 then forwarded to the transform's `Fanout` instance (task transforms do not
 support multiple outputs).
 
-**TODO: built task style transform diagram**
+![image](https://user-images.githubusercontent.com/333505/156249430-5f82a1e0-8caa-49fe-88b8-290b6ed06ad7.png)
 
 ### Sinks
 
@@ -145,7 +145,7 @@ Once the healthcheck and buffer are built, the sink itself is constructed via
 of the buffer (removing it from the in-case-of-error stash), filter and wrap the
 input stream with telemetry, and then pass it to `VectorSink::run`.
 
-**TODO: built sink diagram**
+![image](https://user-images.githubusercontent.com/333505/156249509-fd1b1ae6-7193-4fda-a33e-bbd128d63c87.png)
 
 ## Connecting components
 
