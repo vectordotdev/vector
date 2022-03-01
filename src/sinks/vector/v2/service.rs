@@ -51,7 +51,7 @@ impl DriverResponse for VectorResponse {
 pub struct VectorRequest {
     pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
-    pub events_byte_size: usize,
+    pub(crate) events_byte_size: usize,
 }
 
 impl Ackable for VectorRequest {
