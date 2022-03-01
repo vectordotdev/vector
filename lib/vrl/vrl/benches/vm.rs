@@ -51,21 +51,27 @@ fn benchmark_kind_display(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("Vm", source.name), &vm, |b, vm| {
             let state = state::Runtime::default();
             let mut runtime = Runtime::new(state);
-            let mut obj = Value::Object(BTreeMap::default());
-            b.iter(|| {
-                let _ = black_box(runtime.run_vm(vm, &mut obj, &tz));
-                runtime.clear();
-            })
+            b.iter_with_setup(
+                || Value::Object(BTreeMap::default()),
+                |mut obj| {
+                    let _ = black_box(runtime.run_vm(vm, &mut obj, &tz));
+                    runtime.clear();
+                    obj // Return the obj so it doesn't get dropped.
+                },
+            )
         });
 
         group.bench_with_input(BenchmarkId::new("Ast", source.name), &(), |b, _| {
             let state = state::Runtime::default();
             let mut runtime = Runtime::new(state);
-            let mut obj = Value::Object(BTreeMap::default());
-            b.iter(|| {
-                let _ = black_box(runtime.resolve(&mut obj, &program, &tz));
-                runtime.clear();
-            })
+            b.iter_with_setup(
+                || Value::Object(BTreeMap::default()),
+                |mut obj| {
+                    let _ = black_box(runtime.resolve(&mut obj, &program, &tz));
+                    runtime.clear();
+                    obj
+                },
+            )
         });
     }
 }
