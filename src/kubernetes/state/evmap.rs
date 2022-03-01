@@ -124,7 +124,7 @@ where
 }
 
 /// An alias to the value used at [`evmap`].
-pub type Value<T> = Box<HashValue<T>>;
+pub(crate) type Value<T> = Box<HashValue<T>>;
 
 /// Build a key value pair for using in [`evmap`].
 fn kv<T: Metadata<Ty = ObjectMeta>>(object: T, hash_key: HashKey) -> Option<(String, Value<T>)> {

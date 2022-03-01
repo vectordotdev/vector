@@ -23,7 +23,7 @@ pub struct AddTagsConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct AddTags {
+pub(crate) struct AddTags {
     tags: IndexMap<String, String>,
     overwrite: bool,
 }
