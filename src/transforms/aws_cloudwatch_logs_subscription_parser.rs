@@ -20,7 +20,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
-pub struct AwsCloudwatchLogsSubscriptionParserConfig {
+pub(crate) struct AwsCloudwatchLogsSubscriptionParserConfig {
     pub field: Option<String>,
 }
 
