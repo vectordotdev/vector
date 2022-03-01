@@ -1,6 +1,6 @@
 pub mod adaptive_concurrency;
 pub mod batch;
-pub mod buffer;
+pub(crate) mod buffer;
 pub mod builder;
 pub mod compressor;
 pub mod encoding;

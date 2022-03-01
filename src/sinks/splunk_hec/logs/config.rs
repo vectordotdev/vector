@@ -42,7 +42,7 @@ pub(crate) struct HecLogsSinkConfig {
     pub source: Option<Template>,
     pub encoding: EncodingConfig<HecLogsEncoder>,
     #[serde(default)]
-    pub compression: Compression,
+    pub(crate) compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
