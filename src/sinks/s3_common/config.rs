@@ -22,7 +22,7 @@ use crate::{
 pub struct S3Options {
     pub acl: Option<S3CannedAcl>,
     pub grant_full_control: Option<String>,
-    pub grant_read: Option<String>,
+    pub(crate) grant_read: Option<String>,
     pub grant_read_acp: Option<String>,
     pub grant_write_acp: Option<String>,
     pub server_side_encryption: Option<S3ServerSideEncryption>,
