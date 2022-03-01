@@ -15,7 +15,7 @@ use crate::{
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
-pub struct InternalMetricsConfig {
+pub(crate) struct InternalMetricsConfig {
     #[derivative(Default(value = "2"))]
     scrape_interval_secs: u64,
     tags: TagsConfig,
