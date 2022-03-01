@@ -70,7 +70,7 @@ pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]
-pub mod redis;
+pub(crate) mod redis;
 #[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]

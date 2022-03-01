@@ -141,7 +141,7 @@ impl From<TcpListener> for MaybeTlsListener {
     }
 }
 
-pub struct MaybeTlsIncomingStream<S> {
+pub(crate) struct MaybeTlsIncomingStream<S> {
     state: StreamState<S>,
     // BoxFuture doesn't allow access to the inner stream, but users
     // of MaybeTlsIncomingStream want access to the peer address while
