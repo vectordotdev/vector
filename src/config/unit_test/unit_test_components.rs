@@ -86,7 +86,7 @@ pub struct UnitTestSinkConfig {
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     // Check applied to incoming events
-    pub check: UnitTestSinkCheck,
+    pub(crate) check: UnitTestSinkCheck,
 }
 
 #[async_trait::async_trait]

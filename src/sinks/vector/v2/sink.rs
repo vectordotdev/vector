@@ -20,7 +20,7 @@ struct EventData {
 }
 
 pub struct VectorSink {
-    pub batch_settings: BatcherSettings,
+    pub(crate) batch_settings: BatcherSettings,
     pub service: BoxService<VectorRequest, VectorResponse, Error>,
     pub acker: Acker,
 }
