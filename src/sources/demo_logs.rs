@@ -38,7 +38,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
     #[derivative(Default(value = "default_decoding()"))]
-    pub decoding: DeserializerConfig,
+    pub(crate) decoding: DeserializerConfig,
 }
 
 const fn default_interval() -> f64 {
