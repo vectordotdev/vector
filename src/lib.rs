@@ -108,7 +108,7 @@ pub mod vector_windows;
 pub use source_sender::SourceSender;
 pub use vector_core::{event, metrics, schema, Error, Result};
 
-pub fn vector_version() -> impl std::fmt::Display {
+pub(crate) fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
 
