@@ -22,7 +22,7 @@ pub struct NginxStubStatus {
     pub requests: usize,
     pub reading: usize,
     pub writing: usize,
-    pub waiting: usize,
+    pub(crate) waiting: usize,
 }
 
 fn get_usize(input: &str) -> nom::IResult<&str, usize, nom::error::Error<&str>> {
