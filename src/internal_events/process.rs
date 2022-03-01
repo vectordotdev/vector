@@ -75,7 +75,7 @@ impl InternalEvent for VectorQuit {
 }
 
 #[derive(Debug)]
-pub struct VectorReloadFailed;
+pub(crate) struct VectorReloadFailed;
 
 impl InternalEvent for VectorReloadFailed {
     fn emit_logs(&self) {
