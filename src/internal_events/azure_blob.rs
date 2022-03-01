@@ -31,7 +31,7 @@ impl InternalEvent for AzureBlobErrorResponse {
 }
 
 #[derive(Debug)]
-pub struct AzureBlobHttpError {
+pub(crate) struct AzureBlobHttpError {
     pub error: String,
 }
 
