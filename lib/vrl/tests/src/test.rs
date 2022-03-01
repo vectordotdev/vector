@@ -144,5 +144,5 @@ fn test_name(path: &Path) -> String {
         .unwrap()
         .1
         .trim_end_matches(".vrl")
-        .replace("_", " ")
+        .replace('_', " ")
 }

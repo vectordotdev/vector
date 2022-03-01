@@ -12,6 +12,7 @@ use clap::Parser;
 use glob::glob;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
+use vrl::VrlRuntime;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 use vrl_tests::{docs, Test};
 
@@ -41,6 +42,10 @@ pub struct Cmd {
 
     #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
 }
 
 impl Cmd {
@@ -141,8 +146,12 @@ fn main() {
         let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
-        let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
-        let program = vrl::compile(&test.source, &functions, Some(test_enrichment.clone()));
+        let test_enrichment = test_enrichment::test_enrichment_table();
+
+        let mut state = vrl::state::Compiler::new();
+        state.set_external_context(test_enrichment.clone());
+
+        let program = vrl::compile_with_state(&test.source, &functions, &mut state);
         test_enrichment.finish_load();
 
         let want = test.result.clone();
@@ -150,7 +159,14 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = run_vrl(runtime, functions, program, &mut test, timezone);
+                let result = run_vrl(
+                    runtime,
+                    functions,
+                    program,
+                    &mut test,
+                    timezone,
+                    cmd.runtime,
+                );
 
                 match result {
                     Ok(got) => {
@@ -308,27 +324,21 @@ fn main() {
     print_result(failed_count)
 }
 
-#[cfg(feature = "vrl-vm")]
 fn run_vrl(
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, Terminate> {
-    let vm = runtime.compile(functions, &program).unwrap();
-    runtime.run_vm(&vm, &mut test.object, &timezone)
-}
-
-#[cfg(not(feature = "vrl-vm"))]
-fn run_vrl(
-    mut runtime: Runtime,
-    _functions: Vec<Box<dyn vrl::Function>>,
-    program: vrl::Program,
-    test: &mut Test,
-    timezone: TimeZone,
-) -> Result<Value, Terminate> {
-    runtime.resolve(&mut test.object, &program, &timezone)
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime.compile(functions, &program).unwrap();
+            runtime.run_vm(&vm, &mut test.object, &timezone)
+        }
+        VrlRuntime::Ast => runtime.resolve(&mut test.object, &program, &timezone),
+    }
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
