@@ -3,7 +3,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct JournaldEventsReceived {
+pub(crate) struct JournaldEventsReceived {
     pub count: usize,
     pub byte_size: usize,
 }
