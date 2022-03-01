@@ -82,7 +82,7 @@ inventory::submit! {
 /// This represents the configuration of a single pipeline, not the pipelines transform
 /// itself, which can contain multiple individual pipelines
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct PipelineConfig {
+pub(crate) struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
     #[serde(default)]
@@ -91,7 +91,7 @@ pub struct PipelineConfig {
 
 #[cfg(test)]
 impl PipelineConfig {
-    pub fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
+    pub(crate) fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
         &self.transforms
     }
 }
@@ -132,7 +132,7 @@ impl PipelineConfig {
 /// This represent an ordered list of pipelines depending on the event type.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventTypeConfig {
+pub(crate) struct EventTypeConfig {
     #[serde(default)]
     order: Option<Vec<String>>,
     pipelines: IndexMap<String, PipelineConfig>,
@@ -140,11 +140,11 @@ pub struct EventTypeConfig {
 
 #[cfg(test)]
 impl EventTypeConfig {
-    pub const fn order(&self) -> &Option<Vec<String>> {
+    pub(crate) const fn order(&self) -> &Option<Vec<String>> {
         &self.order
     }
 
-    pub const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+    pub(crate) const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
         &self.pipelines
     }
 }
@@ -185,7 +185,7 @@ impl EventTypeConfig {
 
 /// The configuration of the pipelines transform itself.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct PipelinesConfig {
+pub(crate) struct PipelinesConfig {
     #[serde(default)]
     logs: EventTypeConfig,
     #[serde(default)]
@@ -194,11 +194,11 @@ pub struct PipelinesConfig {
 
 #[cfg(test)]
 impl PipelinesConfig {
-    pub const fn logs(&self) -> &EventTypeConfig {
+    pub(crate) const fn logs(&self) -> &EventTypeConfig {
         &self.logs
     }
 
-    pub const fn metrics(&self) -> &EventTypeConfig {
+    pub(crate) const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
 }
@@ -291,13 +291,6 @@ impl GenerateConfig for PipelinesConfig {
             condition = ""
         "#})
         .unwrap()
-    }
-}
-
-#[cfg(test)]
-impl PipelinesConfig {
-    pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 }
 
