@@ -6,6 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+num-traits = "0.2"
 serde = "1"
 serde_json = "1"
 serde_with = "1.12"
