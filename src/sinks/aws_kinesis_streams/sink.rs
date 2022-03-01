@@ -25,7 +25,7 @@ pub struct KinesisMetadata {
 }
 
 pub struct KinesisSink {
-    pub batch_settings: BatcherSettings,
+    pub(crate) batch_settings: BatcherSettings,
     pub acker: Acker,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
     pub request_builder: KinesisRequestBuilder,

@@ -178,7 +178,7 @@ enum ControlAction {
     Restart { stop_timeout: Duration },
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
     match sub_command {
         Some(s) => match s {
