@@ -43,7 +43,7 @@ pub(crate) struct EncodedList {
     sinks: Vec<&'static str>,
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut sources = SourceDescription::types();
     let mut transforms = TransformDescription::types();
     let mut sinks = SinkDescription::types();
