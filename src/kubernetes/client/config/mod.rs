@@ -23,7 +23,7 @@ pub struct Config {
     pub base: Uri,
 
     /// The bearer token to use at the `Authorization` header.
-    pub token: Option<String>,
+    pub(crate) token: Option<String>,
 
     /// The TLS configuration parameters to use at the HTTP client.
     pub tls_options: TlsOptions,
