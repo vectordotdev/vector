@@ -518,7 +518,7 @@ pub trait ServiceLogic: Clone {
 
 #[derive(Derivative)]
 #[derivative(Clone)]
-pub struct StdServiceLogic<R> {
+pub(crate) struct StdServiceLogic<R> {
     _pd: PhantomData<R>,
 }
 
