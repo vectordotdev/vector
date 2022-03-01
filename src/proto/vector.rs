@@ -3,4 +3,4 @@
 tonic::include_proto!("vector");
 
 pub(crate) use vector_client::VectorClient as Client;
-pub use vector_server::{Vector as Service, VectorServer as Server};
+pub(crate) use vector_server::{Vector as Service, VectorServer as Server};

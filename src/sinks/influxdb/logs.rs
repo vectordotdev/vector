@@ -58,7 +58,7 @@ pub struct InfluxDbLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
