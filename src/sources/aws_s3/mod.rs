@@ -27,7 +27,7 @@ pub mod sqs;
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
-pub enum Compression {
+pub(crate) enum Compression {
     #[derivative(Default)]
     Auto,
     None,
