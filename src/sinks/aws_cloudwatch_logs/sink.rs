@@ -36,16 +36,7 @@ impl CloudwatchSink {
         let acker = self.acker;
 
         input
-            .filter_map(|event| future::ready(request_builder.build(event).transpose()))
-            .filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build Cloudwatch Logs request: {:?}.", e);
-                        None
-                    }
-                    Ok(req) => Some(req),
-                }
-            })
+            .filter_map(|event| future::ready(request_builder.build(event)))
             .filter(|req| {
                 let now = Utc::now();
                 let start = (now - Duration::days(14) + Duration::minutes(5)).timestamp_millis();

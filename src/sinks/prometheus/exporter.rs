@@ -19,7 +19,13 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use vector_core::{buffers::Acker, event::metric::MetricSeries};
+use tracing_futures::Instrument;
+use vector_core::{
+    buffers::Acker,
+    event::metric::MetricSeries,
+    internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
+};
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
@@ -327,12 +333,20 @@ fn handle(
                 collector.encode_metric(default_namespace, buckets, quantiles, metric);
             }
 
-            *response.body_mut() = collector.finish().into();
+            let body = collector.finish();
+            let body_size = body.size_of();
+
+            *response.body_mut() = body.into();
 
             response.headers_mut().insert(
                 "Content-Type",
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
+
+            emit!(&BytesSent {
+                byte_size: body_size,
+                protocol: "http",
+            });
         }
         _ => {
             *response.status_mut() = StatusCode::NOT_FOUND;
@@ -357,12 +371,14 @@ impl PrometheusExporter {
             return;
         }
 
+        let span = crate::trace::current_span();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
 
         let new_service = make_service_fn(move |_| {
+            let span = crate::trace::current_span();
             let metrics = Arc::clone(&metrics);
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
@@ -370,28 +386,35 @@ impl PrometheusExporter {
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
-                    let metrics = metrics.read().unwrap();
+                    span.in_scope(|| {
+                        let metrics = metrics.read().unwrap();
 
-                    let response = info_span!(
-                        "prometheus_server",
-                        method = ?req.method(),
-                        path = ?req.uri().path(),
-                    )
-                    .in_scope(|| {
-                        handle(
+                        let count = metrics.len();
+                        let byte_size = metrics
+                            .iter()
+                            .map(|(_, (metric, _))| metric.size_of())
+                            .sum();
+
+                        let response = handle(
                             req,
                             default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
                             &metrics,
-                        )
-                    });
+                        );
 
-                    emit!(&PrometheusServerRequestComplete {
-                        status_code: response.status(),
-                    });
+                        emit!(&EventsSent {
+                            count,
+                            byte_size,
+                            output: None
+                        });
 
-                    future::ok::<_, Infallible>(response)
+                        emit!(&PrometheusServerRequestComplete {
+                            status_code: response.status(),
+                        });
+
+                        future::ok::<_, Infallible>(response)
+                    })
                 }))
             }
         });
@@ -415,6 +438,7 @@ impl PrometheusExporter {
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .instrument(span)
                 .await
                 .map_err(|error| eprintln!("Server error: {}", error))?;
 
