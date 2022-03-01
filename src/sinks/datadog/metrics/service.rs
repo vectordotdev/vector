@@ -54,7 +54,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
     pub payload: Bytes,
-    pub uri: Uri,
+    pub(crate) uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
