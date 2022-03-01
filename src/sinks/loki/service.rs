@@ -50,7 +50,7 @@ pub struct LokiRequest {
     pub compression: Compression,
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
-    pub payload: Bytes,
+    pub(crate) payload: Bytes,
     pub tenant_id: Option<String>,
     pub events_byte_size: usize,
 }

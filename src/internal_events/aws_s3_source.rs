@@ -80,7 +80,7 @@ impl InternalEvent for SqsMessageReceiveSucceeded {
 }
 
 #[derive(Debug)]
-pub struct SqsMessageProcessingSucceeded<'a> {
+ pub(crate) struct SqsMessageProcessingSucceeded<'a> {
     pub message_id: &'a str,
 }
 
