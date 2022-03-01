@@ -123,7 +123,7 @@ impl SinkConfig for LogdnaConfig {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
-pub struct PartitionKey {
+pub(crate) struct PartitionKey {
     hostname: String,
     tags: Option<Vec<String>>,
 }
