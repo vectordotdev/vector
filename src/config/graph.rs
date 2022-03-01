@@ -7,7 +7,7 @@ use super::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Node {
+pub(crate) enum Node {
     Source {
         outputs: Vec<Output>,
     },
