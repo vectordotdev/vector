@@ -2,7 +2,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AddTagsTagOverwritten<'a> {
-    pub tag: &'a str,
+    pub(crate) tag: &'a str,
 }
 
 impl<'a> InternalEvent for AddTagsTagOverwritten<'a> {
