@@ -37,7 +37,7 @@ pub enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn create_client(
+pub(crate) fn create_client(
     tls: &Option<TlsOptions>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
