@@ -17,7 +17,7 @@ impl InternalEvent for UdpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct UdpSocketConnectionFailed<E> {
+pub(crate) struct UdpSocketConnectionFailed<E> {
     pub error: E,
 }
 
