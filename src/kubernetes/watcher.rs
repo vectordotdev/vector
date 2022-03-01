@@ -87,7 +87,7 @@ pub(crate) mod stream {
     impl<T> Eq for Error<T> where T: std::error::Error + Send + 'static + Eq {}
 }
 
-pub mod invocation {
+pub(crate) mod invocation {
     //! Invocation errors.
     use super::*;
 
