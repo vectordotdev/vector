@@ -128,8 +128,6 @@ As another example, the Datadog Agent collects service metrics and enriches them
 
 More examples are below.
 
-**Examples**
-
 | Agent | Action | Rationale |
 | --- | --- | --- |
 | Datadog Agent | Integrate | The Datadog Agent integrates with more systems, produces better data, and seamlessly integrates with the Datadog platform. |
@@ -153,7 +151,7 @@ Sources such as the `datadog_agent` source can be used to receive data from your
 
 Alternatively, you can deploy Vector [on separate nodes as an aggregator](/docs/setup/going-to-prod/arch/aggregator/). This strategy is covered in more detail in the [where to process data section](#choosing-where-to-process-data).
 
-**Reducing Agent Risk**
+##### **Reducing Agent Risk**
 
 When integrating with an agent, you should configure the agent to be a simple data forwarder, and route [supported data types](docs/about/under-the-hood/architecture/data-model/) through Vector. This strategy reduces the risk of data loss and service disruption due to misbehaving agents by minimizing their responsibilities.
 

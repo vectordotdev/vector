@@ -55,21 +55,21 @@ The following is an example configuration that routes failed events from a `rema
 
 ```toml
 [sources.input]
-	type = "datadog_agent"
+    type = "datadog_agent"
 
 [transforms.parsing]
-	inputs = ["input"]
-	type = "remap"
+    inputs = ["input"]
+    type = "remap"
     reroute_dropped = true
-	source = "..."
+    source = "..."
 
 [sinks.analysis]
-	inputs = ["parsing"]
-	type = "datadog_logs"
+    inputs = ["parsing"]
+    type = "datadog_logs"
 
 [sinks.backup]
-	inputs = ["**parsing.dropped**"] # dropped events from the `parsing` transform
-	type = "aws_s3"
+    inputs = ["**parsing.dropped**"] # dropped events from the `parsing` transform
+    type = "aws_s3"
 ```
 
 #### Data Send Failure
