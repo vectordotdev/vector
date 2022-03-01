@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct InternalLogsConfig {
+pub(crate) struct InternalLogsConfig {
     host_key: Option<String>,
     pid_key: Option<String>,
 }

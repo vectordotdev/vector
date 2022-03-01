@@ -70,14 +70,15 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     }
 });
 /// The component test specification for components with multiple outputs
-pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
-    events: &["EventsSent"],
-    tagged_counters: &[
-        "component_sent_events_total",
-        "component_sent_event_bytes_total",
-    ],
-    untagged_counters: &[],
-});
+pub(crate) static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> =
+    Lazy::new(|| ComponentTests {
+        events: &["EventsSent"],
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[],
+    });
 
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed

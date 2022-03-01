@@ -26,5 +26,5 @@ pub struct Config {
     pub(crate) token: Option<String>,
 
     /// The TLS configuration parameters to use at the HTTP client.
-    pub tls_options: TlsOptions,
+    pub(crate) tls_options: TlsOptions,
 }
