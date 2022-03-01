@@ -39,7 +39,7 @@ pub(super) enum BuildError {
     TopicTemplate { source: TemplateParseError },
 }
 
-pub struct KafkaSink {
+pub(crate) struct KafkaSink {
     encoding: EncodingConfig<StandardEncodings>,
     acker: Acker,
     service: KafkaService,

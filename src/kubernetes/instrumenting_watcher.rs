@@ -7,7 +7,7 @@ use super::watcher::{self, Watcher};
 use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 
 /// A watcher that wraps another watcher with instrumentation calls.
-pub struct InstrumentingWatcher<T>
+pub(crate) struct InstrumentingWatcher<T>
 where
     T: Watcher,
 {
