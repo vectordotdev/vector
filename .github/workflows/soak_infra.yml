@@ -8,11 +8,13 @@ on:
   pull_request:
     paths:
       - 'lib/soak'
+      - '.github/workfloaws/soak_infra.yml'
   push:
     branches:
       - master
     paths:
       - 'lib/soak'
+      - '.github/workfloaws/soak_infra.yml'
 
 jobs:
   cancel-previous:
