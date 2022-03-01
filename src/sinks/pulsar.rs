@@ -16,7 +16,7 @@ use vector_buffers::Acker;
 use crate::{
     config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::PulsarEncodeEventFailed,
+    internal_events::PulsarEncodeEventError,
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
 };
 
@@ -116,6 +116,10 @@ impl SinkConfig for PulsarSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "pulsar"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -222,11 +226,8 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
-            emit!(&PulsarEncodeEventFailed {
-                error: &*e.to_string()
-            })
-        })?;
+        let message = encode_event(item, &self.encoding, &self.avro_schema)
+            .map_err(|error| emit!(&PulsarEncodeEventError { error }))?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,

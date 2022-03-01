@@ -28,4 +28,3 @@ tikv-jemallocator = { version = "0.4.3" }
 
 [features]
 default = []
-vrl-vm = []

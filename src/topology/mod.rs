@@ -6,8 +6,10 @@
 //! part contains config related items including config traits for
 //! each type of component.
 
-pub mod builder;
 pub(super) use vector_core::fanout;
+
+pub mod builder;
+pub(self) mod ready_events;
 mod running;
 mod schema;
 mod task;
@@ -16,7 +18,7 @@ mod task;
 mod test;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
@@ -31,7 +33,7 @@ use vector_buffers::{
 
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
-    event::Event,
+    event::EventArray,
     topology::{
         builder::Pieces,
         task::{Task, TaskOutput},
@@ -41,19 +43,29 @@ use crate::{
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
-    BufferSender<Event>,
-    Arc<Mutex<Option<BufferReceiver<Event>>>>,
+    BufferSender<EventArray>,
+    Arc<Mutex<Option<BufferReceiver<EventArray>>>>,
     Acker,
 );
+
+/// A tappable output consisting of an output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: &'static str,
+    pub component_type: String,
+}
 
 /// Resources used by the `tap` API to monitor component inputs and outputs,
 /// updated alongside the topology
 #[derive(Debug, Default, Clone)]
 pub struct TapResource {
     // Outputs and their corresponding Fanout control
-    pub outputs: HashMap<OutputId, fanout::ControlChannel>,
+    pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Components removed on a reload (used to drop TapSinks)
+    pub removals: HashSet<ComponentKey>,
 }
 
 // Watcher types for topology changes.

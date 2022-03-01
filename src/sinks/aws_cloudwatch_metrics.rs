@@ -96,6 +96,10 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_cloudwatch_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl CloudWatchMetricsSinkConfig {

@@ -71,7 +71,7 @@ async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
                 .finalize()
         });
 
-    let mut staged_read = spawn(async { reader.next().await });
+    let mut staged_read = spawn(reader.next());
     if let Some(assertion) = flush_assert {
         while !assertion.try_assert() {
             assert_pending!(staged_read.poll());

@@ -1,5 +1,9 @@
 #![recursion_limit = "256"] // for async-stream
 #![deny(unreachable_pub)]
+#![deny(unused_extern_crates)]
+#![deny(unused_allocation)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::blocks_in_if_conditions)]
@@ -19,9 +23,6 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-extern crate vector_core;
-#[cfg(feature = "vrl-cli")]
-extern crate vrl_cli;
 
 #[cfg(feature = "tikv-jemallocator")]
 #[global_allocator]
@@ -31,7 +32,6 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
-#[allow(unreachable_pub)]
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
@@ -58,7 +58,6 @@ pub mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-#[allow(unreachable_pub)]
 pub(crate) mod kafka;
 #[allow(unreachable_pub)]
 pub mod kubernetes;

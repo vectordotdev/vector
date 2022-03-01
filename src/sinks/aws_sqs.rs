@@ -23,11 +23,11 @@ use crate::{
         log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingError},
+    internal_events::{AwsSqsEventsSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::{self, Response},
+        sink::Response,
         BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
@@ -132,6 +132,10 @@ impl SinkConfig for SqsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 impl SqsSinkConfig {
@@ -200,7 +204,6 @@ impl SqsSink {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
@@ -245,7 +248,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
             client
                 .send_message(request)
                 .inspect_ok(|result| {
-                    emit!(&AwsSqsEventSent {
+                    emit!(&AwsSqsEventsSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })

@@ -17,13 +17,13 @@ use crate::{
         Event,
     },
     http::HttpClient,
-    internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
+    internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
-            sink, BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, VectorSink,
     },
@@ -122,6 +122,10 @@ impl SinkConfig for SematextMetricsConfig {
     fn sink_type(&self) -> &'static str {
         "sematext_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn write_uri(endpoint: &str) -> Result<Uri> {
@@ -162,7 +166,6 @@ impl SematextMetricsService {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -207,7 +210,7 @@ impl MetricNormalize for SematextMetricNormalize {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(&SematextMetricsInvalidMetricReceived { metric: &metric });
+                emit!(&SematextMetricsInvalidMetricError { metric: &metric });
                 None
             }
         }
@@ -262,7 +265,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(&SematextMetricsEncodeEventFailed { error });
+            emit!(&SematextMetricsEncodeEventError { error });
         };
     }
 

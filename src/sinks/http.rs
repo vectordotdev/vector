@@ -16,7 +16,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
@@ -169,6 +169,10 @@ impl SinkConfig for HttpSinkConfig {
     fn sink_type(&self) -> &'static str {
         "http"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait::async_trait]
@@ -188,7 +192,7 @@ impl HttpSink for HttpSinkConfig {
                     body.put_u8(b'\n');
                     body
                 } else {
-                    emit!(&HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessageError);
                     return None;
                 }
             }
