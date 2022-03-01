@@ -233,7 +233,7 @@ impl Filter<LogEvent> for EventFilter {
                 )
             }
             // Tag values need extracting by "key:value" to be compared.
-            Field::Tag(tag) => any_string_match("tags", move |value| match value.split_once(":") {
+            Field::Tag(tag) => any_string_match("tags", move |value| match value.split_once(':') {
                 Some((t, lhs)) if t == tag => {
                     let lhs = Cow::from(lhs);
 

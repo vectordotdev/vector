@@ -21,9 +21,8 @@ use vector_core::{buffers::Acker, ByteSizeOf};
 
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink::{self, ServiceLogic},
-    uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    sink, uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     event::Event,
@@ -54,16 +53,11 @@ pub trait HttpSink: Send + Sync + 'static {
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
 #[pin_project]
-pub struct BatchedHttpSink<
-    T,
-    B,
-    RL = HttpRetryLogic,
-    SL = sink::StdServiceLogic<http::Response<Bytes>>,
-> where
+pub struct BatchedHttpSink<T, B, RL = HttpRetryLogic>
+where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
@@ -71,7 +65,6 @@ pub struct BatchedHttpSink<
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
         B,
         RL,
-        SL,
     >,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
@@ -101,17 +94,15 @@ where
             batch_timeout,
             client,
             acker,
-            sink::StdServiceLogic::default(),
         )
     }
 }
 
-impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
+impl<T, B, RL> BatchedHttpSink<T, B, RL>
 where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_logic(
@@ -122,7 +113,6 @@ where
         batch_timeout: Duration,
         client: HttpClient,
         acker: Acker,
-        service_logic: SL,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -133,14 +123,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(
-            retry_logic,
-            svc,
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        );
+        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout, acker);
 
         Self {
             sink,
@@ -150,13 +133,12 @@ where
     }
 }
 
-impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
+impl<T, B, RL> Sink<Event> for BatchedHttpSink<T, B, RL>
 where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -223,7 +205,6 @@ where
         B,
         RL,
         K,
-        sink::StdServiceLogic<hyper::Response<Bytes>>,
     >,
     slot: Option<EncodedEvent<B::Input>>,
 }
@@ -283,14 +264,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.partition_sink(
-            retry_logic,
-            svc,
-            batch,
-            batch_timeout,
-            acker,
-            sink::StdServiceLogic::default(),
-        );
+        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout, acker);
 
         Self {
             sink,

@@ -251,7 +251,7 @@ impl fmt::Debug for ParseUserAgentFn {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
+pub(crate) enum Mode {
     Fast,
     Reliable,
     Enriched,

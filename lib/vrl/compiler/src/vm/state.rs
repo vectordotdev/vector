@@ -2,7 +2,7 @@ use super::{argument_list::VmArgument, machine::Instruction, OpCode, Vm};
 use crate::{ExpressionError, Value};
 
 /// `VmState` contains the mutable state used to run the Vm.
-pub struct VmState<'a> {
+pub(crate) struct VmState<'a> {
     vm: &'a Vm,
     /// The index of the next instruction to run.
     pub(super) instruction_pointer: usize,

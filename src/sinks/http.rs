@@ -16,7 +16,7 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
@@ -192,7 +192,7 @@ impl HttpSink for HttpSinkConfig {
                     body.put_u8(b'\n');
                     body
                 } else {
-                    emit!(&HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessageError);
                     return None;
                 }
             }

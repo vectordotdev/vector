@@ -1,5 +1,4 @@
-// ## skip check-events ##
-
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -19,16 +18,21 @@ impl InternalEvent for RemapMappingError {
             "Mapping failed with event."
         };
 
-        warn!(
+        error!(
             message,
             error = ?self.error,
-            internal_log_rate_secs = 30
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         )
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "failed_mapping");
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
 

@@ -68,7 +68,7 @@ impl Function for Merge {
 }
 
 #[derive(Debug, Clone)]
-pub struct MergeFn {
+pub(crate) struct MergeFn {
     to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Box<dyn Expression>,

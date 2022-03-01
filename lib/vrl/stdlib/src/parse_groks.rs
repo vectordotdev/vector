@@ -10,7 +10,7 @@ use vrl::{
 };
 
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(datadog_grok::parse_grok_rules::Error),
 }
 

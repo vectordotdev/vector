@@ -101,7 +101,7 @@ impl Function for Get {
 }
 
 #[derive(Debug, Clone)]
-pub struct GetFn {
+pub(crate) struct GetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
 }
