@@ -1048,7 +1048,7 @@ mod tests {
         };
 
         let hashset =
-            |v: &[&str]| -> HashSet<String> { v.to_vec().into_iter().map(String::from).collect() };
+            |v: &[&str]| -> HashSet<String> { v.iter().copied().map(String::from).collect() };
 
         let matches = journald_config.merged_include_matches().unwrap();
         let units = matches.get("_SYSTEMD_UNIT").unwrap();

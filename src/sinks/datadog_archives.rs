@@ -404,7 +404,7 @@ impl Default for DatadogArchivesEncoding {
     fn default() -> Self {
         Self {
             inner: StandardEncodings::Ndjson,
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
             log_schema: log_schema(),
