@@ -75,7 +75,7 @@ pub struct Cluster {
 pub struct NamedAuthInfo {
     pub name: String,
     #[serde(rename = "user")]
-    pub auth_info: AuthInfo,
+    pub(crate) auth_info: AuthInfo,
 }
 
 /// AuthInfo stores information to tell cluster who you are.

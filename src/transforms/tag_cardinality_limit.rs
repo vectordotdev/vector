@@ -59,7 +59,7 @@ pub enum LimitExceededAction {
 }
 
 #[derive(Debug)]
-pub struct TagCardinalityLimit {
+pub(crate) struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
     accepted_tags: HashMap<String, TagValueSet>,
 }
