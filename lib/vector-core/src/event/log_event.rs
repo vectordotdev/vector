@@ -120,8 +120,8 @@ impl LogEvent {
         self.as_map().get(key.as_ref())
     }
 
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(key.as_ref())
+    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(path)
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
@@ -232,7 +232,7 @@ impl LogEvent {
                 None => continue,
                 Some(val) => val,
             };
-            match self.get_mut(&field) {
+            match self.get_mut(field.as_ref()) {
                 None => {
                     self.insert(field.as_ref(), incoming_val);
                 }
