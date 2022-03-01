@@ -30,7 +30,7 @@ const MAX_BATCH_SIZE: i32 = 10;
 pub struct SqsSource {
     pub client: SqsClient,
     pub queue_url: String,
-    pub decoder: Decoder,
+    pub(crate) decoder: Decoder,
     pub poll_secs: u32,
     pub concurrency: u32,
     pub(super) acknowledgements: bool,
