@@ -83,7 +83,7 @@ impl InternalEvent for ExecFailedError<'_> {
 pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
-    pub error: Elapsed,
+    pub(crate) error: Elapsed,
 }
 
 impl InternalEvent for ExecTimeoutError<'_> {

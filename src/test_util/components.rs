@@ -48,7 +48,7 @@ pub struct ComponentTests {
 }
 
 /// The component test specification for all sources
-pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+pub(crate) static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["BytesReceived", "EventsReceived", "EventsSent"],
     tagged_counters: &["component_received_bytes_total"],
     untagged_counters: &[
