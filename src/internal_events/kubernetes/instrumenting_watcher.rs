@@ -15,7 +15,7 @@ impl InternalEvent for WatchRequestInvoked {
 }
 
 #[derive(Debug)]
-pub struct WatchRequestInvocationFailed<E> {
+pub(crate) struct WatchRequestInvocationFailed<E> {
     pub error: E,
 }
 
