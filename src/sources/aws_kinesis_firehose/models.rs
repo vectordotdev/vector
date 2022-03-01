@@ -20,7 +20,7 @@ pub struct FirehoseRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EncodedFirehoseRecord {
     /// data is base64 encoded, gzip'd, bytes
-    pub data: String,
+    pub(crate) data: String,
 }
 
 /// Represents an AWS Kinesis Firehose response
