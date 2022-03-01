@@ -37,12 +37,12 @@ use vector::{
     },
     schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
-    source_sender::{ReceiverStream, SourceSender},
+    source_sender::SourceSender,
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::Acker;
+use vector_buffers::{topology::channel::LimitedReceiver, Acker};
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -124,7 +124,7 @@ pub fn create_directory() -> PathBuf {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
     #[serde(skip)]
-    receiver: Arc<Mutex<Option<ReceiverStream<EventArray>>>>,
+    receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
@@ -134,7 +134,7 @@ pub struct MockSourceConfig {
 }
 
 impl MockSourceConfig {
-    pub fn new(receiver: ReceiverStream<EventArray>) -> Self {
+    pub fn new(receiver: LimitedReceiver<EventArray>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -143,7 +143,7 @@ impl MockSourceConfig {
         }
     }
 
-    pub fn new_with_data(receiver: ReceiverStream<EventArray>, data: &str) -> Self {
+    pub fn new_with_data(receiver: LimitedReceiver<EventArray>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -153,7 +153,7 @@ impl MockSourceConfig {
     }
 
     pub fn new_with_event_counter(
-        receiver: ReceiverStream<EventArray>,
+        receiver: LimitedReceiver<EventArray>,
         event_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {

@@ -1,11 +1,7 @@
-use std::{collections::HashMap, pin::Pin};
+use std::collections::HashMap;
 
-use futures::{
-    task::{Context, Poll},
-    Stream, StreamExt,
-};
-use pin_project::pin_project;
-use tokio::sync::mpsc;
+use futures::{SinkExt, Stream, StreamExt};
+use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
@@ -39,7 +35,7 @@ impl Builder {
         }
     }
 
-    pub fn add_output(&mut self, output: Output) -> ReceiverStream<EventArray> {
+    pub fn add_output(&mut self, output: Output) -> LimitedReceiver<EventArray> {
         match output.port {
             None => {
                 let (inner, rx) = Inner::new_with_buffer(self.buf_size, DEFAULT_OUTPUT.to_owned());
@@ -79,7 +75,7 @@ impl SourceSender {
         }
     }
 
-    pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<EventArray>) {
+    pub fn new_with_buffer(n: usize) -> (Self, LimitedReceiver<EventArray>) {
         let (inner, rx) = Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned());
         (
             Self {
@@ -188,15 +184,14 @@ impl SourceSender {
 
 #[derive(Debug, Clone)]
 struct Inner {
-    inner: mpsc::Sender<EventArray>,
+    inner: LimitedSender<EventArray>,
     output: String,
 }
 
 impl Inner {
-    fn new_with_buffer(n: usize, output: String) -> (Self, ReceiverStream<EventArray>) {
-        let (tx, rx) = mpsc::channel(n);
-        let rx = tokio_stream::wrappers::ReceiverStream::new(rx);
-        (Self { inner: tx, output }, ReceiverStream::new(rx))
+    fn new_with_buffer(n: usize, output: String) -> (Self, LimitedReceiver<EventArray>) {
+        let (tx, rx) = channel::limited(n);
+        (Self { inner: tx, output }, rx)
     }
 
     async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
@@ -257,35 +252,5 @@ impl Inner {
         });
 
         Ok(())
-    }
-}
-
-#[pin_project]
-#[derive(Debug)]
-pub struct ReceiverStream<T> {
-    #[pin]
-    inner: tokio_stream::wrappers::ReceiverStream<T>,
-}
-
-impl<T> ReceiverStream<T> {
-    const fn new(inner: tokio_stream::wrappers::ReceiverStream<T>) -> Self {
-        Self { inner }
-    }
-
-    pub fn close(&mut self) {
-        self.inner.close()
-    }
-}
-
-impl<T> Stream for ReceiverStream<T> {
-    type Item = T;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        this.inner.poll_next(cx)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
     }
 }
