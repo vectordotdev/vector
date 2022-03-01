@@ -34,7 +34,7 @@ pub struct MergeConfig {
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
     /// event processing.
-    pub stream_discriminant_fields: Vec<String>,
+    pub(crate) stream_discriminant_fields: Vec<String>,
 }
 
 inventory::submit! {
