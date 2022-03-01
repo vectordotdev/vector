@@ -76,7 +76,7 @@ pub enum TapNotification {
 /// A tap payload contains events or notifications that alert users about the
 /// status of the tap request.
 #[derive(Debug)]
-pub enum TapPayload {
+pub(crate) enum TapPayload {
     Log(TapOutput, LogEvent),
     Metric(TapOutput, Metric),
     Notification(String, TapNotification),
