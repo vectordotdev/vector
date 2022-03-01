@@ -68,6 +68,7 @@ jobs:
           context: .
           file: lib/soak/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -79,6 +80,9 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1.2.0
 
       - name: Set up Docker Buildx
         id: buildx
