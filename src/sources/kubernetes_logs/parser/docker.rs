@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub(crate) const TIME: &str = "time";
-pub const LOG: &str = "log";
+pub(crate) const LOG: &str = "log";
 
 /// Parser for the docker log format.
 ///

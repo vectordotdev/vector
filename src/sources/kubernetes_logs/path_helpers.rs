@@ -59,7 +59,7 @@ pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
 pub struct LogFileInfo<'a> {
     pub pod_namespace: &'a str,
     pub pod_name: &'a str,
-    pub pod_uid: &'a str,
+    pub(crate) pod_uid: &'a str,
     pub container_name: &'a str,
 }
 

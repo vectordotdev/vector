@@ -33,7 +33,7 @@ pub struct GrokParserConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub types: HashMap<String, String>,
-    pub timezone: Option<TimeZone>,
+    pub(crate) timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
