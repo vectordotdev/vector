@@ -54,7 +54,7 @@ impl Default for OpenGauge {
     }
 }
 
-pub struct OpenToken<E: Fn(usize)> {
+pub(crate) struct OpenToken<E: Fn(usize)> {
     gauge: Arc<AtomicUsize>,
     emitter: E,
 }
