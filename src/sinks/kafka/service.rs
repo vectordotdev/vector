@@ -31,7 +31,7 @@ pub struct KafkaRequestMetadata {
     pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
-    pub topic: String,
+    pub(crate) topic: String,
 }
 
 pub struct KafkaResponse {

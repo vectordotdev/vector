@@ -16,7 +16,7 @@ struct CompoundConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct TransformStep {
+pub(crate) struct TransformStep {
     id: Option<String>,
 
     #[serde(flatten)]
