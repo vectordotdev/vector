@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AggregateEventRecorded;
+pub(crate) struct AggregateEventRecorded;
 
 impl InternalEvent for AggregateEventRecorded {
     fn emit_metrics(&self) {
