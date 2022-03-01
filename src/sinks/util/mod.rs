@@ -9,7 +9,7 @@ pub mod normalizer;
 pub mod partitioner;
 pub mod processed_event;
 pub mod request_builder;
-pub mod retries;
+pub(crate) mod retries;
 pub mod service;
 pub mod sink;
 pub mod socket_bytes_sink;
