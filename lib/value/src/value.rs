@@ -771,7 +771,7 @@ impl Value {
     }
 
     /// Returns a reference to a field value specified by a path iter.
-    pub fn get2<'a>(&self, path: impl Path<'a>) -> Option<&Value> {
+    pub fn get2<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();
         loop {
@@ -892,7 +892,7 @@ impl Value {
     }
 
     /// Get a mutable borrow of the value by path
-    pub fn get_mut2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+    pub fn get_mut2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();
         loop {

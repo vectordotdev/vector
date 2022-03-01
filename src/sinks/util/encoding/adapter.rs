@@ -108,12 +108,11 @@ where
                 }
             }
             Self::LegacyEncodingConfig(config) => Transformer {
-                only_fields: config.encoding.only_fields().as_ref().map(|fields| {
-                    fields
-                        .iter()
-                        .map(|field| field.iter().map(|component| component.clone()).collect())
-                        .collect()
-                }),
+                only_fields: config
+                    .encoding
+                    .only_fields()
+                    .as_ref()
+                    .map(|fields| fields.iter().map(|field| field.to_vec()).collect()),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
             },

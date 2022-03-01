@@ -9,7 +9,6 @@ use crate::{event::test::common::Name, ByteSizeOf};
 fn at_least_wrapper_size() {
     // The byte size of an `Event` should always be at least as big as the
     // mem::size_of of the `Event`.
-    #[allow(clippy::needless_pass_by_value)]
     fn inner(event: Event) -> TestResult {
         let baseline = mem::size_of::<Event>();
         assert!(baseline <= event.size_of());
@@ -26,7 +25,6 @@ fn at_least_wrapper_size() {
 fn exactly_equal_if_no_allocated_bytes() {
     // The byte size of an `Event` should always be exactly equal to its
     // `mem::size_of` if there are no reported allocated bytes.
-    #[allow(clippy::needless_pass_by_value)]
     fn inner(event: Event) -> TestResult {
         let allocated_sz = event.allocated_bytes();
         if allocated_sz == 0 {
@@ -47,7 +45,6 @@ fn exactly_equal_if_no_allocated_bytes() {
 fn size_greater_than_allocated_size() {
     // The total byte size of an `Event` should always be strictly greater than
     // the allocated bytes of the `Event`.
-    #[allow(clippy::needless_pass_by_value)]
     fn inner(event: Event) -> TestResult {
         let total_sz = event.size_of();
         let allocated_sz = event.allocated_bytes();

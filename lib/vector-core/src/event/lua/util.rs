@@ -41,7 +41,6 @@ pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
 /// # Errors
 ///
 /// This function will fail if the table is malformed.
-#[allow(clippy::needless_pass_by_value)] // constrained by mlua types
 pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let year = t.raw_get("year")?;
     let month = t.raw_get("month")?;

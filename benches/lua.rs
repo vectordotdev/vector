@@ -15,7 +15,7 @@ use vector::{
 fn bench_add_fields(c: &mut Criterion) {
     let event = Event::new_empty_log();
 
-    let key = "the key";
+    let key = "the_key";
     let value = "this is the value";
 
     let mut group = c.benchmark_group("lua/add_fields");

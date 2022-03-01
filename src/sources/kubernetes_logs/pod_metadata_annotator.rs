@@ -125,7 +125,7 @@ fn annotate_from_file_info(
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    for (ref key, ref val) in [
+    for (key, val) in [
         (&fields_spec.pod_name, &metadata.name),
         (&fields_spec.pod_namespace, &metadata.namespace),
         (&fields_spec.pod_uid, &metadata.uid),
@@ -149,7 +149,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = parse_path(&fields_spec.pod_labels);
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push(OwnedSegment::Field(key.clone().into()));
+            path.push(OwnedSegment::Field(key.clone()));
             log.insert_path(&path, val.to_owned());
         }
     }
@@ -158,14 +158,14 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = parse_path(&fields_spec.pod_annotations);
         for (key, val) in annotations.iter() {
             let mut path = prefix_path.clone();
-            path.push(OwnedSegment::Field(key.clone().into()));
+            path.push(OwnedSegment::Field(key.clone()));
             log.insert_path(&path, val.to_owned());
         }
     }
 }
 
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
-    for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
+    for (key, val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
         if let Some(val) = val {
             log.insert(*key, val.to_owned());
         }
@@ -173,13 +173,13 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
 }
 
 fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
-    for (ref key, ref val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
+    for (key, val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
         if let Some(val) = val {
             log.insert(*key, val.to_owned());
         }
     }
 
-    for (ref key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
+    for (key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
         if let Some(val) = val {
             let inner: Vec<String> = val
                 .iter()
@@ -195,7 +195,7 @@ fn annotate_from_container_status(
     fields_spec: &FieldsSpec,
     container_status: &ContainerStatus,
 ) {
-    for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
+    for (key, val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
         if let Some(val) = val {
             log.insert(*key, val.to_owned());
         }
@@ -203,7 +203,7 @@ fn annotate_from_container_status(
 }
 
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
-    for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
+    for (key, val) in [(&fields_spec.container_image, &container.image)].iter() {
         if let Some(val) = val {
             log.insert(*key, val.to_owned());
         }
