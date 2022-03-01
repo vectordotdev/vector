@@ -53,7 +53,7 @@ jobs:
       - name: Report on PR metadata
         id: pr-metadata
         run: |
-          export PR_NUMBER=${{ github.run_id }}
+          export PR_NUMBER=${{ github.event.number }}
           echo "::set-output name=PR_NUMBER::${PR_NUMBER}"
           echo "PR number: ${PR_NUMBER}"
 
