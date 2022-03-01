@@ -131,6 +131,7 @@ tracing-futures = { version = "0.2.5", default-features = false, features = ["fu
 tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
 tracing-subscriber = { version = "0.3.9", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
+tracing-flame = "0.2"
 
 # Metrics
 metrics = { version = "0.17.1", default-features = false, features = ["std"] }

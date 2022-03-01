@@ -7831,6 +7831,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-flame"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bae117ee14789185e129aaee5d93750abe67fdc5a9a62650452bfe4e122a3a9"
+dependencies = [
+ "lazy_static",
+ "tracing 0.1.31",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-fluent-assertions"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8487,6 +8498,7 @@ dependencies = [
  "tower-test",
  "tracing 0.1.31",
  "tracing-core 0.1.22",
+ "tracing-flame",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",

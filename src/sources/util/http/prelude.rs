@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait HttpSource: Clone + Send + Sync + 'static {
+pub trait HttpSource: Clone + fmt::Debug + Send + Sync + 'static {
     fn build_events(
         &self,
         body: Bytes,
@@ -151,6 +151,7 @@ impl fmt::Debug for RejectShuttingDown {
 
 impl warp::reject::Reject for RejectShuttingDown {}
 
+#[instrument]
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,

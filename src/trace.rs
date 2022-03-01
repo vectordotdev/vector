@@ -10,6 +10,7 @@ use tracing::{
     Id, Metadata, Subscriber,
 };
 use tracing_core::span;
+use tracing_flame::FlameLayer;
 pub use tracing_futures::Instrument;
 use tracing_limit::RateLimitedLayer;
 use tracing_log::LogTracer;
@@ -40,6 +41,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
     // This is a hidden and undocumented functionality.
     let metrics_layer_enabled = metrics_layer_enabled();
 
+    let (flame_layer, _guard) = FlameLayer::with_file("/tmp/vector-tracing.folded").unwrap();
+
     #[cfg(feature = "tokio-console")]
     let subscriber = {
         let (tasks_layer, tasks_server) = console_subscriber::ConsoleLayer::new();
@@ -47,11 +50,13 @@ pub fn init(color: bool, json: bool, levels: &str) {
 
         tracing_subscriber::registry::Registry::default()
             .with(tasks_layer)
+            .with(flame_layer)
             .with(tracing_subscriber::filter::EnvFilter::from(levels))
     };
     #[cfg(not(feature = "tokio-console"))]
     let subscriber = tracing_subscriber::registry::Registry::default()
-        .with(tracing_subscriber::filter::EnvFilter::from(levels));
+        .with(tracing_subscriber::filter::EnvFilter::from(levels))
+        .with(flame_layer);
 
     // dev note: we attempted to refactor to reduce duplication but it was starting to seem like
     // the refactored code would be introducing more complexity than it was worth to remove this

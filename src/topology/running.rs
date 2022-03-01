@@ -569,8 +569,8 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task);
+        let task = handle_errors(task, self.abort_tx.clone());
+        let spawned = tokio::spawn(task.instrument(span.or_current()));
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -586,8 +586,8 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task);
+        let task = handle_errors(task, self.abort_tx.clone());
+        let spawned = tokio::spawn(task.instrument(span.or_current()));
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -603,8 +603,8 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
-        let spawned = tokio::spawn(task);
+        let task = handle_errors(task, self.abort_tx.clone());
+        let spawned = tokio::spawn(task.instrument(span.clone().or_current()));
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -613,9 +613,11 @@ impl RunningTopology {
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
-        self.source_tasks
-            .insert(key.clone(), tokio::spawn(source_task));
+        let source_task = handle_errors(source_task, self.abort_tx.clone());
+        self.source_tasks.insert(
+            key.clone(),
+            tokio::spawn(source_task.instrument(span.or_current())),
+        );
     }
 
     fn remove_outputs(&mut self, key: &ComponentKey) {

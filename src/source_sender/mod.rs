@@ -127,6 +127,7 @@ impl SourceSender {
         recv
     }
 
+    #[instrument]
     pub async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
         self.inner
             .as_mut()

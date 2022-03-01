@@ -68,7 +68,7 @@ impl GenerateConfig for LogplexConfig {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct LogplexSource {
     query_parameters: Vec<String>,
     decoder: codecs::Decoder,

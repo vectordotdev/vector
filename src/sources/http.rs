@@ -81,7 +81,7 @@ fn default_path_key() -> String {
     "path".to_string()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct SimpleHttpSource {
     headers: Vec<String>,
     query_parameters: Vec<String>,
@@ -90,6 +90,7 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
+    #[instrument]
     fn build_events(
         &self,
         body: Bytes,

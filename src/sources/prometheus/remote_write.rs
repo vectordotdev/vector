@@ -81,7 +81,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RemoteWriteSource;
 
 impl RemoteWriteSource {
