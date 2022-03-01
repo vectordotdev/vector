@@ -147,7 +147,7 @@ impl HecMetricsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
+pub(crate) type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
 
 pub fn process_metric(
     metric: Metric,

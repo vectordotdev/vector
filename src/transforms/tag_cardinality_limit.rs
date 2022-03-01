@@ -48,7 +48,7 @@ pub enum Mode {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BloomFilterConfig {
     #[serde(default = "default_cache_size")]
-    pub cache_size_per_key: usize,
+    pub(crate) cache_size_per_key: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
