@@ -131,7 +131,7 @@ pub fn healthcheck_response(
 }
 
 #[derive(Clone)]
-pub struct GcsRetryLogic;
+pub(crate) struct GcsRetryLogic;
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl RetryLogic for GcsRetryLogic {
