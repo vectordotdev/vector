@@ -21,7 +21,7 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub(crate) struct AwsCloudwatchLogsSubscriptionParserConfig {
-    pub field: Option<String>,
+    pub(crate) field: Option<String>,
 }
 
 inventory::submit! {
