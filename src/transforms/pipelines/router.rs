@@ -8,7 +8,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum EventType {
     Log,
     Metric,
@@ -77,9 +77,7 @@ impl TransformConfig for EventRouterConfig {
             let mut res: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
             res.insert(
                 "filter".to_string(),
-                Box::new(EventFilterConfig {
-                    inner: self.filter.clone(),
-                }),
+                Box::new(EventFilterConfig { inner: self.filter }),
             );
             res.insert("pipelines".to_string(), inner.clone());
             Ok(Some((res, ExpandType::Serial { alias: true })))
