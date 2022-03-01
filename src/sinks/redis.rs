@@ -15,7 +15,7 @@ use super::util::SinkBatchSettings;
 use crate::{
     config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingError},
+    internal_events::{RedisEventsSent, RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -339,14 +339,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(&RedisEventSent { count, byte_size });
+                        emit!(&RedisEventsSent { count, byte_size });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventFailed {
-                    error: error.to_string()
-                }),
+                Err(error) => emit!(&RedisSendEventError { error }),
             };
             result
         })

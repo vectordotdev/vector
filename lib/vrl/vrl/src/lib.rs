@@ -1,8 +1,17 @@
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+#![allow(clippy::module_name_repetitions)]
+
 pub mod prelude;
 mod runtime;
 
 pub use compiler::{
     function, state, value, vm::Vm, Context, Expression, Function, Program, Target, Value,
+    VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

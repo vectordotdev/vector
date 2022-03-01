@@ -29,7 +29,7 @@ use crate::{
     trigger::DisabledTrigger,
 };
 
-use super::TapResource;
+use super::{TapOutput, TapResource};
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -442,6 +442,7 @@ impl RunningTopology {
 
     /// Rewires topology
     pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+        let mut tap_metadata = HashMap::new();
         let mut watch_inputs = HashMap::new();
         if !self.watch.0.is_closed() {
             watch_inputs = new_pieces
@@ -453,6 +454,9 @@ impl RunningTopology {
 
         // Sources
         for key in diff.sources.changed_and_added() {
+            if let Some(task) = new_pieces.tasks.get(key) {
+                tap_metadata.insert(key, ("source", task.typetag().to_string()));
+            }
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -460,6 +464,9 @@ impl RunningTopology {
         // Make sure all transform outputs are set up before another transform
         // might try use it as an input
         for key in diff.transforms.changed_and_added() {
+            if let Some(task) = new_pieces.tasks.get(key) {
+                tap_metadata.insert(key, ("transform", task.typetag().to_string()));
+            }
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -482,11 +489,35 @@ impl RunningTopology {
 
         // Broadcast changes to subscribers.
         if !self.watch.0.is_closed() {
+            let outputs = self
+                .outputs
+                .clone()
+                .into_iter()
+                .flat_map(|(output_id, control_tx)| {
+                    tap_metadata.get(&output_id.component).map(
+                        |(component_kind, component_type)| {
+                            (
+                                TapOutput {
+                                    output_id,
+                                    component_kind,
+                                    component_type: component_type.clone(),
+                                },
+                                control_tx,
+                            )
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            let mut removals = diff.sources.to_remove.clone();
+            removals.extend(diff.transforms.to_remove.iter().cloned());
             self.watch
                 .0
                 .send(TapResource {
-                    outputs: self.outputs.clone(),
+                    outputs,
                     inputs: watch_inputs,
+                    // Note, only sources and transforms are relevant. Sinks do
+                    // not have outputs to tap.
+                    removals,
                 })
                 .expect("Couldn't broadcast config changes.");
         }

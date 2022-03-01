@@ -150,7 +150,9 @@ impl Function for Log {
             .required_any("level")
             .downcast_ref::<LogInfo>()
             .unwrap();
-        let rate_limit_secs = args.optional("rate_limit_secs").unwrap_or(value!(1));
+        let rate_limit_secs = args
+            .optional("rate_limit_secs")
+            .unwrap_or_else(|| value!(1));
         log(rate_limit_secs, &info.level, value, info.span)
     }
 }

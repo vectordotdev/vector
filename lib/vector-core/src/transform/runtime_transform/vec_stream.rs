@@ -32,7 +32,7 @@ use pin_project::pin_project;
 
 impl<T: ?Sized> VecStreamExt for T where T: Stream {}
 
-pub trait VecStreamExt: Stream {
+pub(crate) trait VecStreamExt: Stream {
     /// Creates a stream that selects the next element from either this stream
     /// or the provided one, whichever is ready first.
     ///
@@ -64,7 +64,7 @@ pub trait VecStreamExt: Stream {
 /// they become available, and the streams are polled in a round-robin fashion.
 /// Errors, however, are not merged: you get at most one error at a time.
 #[pin_project]
-pub struct SelectWeak<St1, St2> {
+pub(crate) struct SelectWeak<St1, St2> {
     #[pin]
     stream1: Fuse<St1>,
     #[pin]

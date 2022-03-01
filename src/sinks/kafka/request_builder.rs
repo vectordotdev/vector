@@ -4,7 +4,7 @@ use vector_core::{config::LogSchema, ByteSizeOf};
 
 use crate::{
     event::{Event, Finalizable, Value},
-    internal_events::KafkaHeaderExtractionFailed,
+    internal_events::KafkaHeaderExtractionError,
     sinks::{
         kafka::service::{KafkaRequest, KafkaRequestMetadata},
         util::encoding::{Encoder, EncodingConfig, StandardEncodings},
@@ -75,7 +75,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                             if let Value::Bytes(value_bytes) = value {
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {
-                                emit!(&KafkaHeaderExtractionFailed {
+                                emit!(&KafkaHeaderExtractionError {
                                     header_field: headers_key
                                 });
                             }
@@ -83,7 +83,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                         return Some(owned_headers);
                     }
                     _ => {
-                        emit!(&KafkaHeaderExtractionFailed {
+                        emit!(&KafkaHeaderExtractionError {
                             header_field: headers_key
                         });
                     }

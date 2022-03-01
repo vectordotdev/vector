@@ -119,6 +119,7 @@ impl Output {
     }
 
     /// Set the schema definition for this output.
+    #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
         self.log_schema_definition = Some(schema_definition);
         self
@@ -141,6 +142,7 @@ pub struct AcknowledgementsConfig {
 }
 
 impl AcknowledgementsConfig {
+    #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);
         Self { enabled }

@@ -8,7 +8,7 @@ use vector_buffers::Acker;
 use crate::{
     config::log_schema,
     event::{Event, LogEvent},
-    internal_events::DatadogEventsFieldInvalid,
+    internal_events::ParserMissingFieldError,
     sinks::{
         datadog::events::{
             request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
@@ -50,7 +50,7 @@ impl DatadogEventsSink {
 
 async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
     if !log.contains("title") {
-        emit!(&DatadogEventsFieldInvalid { field: "title" });
+        emit!(&ParserMissingFieldError { field: "title" });
         return None;
     }
 
@@ -60,7 +60,7 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
         if let Some(message) = log.remove(log_schema.message_key()) {
             log.insert("text", message);
         } else {
-            emit!(&DatadogEventsFieldInvalid {
+            emit!(&ParserMissingFieldError {
                 field: log_schema.message_key()
             });
             return None;
