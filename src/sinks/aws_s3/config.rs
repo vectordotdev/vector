@@ -43,7 +43,7 @@ pub struct S3SinkConfig {
     pub options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
