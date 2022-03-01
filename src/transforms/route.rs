@@ -42,9 +42,11 @@ impl SyncTransform for Route {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
-                emit!(&RouteEventDiscarded {
-                    output: output_name.as_ref()
-                });
+                // Nothing, intentionally.
+                //
+                // emit!(&RouteEventDiscarded {
+                //     output: output_name.as_ref()
+                // });
             }
         }
     }
