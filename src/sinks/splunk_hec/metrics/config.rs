@@ -35,7 +35,7 @@ pub struct HecMetricsSinkConfig {
     pub endpoint: String,
     #[serde(default = "crate::sinks::splunk_hec::common::host_key")]
     pub host_key: String,
-    pub index: Option<Template>,
+    pub(crate) index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     #[serde(default)]

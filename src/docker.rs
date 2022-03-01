@@ -29,7 +29,7 @@ pub struct DockerTlsConfig {
     key_file: PathBuf,
 }
 
-pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
+pub(crate) fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
