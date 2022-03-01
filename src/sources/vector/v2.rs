@@ -93,7 +93,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
-    pub address: SocketAddr,
+    pub(crate) address: SocketAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     #[serde(default)]

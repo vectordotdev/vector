@@ -18,7 +18,7 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PipelineFilterConfig {
+pub(crate) struct PipelineFilterConfig {
     condition: AnyCondition,
     inner: Box<dyn TransformConfig>,
 }
