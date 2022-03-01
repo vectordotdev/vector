@@ -16,7 +16,7 @@ use crate::{
     template::TemplateParseError,
 };
 
-pub const BASE_URL: &str = "https://storage.googleapis.com/";
+pub(crate) const BASE_URL: &str = "https://storage.googleapis.com/";
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]

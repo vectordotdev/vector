@@ -25,7 +25,7 @@ pub struct ClickhouseConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub(crate) endpoint: UriSerde,
-    pub table: String,
+    pub(crate) table: String,
     pub database: Option<String>,
     #[serde(default)]
     pub skip_unknown_fields: bool,
