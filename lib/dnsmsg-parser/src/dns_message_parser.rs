@@ -152,9 +152,7 @@ impl DnsMessageParser {
         let record_data = match record.data() {
             Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
             Some(rdata) => format_rdata(rdata),
-            None => Err(DnsMessageParserError::SimpleError {
-                cause: String::from("Empty rdata"),
-            }),
+            None => Ok((Some(String::from("")), None)), // NULL record
         }?;
 
         Ok(DnsRecord {
