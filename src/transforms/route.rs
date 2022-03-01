@@ -54,7 +54,7 @@ impl SyncTransform for Route {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct RouteConfig {
+pub(crate) struct RouteConfig {
     // Deprecated name
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,

@@ -118,7 +118,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 pub struct NewRelicSink<S> {
     pub service: S,
     pub acker: Acker,
-    pub encoding: EncodingConfigFixed<Encoding>,
+    pub(crate) encoding: EncodingConfigFixed<Encoding>,
     pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
     pub batcher_settings: BatcherSettings,
