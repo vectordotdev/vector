@@ -9,7 +9,10 @@ use serde_json::json;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -33,6 +36,13 @@ pub(super) struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -95,8 +105,8 @@ impl SinkConfig for HoneycombConfig {
         "honeycomb"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

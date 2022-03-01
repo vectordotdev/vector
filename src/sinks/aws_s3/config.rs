@@ -8,7 +8,7 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::{
     aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -55,6 +55,12 @@ pub struct S3SinkConfig {
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for S3SinkConfig {
@@ -74,6 +80,7 @@ impl GenerateConfig for S3SinkConfig {
             tls: Some(TlsOptions::default()),
             assume_role: None,
             auth: AwsAuthentication::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -97,8 +104,8 @@ impl SinkConfig for S3SinkConfig {
         "aws_s3"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

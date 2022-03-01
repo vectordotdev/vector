@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
@@ -164,11 +165,20 @@ impl FunctionCall {
                 })
             })?;
 
-        let compile_ctx = FunctionCompileContext { span: call_span };
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = state.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(call_span).with_external_context(external_context);
 
         let mut expr = function
-            .compile(state, &compile_ctx, list)
+            .compile(state, &mut compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
+
+        // Re-insert the external context into the compiler state.
+        let _ = state.swap_external_context(compile_ctx.into_external_context());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
@@ -382,7 +392,7 @@ impl Expression for FunctionCall {
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        let compile_ctx = FunctionCompileContext { span: self.span };
+        let compile_ctx = FunctionCompileContext::new(self.span);
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
@@ -851,7 +861,7 @@ mod tests {
         fn compile(
             &self,
             _state: &crate::State,
-            _info: &FunctionCompileContext,
+            _ctx: &mut FunctionCompileContext,
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
