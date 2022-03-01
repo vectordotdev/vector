@@ -24,7 +24,7 @@ use crate::{
 pub struct CloudwatchSink {
     pub batcher_settings: BatcherSettings,
     pub(super) request_builder: CloudwatchRequestBuilder,
-    pub acker: Acker,
+    pub(crate) acker: Acker,
     pub(crate) service: Svc<CloudwatchLogsPartitionSvc, CloudwatchRetryLogic<CloudwatchResponse>>,
 }
 
