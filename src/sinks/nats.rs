@@ -44,7 +44,7 @@ fn default_name() -> String {
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum Encoding {
+pub(crate) enum Encoding {
     Text,
     Json,
 }
