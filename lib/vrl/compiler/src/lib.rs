@@ -42,7 +42,7 @@ pub enum VrlRuntime {
 
 impl Default for VrlRuntime {
     fn default() -> Self {
-        Self::Ast
+        Self::Vm
     }
 }
 
