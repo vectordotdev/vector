@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -13,8 +13,6 @@ impl InternalEvent for LuaGcTriggered {
     }
 }
 
-pub const SCRIPT_FAILED: &str = "script_failed";
-
 #[derive(Debug)]
 pub struct LuaScriptError {
     pub error: mlua::Error,
@@ -25,7 +23,8 @@ impl InternalEvent for LuaScriptError {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = SCRIPT_FAILED,
+            error_code = "execution",
+            error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
@@ -34,14 +33,14 @@ impl InternalEvent for LuaScriptError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "execution",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "execution",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -59,7 +58,7 @@ impl InternalEvent for LuaBuildError {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = SCRIPT_FAILED,
+            error_type = error_type::SCRIPT_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
@@ -68,14 +67,14 @@ impl InternalEvent for LuaBuildError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "build",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "build",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

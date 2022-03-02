@@ -54,7 +54,8 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to annotate event with pod metadata.",
-            error_type = ANNOTATION_FAILED,
+            error_code = ANNOTATION_FAILED,
+            error_type = error_type::READER_FAILED,
             event = ?self.event,
             stage = error_stage::PROCESSING,
         );
@@ -63,8 +64,8 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Failed to annotate event with pod metadata.",
-            "error_type" => ANNOTATION_FAILED,
+            "error_code" => ANNOTATION_FAILED,
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_annotation_failures_total", 1);
@@ -80,7 +81,8 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to annotate event with namespace metadata.",
-            error_type = ANNOTATION_FAILED,
+            error_code = ANNOTATION_FAILED,
+            error_type = error_type::READER_FAILED,
             event = ?self.event,
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
@@ -90,8 +92,8 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Failed to annotate event with namespace metadata.",
-            "error_type" => ANNOTATION_FAILED,
+            "error_code" => ANNOTATION_FAILED,
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_namespace_annotation_failures_total", 1);
@@ -135,7 +137,6 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -158,7 +159,8 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
         error!(
             message = self.message,
             error = %self.error,
-            error_type = KUBERNETES_LIFECYCLE,
+            error_code = KUBERNETES_LIFECYCLE,
+            error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
@@ -167,8 +169,8 @@ impl<E: std::fmt::Debug + std::string::ToString + std::fmt::Display> InternalEve
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => KUBERNETES_LIFECYCLE,
+            "error_code" => KUBERNETES_LIFECYCLE,
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
