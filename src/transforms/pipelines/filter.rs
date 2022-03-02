@@ -61,6 +61,10 @@ impl TransformConfig for PipelineFilterConfig {
         Ok(Some((result, ExpandType::Parallel { aggregates: true })))
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn input(&self) -> Input {
         self.inner.input()
     }

@@ -25,6 +25,10 @@ impl TransformConfig for Noop {
         vec![Output::default(DataType::all())]
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "noop"
     }

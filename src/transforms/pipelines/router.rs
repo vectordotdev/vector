@@ -88,6 +88,10 @@ impl TransformConfig for EventRouterConfig {
         }
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn input(&self) -> Input {
         Input::all()
     }
@@ -121,6 +125,10 @@ impl TransformConfig for EventFilterConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(self.inner.data_type())]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {

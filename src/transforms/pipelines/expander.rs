@@ -39,6 +39,10 @@ impl TransformConfig for ExpanderConfig {
         Ok(Some((self.inner.clone(), self.mode.clone())))
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn input(&self) -> Input {
         self.inner
             .first()
