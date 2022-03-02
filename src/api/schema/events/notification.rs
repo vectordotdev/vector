@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use async_graphql::{Object, SimpleObject, Union};
 
 #[derive(Debug, Clone, PartialEq, SimpleObject)]
@@ -71,14 +69,13 @@ pub enum Notification {
     InvalidMatch(InvalidMatch),
 }
 
-impl Display for Notification {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message: &str = match self {
+impl Notification {
+    fn as_str(&self) -> &str {
+        match self {
             Notification::Matched(n) => n.message.as_ref(),
             Notification::NotMatched(n) => n.message.as_ref(),
             Notification::InvalidMatch(n) => n.message.as_ref(),
-        };
-        write!(f, "{}", message)
+        }
     }
 }
 
@@ -102,7 +99,7 @@ impl EventNotification {
     }
 
     /// The human-readable message associated with the notification
-    async fn message(&self) -> String {
-        self.notification.to_string()
+    async fn message(&self) -> &str {
+        self.notification.as_str()
     }
 }
