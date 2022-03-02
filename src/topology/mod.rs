@@ -26,6 +26,7 @@ use std::{
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
+use tracing::instrument::Instrumented;
 use vector_buffers::{
     topology::channel::{BufferReceiver, BufferSender},
     Acker,
@@ -112,7 +113,7 @@ pub async fn build_or_log_errors(
 pub(super) fn take_healthchecks(
     diff: &ConfigDiff,
     pieces: &mut Pieces,
-) -> Vec<(ComponentKey, Task)> {
+) -> Vec<(ComponentKey, Instrumented<Task>)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
         .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))

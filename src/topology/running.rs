@@ -128,7 +128,8 @@ impl RunningTopology {
               message = "Failed to gracefully shut down in time. Killing components.",
                 components = ?remaining_components
             );
-        };
+        }
+        .instrument(tracing::debug_span!("stop_timeout").or_current());
 
         // Reports in intervals which components are still running.
         let mut interval = interval(Duration::from_secs(5));
@@ -155,7 +156,7 @@ impl RunningTopology {
                     message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components, time_remaining = ?time_remaining
                 );
             }
-        };
+        }.instrument(tracing::debug_span!("stop_reporter").or_current());
 
         // Finishes once all tasks have shutdown.
         let success = futures::future::join_all(wait_handles).map(|_| ());
@@ -234,6 +235,7 @@ impl RunningTopology {
         Err(())
     }
 
+    #[instrument(skip(self, diff, pieces, options))]
     pub(crate) async fn run_healthchecks(
         &mut self,
         diff: &ConfigDiff,
@@ -455,7 +457,7 @@ impl RunningTopology {
         // Sources
         for key in diff.sources.changed_and_added() {
             if let Some(task) = new_pieces.tasks.get(key) {
-                tap_metadata.insert(key, ("source", task.typetag().to_string()));
+                tap_metadata.insert(key, ("source", task.inner().typetag().to_string()));
             }
             self.setup_outputs(key, new_pieces).await;
         }
@@ -465,7 +467,7 @@ impl RunningTopology {
         // might try use it as an input
         for key in diff.transforms.changed_and_added() {
             if let Some(task) = new_pieces.tasks.get(key) {
-                tap_metadata.insert(key, ("transform", task.typetag().to_string()));
+                tap_metadata.insert(key, ("transform", task.inner().typetag().to_string()));
             }
             self.setup_outputs(key, new_pieces).await;
         }
@@ -559,15 +561,16 @@ impl RunningTopology {
         }
     }
 
+    #[instrument(skip(self, new_pieces))]
     fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "sink",
             component_kind = "sink",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
+            component_id = %task.inner().id(),
+            component_type = %task.inner().typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            component_name = %task.inner().id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
         let spawned = tokio::spawn(task.instrument(span.or_current()))
@@ -577,15 +580,16 @@ impl RunningTopology {
         }
     }
 
+    #[instrument(skip(self, new_pieces))]
     fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "transform",
             component_kind = "transform",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
+            component_id = %task.inner().id(),
+            component_type = %task.inner().typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            component_name = %task.inner().id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
         let spawned = tokio::spawn(task.instrument(span.or_current()))
@@ -595,15 +599,16 @@ impl RunningTopology {
         }
     }
 
+    #[instrument(skip(self, new_pieces))]
     fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "source",
             component_kind = "source",
-            component_id = %task.id(),
-            component_type = %task.typetag(),
+            component_id = %task.inner().id(),
+            component_type = %task.inner().typetag(),
             // maintained for compatibility
-            component_name = %task.id(),
+            component_name = %task.inner().id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
         let spawned = tokio::spawn(task.instrument(span.clone().or_current()))
@@ -628,6 +633,7 @@ impl RunningTopology {
         self.outputs.retain(|id, _output| &id.component != key);
     }
 
+    #[instrument(skip(self))]
     async fn remove_inputs(&mut self, key: &ComponentKey) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
@@ -647,6 +653,7 @@ impl RunningTopology {
         }
     }
 
+    #[instrument(skip(self, new_pieces))]
     async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
@@ -683,6 +690,7 @@ impl RunningTopology {
         }
     }
 
+    #[instrument(skip(self, new_pieces))]
     async fn setup_inputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
@@ -702,6 +710,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(key.clone(), trigger.into()));
     }
 
+    #[instrument(skip(self, new_pieces, diff))]
     async fn replace_inputs(
         &mut self,
         key: &ComponentKey,
@@ -775,6 +784,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(key.clone(), trigger.into()));
     }
 
+    #[instrument(skip(self))]
     async fn detach_inputs(&mut self, key: &ComponentKey) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);

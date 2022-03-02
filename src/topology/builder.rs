@@ -12,7 +12,7 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use tracing_futures::Instrument;
+use tracing::{instrument::Instrumented, Instrument};
 use vector_core::{
     buffers::{
         topology::{
@@ -115,9 +115,9 @@ pub(self) async fn load_enrichment_tables<'a>(
 pub struct Pieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Vec<OutputId>)>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
-    pub(super) tasks: HashMap<ComponentKey, Task>,
-    pub(crate) source_tasks: HashMap<ComponentKey, Task>,
-    pub(super) healthchecks: HashMap<ComponentKey, Task>,
+    pub(super) tasks: HashMap<ComponentKey, Instrumented<Task>>,
+    pub(crate) source_tasks: HashMap<ComponentKey, Instrumented<Task>>,
+    pub(super) healthchecks: HashMap<ComponentKey, Instrumented<Task>>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
 }
@@ -130,9 +130,9 @@ pub async fn build_pieces(
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
-    let mut tasks = HashMap::new();
-    let mut source_tasks = HashMap::new();
-    let mut healthchecks = HashMap::new();
+    let mut tasks: HashMap<ComponentKey, Instrumented<Task>> = HashMap::new();
+    let mut source_tasks: HashMap<ComponentKey, Instrumented<Task>> = HashMap::new();
+    let mut healthchecks: HashMap<ComponentKey, Instrumented<Task>> = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
     let mut detach_triggers = HashMap::new();
 
@@ -183,14 +183,19 @@ pub async fn build_pieces(
         let pump = async move {
             let mut handles = Vec::new();
             for pump in pumps {
-                handles.push(tokio::spawn(pump));
+                handles.push(
+                    tokio::spawn(pump)
+                        .instrument(tracing::debug_span!("sub-source-pump").or_current()),
+                );
             }
             for handle in handles {
                 handle.await.expect("join error")?;
             }
             Ok(TaskOutput::Source)
         };
-        let pump = Task::new(key.clone(), typetag, pump);
+
+        let pump = Task::new(key.clone(), typetag, pump)
+            .instrument(tracing::debug_span!("sources_pump").or_current());
 
         let pipeline = builder.build();
 
@@ -236,7 +241,8 @@ pub async fn build_pieces(
                 Err(()) => Err(()),
             }
         };
-        let server = Task::new(key.clone(), typetag, server);
+        let server = Task::new(key.clone(), typetag, server)
+            .instrument(tracing::debug_span!("sources-server").or_current());
 
         outputs.extend(controls);
         tasks.insert(key.clone(), pump);
@@ -393,7 +399,8 @@ pub async fn build_pieces(
             })
         };
 
-        let task = Task::new(key.clone(), typetag, sink);
+        let task = Task::new(key.clone(), typetag, sink)
+            .instrument(tracing::debug_span!("sink").or_current());
 
         let component_key = key.clone();
         let healthcheck_task = async move {
@@ -436,7 +443,8 @@ pub async fn build_pieces(
             }
         };
 
-        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
+        let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task)
+            .instrument(tracing::debug_span!("sink-healthcheck").or_current());
 
         inputs.insert(key.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(key.clone(), healthcheck_task);
@@ -495,7 +503,10 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+) -> (
+    Instrumented<Task>,
+    HashMap<OutputId, fanout::ControlChannel>,
+) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
@@ -514,7 +525,10 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+) -> (
+    Instrumented<Task>,
+    HashMap<OutputId, fanout::ControlChannel>,
+) {
     let (outputs, controls) = TransformOutputs::new(node.outputs);
 
     let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
@@ -532,7 +546,8 @@ fn build_sync_transform(
         output_controls.insert(id, control);
     }
 
-    let task = Task::new(node.key.clone(), node.typetag, transform);
+    let task = Task::new(node.key.clone(), node.typetag, transform)
+        .instrument(tracing::debug_span!("sync-transform").or_current());
 
     (task, output_controls)
 }
@@ -674,7 +689,10 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+) -> (
+    Instrumented<Task>,
+    HashMap<OutputId, fanout::ControlChannel>,
+) {
     let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
@@ -707,7 +725,8 @@ fn build_task_transform(
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);
 
-    let task = Task::new(key.clone(), typetag, transform);
+    let task = Task::new(key.clone(), typetag, transform)
+        .instrument(tracing::debug_span!("task-transform").or_current());
 
     (task, outputs)
 }
