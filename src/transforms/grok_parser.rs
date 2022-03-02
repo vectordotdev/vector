@@ -2,7 +2,7 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use grok::Pattern;
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;

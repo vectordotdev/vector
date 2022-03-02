@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str};
 
 use bytes::Bytes;
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 

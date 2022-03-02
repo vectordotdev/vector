@@ -28,7 +28,7 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup2::OwnedSegment;
+use lookup::lookup_v2::OwnedSegment;
 
 use super::{
     dns_message::{

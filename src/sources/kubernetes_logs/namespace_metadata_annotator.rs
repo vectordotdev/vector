@@ -4,7 +4,7 @@
 
 use evmap::ReadHandle;
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 
 use crate::{

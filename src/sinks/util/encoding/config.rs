@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,

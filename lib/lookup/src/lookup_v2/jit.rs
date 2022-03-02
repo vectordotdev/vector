@@ -1,4 +1,4 @@
-use crate::lookup2::{BorrowedSegment, Path};
+use crate::lookup_v2::{BorrowedSegment, Path};
 use std::str::CharIndices;
 
 #[derive(Clone)]
@@ -148,7 +148,7 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup2::{BorrowedSegment, JitPath, Path};
+    use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
 
     #[test]
     fn parsing() {

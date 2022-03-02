@@ -1,4 +1,4 @@
-use lookup::lookup2::{BorrowedSegment, Path};
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::{collections::BTreeMap, iter::Peekable};
 
 use super::Value;
@@ -10,26 +10,10 @@ pub fn insert<'a>(
     value: Value,
 ) -> Option<Value> {
     let path_iter = path.segment_iter().peekable();
-    map_insert2(fields, path_iter, value)
+    map_insert(fields, path_iter, value)
 }
 
-// pub fn insert_path(
-//     fields: &mut BTreeMap<String, Value>,
-//     path: Vec<PathComponent>,
-//     value: Value,
-// ) -> Option<Value> {
-//     map_insert(fields, path.into_iter().peekable(), value)
-// }
-
-// pub fn insert_path2(
-//     fields: &mut BTreeMap<String, Value>,
-//     path: Vec<BorrowedSegment>,
-//     value: Value,
-// ) -> Option<Value> {
-//     map_insert2(fields, path.into_iter().peekable(), value)
-// }
-
-fn map_insert2<'a>(
+fn map_insert<'a>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
@@ -38,19 +22,19 @@ fn map_insert2<'a>(
         (Some(BorrowedSegment::Field(current)), None) => fields.insert(current.to_owned(), value),
         (Some(BorrowedSegment::Field(current)), Some(BorrowedSegment::Field(_))) => {
             if let Some(Value::Object(map)) = fields.get_mut(current) {
-                map_insert2(map, path_iter, value)
+                map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
-                map_insert2(&mut map, path_iter, value);
+                map_insert(&mut map, path_iter, value);
                 fields.insert(current.to_owned(), Value::Object(map))
             }
         }
         (Some(BorrowedSegment::Field(current)), Some(&BorrowedSegment::Index(next))) => {
             if let Some(Value::Array(array)) = fields.get_mut(current) {
-                array_insert2(array, path_iter, value)
+                array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity((next as usize) + 1);
-                array_insert2(&mut array, path_iter, value);
+                array_insert(&mut array, path_iter, value);
                 fields.insert(current.to_owned(), Value::Array(array))
             }
         }
@@ -58,7 +42,7 @@ fn map_insert2<'a>(
     }
 }
 
-fn array_insert2<'a>(
+fn array_insert<'a>(
     values: &mut Vec<Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
@@ -72,10 +56,10 @@ fn array_insert2<'a>(
         }
         (Some(BorrowedSegment::Index(current)), Some(BorrowedSegment::Field(_))) => {
             if let Some(Value::Object(map)) = values.get_mut(current as usize) {
-                map_insert2(map, path_iter, value)
+                map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
-                map_insert2(&mut map, path_iter, value);
+                map_insert(&mut map, path_iter, value);
                 while values.len() <= (current as usize) {
                     values.push(Value::Null);
                 }
@@ -87,10 +71,10 @@ fn array_insert2<'a>(
         }
         (Some(BorrowedSegment::Index(current)), Some(BorrowedSegment::Index(next))) => {
             if let Some(Value::Array(array)) = values.get_mut(current as usize) {
-                array_insert2(array, path_iter, value)
+                array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity((*next as usize) + 1);
-                array_insert2(&mut array, path_iter, value);
+                array_insert(&mut array, path_iter, value);
                 while values.len() <= (current as usize) {
                     values.push(Value::Null);
                 }

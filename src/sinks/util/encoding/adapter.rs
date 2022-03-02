@@ -6,7 +6,7 @@ use crate::{
     event::Event,
 };
 use core::fmt::Debug;
-use lookup::lookup2::OwnedSegment;
+use lookup::lookup_v2::OwnedSegment;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 

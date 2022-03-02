@@ -7,7 +7,7 @@ use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};

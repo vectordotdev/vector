@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use lookup::lookup2::OwnedSegment;
+use lookup::lookup_v2::OwnedSegment;
 use std::{io, sync::Arc};
 
 use vector_core::{buffers::Ackable, ByteSizeOf};

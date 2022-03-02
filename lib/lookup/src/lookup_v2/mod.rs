@@ -1,6 +1,6 @@
 mod jit;
 
-use crate::lookup2::jit::{JitLookup, JitPath};
+use crate::lookup_v2::jit::{JitLookup, JitPath};
 use serde::{Deserialize, Serialize};
 use std::iter::Cloned;
 use std::slice::Iter;

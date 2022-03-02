@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use lookup::lookup2::Path;
+use lookup::lookup_v2::Path;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 

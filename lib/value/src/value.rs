@@ -27,7 +27,7 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use error::ValueError;
-use lookup::lookup2::{BorrowedSegment, Path};
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
 use std::result::Result as StdResult;

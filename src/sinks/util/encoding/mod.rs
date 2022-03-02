@@ -78,7 +78,7 @@ pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator};
 pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
-use lookup::lookup2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {

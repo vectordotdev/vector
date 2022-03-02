@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str};
 
-use lookup::lookup2::BorrowedSegment;
+use lookup::lookup_v2::BorrowedSegment;
 use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
