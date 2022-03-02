@@ -304,9 +304,9 @@ impl Expression for Op {
             }
             ast::Opcode::And => {
                 // And is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-                vm.write_opcode(OpCode::Pop);
+                let if_jump = vm.emit_jump(OpCode::JumpIfFalsey);
                 self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::And);
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Err => {
