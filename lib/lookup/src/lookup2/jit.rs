@@ -1,6 +1,7 @@
 use crate::lookup2::{BorrowedSegment, Path};
 use std::str::CharIndices;
 
+#[derive(Clone)]
 pub struct JitPath<'a> {
     path: &'a str,
 }

@@ -14,8 +14,9 @@ pub fn parse_path(path: &str) -> Vec<OwnedSegment> {
         .collect()
 }
 
-/// A path is simply the data describing how to look up a value
-pub trait Path<'a> {
+/// A path is simply the data describing how to look up a value.
+/// This should only be implemented for types that are very cheap to clone, such as references.
+pub trait Path<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>>;
 
     fn segment_iter(&self) -> Self::Iter;

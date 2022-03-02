@@ -136,10 +136,9 @@ impl LogEvent {
         util::log::insert(self.as_map_mut(), path, value.into())
     }
 
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+        if !self.contains(path.clone()) {
+            self.insert(path, value);
         }
     }
 
