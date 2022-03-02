@@ -8,8 +8,28 @@ use value::Kind;
 /// components.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Requirement {
-    /// Semantic meaning required to exist for a given event.
-    meaning: BTreeMap<&'static str, Kind>,
+    /// Semantic meanings confingured for this requirement.
+    meaning: BTreeMap<&'static str, SemanticMeaning>,
+}
+
+/// The semantic meaning of an event.
+#[derive(Debug, Clone, PartialEq)]
+struct SemanticMeaning {
+    /// The type required by this semantic meaning.
+    kind: Kind,
+
+    /// Whether the meaning is optional.
+    ///
+    /// If a meaning is optional, the sink must not error when the meaning is not defined in the
+    /// provided `Definition`, but it *must* error if it is defined, but its type does not meet the
+    /// requirement.
+    optional: bool,
+}
+
+impl SemanticMeaning {
+    fn new(kind: Kind, optional: bool) -> Self {
+        Self { kind, optional }
+    }
 }
 
 impl Requirement {
@@ -32,8 +52,23 @@ impl Requirement {
     }
 
     /// Add a restriction to the schema.
-    pub fn require_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
-        self.meaning.insert(meaning, kind);
+    pub fn required_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
+        self.insert_meaning(meaning, kind, true);
         self
+    }
+
+    /// Add an optional restriction to the schema.
+    ///
+    /// This differs from `required_meaning` in that it is valid for the event to not have the
+    /// specified meaning defined, but invalid for that meaning to be defined, but its [`Kind`] not
+    /// matching the configured expectation.
+    pub fn optional_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
+        self.insert_meaning(meaning, kind, false);
+        self
+    }
+
+    fn insert_meaning(&mut self, identifier: &'static str, kind: Kind, optional: bool) {
+        let meaning = SemanticMeaning { kind, optional };
+        self.meaning.insert(identifier, meaning);
     }
 }

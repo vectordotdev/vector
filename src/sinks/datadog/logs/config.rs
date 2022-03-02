@@ -4,6 +4,7 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -13,6 +14,7 @@ use super::{
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
+    schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
@@ -170,7 +172,16 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .required_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn sink_type(&self) -> &'static str {
