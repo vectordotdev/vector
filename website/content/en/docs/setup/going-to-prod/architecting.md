@@ -107,7 +107,7 @@ Your pipeline begins with data collection. Your services and systems generate lo
 
 In line with [guideline 1](#1-use-the-best-tool-for-the-job), it is best to choose the agent that optimizes your engineering team's ability to monitor their systems. Sacrificing this to use Vector is not recommended since Vector can be deployed in between agents to reduce lock-in. Therefore, Vector should [integrate](#integrating-with-agents) with the best agent for the job and [replace](#replacing-agents) others. Specific guidance is below.
 
-##### **When Vector Should Replace Agents**
+##### When Vector Should Replace Agents
 
 Vector should replace agents performing generic data forwarding functions, such as:
 
@@ -118,7 +118,7 @@ Vector should replace agents performing generic data forwarding functions, such 
 
 Notice that these functions collect and forward existing data, unchanged. There is nothing unique about these functions. Vector should replace these agents since Vector offers better performance and reliability.
 
-##### **When Vector Should Not Replace Agents**
+##### When Vector Should Not Replace Agents
 
 Vector should not replace agents that produce vendor-specific data that Vector cannot replicate.
 
@@ -136,12 +136,12 @@ More examples are below.
 | FluentD | Replace | Vector can perform the same functions as Fluentd with significantly better performance and reliability. |
 | Metric Beat | Integrate | Metric Beat integrates with more systems, produces better data, and seamlessly integrates with the Elastic platform. |
 | New Relic Agent | Integrate | The New Relic Agent integrates with more systems, produces better data, and seamlessly integrates with the New Relic platform. |
-| Open Telemetry Collector | Replace | Vector implements the OT protocol with better performance, reliability, and data quality. |
+| Open Telemetry Collector | Integrate | Vector's built-in OTel support is forthcoming. |
 | Splunk UF | Replace | Vector integrates deeply with Splunk with better performance, reliability, and data quality. |
 | Syslog | Replace | Vector implements the Syslog protocol with better performance, reliability, and data quality. |
 | Telegraf | Integrate | Telegraf integrates with more systems and produces better metrics data. |
 
-#### **Integrating with Agents**
+#### Integrating with Agents
 
 If you decide to integrate with an agent, you should configure Vector to receive data directly from the agent over the local network, routing data through Vector.
 
@@ -151,7 +151,7 @@ Sources such as the `datadog_agent` source can be used to receive data from your
 
 Alternatively, you can deploy Vector [on separate nodes as an aggregator](/docs/setup/going-to-prod/arch/aggregator/). This strategy is covered in more detail in the [where to process data section](#choosing-where-to-process-data).
 
-##### **Reducing Agent Risk**
+##### *Reducing Agent Risk
 
 When integrating with an agent, you should configure the agent to be a simple data forwarder, and route [supported data types](docs/about/under-the-hood/architecture/data-model/) through Vector. This strategy reduces the risk of data loss and service disruption due to misbehaving agents by minimizing their responsibilities.
 
@@ -179,7 +179,7 @@ Primitive data types that [Vector’s data model](docs/about/under-the-hood/arch
 
 As stated in the [deployment roles section](#roles), Vector can deploy anywhere in your infrastructure. It can deploy directly on your node as an agent for [local processing](#local-processing), or on separate nodes as an aggregator for [remote processing](#remote-processing). Where processing happens depends largely on your use cases and environment, which we cover in more detail below.
 
-##### **Local Processing**
+##### Local Processing
 
 With local processing, [Vector is deployed on each node as an agent](#agent-role):
 
@@ -199,7 +199,7 @@ Since this is usually the exception, consider [remote processing](#remote-proces
 Local processing is demonstrated in the [agent architecture document](/docs/setup/going-to-prod/arch/agent/).
 {{< /info >}}
 
-##### **Remote Processing**
+##### Remote Processing
 
 For remote processing, [Vector can be deployed on separate nodes as an aggregator](#aggregator-role):
 
@@ -211,7 +211,7 @@ This strategy shifts processing off your nodes and onto remote aggregator nodes.
 Remote processing is demonstrated in the [aggregator architecture document](/docs/setup/going-to-prod/arch/aggregator/).
 {{< /info >}}
 
-##### **Unified Processing**
+##### Unified Processing
 
 Finally, you can combine the above strategies to get the best of both worlds, creating a unified observability data pipeline.
 

@@ -20,7 +20,7 @@ The following numbers are starting points for estimating your instance sizes. Th
 
 `*` - These numbers are conservative for estimation purposes.
 
-`*` - 1 vCPU = 1 ARM physical CPU or 0.5 Intel physical CPU.
+`*` - 1 vCPU = 1 ARM physical CPU or 0.5 Intel physical CPU with hyperthreading.
 
 ### Recommendations
 
@@ -106,7 +106,7 @@ When configuring a load balancer, we recommend the following general settings:
 
 Not all connections are equal; some connections produce much more data making it difficult to evenly load balance traffic across your aggregators. To mitigate this, we recommend the following best practices:
 
-- Use a protocol that allows for even load balancing, such as an HTTP-based protocol. Avoid plain TCP or UDP connections for the same reasons.
+- Use a protocol that allows for even load balancing, such as an HTTP-based protocol. Avoid plain TCP connections for the same reasons.
 - Distribute data across multiple connections for easier load balancing.
 - Ensure your Vector instances are large enough to handle your highest volume connection to take full advantage of vertical scaling.
 - Avoid stateful transformation in aggregators (i.e., the `aggregate` transform), when possible, so that you can use a more fair balancing algorithm.
@@ -117,8 +117,6 @@ For the vast majority of Vector deployments, autoscaling should be based on aver
 
 - Average CPU over 5 minutes with a 85% utilization target.
 - A 5 minute stabilization period for scaling up and down.
-
-These settings are the default in platforms that support them, such as Kubernetes via Helm.
 
 ## Capacity Planning
 

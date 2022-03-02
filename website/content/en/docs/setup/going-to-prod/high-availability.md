@@ -47,7 +47,7 @@ This feature should be paired with disk buffers or streaming sinks to ensure ack
 
 #### Data Processing Failure
 
-Mitigate data processing failures with Vector’s dropped events routing. Any component that can fail processing drops events, and comes with a `dropped` output channel that routes dropped events through another pipeline. This flexible design allows the routing of dropped events like any other event.
+Mitigate data processing failures with Vector’s dropped events routing. `remap` transforms have a `dropped` output channel that routes dropped events through another pipeline. This flexible design allows the routing of dropped events like any other event.
 
 We recommend routing dropped events immediately to a backup destination to prioritize durability. Then, once data is persisted, you can inspect it, correct the error, and replay it.
 
@@ -72,9 +72,13 @@ The following is an example configuration that routes failed events from a `rema
     type = "aws_s3"
 ```
 
+{{< info >}}
+Support for `dropped` channels in other components is forthcoming.
+{{< /info >}}
+
 #### Data Send Failure
 
-Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/about/under-the-hood/networking/arc/), buffers, and circuit breaking.
+Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/about/under-the-hood/networking/arc/) and buffers.
 
 ARC automatically scales down the number of outgoing connections when Vector cannot send data. ARC minimizes the amount of in-flight data, appropriately applies backpressure, and prevents the stampede effect that often prohibits downstream services from recovering.
 
