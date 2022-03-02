@@ -113,7 +113,8 @@ The `ConfigBuilder` struct will get a new `secret_backend` field (type to someth
 that `load_builder_from_paths` will then assert if this field is present before returning to the caller, and if it, the
 config will be reloaded with this `SecretBackend` passed to downstream callee and hook the secret interpolation around
 the same point as [the environment variable interpolation][env-var-hook] it would then query this `SecretBackend` for
-each `ENC[secret_key]`.
+each `ENC[secret_key]`, `ENC[backend_name/secret_key]` or `secret://backend_name/secret_key` (The placeholded choice
+remains TBC).
 
 The implementation should ease future extension and split the internal API queried by the interpolation logic and the
 secret provider that may see other implementation like: `executable` (the one documented in this RFC), `vault`,
