@@ -124,27 +124,24 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        let errors: Vec<_> = self
-            .sinks
-            .iter()
-            .filter_map(|(name, sink)| {
-                (sink.acknowledgements.enabled() && !sink.inner.can_acknowledge()).then(|| {
-                    format!(
-                        "Sink `{}` has acknowledgements enabled but does not support them.",
-                        name,
-                    )
-                })
-            })
-            .collect();
-        if !errors.is_empty() {
-            return Err(errors);
+        if self.global.acknowledgements.enabled() {
+            for (name, sink) in &self.sinks {
+                if sink.inner.acknowledgements().is_none() {
+                    warn!(
+                        message = "Acknowledgements are globally enabled but sink does not support them.",
+                        sink = %name,
+                    );
+                }
+            }
         }
 
         let inputs: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
-                sink.acknowledgements
+                sink.inner
+                    .acknowledgements()
+                    .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })

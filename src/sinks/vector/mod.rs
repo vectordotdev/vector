@@ -3,7 +3,9 @@ pub mod v2;
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription};
+use crate::config::{
+    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -76,8 +78,11 @@ impl SinkConfig for VectorConfig {
         "vector"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(v2) => Some(&v2.config.acknowledgements),
+        }
     }
 }
 

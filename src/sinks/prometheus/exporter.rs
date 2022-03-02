@@ -29,7 +29,10 @@ use vector_core::{
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{GenerateConfig, Input, Resource, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{
         metric::{Metric, MetricData, MetricKind, MetricValue},
         Event,
@@ -146,8 +149,8 @@ impl SinkConfig for PrometheusExporterConfig {
         vec![Resource::tcp(self.address)]
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -178,8 +181,8 @@ impl SinkConfig for PrometheusCompatConfig {
         self.config.resources()
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

@@ -67,6 +67,7 @@ async fn firehose_put_records() {
         tls: None,
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();
