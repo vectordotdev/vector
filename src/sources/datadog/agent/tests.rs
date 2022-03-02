@@ -3,7 +3,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     iter::FromIterator,
     net::SocketAddr,
-    num::NonZeroU16,
     str,
 };
 
@@ -944,12 +943,12 @@ async fn decode_traces() {
 
     {
         let trace = events[0].as_trace();
-        assert_eq!(trace["host"], "a_hostname".into());
-        assert_eq!(trace["env"], "an_environment".into());
-        assert_eq!(trace["language"], "ada".into());
+        assert_eq!(trace.as_map()["host"], "a_hostname".into());
+        assert_eq!(trace.as_map()["env"], "an_environment".into());
+        assert_eq!(trace.as_map()["language"], "ada".into());
         assert!(trace.contains("spans"));
-        assert_eq!(trace["spans"].as_array().unwrap().len(), 1);
-        let span_from_trace = trace["spans"].as_array().unwrap()[0].as_object().unwrap();
+        assert_eq!(trace.as_map()["spans"].as_array().unwrap().len(), 1);
+        let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0].as_object().unwrap();
         assert_eq!(span_from_trace["service"], "a_service".into());
         assert_eq!(span_from_trace["name"], "a_name".into());
         assert_eq!(span_from_trace["resource"], "a_resource".into());
@@ -979,12 +978,12 @@ async fn decode_traces() {
 
         let apm_event = events[1].as_trace();
         assert!(!apm_event.contains("spans"));
-        assert_eq!(apm_event["env"], "an_environment".into());
-        assert_eq!(apm_event["language"], "ada".into());
-        assert_eq!(apm_event["host"], "a_hostname".into());
-        assert_eq!(apm_event["service"], "a_service".into());
-        assert_eq!(apm_event["name"], "a_name".into());
-        assert_eq!(apm_event["resource"], "a_resource".into());
+        assert_eq!(apm_event.as_map()["env"], "an_environment".into());
+        assert_eq!(apm_event.as_map()["language"], "ada".into());
+        assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
+        assert_eq!(apm_event.as_map()["service"], "a_service".into());
+        assert_eq!(apm_event.as_map()["name"], "a_name".into());
+        assert_eq!(apm_event.as_map()["resource"], "a_resource".into());
 
         assert_eq!(
             &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],

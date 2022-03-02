@@ -6,7 +6,7 @@ use futures::future;
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use vector_core::metrics::AgentDDSketch;
+use vector_core::{metrics::AgentDDSketch, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection};
 
 use crate::{
@@ -22,7 +22,6 @@ use crate::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
     },
-    vector_core::ByteSizeOf,
     SourceSender,
 };
 

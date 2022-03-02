@@ -16,7 +16,7 @@ paste = "1"
 thiserror = "1"
 
 [dev-dependencies]
-test-case = "1"
+test-case = "2"
 
 [build-dependencies]
 lalrpop = "0.19.7"

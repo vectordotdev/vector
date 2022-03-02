@@ -6,6 +6,7 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
 use crate::{
@@ -15,7 +16,6 @@ use crate::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
     },
-    vector_core::ByteSizeOf,
     SourceSender,
 };
 

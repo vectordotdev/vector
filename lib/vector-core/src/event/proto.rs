@@ -104,7 +104,7 @@ impl From<Trace> for event::TraceEvent {
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
             .collect::<BTreeMap<_, _>>();
 
-        Self::from(fields)
+        Self::from(event::LogEvent::from(fields))
     }
 }
 
@@ -383,7 +383,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .map(|k| (k, k > 0))
             .map(|(k, pos)| {
                 k.try_into()
-                    .unwrap_or_else(|_| if pos { i16::MAX } else { i16::MIN })
+                    .unwrap_or(if pos { i16::MAX } else { i16::MIN })
             })
             .collect::<Vec<_>>();
         let counts = sketch

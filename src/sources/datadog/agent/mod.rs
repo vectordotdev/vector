@@ -280,7 +280,6 @@ impl DatadogAgentSource {
         traces: bool,
         multiple_outputs: bool,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-
         let mut filters = logs.then(|| {
             logs::build_warp_filter(
                 acknowledgements,

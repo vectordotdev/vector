@@ -36,7 +36,7 @@ impl TransformConfig for ExpanderConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        Ok(Some((self.inner.clone(), self.mode.clone())))
+        Ok(Some((self.inner.clone(), self.mode)))
     }
 
     fn input(&self) -> Input {

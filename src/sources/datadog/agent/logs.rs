@@ -5,6 +5,7 @@ use chrono::Utc;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
+use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -14,7 +15,6 @@ use crate::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::{ErrorMessage, StreamDecodingError},
     },
-    vector_core::ByteSizeOf,
     SourceSender,
 };
 
