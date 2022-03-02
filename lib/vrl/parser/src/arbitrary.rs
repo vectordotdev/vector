@@ -115,12 +115,16 @@ impl<'a> ArbitraryDepth<'a> for IfStatement {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
         let predicate = Predicate::arbitrary_depth(u, depth - 1)?;
         let consequent = Block::arbitrary_depth(u, depth - 1)?;
-        let alternative = Block::arbitrary_depth(u, depth - 1)?;
+        let alternative = if bool::arbitrary(u) {
+            Some(Block::arbitrary_depth(u, depth - 1)?)
+        } else {
+            None
+        };
 
         Ok(IfStatement {
             predicate: Node::new(Span::default(), predicate),
             consequent: Node::new(Span::default(), consequent),
-            alternative: Some(Node::new(Span::default(), alternative)),
+            alternative: Node::new(Span::default(), alternative),
         })
     }
 }
