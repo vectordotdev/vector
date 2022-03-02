@@ -208,7 +208,7 @@ async fn multiple_inputs_backpressure() {
 }
 
 mod test_sink {
-    use crate::config::{Input, SinkConfig, SinkContext};
+    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
     use crate::event::Event;
     use crate::sinks::util::StreamSink;
     use crate::sinks::{Healthcheck, VectorSink};
@@ -254,6 +254,10 @@ mod test_sink {
 
         fn sink_type(&self) -> &'static str {
             "test-backpressure-sink"
+        }
+
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
         }
     }
 }

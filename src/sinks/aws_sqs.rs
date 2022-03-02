@@ -20,14 +20,15 @@ use super::util::SinkBatchSettings;
 use crate::{
     aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingError},
+    internal_events::{AwsSqsEventsSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::{self, Response},
+        sink::Response,
         BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
@@ -85,6 +86,12 @@ pub struct SqsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -131,6 +138,10 @@ impl SinkConfig for SqsSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -200,7 +211,6 @@ impl SqsSink {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
@@ -245,7 +255,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
             client
                 .send_message(request)
                 .inspect_ok(|result| {
-                    emit!(&AwsSqsEventSent {
+                    emit!(&AwsSqsEventsSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })
@@ -433,6 +443,7 @@ mod integration_tests {
             tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();

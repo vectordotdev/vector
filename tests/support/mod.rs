@@ -27,8 +27,8 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+        SourceContext, TransformConfig, TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -406,6 +406,10 @@ impl SinkConfig for MockSinkConfig {
 
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

@@ -11,7 +11,7 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, Input, SinkConfig, SinkDescription},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingError,
@@ -146,6 +146,10 @@ impl SinkConfig for RemoteWriteConfig {
 
     fn sink_type(&self) -> &'static str {
         "prometheus_remote_write"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

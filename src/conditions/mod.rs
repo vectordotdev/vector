@@ -2,15 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{config::component::ComponentDescription, event::Event};
 
-pub mod check_fields;
-pub mod datadog_search;
-pub mod is_log;
-pub mod is_metric;
+mod check_fields;
+pub(self) mod datadog_search;
+pub(crate) mod is_log;
+pub(self) mod is_metric;
 pub mod not;
-pub mod vrl;
+mod vrl;
 
 pub use self::vrl::VrlConfig;
-pub use check_fields::CheckFieldsConfig;
 
 #[derive(Debug, Clone)]
 pub enum Condition {
@@ -77,7 +76,7 @@ pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
 
 dyn_clone::clone_trait_object!(ConditionConfig);
 
-pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
+type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
 

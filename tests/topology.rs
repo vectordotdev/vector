@@ -76,7 +76,7 @@ async fn topology_shutdown_while_active() {
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
-    let stop_complete = tokio::spawn(async move { topology.stop().await });
+    let stop_complete = tokio::spawn(topology.stop());
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.

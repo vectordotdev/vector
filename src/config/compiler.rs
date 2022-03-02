@@ -115,7 +115,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             expansions,
         };
 
-        config.propagate_acknowledgements();
+        config.propagate_acknowledgements()?;
 
         let warnings = validation::warnings(&config);
 
@@ -234,8 +234,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-            TransformConfig, TransformContext,
+            AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+            SourceContext, TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -304,6 +304,10 @@ mod test {
 
         fn input(&self) -> Input {
             Input::all()
+        }
+
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
         }
     }
 

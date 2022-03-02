@@ -7,9 +7,11 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingError},
+    internal_events::{NatsEventSendError, NatsEventSendSuccess, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -82,6 +84,10 @@ impl SinkConfig for NatsSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "nats"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -182,7 +188,7 @@ impl StreamSink<Event> for NatsSink {
                     });
                 }
                 Err(error) => {
-                    emit!(&NatsEventSendFail { error });
+                    emit!(&NatsEventSendError { error });
                 }
             }
 
