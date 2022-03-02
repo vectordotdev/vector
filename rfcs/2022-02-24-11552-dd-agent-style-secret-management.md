@@ -21,7 +21,8 @@ and the syntax to retrieve encrypted config value.
 
 - User shall be able to use the same kind of executable to load/decrypt secrets for Vector.
 - This new feature will have a deterministic behaviour when used in conjunction with templates.
-- Situations like topology reload and load/decryption failure will be accounted for.
+- Situations like topology reload, including SIGHUP configuration reload where secret shall also be refreshed,
+- Load/decryption failure shall be accounted for.
 
 ### Out of scope
 
@@ -99,7 +100,7 @@ The first implementation would only support the `exec` backend but with extensib
 implement additional backend if needed.
 
 Overall the behaviour for corner cases should follow what's in place for environmment variable interpolation as this is
-a very close feature.
+a very close feature. When a configuration reload happens, secrets shall also be refreshed.
 
 ### Implementation
 
