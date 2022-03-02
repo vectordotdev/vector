@@ -76,6 +76,11 @@ impl Expression for IfStatement {
         if let Some(alternative) = &self.alternative {
             // Write the alternative block.
             alternative.compile_to_vm(vm)?;
+        } else {
+            // No alternative resolves to Null.
+            let null = vm.add_constant(Value::Null);
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(null);
         }
 
         // Update the continue jump to jump to the current position after the else block.
