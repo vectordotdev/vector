@@ -6,16 +6,16 @@ require 'find'
 # These members/tags are common to multiple events
 BYTE_SIZE_COUNT = ['byte_size', 'count']
 
-# SUFFIX => [MESSAGE, COUNTERS, REQUIRED_MEMBERS, ADDITIONAL_TAGS]
+# SUFFIX => [MESSAGE, COUNTERS, ADDITIONAL_TAGS]
 EVENT_CLASSES = {
   'BytesReceived' => [
     'Bytes received.', ['received_bytes'], ['byte_size'], ['protocol']
   ],
   'EventsReceived' => [
-    'Events received.', ['received_events', 'received_event_bytes'], BYTE_SIZE_COUNT, []
+    'Events received.', ['received_events', 'received_event_bytes'], ['count', 'byte_size']
   ],
   'EventsSent' => [
-    'Events sent.', ['sent_events', 'sent_event_bytes'], BYTE_SIZE_COUNT, []
+    'Events sent.', ['sent_events', 'sent_event_bytes'], ['count', 'byte_size']
   ],
   'BytesSent' => [
     'Bytes sent.', ['sent_bytes'], ['byte_size'], ['protocol']
@@ -54,7 +54,7 @@ class Event
   def valid?
     @reports.clear
 
-    EVENT_CLASSES.each do |suffix, (required_message, counters, required_members, additional_tags)|
+    EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
       if @name.end_with? suffix
         @logs.each do |type, message, parameters|
           if type != 'trace'
@@ -63,11 +63,15 @@ class Event
           if message != required_message
             @reports.append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
           end
+          additional_tags.each do |tag_name|
+            unless parameters.include? tag_name
+              @reports.append("Log MUST contain tag \"#{tag_name}\"")
+            end
+          end
         end
-        members_must_include(required_members)
         counters.each do |counter|
           counter = "component_#{counter}_total"
-          counters_must_include(counter, additional_tags + @members - BYTE_SIZE_COUNT)
+          counters_must_include(counter, additional_tags - BYTE_SIZE_COUNT)
         end
       end
     end
@@ -77,15 +81,25 @@ class Event
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
-      counters_must_include('component_errors_total', ['error_type', 'stage'] + @members - ['body', 'error', 'text'])
+      counters_must_include('component_errors_total', ['error_type', 'stage'])
     end
 
     # Make sure error events contain the right parameters
     @logs.each do |type, message, parameters|
       if type == 'error'
-        ['error', 'stage'].each do |parameter|
+        ['error_type', 'stage'].each do |parameter|
           unless parameters.include? parameter
             @reports.append("Error log MUST include parameter \"#{parameter}\".")
+          end
+        end
+
+        ['component_errors_total', 'component_discarded_events_total'].each do |event_name|
+          if @counters[event_name]
+            ['error_code', 'error_type', 'stage'].each do |parameter|
+              if parameters.include? parameter and !@counters[event_name].include? parameter
+                @reports.append("Counter \"#{event_name}\" must include \"#{parameter}\" to match error log.")
+              end
+            end
           end
         end
       end
@@ -109,14 +123,6 @@ class Event
           unless tags.include? tag
             @reports.append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
           end
-        end
-      end
-    end
-
-    def members_must_include(names)
-      names.each do |name|
-        unless @members.include? name
-          @reports.append("This event MUST have a member named \"#{name}\".")
         end
       end
     end
@@ -166,6 +172,7 @@ Find.find('.') do |path|
         # Scan for counter names and tags
         block.scan(/ counter!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |name, tags|
           tags = tags.scan(/"([^"]+)" => /).map { |tag,| tag }
+
           $all_events[event_name].add_counter(name, tags)
         end
 
