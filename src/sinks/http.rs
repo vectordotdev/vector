@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
@@ -56,6 +58,12 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[cfg(test)]
@@ -70,6 +78,7 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -170,8 +179,8 @@ impl SinkConfig for HttpSinkConfig {
         "http"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

@@ -14,7 +14,10 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     internal_events::PulsarEncodeEventError,
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
@@ -118,8 +121,8 @@ impl SinkConfig for PulsarSinkConfig {
         "pulsar"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

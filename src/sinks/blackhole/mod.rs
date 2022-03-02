@@ -27,6 +27,7 @@ mod tests {
         let config = BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         };
         let sink = BlackholeSink::new(config, Acker::passthrough());
         let sink = VectorSink::from_event_streamsink(sink);

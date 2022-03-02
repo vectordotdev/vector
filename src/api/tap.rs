@@ -516,6 +516,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -570,6 +571,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -617,6 +619,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -667,6 +670,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -733,6 +737,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -790,6 +795,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -866,6 +872,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
