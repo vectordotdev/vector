@@ -172,6 +172,7 @@ components: sinks: [Name=string]: {
 					description: "Configures the encoding specific sink behavior."
 					required:    features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
+					type: object: examples: [{codec: "text"}]
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
