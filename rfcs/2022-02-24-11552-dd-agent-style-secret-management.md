@@ -44,6 +44,31 @@ and the syntax to retrieve encrypted config value.
 - A convenient syntax for config option to indicate Vector that a secret should be retrieved for this option (Subject to
   be changed but the Datadog Agent uses `ENC[secret_key]`)
 
+Datadog Secret API, as per the official [doc][dd-secret-backend-exec-api]:
+
+- Communication happens on stdout/sdin
+- It uses plain text json
+
+Vector would run the user-provided executable and feed its standard input with the list of secrets to retrieve:
+
+```json
+{"version": "1.0", "secrets": ["secret1", "secret2"]}
+```
+
+The version used by the Datadog agent is 1.0. The user provided executable should then reply on its standard output with
+a JSON formatted string:
+
+```json
+{
+  "secret1": {"value": "secret_value", "error": null},
+  "secret2": {"value": null, "error": "could not fetch the secret"}
+}
+```
+
+**Note**: The version field can be used to introduce specific behaviour, one major useful thing that could be introduced
+is the ability for the user provided executable to provide a secrete expiration date. This is mentioned in the
+improvements section.
+
 New top level options to be added:
 
 ```toml
@@ -120,6 +145,7 @@ users.
 
 - Support additional backend.
 - Embed/implement helpers like the [Agent][dd-agent-secret-helper].
+- Possible extention to the API, it will mostly depends on user feedback
 
 
 [dd-agent-secret-mgmt]: https://docs.datadoghq.com/agent/guide/secrets-management/
