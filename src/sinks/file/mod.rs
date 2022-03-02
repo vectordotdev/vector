@@ -16,7 +16,10 @@ use tokio::{
 use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{
@@ -44,6 +47,12 @@ pub struct FileSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub compression: Compression,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -57,6 +66,7 @@ impl GenerateConfig for FileSinkConfig {
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
             compression: Default::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -146,8 +156,8 @@ impl SinkConfig for FileSinkConfig {
         "file"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -415,6 +425,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
             compression: Compression::None,
+            acknowledgements: Default::default(),
         };
 
         let mut sink = FileSink::new(&config, Acker::passthrough());
@@ -442,6 +453,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
             compression: Compression::Gzip,
+            acknowledgements: Default::default(),
         };
 
         let mut sink = FileSink::new(&config, Acker::passthrough());
@@ -474,6 +486,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
             compression: Compression::None,
+            acknowledgements: Default::default(),
         };
 
         let mut sink = FileSink::new(&config, Acker::passthrough());
@@ -555,6 +568,7 @@ mod tests {
             idle_timeout_secs: Some(1),
             encoding: Encoding::Text.into(),
             compression: Compression::None,
+            acknowledgements: Default::default(),
         };
 
         let mut sink = FileSink::new(&config, Acker::passthrough());

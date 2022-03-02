@@ -1356,9 +1356,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.2"
+version = "3.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5177fac1ab67102d8989464efd043c6ff44191b1557ec1ddd489b4f7e1447e77"
+checksum = "86f8c0e2a6b902acc18214e24a6935cdaf8a8e34231913d4404dcaee659f65a1"
 dependencies = [
  "atty",
  "bitflags",
@@ -2041,7 +2041,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "thiserror",
- "trust-dns-proto",
+ "trust-dns-proto 0.21.1",
 ]
 
 [[package]]
@@ -2151,6 +2151,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c5f0096a91d210159eceb2ff5e1c4da18388a170e1e3ce948aac9c8fdbbf595"
 dependencies = [
  "heck 0.3.3",
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "syn 1.0.84",
+]
+
+[[package]]
+name = "enum-as-inner"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21cdad81446a7f7dc43f6a77409efeb9733d2fa65553efef6018ef257c959b73"
+dependencies = [
+ "heck 0.4.0",
  "proc-macro2 1.0.32",
  "quote 1.0.10",
  "syn 1.0.84",
@@ -3781,9 +3793,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "274353858935c992b13c0ca408752e2121da852d07dec7ce5f108c77dfa14d1f"
+checksum = "fcb87f3080f6d1d69e8c564c0fcfde1d7aa8cc451ce40cae89479111f03bc0eb"
 
 [[package]]
 name = "lru-cache"
@@ -4174,7 +4186,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util 0.6.8",
- "trust-dns-proto",
+ "trust-dns-proto 0.20.4",
  "trust-dns-resolver",
  "typed-builder 0.9.1",
  "uuid",
@@ -7925,7 +7937,32 @@ dependencies = [
  "async-trait",
  "cfg-if 1.0.0",
  "data-encoding",
- "enum-as-inner",
+ "enum-as-inner 0.3.3",
+ "futures-channel",
+ "futures-io",
+ "futures-util",
+ "idna",
+ "ipnet",
+ "lazy_static",
+ "log",
+ "rand 0.8.5",
+ "smallvec",
+ "thiserror",
+ "tinyvec",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "trust-dns-proto"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2861b3ed517888174d13909e675c4e94b3291867512068be59d76533e4d1270c"
+dependencies = [
+ "async-trait",
+ "cfg-if 1.0.0",
+ "data-encoding",
+ "enum-as-inner 0.4.0",
  "futures-channel",
  "futures-io",
  "futures-util",
@@ -7958,7 +7995,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "tokio",
- "trust-dns-proto",
+ "trust-dns-proto 0.20.4",
 ]
 
 [[package]]
@@ -8319,7 +8356,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.1.2",
+ "clap 3.1.3",
  "colored",
  "console-subscriber",
  "criterion",
@@ -8455,7 +8492,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns-proto",
+ "trust-dns-proto 0.21.1",
  "tui",
  "typetag",
  "url",
@@ -8512,7 +8549,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.1.2",
+ "clap 3.1.3",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8673,7 +8710,7 @@ name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
- "clap 3.1.2",
+ "clap 3.1.3",
  "exitcode",
  "indoc",
  "once_cell",
@@ -8798,7 +8835,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.1.2",
+ "clap 3.1.3",
  "enrichment",
  "glob",
  "prettydiff",

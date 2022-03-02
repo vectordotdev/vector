@@ -331,6 +331,7 @@ mod integration_tests {
             tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 

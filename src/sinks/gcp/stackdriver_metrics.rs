@@ -7,7 +7,7 @@ use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
     http::HttpClient,
     sinks::{
@@ -44,6 +44,12 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -111,8 +117,8 @@ impl SinkConfig for StackdriverConfig {
         "gcp_stackdriver_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
