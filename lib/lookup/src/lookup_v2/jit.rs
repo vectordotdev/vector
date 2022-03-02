@@ -90,7 +90,7 @@ impl<'a> Iterator for JitLookup<'a> {
                         },
                         JitState::Field { start } => match c {
                             'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
-                                (None, JitState::Field { start: start })
+                                (None, JitState::Field { start })
                             }
                             '.' => (
                                 Some(Some(BorrowedSegment::Field(&self.path[start..index]))),

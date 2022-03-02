@@ -78,7 +78,7 @@ mod test {
         ];
 
         for (query, expected) in &queries {
-            assert_eq!(contains(&fields, query), *expected, "{}", query);
+            assert_eq!(contains(&fields, *query), *expected, "{}", query);
         }
     }
 }

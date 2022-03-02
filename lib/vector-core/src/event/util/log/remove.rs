@@ -77,7 +77,7 @@ fn array_remove(values: &mut Vec<Value>, index: usize) -> Option<Value> {
 mod test {
     use serde_json::json;
 
-    use super::{super::test::fields_from_json, *};
+    use super::*;
 
     #[test]
     fn array_remove_from_middle() {
@@ -94,7 +94,7 @@ mod test {
 
     #[test]
     fn remove_simple() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "field": 123
         }));
         assert_eq!(
@@ -106,7 +106,7 @@ mod test {
 
     #[test]
     fn remove_nested() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "a": {
                 "b": {
                     "c": 5
@@ -132,13 +132,13 @@ mod test {
 
         for (query, expected_first, expected_second) in &queries {
             assert_eq!(
-                remove(&mut fields, query, false),
+                remove(&mut fields, *query, false),
                 *expected_first,
                 "{}",
                 query
             );
             assert_eq!(
-                remove(&mut fields, query, false),
+                remove(&mut fields, *query, false),
                 *expected_second,
                 "{}",
                 query
@@ -146,7 +146,7 @@ mod test {
         }
         assert_eq!(
             fields,
-            fields_from_json(json!({
+            Value::from(json!({
                 "a": {
                     "b": {},
                     "array": [
@@ -162,7 +162,7 @@ mod test {
 
     #[test]
     fn remove_prune() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "a": {
                 "b": {
                     "c": vec![5]
@@ -174,7 +174,7 @@ mod test {
         assert_eq!(remove(&mut fields, "a.d", true), Some(Value::Integer(4)));
         assert_eq!(
             fields,
-            fields_from_json(json!({
+            Value::from(json!({
                 "a": {
                     "b": {
                         "c": vec![5]
@@ -187,6 +187,6 @@ mod test {
             remove(&mut fields, "a.b.c[0]", true),
             Some(Value::Integer(5))
         );
-        assert_eq!(fields, fields_from_json(json!({})));
+        assert_eq!(fields, Value::from(json!({})));
     }
 }
