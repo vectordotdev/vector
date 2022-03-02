@@ -1008,7 +1008,7 @@
         {
           "kind": "OBJECT",
           "name": "EventNotification",
-          "description": null,
+          "description": "A notification regarding events observation",
           "fields": [
             {
               "name": "notification",
@@ -3060,7 +3060,7 @@
         {
           "kind": "UNION",
           "name": "Notification",
-          "description": "A notification regarding events observation",
+          "description": "A specific kind of notification with additional details",
           "fields": null,
           "inputFields": null,
           "interfaces": null,

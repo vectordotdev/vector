@@ -62,7 +62,7 @@ impl InvalidMatch {
 }
 
 #[derive(Union, Debug, Clone, PartialEq)]
-/// A notification regarding events observation
+/// A specific kind of notification with additional details
 pub enum Notification {
     Matched(Matched),
     NotMatched(NotMatched),
@@ -92,6 +92,7 @@ pub struct EventNotification {
 }
 
 #[Object]
+/// A notification regarding events observation
 impl EventNotification {
     /// Notification details
     async fn notification(&self) -> &Notification {
