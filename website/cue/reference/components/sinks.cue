@@ -6,22 +6,20 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
-		if features.acknowledgements != _|_ {
-			if features.acknowledgements.enabled {
-				acknowledgements: {
-					common: true
-					description: """
-						Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
-						"""
-					required: false
-					type: object: options: {
-						enabled: {
-							common:      true
-							description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
-							warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
-							required: false
-							type: bool: default: false
-						}
+		if features.acknowledgements {
+			acknowledgements: {
+				common: true
+				description: """
+					Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
+					"""
+				required: false
+				type: object: options: {
+					enabled: {
+						common:      true
+						description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
+						warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
+						required: false
+						type: bool: default: false
 					}
 				}
 			}

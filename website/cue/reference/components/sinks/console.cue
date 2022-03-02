@@ -13,6 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
+		acknowledgements: false
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false

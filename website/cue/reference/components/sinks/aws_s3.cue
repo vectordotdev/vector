@@ -13,6 +13,7 @@ components: sinks: aws_s3: components._aws & {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
