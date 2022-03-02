@@ -299,6 +299,7 @@ impl Clone for Remap {
 }
 
 impl SyncTransform for Remap {
+    #[instrument]
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the

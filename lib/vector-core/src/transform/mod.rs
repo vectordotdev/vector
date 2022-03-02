@@ -285,6 +285,7 @@ impl TransformOutputs {
     }
 }
 
+#[derive(Debug)]
 pub struct TransformOutputsBuf {
     primary_buffer: Option<OutputBuffer>,
     named_buffers: HashMap<String, OutputBuffer>,

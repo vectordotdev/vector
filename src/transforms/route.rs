@@ -16,7 +16,7 @@ use crate::{
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Route {
     conditions: IndexMap<String, Condition>,
 }
@@ -33,6 +33,7 @@ impl Route {
 }
 
 impl SyncTransform for Route {
+    #[instrument]
     fn transform(
         &mut self,
         event: Event,

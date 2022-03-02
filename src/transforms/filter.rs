@@ -87,6 +87,7 @@ impl Filter {
 }
 
 impl FunctionTransform for Filter {
+    #[instrument]
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.condition.check(&event) {
             output.push(event);

@@ -217,6 +217,7 @@ mod tests {
     use futures::{stream, Sink, SinkExt, StreamExt};
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use tracing::Instrument;
     use vector_buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -644,7 +645,7 @@ mod tests {
         // the receivers while the forward task drives itself to completion:
         let events = make_event_array(3);
         let send = stream::iter(vec![Ok(events.clone())]).forward(fanout);
-        tokio::spawn(send);
+        tokio::spawn(send).instrument(tracing::error_span!("fanout error").or_current());
 
         // Wait for all of our receivers for non-erroring-senders to complete, and make sure they
         // got all of the events we sent in.  We also spawn these as tasks so they can empty
@@ -652,7 +653,10 @@ mod tests {
         // stuck receiving everything from one while the others need to be drained to make progress:
         let collectors = receivers
             .into_iter()
-            .map(|rx| tokio::spawn(rx.collect::<Vec<_>>()))
+            .map(|rx| {
+                tokio::spawn(rx.collect::<Vec<_>>())
+                    .instrument(tracing::debug_span!("collecting receivers").or_current())
+            })
             .collect::<Vec<_>>();
 
         let events = flatten(events);

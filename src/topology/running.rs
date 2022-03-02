@@ -11,7 +11,7 @@ use tokio::{
     sync::{mpsc, watch},
     time::{interval, sleep_until, Duration, Instant},
 };
-use tracing::Instrument;
+use tracing::{instrument::Instrumented, Instrument};
 use vector_buffers::topology::channel::BufferSender;
 
 use crate::{
@@ -35,8 +35,8 @@ use super::{TapOutput, TapResource};
 pub struct RunningTopology {
     inputs: HashMap<ComponentKey, BufferSender<EventArray>>,
     outputs: HashMap<OutputId, ControlChannel>,
-    source_tasks: HashMap<ComponentKey, TaskHandle>,
-    tasks: HashMap<ComponentKey, TaskHandle>,
+    source_tasks: HashMap<ComponentKey, Instrumented<TaskHandle>>,
+    tasks: HashMap<ComponentKey, Instrumented<TaskHandle>>,
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
@@ -570,7 +570,8 @@ impl RunningTopology {
             component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
-        let spawned = tokio::spawn(task.instrument(span.or_current()));
+        let spawned = tokio::spawn(task.instrument(span.or_current()))
+            .instrument(tracing::debug_span!("spawn_sink").or_current());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -587,7 +588,8 @@ impl RunningTopology {
             component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
-        let spawned = tokio::spawn(task.instrument(span.or_current()));
+        let spawned = tokio::spawn(task.instrument(span.or_current()))
+            .instrument(tracing::debug_span!("spawn_transform").or_current());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -604,7 +606,8 @@ impl RunningTopology {
             component_name = %task.id(),
         );
         let task = handle_errors(task, self.abort_tx.clone());
-        let spawned = tokio::spawn(task.instrument(span.clone().or_current()));
+        let spawned = tokio::spawn(task.instrument(span.clone().or_current()))
+            .instrument(tracing::debug_span!("spawn_source").or_current());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -616,7 +619,8 @@ impl RunningTopology {
         let source_task = handle_errors(source_task, self.abort_tx.clone());
         self.source_tasks.insert(
             key.clone(),
-            tokio::spawn(source_task.instrument(span.or_current())),
+            tokio::spawn(source_task.instrument(span.or_current()))
+                .instrument(tracing::debug_span!("spawn_source").or_current()),
         );
     }
 

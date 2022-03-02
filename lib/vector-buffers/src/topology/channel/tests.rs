@@ -5,6 +5,7 @@ use std::{
 
 use futures::{SinkExt, StreamExt};
 use tokio::{pin, sync::Barrier, time::sleep};
+use tracing::{instrument, Instrument};
 
 use crate::{
     topology::{
@@ -26,6 +27,7 @@ async fn assert_send_ok_with_capacities<T>(
     assert_current_send_capacity(sender, base_expected, overflow_expected);
 }
 
+#[instrument]
 async fn blocking_send_and_drain_receiver<T>(
     mut sender: BufferSender<T>,
     receiver: BufferReceiver<T>,
@@ -52,7 +54,8 @@ where
             results.push(msg);
         }
         results
-    });
+    })
+    .instrument(tracing::debug_span!("block and drain receivers").or_current());
 
     // We also have to drop our sender after sending the fourth message so that the receiver
     // task correctly exits.  If we didn't drop it, the receiver task would just assume that we

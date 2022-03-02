@@ -31,6 +31,7 @@ impl TransformConfig for Noop {
 }
 
 impl FunctionTransform for Noop {
+    #[instrument]
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         output.push(event);
     }

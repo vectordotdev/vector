@@ -13,6 +13,7 @@ use futures_util::{
 };
 use pin_project::pin_project;
 use tokio::task::JoinHandle;
+use tracing::{instrument::Instrumented, Instrument};
 
 #[pin_project]
 pub struct ConcurrentMap<St, T>
@@ -23,7 +24,7 @@ where
     #[pin]
     stream: Fuse<St>,
     limit: Option<NonZeroUsize>,
-    in_flight: FuturesOrdered<JoinHandle<T>>,
+    in_flight: FuturesOrdered<Instrumented<JoinHandle<T>>>,
     f: Box<dyn Fn(St::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send>,
 }
 
@@ -73,7 +74,8 @@ where
                     Poll::Pending | Poll::Ready(None) => break,
                     Poll::Ready(Some(item)) => {
                         let fut = (this.f)(item);
-                        let handle = tokio::spawn(fut);
+                        let handle = tokio::spawn(fut)
+                            .instrument(tracing::debug_span!("in-flight re-poll").or_current());
                         this.in_flight.push(handle);
                     }
                 }
