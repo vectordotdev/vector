@@ -1,8 +1,6 @@
 use bytes::{BufMut, BytesMut};
-use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use value::Kind;
 
 use crate::{event::Event, schema};
 
