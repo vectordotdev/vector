@@ -1,4 +1,4 @@
-# RFC <issue#> - 2022-02-xx - Datadog Agent style secret management
+# RFC 11552 - 2022-02-24 - Datadog Agent style secret management
 
 The Datadog Agent has a straighforward secret resolution facility to avoid having sensitive information stored directly
 in its config, it relies on a user-provided external program that is run to retrieve sensitive value from a third party
