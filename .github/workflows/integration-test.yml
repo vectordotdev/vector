@@ -84,7 +84,7 @@ jobs:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: make ci-sweep
       - run: make test-integration-${{ matrix.test }}
         env:
