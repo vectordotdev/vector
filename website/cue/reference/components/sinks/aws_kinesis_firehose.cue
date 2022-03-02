@@ -13,8 +13,8 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	}
 
 	features: {
-		acknowledgements: enabled: true
-		healthcheck: enabled:      true
+		acknowledgements: true
+		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true

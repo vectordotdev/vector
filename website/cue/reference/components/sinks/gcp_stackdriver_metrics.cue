@@ -13,8 +13,8 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	features: {
-		acknowledgements: enabled: true
-		healthcheck: enabled:      false
+		acknowledgements: true
+		healthcheck: enabled: false
 		send: {
 			batch: {
 				enabled:      true

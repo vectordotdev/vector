@@ -208,9 +208,7 @@ components: {
 		descriptions: [Name=string]: string
 	}
 
-	#FeaturesAcknowledgements: {
-		enabled: bool
-	}
+	#FeaturesAcknowledgements: bool
 
 	#FeaturesAggregate: {
 	}

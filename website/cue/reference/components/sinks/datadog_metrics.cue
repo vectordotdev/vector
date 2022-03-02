@@ -6,8 +6,8 @@ components: sinks: datadog_metrics: {
 	classes: sinks._datadog.classes
 
 	features: {
-		acknowledgements: enabled: true
-		healthcheck: enabled:      true
+		acknowledgements: true
+		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
