@@ -31,7 +31,8 @@ and the syntax to retrieve encrypted config value.
 ## Pain
 
 - As of today, secrets like authentication tokens and passwords should be provided inside the topology configuration in
-  plain text and that may not be acceptable in some circumstances.
+  plain text or in [environment variables][env-var-in-vector-config] and that may not be acceptable in some
+  circumstances.
 - Decoupling secret management and key rotation from configuration management.
 
 ## Proposal
@@ -69,14 +70,33 @@ a JSON formatted string:
 is the ability for the user provided executable to provide a secrete expiration date. This is mentioned in the
 improvements section.
 
-New top level options to be added:
+New top level options to be added will be sitting inside the `secret` namespace, this would lead to something like:
 
 ```toml
-[secret_backend]
+[secret.local_exec]
+type = "exec"
 path = "/path/to/the/command"
 argument = "--config foo=bar"
 timeout = 5
+
+[secret.prod_vault]
+type = "vault"
+address = "https://vault.corp.tld/"
+token = "secret://local_exec/vault_token"
+timeout = 5
+
+[sources.system_logs]
+type = "file"
+includes = ["/var/log/system.log"]
+
+[sinks.app_logs]
+type = "datadog_logs"
+default_api_key = "secret://prod_vault/dd_api_2022_02"
+inputs = ["system_logs"]
 ```
+
+The first implementation would only support the `exec` backend but with extensibility point clearly identified to easily
+implement additional backend if needed.
 
 Overall the behaviour for corner cases should follow what's in place for environmment variable interpolation as this is
 a very close feature.
@@ -121,8 +141,8 @@ secret provider that may see other implementation like: `executable` (the one do
 
 - Integrate with other third party tools: Vault and CSP APIs for secret management to start with.
 - Stick to environment variables interpolation and leverage [K8s ability to expose secret][k8s-env-var-from-secrets] as
-  environment variables, this is already documented in the [Vector helm char][env-var-from-k8s-secrets]. Note that the
-  Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
+  environment variables, relevant examples are already in the [Vector helm char][env-var-from-k8s-secrets]. Note that
+  the Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
 
 Note: doing nothing is not really an alternative here, as plain text secret in config is a strong blocker for some
 users.
@@ -131,7 +151,7 @@ users.
 
 - Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement in many
   situations.
-- Secret syntax in config, the Datadog Agent uses ENC[secret_key], whereas an URL scheme like `secret://<backend>/<key>`
+- Secret syntax in config, the Datadog Agent uses `ENC[secret_key]`, whereas an URL scheme like `secret://<backend>/<key>`
   may be a more extensible and futur proof scheme. It would easily provide a convenient user facing syntax if multiple
   backen are required in the future.
 - Specific security constraints that may have been missed.
@@ -157,3 +177,4 @@ users.
 [vector-config-schema-work]: https://github.com/vectordotdev/vector/issues/9115
 [dd-secret-backend-exec-api]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#the-executable-api
 [env-var-from-k8s-secrets]: https://github.com/vectordotdev/helm-charts/blob/5a92272/charts/vector/values.yaml#L131-L143
+[env-var-in-vector-config]: https://vector.dev/docs/reference/configuration/#environment-variables
