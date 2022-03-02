@@ -2,18 +2,29 @@ use chrono::{TimeZone as _, Utc};
 use vector_common::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
-fn to_timestamp(value: Value) -> Resolved {
+fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
     use Value::*;
 
     let value = match value {
         v @ Timestamp(_) => v,
-        Integer(v) => {
-            let t = Utc.timestamp_opt(v, 0).single();
-            match t {
-                Some(time) => time.into(),
-                None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+        Integer(v) => match unit.as_ref() {
+            b"seconds" => {
+                let t = Utc.timestamp_opt(v, 0).single();
+                match t {
+                    Some(time) => time.into(),
+                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                }
             }
-        }
+            b"milliseconds" => {
+                let t = Utc.timestamp_millis_opt(v).single();
+                match t {
+                    Some(time) => time.into(),
+                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                }
+            }
+            b"nanoseconds" => Utc.timestamp_nanos(v).into(),
+            _ => unreachable!(),
+        },
         Float(v) => {
             let t = Utc
                 .timestamp_opt(
@@ -43,11 +54,18 @@ impl Function for ToTimestamp {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            kind: kind::ANY,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::ANY,
+                required: true,
+            },
+            Parameter {
+                keyword: "unit",
+                kind: kind::BYTES,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -130,25 +148,46 @@ impl Function for ToTimestamp {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
+        let units = vec![
+            value!("seconds"),
+            value!("milliseconds"),
+            value!("nanoseconds"),
+        ];
+
         let value = arguments.required("value");
 
-        Ok(Box::new(ToTimestampFn { value }))
+        let unit = arguments
+            .optional_enum("unit", &units)?
+            .unwrap_or_else(|| value!("seconds"))
+            .try_bytes()
+            .expect("variant not bytes");
+
+        Ok(Box::new(ToTimestampFn { value, unit }))
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
-        to_timestamp(value)
+        let unit = args
+            .optional("unit")
+            .unwrap_or_else(|| value!("seconds"))
+            .try_bytes()
+            .expect("variant not bytes");
+        to_timestamp(value, unit)
     }
 }
 
 #[derive(Debug, Clone)]
 struct ToTimestampFn {
     value: Box<dyn Expression>,
+    unit: Bytes,
 }
 
 impl Expression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        to_timestamp(self.value.resolve(ctx)?)
+        let value = self.value.resolve(ctx)?;
+        let unit = self.unit.clone();
+
+        to_timestamp(value, unit)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -177,6 +216,7 @@ mod tests {
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Integer(9999999999999)),
+            unit: Bytes::from_static(b"seconds"),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
         assert_eq!(string, r#"unable to coerce 9999999999999 into timestamp"#)
@@ -190,6 +230,7 @@ mod tests {
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
+            unit: Bytes::from_static(b"seconds"),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
         assert_eq!(string, r#"unable to coerce 9999999999999.9 into timestamp"#)
@@ -208,6 +249,24 @@ mod tests {
              args: func_args![value: 1431648000.5],
              want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
              tdef: TypeDef::timestamp().fallible(),
+        }
+
+        seconds {
+            args: func_args![value: 1609459200i64, unit: "seconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
+        }
+
+        milliseconds {
+            args: func_args![value: 1609459200000i64, unit: "milliseconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
+        }
+
+        nanoseconds {
+            args: func_args![value: 1609459200000000000i64, unit: "nanoseconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
         }
     ];
 }
