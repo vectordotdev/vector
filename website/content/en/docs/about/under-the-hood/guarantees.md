@@ -23,11 +23,11 @@ relevant sink or source configuration reference page.
 For a source that supports end-to-end acknowledgements and is
 connected to a sink that has the `acknowledgements` option enabled,
 this will cause it to wait for _all_ connected sinks to either mark
-the event as delivered, or to persist the events to a durable buffer
-before acknowledging receipt of the event. If a sink signals the event
-was rejected and the source can provide an error response (ie through
-an HTTP error code), then the source will provide an appropriate error
-to the sending agent.
+the event as delivered, or to persist the events to a disk buffer, if
+configured on the sink, before acknowledging receipt of the event. If
+a sink signals the event was rejected and the source can provide an
+error response (i.e. through an HTTP error code), then the source will
+provide an appropriate error to the sending agent.
 
 Sinks support end-to-end acknowledgements by providing an indicator of
 the final status of each event after delivery has completed. This
