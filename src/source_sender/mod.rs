@@ -226,7 +226,7 @@ impl Inner {
         let mut byte_size = 0;
 
         let events = events.into_iter().map(Into::into);
-        for events in array::events_into_arrays(events) {
+        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let this_count = events.len();
             let this_size = events.size_of();
             match self.inner.send(events).await {

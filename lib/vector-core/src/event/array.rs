@@ -329,15 +329,34 @@ impl Iterator for EventArrayIntoIter {
 /// events of the same type into one array. This is used by
 /// `events_into_array`.
 #[derive(Debug, Default)]
-pub struct EventArrayBuffer(Option<EventArray>);
+pub struct EventArrayBuffer {
+    buffer: Option<EventArray>,
+    max_size: usize,
+}
 
 impl EventArrayBuffer {
+    fn new(max_size: Option<usize>) -> Self {
+        let max_size = max_size.unwrap_or(usize::MAX);
+        let buffer = None;
+        Self { buffer, max_size }
+    }
+
     #[must_use]
     fn push(&mut self, event: Event) -> Option<EventArray> {
-        match (event, &mut self.0) {
-            (Event::Log(event), Some(EventArray::Logs(array))) => array.push(event),
-            (Event::Metric(event), Some(EventArray::Metrics(array))) => array.push(event),
-            (Event::Trace(event), Some(EventArray::Traces(array))) => array.push(event),
+        match (event, &mut self.buffer) {
+            (Event::Log(event), Some(EventArray::Logs(array))) if array.len() < self.max_size => {
+                array.push(event)
+            }
+            (Event::Metric(event), Some(EventArray::Metrics(array)))
+                if array.len() < self.max_size =>
+            {
+                array.push(event)
+            }
+            (Event::Trace(event), Some(EventArray::Traces(array)))
+                if array.len() < self.max_size =>
+            {
+                array.push(event)
+            }
             (event, current) => {
                 let array = EventArray::from(event);
                 if let Some(array) = current.replace(array) {
@@ -349,7 +368,7 @@ impl EventArrayBuffer {
     }
 
     fn take(&mut self) -> Option<EventArray> {
-        self.0.take()
+        self.buffer.take()
     }
 }
 
@@ -357,10 +376,11 @@ impl EventArrayBuffer {
 /// over coalesced `EventArray`s.
 pub fn events_into_arrays(
     events: impl IntoIterator<Item = Event>,
+    max_size: Option<usize>,
 ) -> impl Iterator<Item = EventArray> {
     IntoEventArraysIter {
         inner: events.into_iter().fuse(),
-        current: Default::default(),
+        current: EventArrayBuffer::new(max_size),
     }
 }
 
