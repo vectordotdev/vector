@@ -63,11 +63,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
     };
+
+    use super::*;
 
     /// Test object.
     type TestObject = WatchEvent<Pod>;

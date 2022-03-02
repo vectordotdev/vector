@@ -25,22 +25,12 @@ components: transforms: grok_parser: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(grok_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
 			```
 			""",
@@ -60,27 +50,22 @@ components: transforms: grok_parser: {
 			common:      true
 			description: "If `true` will drop the specified `field` after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to execute the `pattern` against. Must be a `string` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 		pattern: {
 			description: "The [Grok pattern](\(urls.grok_patterns))"
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

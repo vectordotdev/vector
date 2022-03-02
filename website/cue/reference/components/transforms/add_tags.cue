@@ -16,22 +16,12 @@ components: transforms: add_tags: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(add_tags._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			#".tag = "value""#
 			```
 			""",
@@ -44,14 +34,12 @@ components: transforms: add_tags: {
 			common:      true
 			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		tags: {
 			common:      true
 			description: "A table of key/value pairs representing the tags to be added to the metric."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{

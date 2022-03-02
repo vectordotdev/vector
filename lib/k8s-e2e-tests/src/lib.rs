@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, env};
+
 use indoc::formatdoc;
 use k8s_openapi::{
     api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
@@ -6,8 +8,6 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
-use std::collections::BTreeMap;
-use std::env;
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -30,7 +30,7 @@ pub fn get_namespace() -> String {
         .map(|num| (num as char).to_ascii_lowercase())
         .collect();
 
-    format!("test-vector-{}", id)
+    format!("vector-{}", id)
 }
 
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
@@ -45,7 +45,7 @@ pub fn get_override_name(namespace: &str, suffix: &str) -> String {
 
 /// Is the MULTINODE environment variable set?
 pub fn is_multinode() -> bool {
-    env::var("MULTINODE".to_string()).is_ok()
+    env::var("MULTINODE").is_ok()
 }
 
 /// Create config adding fullnameOverride entry. This allows multiple tests
@@ -236,9 +236,9 @@ pub async fn smoke_check_first_line(log_reader: &mut Reader) {
         .read_line()
         .await
         .expect("unable to read first line");
-    let expected_pat = "INFO vector::app: Log level is enabled. level=\"info\"\n";
+    let expected_pat = "INFO vector::app: Log level is enabled.";
     assert!(
-        first_line.ends_with(expected_pat),
+        first_line.contains(expected_pat),
         "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
         expected_pat,
         first_line

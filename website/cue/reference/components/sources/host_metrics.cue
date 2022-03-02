@@ -27,16 +27,6 @@ components: sources: host_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		notices: []
 		requirements: []
 		warnings: [
@@ -63,7 +53,6 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/proc"]
-				syntax: "literal"
 			}
 		}
 
@@ -72,7 +61,6 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -95,7 +83,6 @@ components: sources: host_metrics: {
 						memory:     "Metrics related to memory utilization."
 						network:    "Metrics related to network utilization."
 					}
-					syntax: "literal"
 				}
 			}
 		}
@@ -105,7 +92,6 @@ components: sources: host_metrics: {
 			required:    false
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -133,7 +119,6 @@ components: sources: host_metrics: {
 					type: string: {
 						default: null
 						examples: ["/", "system.slice/snapd.service"]
-						syntax: "literal"
 					}
 				}
 				groups: {
@@ -146,14 +131,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of cgroup name patterns for which to gather metrics.
+
 								Defaults to including all cgroups.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["user.slice/*", "*.service"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -162,14 +148,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of cgroup name patterns for which to gather metrics.
+
 								Defaults to excluding no cgroups.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["user.slice/*", "*.service"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -202,14 +189,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -218,14 +206,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -248,14 +237,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -264,14 +254,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -287,14 +278,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to including all filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["ntfs", "ext*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -303,14 +295,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to excluding no filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["ntfs", "ext*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -326,14 +319,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to including all mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["/home", "/raid*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -342,14 +336,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to excluding no mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["/home", "/raid*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -372,14 +367,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -388,14 +384,15 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
 								items: type: string: {
 									examples: ["sda", "dm-*"]
-									syntax: "literal"
 								}
 							}
 						}
@@ -588,6 +585,11 @@ components: sources: host_metrics: {
 	}
 
 	telemetry: metrics: {
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

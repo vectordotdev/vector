@@ -1,7 +1,6 @@
-query ComponentByComponentKeyQuery($pipelineId: String, $componentId: String!) {
-    componentByComponentKey(pipelineId: $pipelineId, componentId: $componentId) {
+query ComponentByComponentKeyQuery($componentId: String!) {
+    componentByComponentKey(componentId: $componentId) {
         __typename
-        pipelineId
         componentId
     }
 }

@@ -1,16 +1,3 @@
-use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::Event,
-    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    tls::TlsConfig,
-};
-use bytes::{Buf, Bytes};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
@@ -18,15 +5,44 @@ use std::{
     str::FromStr,
 };
 
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, StatusCode};
 
+use crate::{
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
+        SourceConfig, SourceContext, SourceDescription,
+    },
+    event::Event,
+    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::util::{
+        add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, StreamDecodingError,
+    },
+    tls::TlsConfig,
+};
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexConfig {
+pub(crate) struct LogplexConfig {
     address: SocketAddr,
     #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    #[serde(default = "default_framing_message_based")]
+    framing: FramingConfig,
+    #[serde(default = "default_decoding")]
+    decoding: DeserializerConfig,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -44,6 +60,9 @@ impl GenerateConfig for LogplexConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -52,6 +71,7 @@ impl GenerateConfig for LogplexConfig {
 #[derive(Clone, Default)]
 struct LogplexSource {
     query_parameters: Vec<String>,
+    decoder: codecs::Decoder,
 }
 
 impl HttpSource for LogplexSource {
@@ -62,7 +82,7 @@ impl HttpSource for LogplexSource {
         query_parameters: HashMap<String, String>,
         _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let mut events = decode_message(body, header_map)?;
+        let mut events = decode_message(self.decoder.clone(), body, header_map)?;
         add_query_parameters(&mut events, &self.query_parameters, query_parameters);
         Ok(events)
     }
@@ -72,14 +92,24 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
+            decoder,
         };
-        source.run(self.address, "events", true, &self.tls, &self.auth, cx)
+        source.run(
+            self.address,
+            "events",
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -88,6 +118,10 @@ impl SourceConfig for LogplexConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -102,8 +136,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self) -> Vec<Output> {
+        self.0.outputs()
     }
 
     fn source_type(&self) -> &'static str {
@@ -113,9 +147,17 @@ impl SourceConfig for LogplexCompatConfig {
     fn resources(&self) -> Vec<Resource> {
         self.0.resources()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
-fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_message(
+    decoder: codecs::Decoder,
+    body: Bytes,
+    header_map: HeaderMap,
+) -> Result<Vec<Event>, ErrorMessage> {
     // Deal with headers
     let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
         Ok(v) => v,
@@ -131,7 +173,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     });
 
     // Deal with body
-    let events = body_to_events(body);
+    let events = body_to_events(decoder, body);
 
     if events.len() != msg_count {
         let error_msg = format!(
@@ -166,7 +208,7 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(body: Bytes) -> Vec<Event> {
+fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
@@ -174,65 +216,89 @@ fn body_to_events(body: Bytes) -> Vec<Event> {
                 .ok()
         })
         .filter(|s| !s.is_empty())
-        .map(line_to_event)
+        .flat_map(|line| line_to_events(decoder.clone(), line))
         .collect()
 }
 
-fn line_to_event(line: String) -> Event {
+fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event; 1]> {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
-    let mut event = if parts.len() == 8 {
+    let mut events = SmallVec::<[Event; 1]>::new();
+
+    if parts.len() == 8 {
         let timestamp = parts[2];
         let hostname = parts[3];
         let app_name = parts[4];
         let proc_id = parts[5];
         let message = parts[7];
 
-        let mut event = Event::from(message);
-        let log = event.as_mut_log();
+        let mut buffer = BytesMut::new();
+        buffer.put(message.as_bytes());
 
-        if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key(), ts);
+        loop {
+            match decoder.decode_eof(&mut buffer) {
+                Ok(Some((decoded, _byte_size))) => {
+                    for mut event in decoded {
+                        if let Event::Log(ref mut log) = event {
+                            if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
+                                log.try_insert(log_schema().timestamp_key(), ts);
+                            }
+
+                            log.try_insert(log_schema().host_key(), hostname.to_owned());
+
+                            log.try_insert_flat("app_name", app_name.to_owned());
+                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                        }
+
+                        events.push(event);
+                    }
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+            }
         }
-
-        log.insert(log_schema().host_key(), hostname.to_owned());
-
-        log.insert("app_name", app_name.to_owned());
-        log.insert("proc_id", proc_id.to_owned());
-
-        event
     } else {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
             internal_log_rate_secs = 10
         );
-        Event::from(line)
+
+        events.push(Event::from(line))
     };
 
-    // Add source type
-    event
-        .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+    let now = Utc::now();
 
-    event
+    for event in &mut events {
+        if let Event::Log(log) = event {
+            log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+            log.try_insert(log_schema().timestamp_key(), now);
+        }
+    }
+
+    events
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{HttpSourceAuthConfig, LogplexConfig};
-    use crate::{
-        config::{log_schema, SourceConfig, SourceContext},
-        test_util::{
-            components, next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp,
-        },
-        Pipeline,
-    };
+    use std::net::SocketAddr;
+
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use pretty_assertions::assert_eq;
-    use std::net::SocketAddr;
     use vector_core::event::{Event, EventStatus, Value};
+
+    use super::{HttpSourceAuthConfig, LogplexConfig};
+    use crate::{
+        config::{log_schema, SourceConfig, SourceContext},
+        serde::{default_decoding, default_framing_message_based},
+        test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -245,17 +311,19 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init();
-        let (sender, recv) = Pipeline::new_test_finalize(status);
+        components::init_test();
+        let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
                 address,
                 query_parameters,
                 tls: None,
                 auth,
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await
@@ -300,8 +368,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(
@@ -347,11 +413,9 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        trace_init();
-
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
         let events = spawn_collect_n(
             async move {
@@ -371,11 +435,9 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_ignores_disabled_acknowledgements() {
-        trace_init();
-
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {
@@ -411,8 +473,8 @@ mod tests {
     #[test]
     fn logplex_handles_normal_lines() {
         let body = "267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - foo bar baz";
-        let event = super::line_to_event(body.into());
-        let log = event.as_log();
+        let events = super::line_to_events(Default::default(), body.into());
+        let log = events[0].as_log();
 
         assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
@@ -429,8 +491,8 @@ mod tests {
     #[test]
     fn logplex_handles_malformed_lines() {
         let body = "what am i doing here";
-        let event = super::line_to_event(body.into());
-        let log = event.as_log();
+        let events = super::line_to_events(Default::default(), body.into());
+        let log = events[0].as_log();
 
         assert_eq!(
             log[log_schema().message_key()],
@@ -443,8 +505,8 @@ mod tests {
     #[test]
     fn logplex_doesnt_blow_up_on_bad_framing() {
         let body = "1000000 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - i'm not that long";
-        let event = super::line_to_event(body.into());
-        let log = event.as_log();
+        let events = super::line_to_events(Default::default(), body.into());
+        let log = events[0].as_log();
 
         assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
         assert_eq!(

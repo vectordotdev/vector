@@ -46,6 +46,10 @@ impl Function for IsBoolean {
 
         Ok(Box::new(IsBooleanFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_boolean()))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -59,7 +63,7 @@ impl Expression for IsBooleanFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -73,13 +77,13 @@ mod tests {
         bytes {
             args: func_args![value: value!("foobar")],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         array {
             args: func_args![value: value!(false)],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

@@ -29,12 +29,15 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
-use crate::Case;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, Mutex},
+};
+
+use arc_swap::ArcSwap;
 
 use super::{Condition, IndexHandle, Table};
-use arc_swap::ArcSwap;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
+use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
 type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
@@ -46,7 +49,9 @@ pub struct TableRegistry {
 }
 
 impl TableRegistry {
-    /// Load the given Enrichment Tables into the registry.
+    /// Load the given Enrichment Tables into the registry. This can be new tables
+    /// loaded from the config, or tables that need to be reloaded because the
+    /// underlying data has changed.
     ///
     /// If there are no tables currently loaded into the registry, this is a
     /// simple operation, we simply load the tables into the `loading` field.
@@ -69,9 +74,6 @@ impl TableRegistry {
     /// Once loading is complete, the data is swapped out of `loading` and we
     /// return to a single copy of the tables.
     ///
-    /// TODO This function currently does nothing to reload the the underlying
-    /// data should it have changed in the enrichment source.
-    ///
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
@@ -80,11 +82,13 @@ impl TableRegistry {
         let existing = self.tables.load();
         if let Some(existing) = &**existing {
             // We already have some tables
-            tables.extend(
-                existing
-                    .iter()
-                    .map(|(key, value)| (key.clone(), value.clone())),
-            );
+            let extend = existing
+                .iter()
+                .filter(|(key, _)| !tables.contains_key(*key))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect::<HashMap<_, _>>();
+
+            tables.extend(extend);
         }
         match *loading {
             None => *loading = Some(tables),
@@ -151,6 +155,30 @@ impl TableRegistry {
     pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
     }
+
+    /// Returns the indexes that have been applied to the given table.
+    /// If the table is reloaded we need these to reapply them to the new reloaded tables.
+    pub fn index_fields(&self, table: &str) -> Vec<(Case, Vec<String>)> {
+        match &**self.tables.load() {
+            Some(tables) => tables
+                .get(table)
+                .map(|table| table.index_fields())
+                .unwrap_or_default(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Checks if the table needs reloading.
+    /// If in doubt (the table isn't in our list) we return true.
+    pub fn needs_reload(&self, table: &str) -> bool {
+        match &**self.tables.load() {
+            Some(tables) => tables
+                .get(table)
+                .map(|table| table.needs_reload())
+                .unwrap_or(true),
+            None => true,
+        }
+    }
 }
 
 impl std::fmt::Debug for TableRegistry {
@@ -176,7 +204,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
+    ) -> Result<BTreeMap<String, vrl::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -198,7 +226,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
+    ) -> Result<Vec<BTreeMap<String, vrl::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -243,10 +271,11 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+    use vrl::Value;
+
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
-    use shared::btreemap;
-    use vrl_core::Value;
 
     #[test]
     fn tables_loaded() {
@@ -369,5 +398,59 @@ mod tests {
         table_ids.sort();
 
         assert_eq!(vec!["dummy1".to_string(), "dummy2".to_string()], table_ids,);
+    }
+
+    #[test]
+    fn reloads_existing_tables() {
+        let mut tables: TableMap = HashMap::new();
+        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+        registry.finish_load();
+
+        // After we finish load there are no tables in the list
+        assert!(registry.table_ids().is_empty());
+
+        let mut new_data = BTreeMap::new();
+        new_data.insert("thing".to_string(), Value::Null);
+
+        let mut tables: TableMap = HashMap::new();
+        tables.insert(
+            "dummy2".to_string(),
+            Box::new(DummyEnrichmentTable::new_with_data(new_data)),
+        );
+
+        // A load should put both tables back into the list.
+        registry.load(tables);
+        let tables = registry.loading.lock().unwrap();
+        let tables = tables.clone().unwrap();
+
+        // dummy1 should still have old data.
+        assert_eq!(
+            Value::from("result"),
+            tables
+                .get("dummy1")
+                .unwrap()
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .unwrap()
+                .get("field")
+                .cloned()
+                .unwrap()
+        );
+
+        // dummy2 should have new data.
+        assert_eq!(
+            Value::Null,
+            tables
+                .get("dummy2")
+                .unwrap()
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .unwrap()
+                .get("thing")
+                .cloned()
+                .unwrap()
+        );
     }
 }

@@ -1,17 +1,22 @@
-use crate::config::ProxyConfig;
-use crate::rusoto;
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::Healthcheck;
+use std::{collections::BTreeMap, convert::TryInto, time::Duration};
+
 use futures::FutureExt;
 use http::StatusCode;
+use hyper::client;
 use rusoto_core::RusotoError;
 use rusoto_s3::{HeadBucketRequest, PutObjectError, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryInto};
 
-use super::service::S3Response;
+use super::service::{S3Response, S3Service};
+use crate::{
+    aws::{
+        rusoto,
+        rusoto::{AwsAuthentication, RegionOrEndpoint},
+    },
+    config::ProxyConfig,
+    sinks::{util::retries::RetryLogic, Healthcheck},
+};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct S3Options {
@@ -112,24 +117,30 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
     Ok(healthcheck.boxed())
 }
 
-pub fn create_client(
+pub fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
     assume_role: Option<String>,
     proxy: &ProxyConfig,
-) -> crate::Result<S3Client> {
+) -> crate::Result<S3Service> {
     let region = region.try_into()?;
-    let client = rusoto::client(proxy)?;
+    let client = rusoto::custom_client(
+        proxy,
+        // S3 closes idle connections after 20 seconds,
+        // so we can close idle connections ahead of time to prevent re-using them
+        client::Client::builder().pool_idle_timeout(Duration::from_secs(15)),
+    )?;
 
     let creds = auth.build(&region, assume_role)?;
 
-    Ok(S3Client::new_with(client, creds, region))
+    let client = S3Client::new_with(client, creds, region.clone());
+    Ok(S3Service::new(client, region))
 }
 
 #[cfg(test)]
 mod tests {
     use super::S3StorageClass;
-    use crate::serde::to_string;
+    use crate::serde::json::to_string;
 
     #[test]
     fn storage_class_names() {

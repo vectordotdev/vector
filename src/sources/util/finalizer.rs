@@ -1,17 +1,16 @@
-use crate::event::BatchStatusReceiver;
-use crate::shutdown::ShutdownSignal;
+use std::{future::Future, pin::Pin, task::Poll};
+
 use futures::{future::Shared, stream::FuturesOrdered, FutureExt, StreamExt};
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Poll;
 use tokio::sync::mpsc;
+
+use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
 
 /// The `OrderedFinalizer` framework here is a mechanism for marking
 /// events from a source as done in a single background task *in the
 /// order they are received from the source*. The type `T` is the
 /// source-specific data associated with each entry to be used to
 /// complete the finalization.
-pub struct OrderedFinalizer<T> {
+pub(crate) struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
 }
 

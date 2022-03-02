@@ -1,6 +1,7 @@
-use crate::{BoxedSubscription, QueryResult};
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
+
+use crate::{BoxedSubscription, QueryResult};
 
 /// Component links query for returning linked components for sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -74,7 +75,6 @@ pub trait TestQueryExt {
     ) -> crate::QueryResult<FileSourceMetricsQuery>;
     async fn component_by_component_key_query(
         &self,
-        pipeline_id: Option<String>,
         component_id: &str,
     ) -> crate::QueryResult<ComponentByComponentKeyQuery>;
     async fn components_connection_query(
@@ -123,12 +123,10 @@ impl TestQueryExt for crate::Client {
 
     async fn component_by_component_key_query(
         &self,
-        pipeline_id: Option<String>,
         component_id: &str,
     ) -> QueryResult<ComponentByComponentKeyQuery> {
         let request_body = ComponentByComponentKeyQuery::build_query(
             component_by_component_key_query::Variables {
-                pipeline_id,
                 component_id: component_id.to_string(),
             },
         );

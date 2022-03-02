@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+
 use vrl::Value;
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,15 @@ impl enrichment::Table for TestEnrichmentTable {
         _fields: &[&str],
     ) -> Result<enrichment::IndexHandle, String> {
         Ok(enrichment::IndexHandle(1))
+    }
+
+    fn index_fields(&self) -> Vec<(enrichment::Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    /// Returns true if the underlying data has changed and the table needs reloading.
+    fn needs_reload(&self) -> bool {
+        false
     }
 }
 

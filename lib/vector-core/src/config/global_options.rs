@@ -1,13 +1,14 @@
-use crate::config::proxy::ProxyConfig;
-use crate::config::LogSchema;
+use std::{fs::DirBuilder, path::PathBuf};
+
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::DirBuilder;
-use std::path::PathBuf;
+use vector_common::TimeZone;
+
+use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
-pub enum DataDirError {
+pub(crate) enum DataDirError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
     MissingDataDir,
     #[snafu(display("data_dir {:?} does not exist", data_dir))]
@@ -40,6 +41,12 @@ pub struct GlobalOptions {
     pub proxy: ProxyConfig,
     #[serde(skip)]
     pub enterprise: bool,
+    #[serde(
+        default,
+        deserialize_with = "bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GlobalOptions {
@@ -89,7 +96,7 @@ impl GlobalOptions {
         DirBuilder::new()
             .recursive(true)
             .create(&data_subdir)
-            .with_context(|| CouldNotCreate { subdir, data_dir })?;
+            .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
     }
 }

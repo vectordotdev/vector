@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
@@ -77,7 +79,7 @@ prop_compose! {
 
 prop_compose! {
     fn string_literal()(val in "[^\"\\\\\\)\\}]*") -> Literal {
-        Literal::String(val.replace("\\", "\\\\").replace("\"", "\\\""))
+        Literal::String(val.replace('\\', "\\\\").replace('\"', "\\\""))
     }
 }
 

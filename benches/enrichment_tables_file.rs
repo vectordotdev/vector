@@ -1,7 +1,8 @@
+use std::{collections::BTreeMap, time::SystemTime};
+
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use enrichment::Case;
-use std::collections::BTreeMap;
 use vector::enrichment_tables::{file::File, Condition, Table};
 use vrl::Value;
 
@@ -38,6 +39,8 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             .collect::<Vec<_>>();
 
         let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
             data,
             // Headers.
             (0..10)

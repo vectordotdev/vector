@@ -19,22 +19,12 @@ components: transforms: rename_fields: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(rename_fields._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.new_name = del(.old_name)
 			```
 			""",

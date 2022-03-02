@@ -1,16 +1,20 @@
+#[cfg(feature = "datadog-pipelines")]
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
+
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, pipeline::Pipelines, provider, ComponentKey, Config, EnrichmentTableConfig,
-    EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
+    TransformOuter,
 };
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -20,9 +24,11 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[serde(default)]
+    pub schema: schema::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
-    pub datadog: datadog::Options,
+    pub datadog: Option<datadog::Options>,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -30,14 +36,27 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentKey, SinkOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentKey, TransformOuter>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition>,
+    pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
-    #[serde(default)]
-    pub pipelines: Pipelines,
+}
+
+#[cfg(feature = "datadog-pipelines")]
+#[derive(Serialize)]
+struct ConfigBuilderHash<'a> {
+    #[cfg(feature = "api")]
+    api: &'a api::Options,
+    global: &'a GlobalOptions,
+    healthchecks: &'a HealthcheckOptions,
+    enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
+    sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
+    sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
+    transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
+    tests: &'a Vec<TestDefinition<String>>,
+    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
 }
 
 impl Clone for ConfigBuilder {
@@ -53,71 +72,54 @@ impl Clone for ConfigBuilder {
 }
 
 impl From<Config> for ConfigBuilder {
-    fn from(c: Config) -> Self {
-        ConfigBuilder {
-            global: c.global,
+    fn from(config: Config) -> Self {
+        let Config {
+            global,
             #[cfg(feature = "api")]
-            api: c.api,
+            api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
-            datadog: c.datadog,
-            healthchecks: c.healthchecks,
-            enrichment_tables: c.enrichment_tables,
-            sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
+            tests,
+            ..
+        } = config;
+
+        let transforms = transforms
+            .into_iter()
+            .map(|(key, transform)| (key, transform.map_inputs(ToString::to_string)))
+            .collect();
+
+        let sinks = sinks
+            .into_iter()
+            .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
+            .collect();
+
+        let tests = tests.into_iter().map(TestDefinition::stringify).collect();
+
+        ConfigBuilder {
+            global,
+            #[cfg(feature = "api")]
+            api,
+            schema,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
             provider: None,
-            tests: c.tests,
-            pipelines: Default::default(),
+            tests,
         }
     }
 }
 
 impl ConfigBuilder {
-    // moves the pipeline transforms into regular scoped transforms
-    // and add the output to the sources
-    pub fn merge_pipelines(&mut self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
-        let global_inputs = self
-            .transforms
-            .keys()
-            .chain(self.sources.keys())
-            .filter(|id| id.is_global())
-            .map(|id| id.id().to_string())
-            .collect::<HashSet<_>>();
-
-        let pipelines = std::mem::take(&mut self.pipelines);
-        let pipeline_transforms = pipelines.into_scoped_transforms();
-
-        for (component_id, pipeline_transform) in pipeline_transforms {
-            // to avoid ambiguity, we forbid to use a component name in the pipeline scope
-            // that is already used as the global scope.
-            if global_inputs.contains(component_id.id()) {
-                errors.push(format!(
-                    "Component ID '{}' is already used.",
-                    component_id.id()
-                ));
-                continue;
-            }
-            for input in pipeline_transform.outputs.iter() {
-                if let Some(transform) = self.transforms.get_mut(input) {
-                    transform.inputs.push(component_id.clone());
-                } else if let Some(sink) = self.sinks.get_mut(input) {
-                    sink.inputs.push(component_id.clone());
-                } else {
-                    errors.push(format!("Couldn't find transform or sink '{}'", input));
-                }
-            }
-            self.transforms
-                .insert(component_id, pipeline_transform.inner);
-        }
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
-    }
-
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
@@ -154,9 +156,15 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(ComponentKey::from).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
+        self.add_sink_outer(id, sink);
+    }
 
+    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
@@ -168,7 +176,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| ComponentKey::from(value.to_string()))
+            .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
@@ -179,8 +187,8 @@ impl ConfigBuilder {
             .insert(ComponentKey::from(id.into()), transform);
     }
 
-    pub fn set_pipelines(&mut self, pipelines: Pipelines) {
-        self.pipelines = pipelines;
+    pub fn set_data_dir(&mut self, path: &Path) {
+        self.global.data_dir = Some(path.to_owned());
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
@@ -194,9 +202,11 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
-            if self.datadog.enabled {
-                // enable other enterprise features
-                self.global.enterprise = true;
+            if let Some(datadog) = &self.datadog {
+                if datadog.enabled {
+                    // enable other enterprise features
+                    self.global.enterprise = true;
+                }
             }
         }
 
@@ -272,239 +282,101 @@ impl ConfigBuilder {
         Ok(())
     }
 
+    #[cfg(feature = "datadog-pipelines")]
+    /// SHA256 hexadecimal representation of a config builder. This is generated by serializing
+    /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
+    pub fn sha256_hash(&self) -> String {
+        use sha2::{Digest, Sha256};
+
+        let value = serde_json::to_string(&ConfigBuilderHash {
+            #[cfg(feature = "api")]
+            api: &self.api,
+            global: &self.global,
+            healthchecks: &self.healthchecks,
+            enrichment_tables: self.enrichment_tables.iter().collect(),
+            sources: self.sources.iter().collect(),
+            sinks: self.sinks.iter().collect(),
+            transforms: self.transforms.iter().collect(),
+            tests: &self.tests,
+            provider: &self.provider,
+        })
+        .expect("should serialize to JSON");
+
+        let output = Sha256::digest(value.as_bytes());
+
+        hex::encode(output)
+    }
+
     #[cfg(test)]
     pub fn from_toml(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
     #[cfg(test)]
     pub fn from_json(input: &str) -> Self {
-        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
-            .unwrap()
+        crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "datadog-pipelines", feature = "api"))]
 mod tests {
-    use crate::config::pipeline::{Pipeline, Pipelines};
     use crate::config::ConfigBuilder;
-    use indexmap::IndexMap;
 
     #[test]
-    fn success() {
-        let mut pipelines = IndexMap::new();
-        pipelines.insert(
-            "foo".into(),
-            Pipeline::from_toml(
-                r#"
-        [transforms.bar]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
-        outputs = ["print"]
-        "#,
-            ),
-        );
-        let pipelines = Pipelines::from(pipelines);
-        let mut builder = ConfigBuilder::from_toml(
-            r#"
-        [sources.logs]
-        type = "generator"
-        format = "syslog"
+    /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
+    /// fails, it likely means an implementation detail of serialization has changed, which is
+    /// likely to impact the final hash.
+    fn version_json_order() {
+        use serde_json::{json, Value};
 
-        [sinks.print]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-        );
-        builder.set_pipelines(pipelines);
-        let result = builder.build();
-        assert!(result.is_ok());
-    }
+        use super::{ConfigBuilder, ConfigBuilderHash};
 
-    #[test]
-    fn overlaping_transform_id() {
-        let mut pipelines = IndexMap::new();
-        pipelines.insert(
-            "foo".into(),
-            Pipeline::from_toml(
-                r#"
-        [transforms.bar]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
-        outputs = ["print"]
-        "#,
-            ),
-        );
-        let pipelines = Pipelines::from(pipelines);
-        let mut builder = ConfigBuilder::from_toml(
-            r#"
-        [sources.logs]
-        type = "generator"
-        format = "syslog"
+        // Expected key order of serialization. This is important for guaranteeing that a
+        // hash is reproducible across versions.
+        let expected_keys = [
+            "api",
+            "global",
+            "healthchecks",
+            "enrichment_tables",
+            "sources",
+            "sinks",
+            "transforms",
+            "tests",
+            "provider",
+        ];
 
-        [transforms.bar]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
+        let builder = ConfigBuilder::default();
 
-        [sinks.print]
-        inputs = ["bar"]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-        );
-        builder.set_pipelines(pipelines);
-        let errors = builder.build().unwrap_err();
-        assert_eq!(errors[0], "Component ID 'bar' is already used.");
-    }
+        let value = json!(ConfigBuilderHash {
+            api: &builder.api,
+            global: &builder.global,
+            healthchecks: &builder.healthchecks,
+            enrichment_tables: builder.enrichment_tables.iter().collect(),
+            sources: builder.sources.iter().collect(),
+            sinks: builder.sinks.iter().collect(),
+            transforms: builder.transforms.iter().collect(),
+            tests: &builder.tests,
+            provider: &builder.provider,
+        });
 
-    #[test]
-    fn overlaping_pipeline_transform_id() {
-        let mut pipelines = IndexMap::new();
-        pipelines.insert(
-            "foo".into(),
-            Pipeline::from_toml(
-                r#"
-        [transforms.remap]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
-        outputs = ["print"]
-        "#,
-            ),
-        );
-        pipelines.insert(
-            "bar".into(),
-            Pipeline::from_toml(
-                r#"
-        [transforms.remap]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
-        outputs = ["print"]
-        "#,
-            ),
-        );
-        let pipelines = Pipelines::from(pipelines);
-        let mut builder = ConfigBuilder::from_toml(
-            r#"
-        [sources.logs]
-        type = "generator"
-        format = "syslog"
-
-        [sinks.print]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-        );
-        builder.set_pipelines(pipelines);
-        let config = builder.build().unwrap();
-        assert_eq!(config.transforms.len(), 2);
-    }
-
-    #[test]
-    fn component_with_dot() {
-        let builder = ConfigBuilder::from_json(
-            r#"{
-            "sources": {
-                "log.with.dots": {
-                    "type": "generator",
-                    "format": "syslog"
-                }
-            },
-            "sinks": {
-                "print": {
-                    "inputs": ["log.with.dots"],
-                    "type": "console",
-                    "encoding": {
-                        "codec": "json"
-                    }
-                }
+        match value {
+            // Should serialize to a map.
+            Value::Object(map) => {
+                // Check ordering.
+                assert!(map.keys().eq(expected_keys));
             }
-        }"#,
-        );
-        let errors = builder.build().unwrap_err();
-        assert_eq!(
-            errors[0],
-            "Component name \"log.with.dots\" should not contain a \".\""
-        );
-    }
-
-    #[test]
-    fn pipeline_component_with_dot() {
-        let mut pipelines = IndexMap::new();
-        pipelines.insert(
-            "foo".into(),
-            Pipeline::from_json(
-                r#"
-        {
-            "transforms": {
-                "remap.with.dots": {
-                    "inputs": ["logs"],
-                    "type": "remap",
-                    "source": "",
-                    "outputs": ["print"]
-                }
-            }
+            _ => panic!("should serialize to object"),
         }
-        "#,
-            ),
-        );
-        let pipelines = Pipelines::from(pipelines);
-        let mut builder = ConfigBuilder::from_toml(
-            r#"
-        [sources.logs]
-        type = "generator"
-        format = "syslog"
-
-        [sinks.print]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-        );
-        builder.set_pipelines(pipelines);
-        let errors = builder.build().unwrap_err();
-        assert_eq!(
-            errors[0],
-            "Component name \"remap.with.dots\" should not contain a \".\""
-        );
     }
 
     #[test]
-    fn pipeline_with_dot() {
-        let mut pipelines = IndexMap::new();
-        pipelines.insert(
-            "foo.bar".into(),
-            Pipeline::from_toml(
-                r#"
-        [transforms.remap]
-        inputs = ["logs"]
-        type = "remap"
-        source = ""
-        outputs = ["print"]
-        "#,
-            ),
-        );
-        let pipelines = Pipelines::from(pipelines);
-        let mut builder = ConfigBuilder::from_toml(
-            r#"
-        [sources.logs]
-        type = "generator"
-        format = "syslog"
-
-        [sinks.print]
-        type = "console"
-        encoding.codec = "json"
-        "#,
-        );
-        builder.set_pipelines(pipelines);
-        let errors = builder.build().unwrap_err();
+    /// If this hash changes, it means either the `ConfigBuilder` has changed what it
+    /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
+    /// should ideally be able to fix so that the original hash passes!
+    fn version_hash_match() {
         assert_eq!(
-            errors[0],
-            "Pipeline name \"foo.bar\" shouldn't container a '.'."
+            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            ConfigBuilder::default().sha256_hash()
         );
     }
 }

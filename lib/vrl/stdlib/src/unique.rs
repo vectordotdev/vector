@@ -1,6 +1,5 @@
-use vrl::prelude::*;
-
 use indexmap::IndexSet;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Unique;
@@ -53,7 +52,7 @@ impl Expression for UniqueFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+        TypeDef::array(Collection::any())
     }
 }
 
@@ -69,7 +68,7 @@ mod tests {
                 value: value!(["bar", "foo", "baz", "foo"]),
             ],
             want: Ok(value!(["bar", "foo", "baz"])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         mixed_values {
@@ -77,7 +76,7 @@ mod tests {
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
             want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
     ];
 }

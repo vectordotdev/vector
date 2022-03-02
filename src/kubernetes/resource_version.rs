@@ -1,7 +1,9 @@
 //! A resource version types to ensure proper usage protocol.
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
-use k8s_openapi::Metadata;
+use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
+    Metadata,
+};
 
 /// Resource version state in the context of a chain of watch requests.
 #[derive(Debug, Clone, Default)]
@@ -9,8 +11,8 @@ pub struct State(Option<String>);
 
 impl State {
     /// Create a new resource version [`State`].
-    pub const fn new() -> Self {
-        Self(None)
+    pub fn new() -> Self {
+        Self(Some("0".to_owned()))
     }
 
     /// Update the resource version from a candidate obtained earlier.

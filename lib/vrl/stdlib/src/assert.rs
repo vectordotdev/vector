@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{diagnostic::Note, prelude::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Assert;
@@ -66,24 +66,35 @@ impl Expression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.condition.resolve(ctx)?.try_boolean()? {
             true => Ok(true.into()),
-            false => Err(self
-                .message
-                .as_ref()
-                .map(|m| {
-                    m.resolve(ctx)
-                        .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
-                })
-                .transpose()?
-                .unwrap_or_else(|| match self.condition.format() {
-                    Some(string) => format!("assertion failed: {}", string),
-                    None => "assertion failed".to_owned(),
-                })
-                .into()),
+            false => {
+                let message = self
+                    .message
+                    .as_ref()
+                    .map(|m| {
+                        m.resolve(ctx)
+                            .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
+                    })
+                    .transpose()?;
+
+                if let Some(message) = message {
+                    Err(ExpressionError::Error {
+                        message: message.clone(),
+                        labels: vec![],
+                        notes: vec![Note::UserErrorMessage(message)],
+                    })
+                } else {
+                    let message = match self.condition.format() {
+                        Some(string) => format!("assertion failed: {}", string),
+                        None => "assertion failed".to_owned(),
+                    };
+                    Err(ExpressionError::from(message))
+                }
+            }
         }
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.condition.type_def(state).fallible().boolean()
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::boolean().fallible()
     }
 }
 

@@ -1,15 +1,17 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
-    transforms::{FunctionTransform, Transform},
-    types::{parse_check_conversion_map, Conversion},
-};
+use std::{collections::HashMap, str};
+
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use shared::{tokenize::parse, TimeZone};
-use std::collections::HashMap;
-use std::str;
+use vector_common::{tokenize::parse, TimeZone};
+
+use crate::{
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, PathComponent, PathIter, Value},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+    types::{parse_check_conversion_map, Conversion},
+};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -50,12 +52,16 @@ impl TransformConfig for TokenizerConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -97,7 +103,7 @@ impl Tokenizer {
 }
 
 impl FunctionTransform for Tokenizer {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -109,7 +115,7 @@ impl FunctionTransform for Tokenizer {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        emit!(&TokenizerConvertFailed { field: name, error });
+                        emit!(&ParserConversionError { name, error });
                     }
                 }
             }
@@ -117,7 +123,7 @@ impl FunctionTransform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(&TokenizerFieldMissing { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event)
@@ -130,7 +136,9 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -160,9 +168,9 @@ mod tests {
         let parser = parser.as_function();
 
         let metadata = event.metadata().clone();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.into_events().next().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
@@ -204,9 +212,9 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::Float(NotNan::new(42.3).unwrap()));
         assert_eq!(log["flag"], Value::Boolean(true));
-        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["code"], Value::Integer(1234_i64));
         assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
@@ -220,7 +228,7 @@ mod tests {
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         )
         .await;
-        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["code"], Value::Integer(1234_i64));
         assert_eq!(log["who"], Value::Bytes("-".into()));
         assert_eq!(log["why"], Value::Bytes("foo".into()));
     }

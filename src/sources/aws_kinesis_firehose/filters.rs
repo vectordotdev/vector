@@ -1,25 +1,30 @@
+use std::{convert::Infallible, io};
+
+use bytes::{Buf, Bytes};
+use chrono::Utc;
+use flate2::read::MultiGzDecoder;
+use snafu::ResultExt;
+use warp::{http::StatusCode, Filter};
+
 use super::{
-    errors::{Parse, RequestError},
+    errors::{ParseSnafu, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
     Compression,
 };
 use crate::{
+    codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
-    Pipeline,
+    SourceSender,
 };
-use bytes::{Buf, Bytes};
-use chrono::Utc;
-use flate2::read::MultiGzDecoder;
-use snafu::ResultExt;
-use std::{convert::Infallible, io};
-use warp::{http::StatusCode, Filter};
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_key: Option<String>,
     record_compression: Compression,
-    out: Pipeline,
+    decoder: codecs::Decoder,
+    acknowledgements: bool,
+    out: SourceSender,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
         .and(emit_received())
@@ -40,6 +45,8 @@ pub fn firehose(
         )
         .and(parse_body())
         .and(warp::any().map(move || record_compression))
+        .and(warp::any().map(move || decoder.clone()))
+        .and(warp::any().map(move || acknowledgements))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)
@@ -70,7 +77,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                 }
                 .and_then(|r| {
                     serde_json::from_reader(r)
-                        .context(Parse {
+                        .context(ParseSnafu {
                             request_id: request_id.clone(),
                         })
                         .map_err(warp::reject::custom)
@@ -146,6 +153,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     emit!(&AwsKinesisFirehoseRequestError {
         request_id,
         error: message.as_str(),
+        code,
     });
 
     let json = warp::reply::json(&FirehoseResponse {

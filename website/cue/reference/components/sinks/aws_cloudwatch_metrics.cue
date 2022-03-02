@@ -13,7 +13,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      false
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -31,7 +30,13 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			encoding: enabled: false
 			proxy: enabled:    true
 			request: enabled:  false
-			tls: enabled:      false
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 			to: {
 				service: services.aws_cloudwatch_metrics
 
@@ -51,16 +56,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -93,10 +88,8 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 				Used as a namespace for metrics that don't have it.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -127,4 +120,9 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			]
 		},
 	]
+
+	telemetry: metrics: {
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+	}
 }

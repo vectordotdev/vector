@@ -1,5 +1,6 @@
-use crate::util::round_to_precision;
 use vrl::prelude::*;
+
+use crate::util::round_to_precision;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Round;
@@ -68,18 +69,22 @@ impl Expression for RoundFn {
         let precision = self.precision.resolve(ctx)?.try_integer()?;
 
         match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
+            Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+                f.into_inner(),
+                precision,
+                f64::round,
+            ))),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::Float | Kind::Integer,
+                expected: Kind::float() | Kind::integer(),
             }
             .into()),
         }
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().integer()
+        TypeDef::integer().infallible()
     }
 }
 
@@ -93,19 +98,19 @@ mod tests {
         down {
              args: func_args![value: 1234.2],
              want: Ok(1234.0),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         up {
              args: func_args![value: 1234.8],
              want: Ok(1235.0),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         integer {
              args: func_args![value: 1234],
              want: Ok(1234),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         precision {
@@ -113,7 +118,7 @@ mod tests {
                               precision: 1
              ],
              want: Ok(1234.4),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
 
         bigger_precision  {
@@ -121,7 +126,7 @@ mod tests {
                              precision: 4
             ],
             want: Ok(1234.5679),
-            tdef: TypeDef::new().infallible().integer(),
+            tdef: TypeDef::integer().infallible(),
         }
 
         huge {
@@ -129,7 +134,7 @@ mod tests {
                               precision: 5
              ],
              want: Ok(9876543210123456789098765432101234567890987654321.98765),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
     ];
 }

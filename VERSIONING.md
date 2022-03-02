@@ -34,7 +34,7 @@ Vector adheres to the [Semantic Versioning 2.0] convention. In summary:
 
 ## Public API
 
-Semantic Versioning hinges on Vector's defintion of "public API". By the nature
+Semantic Versioning hinges on Vector's definition of "public API". By the nature
 of Vector -- a tool that collects, processes, and routes data from disparate
 systems -- it has a very large public surface area. It's not immediately obvious
 which parts are covered under our versioning contract and how they're covered.
@@ -47,7 +47,7 @@ The following Vector areas are covered in Vector's definition of public API.
 #### Intended for *public* consumption
 
 The follow Vector areas are intended for *public* consumption (consumption by
-anything other than Vector itself). Backward incompatble changes will trigger
+anything other than Vector itself). Backward incompatible changes will trigger
 a major version increment.
 
 * [CLI]
@@ -64,8 +64,8 @@ a major version increment.
 #### Intended for *private* consumption
 
 The following Vector areas are intended for *private* consumption (consumption by
-Vector only). Backward incompatble changes will trigger a major version
-increment only if Vector itself is not compatbile with previous versions.
+Vector only). Backward incompatible changes will trigger a major version
+increment only if Vector itself is not compatible with previous versions.
 
 * [Configuration schema]
 * [Data directory] and its contents
@@ -123,17 +123,17 @@ here. Each minor release bump will include an upgrade guide in the
 [configuration schema]: https://vector.dev/docs/reference/configuration/
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 [data model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
-[Github repository]: https://github.com/timberio/vector
+[Github repository]: https://github.com/vectordotdev/vector
 [GraphQL API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
 [`internal_logs_` source]: https://vector.dev/docs/reference/configuration/sources/internal_logs/
 [`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
-[`master` branch]: https://github.com/timberio/vector/tree/master
+[`master` branch]: https://github.com/vectordotdev/vector/tree/master
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
-[release policy]: https://github.com/timberio/vector/blob/master/RELEASES.md
+[release policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [`vector` command]: https://vector.dev/docs/reference/cli/#vector
 [`vector generate` subcommand]: https://vector.dev/docs/reference/cli/#generate

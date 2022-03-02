@@ -1,32 +1,119 @@
-use super::{
-    builder::ConfigBuilder, format, pipeline::Pipelines, validation, vars, Config, ConfigPath,
-    Format, FormatHint,
-};
-use crate::signal;
-use glob::glob;
-use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{File, ReadDir},
     path::{Path, PathBuf},
     sync::Mutex,
 };
 
-lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<ConfigPath> = vec![ConfigPath::File(
+use super::{
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
+    FormatHint, TransformOuter,
+};
+use crate::signal;
+use glob::glob;
+use indexmap::IndexMap;
+use once_cell::sync::Lazy;
+
+#[cfg(not(windows))]
+fn default_config_paths() -> Vec<ConfigPath> {
+    vec![ConfigPath::File(
         "/etc/vector/vector.toml".into(),
-        Some(Format::Toml)
-    )];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<ConfigPath> = {
-        let program_files = std::env::var("ProgramFiles")
-            .expect("%ProgramFiles% environment variable must be defined");
-        let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![ConfigPath::File(
-            PathBuf::from(config_path),
-            Some(Format::Toml),
-        )]
-    };
-    pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
+        Some(Format::Toml),
+    )]
+}
+
+#[cfg(windows)]
+fn default_config_paths() -> Vec<ConfigPath> {
+    let program_files =
+        std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
+    let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
+    vec![ConfigPath::File(
+        PathBuf::from(config_path),
+        Some(Format::Toml),
+    )]
+}
+
+pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
+
+pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
+    path.read_dir()
+        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+}
+
+pub(super) fn component_name(path: &Path) -> Result<String, Vec<String>> {
+    path.file_stem()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+}
+
+pub(super) fn open_file(path: &Path) -> Option<File> {
+    match File::open(path) {
+        Ok(f) => Some(f),
+        Err(error) => {
+            if let std::io::ErrorKind::NotFound = error.kind() {
+                error!(message = "Config file not found in path.", ?path);
+                None
+            } else {
+                error!(message = "Error opening config file.", %error, ?path);
+                None
+            }
+        }
+    }
+}
+
+fn load_from_file<T: serde::de::DeserializeOwned>(
+    path: &Path,
+    format: Format,
+) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
+    let name = component_name(path)?;
+    if let Some(file) = open_file(path) {
+        let (component, warnings): (T, Vec<String>) = load(file, format)?;
+        Ok(Some((name, component, warnings)))
+    } else {
+        Ok(None)
+    }
+}
+
+fn load_files_from_dir<T: serde::de::DeserializeOwned>(
+    path: &Path,
+) -> Result<(IndexMap<ComponentKey, T>, Vec<String>), Vec<String>> {
+    let readdir = read_dir(path)?;
+    let mut result = IndexMap::new();
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    for res in readdir {
+        match res {
+            Ok(direntry) => {
+                let entry_path = direntry.path();
+                if entry_path.is_file() {
+                    // skip any unknown file formats
+                    if let Ok(format) = Format::from_path(direntry.path()) {
+                        match load_from_file::<T>(&entry_path, format) {
+                            Ok(Some((name, file, warns))) => {
+                                result.insert(ComponentKey::from(name), file);
+                                warnings.extend(warns);
+                            }
+                            Ok(None) => {}
+                            Err(errs) => errors.extend(errs),
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                errors.push(format!(
+                    "Could not read file in config dir: {:?}, {}.",
+                    path, err
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok((result, warnings))
+    } else {
+        Err(errors)
+    }
 }
 
 /// Merge the paths coming from different cli flags with different formats into
@@ -42,13 +129,7 @@ pub fn merge_path_lists(
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
 pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
-    let default_paths = if cfg!(unix) {
-        DEFAULT_UNIX_CONFIG_PATHS.clone()
-    } else if cfg!(windows) {
-        DEFAULT_WINDOWS_CONFIG_PATHS.clone()
-    } else {
-        DEFAULT_UNIX_CONFIG_PATHS.clone()
-    };
+    let default_paths = default_config_paths();
 
     let starting_paths = if !config_paths.is_empty() {
         config_paths
@@ -97,12 +178,8 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     Some(paths)
 }
 
-pub fn load_from_paths(
-    config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) =
-        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
+pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -116,11 +193,9 @@ pub fn load_from_paths(
 /// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
 pub async fn load_from_paths_with_provider(
     config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) =
-        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -139,92 +214,158 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<PathBuf> {
-    config_paths
-        .iter()
-        .filter_map(|path| path.pipeline_dir())
-        .filter(|path| path.exists())
-        .collect()
+fn load_builder_from_file(
+    path: &Path,
+    format: Format,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    match load_from_file(path, format)? {
+        Some((_, loaded, warnings)) => {
+            builder.append(loaded)?;
+            Ok(warnings)
+        }
+        None => Ok(Vec::new()),
+    }
 }
 
-fn load_pipelines_from_paths(pipeline_paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
-    Pipelines::load_from_paths(pipeline_paths)
-}
-
-pub fn load_builder_and_pipelines_from_paths(
-    config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
-    let pipelines = if pipeline_paths.is_empty() {
-        let pipeline_paths = pipeline_paths_from_config_paths(config_paths);
-        load_pipelines_from_paths(&pipeline_paths)?
-    } else {
-        load_pipelines_from_paths(pipeline_paths)?
-    };
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    builder.set_pipelines(pipelines);
-
-    Ok((builder, load_warnings))
-}
-
-fn load_builder_from_paths(
-    config_paths: &[ConfigPath],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
-    let mut inputs = Vec::new();
+fn load_builder_from_dir(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let readdir = read_dir(path)?;
+    let mut warnings = Vec::new();
     let mut errors = Vec::new();
-
-    for config_path in config_paths {
-        match config_path {
-            ConfigPath::File(path, format) => {
-                if let Some(file) = open_config(path) {
-                    inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
-                } else {
-                    errors.push(format!("Config file not found in path: {:?}.", path));
-                };
-            }
-            ConfigPath::Dir(path) => match path.read_dir() {
-                Ok(readdir) => {
-                    for res in readdir {
-                        match res {
-                            Ok(direntry) => {
-                                // skip any unknown file formats
-                                if let Ok(format) = Format::from_path(direntry.path()) {
-                                    if let Some(file) = open_config(&direntry.path()) {
-                                        inputs.push((file, Some(format)));
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                errors.push(format!(
-                                    "Could not read file in config dir: {:?}, {}.",
-                                    path, err
-                                ));
-                            }
+    for res in readdir {
+        match res {
+            Ok(direntry) => {
+                let entry_path = direntry.path();
+                if entry_path.is_file() {
+                    // skip any unknown file formats
+                    if let Ok(format) = Format::from_path(direntry.path()) {
+                        match load_builder_from_file(&direntry.path(), format, builder) {
+                            Ok(warns) => warnings.extend(warns),
+                            Err(errs) => errors.extend(errs),
                         }
                     }
                 }
-                Err(err) => {
-                    errors.push(format!("Could not read config dir: {:?}, {}.", path, err));
-                }
-            },
+            }
+            Err(err) => {
+                errors.push(format!(
+                    "Could not read file in config dir: {:?}, {}.",
+                    path, err
+                ));
+            }
+        }
+    }
+
+    // for components other that `transforms`, we can use `load_files_from_dir` to keep the serde
+    // validation of the components. This avoids doing some conversion and avoids knowing where and
+    // in which file the configuration errors.
+
+    let subfolder = path.join("enrichment_tables");
+    if subfolder.exists() && subfolder.is_dir() {
+        match load_files_from_dir(&subfolder) {
+            Ok((inner, warns)) => {
+                warnings.extend(warns);
+                builder.enrichment_tables.extend(inner);
+            }
+            Err(errs) => errors.extend(errs),
+        }
+    }
+
+    let subfolder = path.join("sinks");
+    if subfolder.exists() && subfolder.is_dir() {
+        match load_files_from_dir(&subfolder) {
+            Ok((inner, warns)) => {
+                warnings.extend(warns);
+                builder.sinks.extend(inner);
+            }
+            Err(errs) => errors.extend(errs),
+        }
+    }
+
+    let subfolder = path.join("sources");
+    if subfolder.exists() && subfolder.is_dir() {
+        match load_files_from_dir(&subfolder) {
+            Ok((inner, warns)) => {
+                warnings.extend(warns);
+                builder.sources.extend(inner);
+            }
+            Err(errs) => errors.extend(errs),
+        }
+    }
+
+    let subfolder = path.join("tests");
+    if subfolder.exists() && subfolder.is_dir() {
+        match load_files_from_dir(&subfolder) {
+            Ok((inner, warns)) => {
+                warnings.extend(warns);
+                builder
+                    .tests
+                    .extend(inner.into_iter().map(|(_, value)| value));
+            }
+            Err(errs) => errors.extend(errs),
+        }
+    }
+
+    let subfolder = path.join("transforms");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TransformOuter<_>>>() {
+            Ok(inner) => {
+                builder.transforms.extend(inner);
+            }
+            Err(err) => errors.push(format!("Unable to decode transform folder: {:?}", err)),
         }
     }
 
     if errors.is_empty() {
-        load_from_inputs(inputs)
+        Ok(warnings)
     } else {
         Err(errors)
     }
 }
 
-pub fn load_from_str(
-    input: &str,
-    format: FormatHint,
-    pipelines: Pipelines,
-) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) =
-        load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    builder.set_pipelines(pipelines);
+pub fn load_builder_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+    let mut result = ConfigBuilder::default();
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+
+    for config_path in config_paths {
+        match config_path {
+            ConfigPath::File(path, format_hint) => {
+                match load_builder_from_file(
+                    path,
+                    format_hint
+                        .or_else(move || Format::from_path(&path).ok())
+                        .unwrap_or_default(),
+                    &mut result,
+                ) {
+                    Ok(warns) => warnings.extend(warns),
+                    Err(errs) => errors.extend(errs),
+                };
+            }
+            ConfigPath::Dir(path) => {
+                match load_builder_from_dir(path, &mut result) {
+                    Ok(warns) => warnings.extend(warns),
+                    Err(errs) => errors.extend(errs),
+                };
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok((result, warnings))
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -235,15 +376,15 @@ pub fn load_from_str(
 }
 
 fn load_from_inputs(
-    inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
+    inputs: impl IntoIterator<Item = (impl std::io::Read, Format)>,
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|(n, mut warn)| {
-            warnings.append(&mut warn);
+        if let Err(errs) = load(input, format).and_then(|(n, warn)| {
+            warnings.extend(warn);
             config.append(n)
         }) {
             // TODO: add back paths
@@ -258,25 +399,7 @@ fn load_from_inputs(
     }
 }
 
-fn open_config(path: &Path) -> Option<File> {
-    match File::open(path) {
-        Ok(f) => Some(f),
-        Err(error) => {
-            if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
-                None
-            } else {
-                error!(message = "Error opening config file.", %error, ?path);
-                None
-            }
-        }
-    }
-}
-
-pub fn load(
-    mut input: impl std::io::Read,
-    format: FormatHint,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -288,20 +411,88 @@ pub fn load(
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
+    Ok(vars::interpolate(&source_string, &vars))
+}
+
+pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let (with_vars, warnings) = prepare_input(input)?;
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "sinks-elasticsearch",
+    feature = "transforms-pipelines",
+    feature = "transforms-regex_parser",
+    feature = "transforms-sample",
+    feature = "sources-demo_logs",
+    feature = "sinks-console"
+))]
 mod tests {
-    use super::load_pipelines_from_paths;
     use std::path::PathBuf;
 
+    use super::load_builder_from_paths;
+    use crate::{
+        config::{ComponentKey, ConfigPath},
+        transforms::pipelines::PipelinesConfig,
+    };
+
     #[test]
-    fn load_pipelines_from_tests() {
-        let path = PathBuf::from("tests/pipelines/pipelines");
-        let paths = vec![path];
-        load_pipelines_from_paths(&paths).unwrap();
+    fn load_namespacing_folder() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("success");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (builder, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+        assert!(builder
+            .transforms
+            .contains_key(&ComponentKey::from("apache_parser")));
+        assert!(builder
+            .transforms
+            .contains_key(&ComponentKey::from("processing")));
+        assert!(builder
+            .sources
+            .contains_key(&ComponentKey::from("apache_logs")));
+        assert!(builder
+            .sinks
+            .contains_key(&ComponentKey::from("es_cluster")));
+        assert_eq!(builder.tests.len(), 2);
+        let processing = builder
+            .transforms
+            .get(&ComponentKey::from("processing"))
+            .unwrap();
+        let output = serde_json::to_string_pretty(&processing.inner).unwrap();
+        let processing: PipelinesConfig = serde_json::from_str(&output).unwrap();
+        assert!(processing.logs().order().is_some());
+        assert!(processing.metrics().order().is_none());
+        assert!(processing.metrics().pipelines().is_empty());
+        let logs = processing.logs().pipelines();
+        let first = logs.get("first").unwrap();
+        assert_eq!(first.transforms().len(), 2);
+    }
+
+    #[test]
+    fn load_namespacing_ignore_invalid() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("ignore-invalid");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warns) = load_builder_from_paths(&configs).unwrap();
+        assert!(warns.is_empty());
+    }
+
+    #[test]
+    fn load_directory_ignores_unknown_file_formats() {
+        let path = PathBuf::from(".").join("tests").join("config-dir");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
     }
 }

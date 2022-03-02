@@ -1,0 +1,2 @@
+type = "pipelines"
+inputs = ["generator"]

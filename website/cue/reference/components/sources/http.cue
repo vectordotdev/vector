@@ -16,6 +16,10 @@ components: sources: http: {
 
 	features: {
 		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "newline_delimited"
+		}
 		receive: {
 			from: {
 				service: services.http
@@ -40,16 +44,6 @@ components: sources: http: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -60,13 +54,26 @@ components: sources: http: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
-				syntax: "literal"
+			}
+		}
+		encoding: {
+			common:      true
+			description: "The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."
+			required:    false
+			type: string: {
+				default: "text"
+				enum: {
+					text:   "Newline-delimited text, with each line forming a message."
+					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
+					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
+					binary: "Binary or text, whole http request body is considered as one message."
+				}
 			}
 		}
 		headers: {
@@ -77,7 +84,6 @@ components: sources: http: {
 				default: null
 				items: type: string: {
 					examples: ["User-Agent", "X-My-Custom-Header"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -90,7 +96,6 @@ components: sources: http: {
 				default: null
 				items: type: string: {
 					examples: ["application", "source"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -101,7 +106,6 @@ components: sources: http: {
 			type: string: {
 				default: "/"
 				examples: ["/event/path", "/logs"]
-				syntax: "literal"
 			}
 		}
 		strict_path: {
@@ -122,7 +126,6 @@ components: sources: http: {
 			type: string: {
 				default: "path"
 				examples: ["vector_http_path"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -136,7 +139,6 @@ components: sources: http: {
 					required:      true
 					type: string: {
 						examples: ["Hello world"]
-						syntax: "literal"
 					}
 				}
 				path: {
@@ -144,7 +146,6 @@ components: sources: http: {
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -165,7 +166,6 @@ components: sources: http: {
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp

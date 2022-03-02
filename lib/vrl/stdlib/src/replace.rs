@@ -50,6 +50,11 @@ impl Function for Replace {
                 source: r#"replace("foobar", r'o|a', "i")"#,
                 result: Ok("fiibir"),
             },
+            Example {
+                title: "replace with capture group",
+                source: r#"replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")"#,
+                result: Ok(r#""123""#),
+            },
         ]
     }
 
@@ -104,11 +109,14 @@ impl Expression for ReplaceFn {
             }
             Value::Regex(regex) => {
                 let replaced = match count {
-                    i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_ref())
-                        .as_bytes()
-                        .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
+                    i if i > 0 => Bytes::copy_from_slice(
+                        regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
+                    )
+                    .into(),
+                    i if i < 0 => {
+                        Bytes::copy_from_slice(regex.replace_all(&value, with.as_ref()).as_bytes())
+                            .into()
+                    }
                     _ => value.into(),
                 };
 
@@ -116,14 +124,14 @@ impl Expression for ReplaceFn {
             }
             value => Err(value::Error::Expected {
                 got: value.kind(),
-                expected: Kind::Regex | Kind::Bytes,
+                expected: Kind::regex() | Kind::bytes(),
             }
             .into()),
         })
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -141,7 +149,7 @@ mod test {
                               with: "o"
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_string2 {
@@ -151,7 +159,7 @@ mod test {
                               count: -1
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_string3 {
@@ -161,7 +169,7 @@ mod test {
                               count: 0
              ],
              want: Ok("I like apples and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_string4 {
@@ -171,7 +179,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_string5 {
@@ -181,7 +189,7 @@ mod test {
                               count: 2
              ],
              want: Ok("I like opples ond bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
 
@@ -191,7 +199,7 @@ mod test {
                               with: "o"
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
 
@@ -202,7 +210,7 @@ mod test {
                               count: -1
              ],
              want: Ok("I like opples ond bononos"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_regex3 {
@@ -212,7 +220,7 @@ mod test {
                               count: 0
              ],
              want: Ok("I like apples and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_regex4 {
@@ -222,7 +230,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_regex5 {
@@ -232,7 +240,7 @@ mod test {
                               count: 2
              ],
              want: Ok("I like opples ond bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_other {
@@ -241,7 +249,7 @@ mod test {
                              with: "biscuits"
             ],
              want: Ok( "I like biscuits and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_other2 {
@@ -251,7 +259,7 @@ mod test {
                               count: 1
              ],
              want: Ok("I like opples and bananas"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         replace_other3 {
@@ -260,7 +268,7 @@ mod test {
                              with: "biscuits"
             ],
             want: Ok("I like biscuits and bananas"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

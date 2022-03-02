@@ -1,5 +1,6 @@
-use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
+
+use super::{PathComponent, PathIter, Value};
 
 /// Returns a reference to a field value specified by the given path.
 pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Value> {
@@ -22,7 +23,7 @@ where
     loop {
         match (path_iter.next(), value) {
             (None, _) => return Some(value),
-            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get(key.as_ref()) {
+            (Some(PathComponent::Key(key)), Value::Object(map)) => match map.get(key.as_ref()) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;
@@ -41,9 +42,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn get_simple() {

@@ -92,7 +92,7 @@ Conditions can also be more multifaceted. This condition would filter out all
 events for which the `severity` field is `"info"`, the `status_code` field is
 greater than or equal to 400, and the `host` field isn't set:
 
-```vrl
+```coffee
 condition = '.severity != "info" && .status_code < 400 && exists(.host)
 ```
 
@@ -120,7 +120,7 @@ acquainted with Vector and VRL:
 VRL is built by the Vector team and its development is guided by two core goals,
 [safety](#safety) and [performance](#performance), without compromising on
 flexibility. This makes VRL ideal for critical, performance-sensitive
-infrastructure, like observabiity pipelines. To illustrate how we achieve these,
+infrastructure, like observability pipelines. To illustrate how we achieve these,
 below is a VRL feature matrix across these principles:
 
 | Feature                                       | Safety | Performance |

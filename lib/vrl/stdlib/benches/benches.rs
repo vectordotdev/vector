@@ -1,16 +1,18 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/pull/6408
+    // https://github.com/vectordotdev/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
-    targets = assert,
+    targets = array,
+              assert,
               assert_eq,
+              r#bool,
               ceil,
               compact,
               contains,
@@ -30,6 +32,7 @@ criterion_group!(
               find,
               flatten,
               floor,
+              float,
               format_int,
               format_number,
               format_timestamp,
@@ -37,6 +40,7 @@ criterion_group!(
               get_env_var,
               get_hostname,
               includes,
+              int,
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
@@ -64,6 +68,7 @@ criterion_group!(
               merge,
               // TODO: value is dynamic so we cannot assert equality
               //now,
+              object,
               parse_apache_log,
               parse_aws_alb_log,
               parse_aws_cloudwatch_log_subscription_message,
@@ -73,6 +78,7 @@ criterion_group!(
               parse_duration,
               parse_glog,
               parse_grok,
+              parse_groks,
               parse_key_value,
               parse_klog,
               parse_int,
@@ -101,9 +107,12 @@ criterion_group!(
               slice,
               split,
               starts_with,
+              string,
               strip_ansi_escape_codes,
               strip_whitespace,
               tally,
+              tally_value,
+              timestamp,
               to_bool,
               to_float,
               to_int,
@@ -134,6 +143,15 @@ bench_function! {
 }
 
 bench_function! {
+    array => vrl_stdlib::Array;
+
+    array {
+        args: func_args![value: value!([1,2,3])],
+        want: Ok(value!([1,2,3])),
+    }
+}
+
+bench_function! {
     assert => vrl_stdlib::Assert;
 
     literal {
@@ -147,6 +165,15 @@ bench_function! {
 
     literal {
         args: func_args![left: value!(true), right: value!(true), message: "must be true"],
+        want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    r#bool => vrl_stdlib::Boolean;
+
+    r#bool {
+        args: func_args![value: value!(true)],
         want: Ok(value!(true)),
     }
 }
@@ -393,6 +420,15 @@ bench_function! {
 }
 
 bench_function! {
+    float => vrl_stdlib::Float;
+
+    float {
+        args: func_args![value: value!(1.2)],
+        want: Ok(value!(1.2)),
+    }
+}
+
+bench_function! {
     floor  => vrl_stdlib::Floor;
 
     literal {
@@ -409,7 +445,7 @@ bench_function! {
         want: Ok("42"),
     }
 
-    hexidecimal {
+    hexadecimal {
         args: func_args![value: 42, base: 16],
         want: Ok(value!("2a")),
     }
@@ -482,6 +518,15 @@ bench_function! {
     indexing {
         args: func_args![value: value!([0, 42, 91]), path: vec![3], data: 1],
         want: Ok(value!([0, 42, 91, 1])),
+    }
+}
+
+bench_function! {
+    int => vrl_stdlib::Integer;
+
+    int {
+        args: func_args![value: value!(1)],
+        want: Ok(value!(1)),
     }
 }
 
@@ -984,6 +1029,15 @@ bench_function! {
 }
 
 bench_function! {
+    object => vrl_stdlib::Object;
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(value!({"foo": "bar"})),
+    }
+}
+
+bench_function! {
     parse_aws_alb_log => vrl_stdlib::ParseAwsAlbLog;
 
     literal {
@@ -1228,6 +1282,32 @@ bench_function! {
             "level": "info",
             "message": "Hello world",
         })),
+    }
+}
+
+bench_function! {
+    parse_groks => vrl_stdlib::ParseGroks;
+
+    simple {
+        args: func_args![
+            value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
+            patterns: Value::Array(vec![
+                "%{common_prefix} %{_status} %{_message}".into(),
+                "%{common_prefix} %{_message}".into(),
+                ]),
+            aliases: value!({
+                common_prefix: "%{_timestamp} %{_loglevel}",
+                _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
+                _loglevel: "%{LOGLEVEL:level}",
+                _status: "%{POSINT:status}",
+                _message: "%{GREEDYDATA:message}"
+            })
+        ],
+        want: Ok(Value::from(btreemap! {
+            "timestamp" => "2020-10-02T23:22:12.223222Z",
+            "level" => "info",
+            "message" => "hello world"
+        }))
     }
 }
 
@@ -1888,6 +1968,15 @@ bench_function! {
 }
 
 bench_function! {
+    string => vrl_stdlib::String;
+
+    string {
+        args: func_args![value: "2"],
+        want: Ok("2")
+    }
+}
+
+bench_function! {
     strip_ansi_escape_codes => vrl_stdlib::StripAnsiEscapeCodes;
 
     literal {
@@ -1985,7 +2074,27 @@ bench_function! {
         ],
         want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
     }
+}
 
+bench_function! {
+    tally_value => vrl_stdlib::TallyValue;
+
+    default {
+        args: func_args![
+            array: value!(["bar", "foo", "baz", "foo"]),
+            value: "foo",
+        ],
+        want: Ok(value!(2)),
+    }
+}
+
+bench_function! {
+    timestamp => vrl_stdlib::Timestamp;
+
+    timestamp {
+        args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
+        want: Ok(value!(Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0))),
+    }
 }
 
 bench_function! {

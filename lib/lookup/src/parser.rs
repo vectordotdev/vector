@@ -1,5 +1,6 @@
-use crate::Lookup;
 use lalrpop_util::lalrpop_mod;
+
+use crate::Lookup;
 
 lalrpop_mod!(
     #[allow(clippy::all)]

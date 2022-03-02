@@ -1,11 +1,13 @@
-use super::state;
-use crate::config::ComponentKey;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
 use tokio_stream::StreamExt;
 use vector_api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };
+
+use super::state::{self, OutputMetrics};
+use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
 /// Components that have been added
 async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
@@ -18,12 +20,13 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
-            let key = ComponentKey::from((c.pipeline_id, c.component_id));
+            let key = ComponentKey::from(c.component_id);
             let _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
                     key,
                     kind: c.on.to_string(),
                     component_type: c.component_type,
+                    outputs: HashMap::new(),
                     received_events_total: 0,
                     received_events_throughput_sec: 0,
                     sent_events_total: 0,
@@ -48,7 +51,7 @@ async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_removed;
-            let id = ComponentKey::from(&c.component_id);
+            let id = ComponentKey::from(c.component_id.as_str());
             let _ = tx.send(state::EventType::ComponentRemoved(id)).await;
         }
     }
@@ -73,7 +76,7 @@ async fn received_events_totals(
                     c.into_iter()
                         .map(|c| {
                             (
-                                ComponentKey::from(&c.component_id),
+                                ComponentKey::from(c.component_id.as_str()),
                                 c.metric.received_events_total as i64,
                             )
                         })
@@ -102,7 +105,7 @@ async fn received_events_throughputs(
                 .send(state::EventType::ReceivedEventsThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
+                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
                         .collect(),
                 ))
                 .await;
@@ -123,11 +126,10 @@ async fn sent_events_totals(client: Arc<SubscriptionClient>, tx: state::EventTx,
             let _ = tx
                 .send(state::EventType::SentEventsTotals(
                     c.into_iter()
-                        .map(|c| {
-                            (
-                                ComponentKey::from(&c.component_id),
-                                c.metric.sent_events_total as i64,
-                            )
+                        .map(|c| SentEventsMetric {
+                            key: ComponentKey::from(c.component_id.as_str()),
+                            total: c.metric.sent_events_total as i64,
+                            outputs: c.outputs().into_iter().collect(),
                         })
                         .collect(),
                 ))
@@ -154,7 +156,11 @@ async fn sent_events_throughputs(
                 .send(state::EventType::SentEventsThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
+                        .map(|c| SentEventsMetric {
+                            key: ComponentKey::from(c.component_id.as_str()),
+                            total: c.throughput,
+                            outputs: c.outputs().into_iter().collect(),
+                        })
                         .collect(),
                 ))
                 .await;
@@ -181,7 +187,7 @@ async fn processed_bytes_totals(
                     c.into_iter()
                         .map(|c| {
                             (
-                                ComponentKey::from(&c.component_id),
+                                ComponentKey::from(c.component_id.as_str()),
                                 c.metric.processed_bytes_total as i64,
                             )
                         })
@@ -210,7 +216,7 @@ async fn processed_bytes_throughputs(
                 .send(state::EventType::ProcessedBytesThroughputs(
                     interval,
                     c.into_iter()
-                        .map(|c| (ComponentKey::from(&c.component_id), c.throughput))
+                        .map(|c| (ComponentKey::from(c.component_id.as_str()), c.throughput))
                         .collect(),
                 ))
                 .await;
@@ -275,13 +281,21 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .flat_map(|d| {
             d.into_iter().filter_map(|edge| {
                 let d = edge?.node;
-                let key = ComponentKey::from((d.pipeline_id, d.component_id));
+                let key = ComponentKey::from(d.component_id);
                 Some((
                     key.clone(),
                     state::ComponentRow {
                         key,
                         kind: d.on.to_string(),
                         component_type: d.component_type,
+                        outputs: d
+                            .on
+                            .outputs()
+                            .into_iter()
+                            .map(|(id, sent_events_total)| {
+                                (id, OutputMetrics::from(sent_events_total))
+                            })
+                            .collect(),
                         received_events_total: d.on.received_events_total(),
                         received_events_throughput_sec: 0,
                         sent_events_total: d.on.sent_events_total(),

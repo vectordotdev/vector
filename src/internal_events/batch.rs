@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct LargeEventDropped {
-    pub length: usize,
+    pub(crate) length: usize,
     pub max_length: usize,
 }
 

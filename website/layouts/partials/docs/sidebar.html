@@ -102,7 +102,7 @@
 {{ define "meta-menu" }}
 {{ range .  }}
 <p class="flex items-start">
-  <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" target="_blank">
+  <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" rel="noopener" target="_blank">
     <span class="flex justify-between items-start">
       <span class="pr-0.5">
         {{ .Name }}

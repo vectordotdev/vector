@@ -18,3 +18,6 @@ yarn-error.log
 
 # Local env vars
 .env
+
+# Generated HTML reports for Lighthouse
+reports/lighthouse.html

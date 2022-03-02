@@ -1,0 +1,18 @@
+diff --git a/.dockerignore b/.dockerignore
+index 7e128117c..3a602c0bd 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -1,11 +1,2 @@
+-*
+-!scripts/Gemfile
+-!scripts/Gemfile.lock
+-!scripts/ci-docker-images/verifier-nixos/Gemfile
+-!rust-toolchain.toml
+-!target/x86_64-unknown-linux-musl/debug/vector
+-!shell.nix
+-!default.nix
+-!scripts/environment
+-!.envrc
+-!tests
++target/
++soaks/

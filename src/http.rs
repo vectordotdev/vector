@@ -1,27 +1,31 @@
-use crate::{
-    config::ProxyConfig,
-    internal_events::http_client,
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+use std::{
+    fmt,
+    task::{Context, Poll},
 };
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
 use hyper::{
     body::{Body, HttpBody},
+    client,
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt,
-    task::{Context, Poll},
-};
 use tower::Service;
 use tracing_futures::Instrument;
 
+use crate::{
+    config::ProxyConfig,
+    internal_events::http_client,
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+};
+
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum HttpError {
     #[snafu(display("Failed to build TLS connector: {}", source))]
     BuildTlsConnector { source: TlsError },
@@ -31,6 +35,8 @@ pub enum HttpError {
     MakeProxyConnector { source: InvalidUri },
     #[snafu(display("Failed to make HTTP(S) request: {}", source))]
     CallRequest { source: hyper::Error },
+    #[snafu(display("Failed to build HTTP request: {}", source))]
+    BuildRequest { source: http::Error },
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
@@ -50,27 +56,16 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+    }
 
-        let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings).context(BuildTlsConnector)?;
-        let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnector)?;
-
-        let settings = settings.tls().cloned();
-        https.set_callback(move |c, _uri| {
-            if let Some(settings) = &settings {
-                settings.apply_connect_configuration(c);
-            }
-
-            Ok(())
-        });
-
-        let mut proxy = ProxyConnector::new(https).unwrap();
-        proxy_config
-            .configure(&mut proxy)
-            .context(MakeProxyConnector)?;
-        let client = Client::builder().build(proxy);
+    pub fn new_with_custom_client(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        client_builder: &mut client::Builder,
+    ) -> Result<HttpClient<B>, HttpError> {
+        let proxy = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let client = client_builder.build(proxy);
 
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
@@ -114,7 +109,7 @@ where
                     });
                     error
                 })
-                .context(CallRequest)?;
+                .context(CallRequestSnafu)?;
 
             // Emit the response into the internal events system.
             emit!(&http_client::GotHttpResponse {
@@ -129,6 +124,32 @@ where
     }
 }
 
+pub fn build_proxy_connector(
+    tls_settings: MaybeTlsSettings,
+    proxy_config: &ProxyConfig,
+) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+
+    let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
+    let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
+
+    let settings = tls_settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c);
+        }
+
+        Ok(())
+    });
+
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config
+        .configure(&mut proxy)
+        .context(MakeProxyConnectorSnafu)?;
+    Ok(proxy)
+}
+
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
     if !request.headers().contains_key("User-Agent") {
         request
@@ -138,7 +159,7 @@ fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue
 
     if !request.headers().contains_key("Accept-Encoding") {
         // hardcoding until we support compressed responses:
-        // https://github.com/timberio/vector/issues/5440
+        // https://github.com/vectordotdev/vector/issues/5440
         request
             .headers_mut()
             .insert("Accept-Encoding", HeaderValue::from_static("identity"));

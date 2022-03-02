@@ -1,9 +1,10 @@
-use crate::internal_events::KafkaStatisticsReceived;
-use crate::tls::TlsOptions;
+use std::path::{Path, PathBuf};
+
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::{Path, PathBuf};
+
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsOptions};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -25,23 +26,23 @@ pub(crate) enum KafkaCompression {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct KafkaAuthConfig {
-    pub sasl: Option<KafkaSaslConfig>,
-    pub tls: Option<KafkaTlsConfig>,
+    pub(crate) sasl: Option<KafkaSaslConfig>,
+    pub(crate) tls: Option<KafkaTlsConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct KafkaSaslConfig {
-    pub enabled: Option<bool>,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub mechanism: Option<String>,
+    pub(crate) enabled: Option<bool>,
+    pub(crate) username: Option<String>,
+    pub(crate) password: Option<String>,
+    pub(crate) mechanism: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct KafkaTlsConfig {
-    pub enabled: Option<bool>,
+    pub(crate) enabled: Option<bool>,
     #[serde(flatten)]
-    pub options: TlsOptions,
+    pub(crate) options: TlsOptions,
 }
 
 impl KafkaAuthConfig {

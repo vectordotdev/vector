@@ -2,17 +2,18 @@
 
 #![deny(missing_docs)]
 
-use super::path_helpers::{parse_log_file_path, LogFileInfo};
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
 use evmap::ReadHandle;
 use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use serde::{Deserialize, Serialize};
+
+use super::path_helpers::{parse_log_file_path, LogFileInfo};
+use crate::{
+    event::{Event, LogEvent, PathComponent, PathIter},
+    kubernetes as k8s,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -25,6 +26,7 @@ pub struct FieldsSpec {
     pub pod_labels: String,
     pub pod_annotations: String,
     pub pod_node_name: String,
+    pub pod_owner: String,
     pub container_name: String,
     pub container_id: String,
     pub container_image: String,
@@ -41,6 +43,7 @@ impl Default for FieldsSpec {
             pod_labels: "kubernetes.pod_labels".to_owned(),
             pod_annotations: "kubernetes.pod_annotations".to_owned(),
             pod_node_name: "kubernetes.pod_node_name".to_owned(),
+            pod_owner: "kubernetes.pod_owner".to_owned(),
             container_name: "kubernetes.container_name".to_owned(),
             container_id: "kubernetes.container_id".to_owned(),
             container_image: "kubernetes.container_image".to_owned(),
@@ -133,6 +136,13 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         }
     }
 
+    if let Some(owner_references) = &metadata.owner_references {
+        log.insert(
+            &fields_spec.pod_owner,
+            format!("{}/{}", owner_references[0].kind, owner_references[0].name),
+        );
+    }
+
     if let Some(labels) = &metadata.labels {
         // Calculate and cache the prefix path.
         let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
@@ -201,9 +211,10 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use k8s_openapi::api::core::v1::PodIP;
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
+
+    use super::*;
 
     #[test]
     fn test_annotate_from_metadata() {

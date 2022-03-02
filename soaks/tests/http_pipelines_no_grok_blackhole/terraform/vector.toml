@@ -1,0 +1,396 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.logs]
+type = "http"
+address = "0.0.0.0:8282"
+encoding = "text"
+
+##
+## Transforms
+##
+
+[transforms.preprocessing]
+type = "remap"
+inputs = ["logs"]
+source = '''
+., err = parse_json(.message)
+.custom = {}
+'''
+
+[transforms.processing]
+type = "pipelines"
+inputs = ["preprocessing"]
+
+[transforms.processing.logs]
+order = [
+    "nginx",
+    "redis",
+    "consul",
+    "python",
+    "rabbitmq",
+    "zookeeper",
+    "elasticsearch",
+    "kafka",
+    "couchdb",
+    "docker",
+    "datadog_agent",
+    "ruby",
+    "vault",
+    "nginx_ingress_controller",
+    "mysql",
+    "kubernetes_cluster_autoscaler",
+    "aws_alb_ingress_controller",
+    "proxysql",
+    "azure",
+    "azure_web",
+    "azure_storage",
+    "azure_network",
+    "azure_compute",
+    "etcd",
+    "glog_pipeline",
+    "auth0",
+    "kube_scheduler__glog_",
+    "aws_ecs_agent",
+    "nodejs",
+    "postgresql",
+    "cassandra",
+    "apache_httpd",
+    "azure_recovery_services",
+    "c_",
+    "web_browser_logs",
+]
+
+[transforms.processing.logs.pipelines.nginx]
+name = "nginx"
+filter.type = "datadog_search"
+filter.source = "source:nginx"
+
+[[transforms.processing.logs.pipelines.nginx.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.redis]
+name = "redis"
+filter.type = "datadog_search"
+filter.source = "source:redis"
+
+[[transforms.processing.logs.pipelines.redis.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.consul]
+name = "consul"
+filter.type = "datadog_search"
+filter.source = "source:consul"
+
+[[transforms.processing.logs.pipelines.consul.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.python]
+name = "python"
+filter.type = "datadog_search"
+filter.source = "source:python"
+
+[[transforms.processing.logs.pipelines.python.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.rabbitmq]
+name = "rabbitmq"
+filter.type = "datadog_search"
+filter.source = "source:rabbitmq"
+
+[[transforms.processing.logs.pipelines.rabbitmq.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.zookeeper]
+name = "zookeeper"
+filter.type = "datadog_search"
+filter.source = "source:zookeeper"
+
+[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.elasticsearch]
+name = "elasticsearch"
+filter.type = "datadog_search"
+filter.source = "source:elasticsearch"
+
+[[transforms.processing.logs.pipelines.elasticsearch.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.kafka]
+name = "kafka"
+filter.type = "datadog_search"
+filter.source = "source:kafka"
+
+[[transforms.processing.logs.pipelines.kafka.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.couchdb]
+name = "couchdb"
+filter.type = "datadog_search"
+filter.source = "source:couchdb"
+
+[[transforms.processing.logs.pipelines.couchdb.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.docker]
+name = "docker"
+filter.type = "datadog_search"
+filter.source = "source:docker"
+
+[[transforms.processing.logs.pipelines.docker.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.datadog_agent]
+name = "datadog_agent"
+filter.type = "datadog_search"
+filter.source = "source:(agent OR datadog-agent OR datadog-agent-cluster-worker OR datadog-cluster-agent OR process-agent OR security-agent OR system-probe OR trace-agent)"
+
+[[transforms.processing.logs.pipelines.datadog_agent.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.ruby]
+name = "ruby"
+filter.type = "datadog_search"
+filter.source = "source:ruby"
+
+[[transforms.processing.logs.pipelines.ruby.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.vault]
+name = "vault"
+filter.type = "datadog_search"
+filter.source = "source:vault"
+
+[[transforms.processing.logs.pipelines.vault.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.nginx_ingress_controller]
+name = "nginx_ingress_controller"
+filter.type = "datadog_search"
+filter.source = "source:nginx-ingress-controller"
+
+[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.mysql]
+name = "mysql"
+filter.type = "datadog_search"
+filter.source = "source:mysql"
+
+[[transforms.processing.logs.pipelines.mysql.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler]
+name = "kubernetes_cluster_autoscaler"
+filter.type = "datadog_search"
+filter.source = "source:cluster-autoscaler"
+
+[[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.aws_alb_ingress_controller]
+name = "aws_alb_ingress_controller"
+filter.type = "datadog_search"
+filter.source = "source:aws-alb-ingress-controller"
+
+[[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.proxysql]
+name = "proxysql"
+filter.type = "datadog_search"
+filter.source = "source:proxysql"
+
+[[transforms.processing.logs.pipelines.proxysql.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure]
+name = "azure"
+filter.type = "datadog_search"
+filter.source = "source:(azure OR azure.alertsmanagement OR azure.analysisservices OR azure.apiconfiguration OR azure.apimanagement OR azure.authorization OR azure.automation OR azure.batchai OR azure.batchazure.cache OR azure.blockchain OR azure.cache OR azure.cdn OR azure.classiccompute OR azure.classicstorage OR azure.cognitiveservices OR azure.containerinstance OR azure.containerregistry OR azure.containerservice OR azure.datafactory OR azure.datalakestore OR azure.dbformariadb OR azure.dbformysql OR azure.dbforpostgresql OR azure.devices OR azure.documentdb OR azure.enterpriseknowledgegraph OR azure.eventgrid OR azure.eventhub OR azure.hdinsight OR azure.insights OR azure.iotcentral OR azure.keyvault OR azure.kusto OR azure.logic OR azure.machinelearningservices OR azure.managedidentity OR azure.operationalinsights OR azure.operationsmanagement OR azure.peering OR azure.relay OR azure.resourcegroup OR azure.resources OR azure.search OR azure.security OR azure.servicebus OR azure.servicefabric OR azure.streamanalytics OR azure.subscription OR azure.synapse)"
+
+[[transforms.processing.logs.pipelines.azure.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure_web]
+name = "azure_web"
+filter.type = "datadog_search"
+filter.source = "source:azure.web"
+
+[[transforms.processing.logs.pipelines.azure_web.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure_storage]
+name = "azure_storage"
+filter.type = "datadog_search"
+filter.source = "source:azure.storage"
+
+[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure_network]
+name = "azure_network"
+filter.type = "datadog_search"
+filter.source = "source:azure.network"
+
+[[transforms.processing.logs.pipelines.azure_network.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure_compute]
+name = "azure_compute"
+filter.type = "datadog_search"
+filter.source = "source:azure.compute"
+
+[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.etcd]
+name = "etcd"
+filter.type = "datadog_search"
+filter.source = "source:etcd"
+
+[[transforms.processing.logs.pipelines.etcd.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.glog_pipeline]
+name = "glog_pipeline"
+filter.type = "datadog_search"
+filter.source = "source:(admission-webhook OR api-server OR cert-manager-acmesolver OR cert-manager-cainjector OR cert-manager-controller OR cert-manager-webhook OR cluster-proportional-autoscaler-amd64 OR hyperkube OR ip-masq-agent OR k8s-prometheus-adapter-amd64 OR kube-apiserver OR kube-controller-manager OR kube-proxy OR kube-state-metrics OR metacontroller OR metrics-server-amd64 OR prometheus-operator OR vpa-admission-controller OR vpa-recommender OR vpa-updater)"
+
+[[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.auth0]
+name = "auth0"
+filter.type = "datadog_search"
+filter.source = "source:auth0"
+
+[[transforms.processing.logs.pipelines.auth0.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.kube_scheduler__glog_]
+name = "kube_scheduler__glog_"
+filter.type = "datadog_search"
+filter.source = "source:(kube_scheduler OR kube-scheduler)"
+
+[[transforms.processing.logs.pipelines.kube_scheduler__glog_.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.aws_ecs_agent]
+name = "aws_ecs_agent"
+filter.type = "datadog_search"
+filter.source = "source:amazon-ecs-agent"
+
+[[transforms.processing.logs.pipelines.aws_ecs_agent.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.nodejs]
+name = "nodejs"
+filter.type = "datadog_search"
+filter.source = "source:nodejs"
+
+[[transforms.processing.logs.pipelines.nodejs.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.postgresql]
+name = "postgresql"
+filter.type = "datadog_search"
+filter.source = "source:postgresql"
+
+[[transforms.processing.logs.pipelines.postgresql.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.cassandra]
+name = "cassandra"
+filter.type = "datadog_search"
+filter.source = "source:cassandra"
+
+[[transforms.processing.logs.pipelines.cassandra.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.apache_httpd]
+name = "apache_httpd"
+filter.type = "datadog_search"
+filter.source = "source:httpd"
+
+[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.azure_recovery_services]
+name = "azure_recovery_services"
+filter.type = "datadog_search"
+filter.source = "source:azure.recoveryservices"
+
+[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.c_]
+name = "c_"
+filter.type = "datadog_search"
+filter.source = "source:csharp"
+
+[[transforms.processing.logs.pipelines.c_.transforms]]
+type = "remap"
+source = "true"
+
+[transforms.processing.logs.pipelines.web_browser_logs]
+name = "web_browser_logs"
+filter.type = "datadog_search"
+filter.source = "source:browser"
+
+[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
+type = "remap"
+source = "true"
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.blackhole]
+type = "blackhole"
+inputs = ["processing"]

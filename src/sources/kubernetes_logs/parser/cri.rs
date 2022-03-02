@@ -1,13 +1,14 @@
+use derivative::Derivative;
+use snafu::{OptionExt, Snafu};
+use vector_common::TimeZone;
+
 use crate::{
     event::{self, Event, LogEvent, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
-        FunctionTransform,
+        FunctionTransform, OutputBuffer,
     },
 };
-use derivative::Derivative;
-use shared::TimeZone;
-use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
 pub const NEW_LINE_TAG: &str = "new_line_tag";
@@ -24,7 +25,7 @@ pub const NEW_LINE_TAG: &str = "new_line_tag";
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Cri {
+pub(super) struct Cri {
     #[derivative(Debug = "ignore")]
     regex_parser: Box<dyn FunctionTransform>,
 }
@@ -53,10 +54,10 @@ impl Cri {
 }
 
 impl FunctionTransform for Cri {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let mut buf = Vec::with_capacity(1);
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        let mut buf = OutputBuffer::with_capacity(1);
         self.regex_parser.transform(&mut buf, event);
-        if let Some(mut event) = buf.into_iter().next() {
+        if let Some(mut event) = buf.into_events().next() {
             if normalize_event(event.as_mut_log()).ok().is_some() {
                 output.push(event);
             }
@@ -66,12 +67,12 @@ impl FunctionTransform for Cri {
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Remove possible new_line tag
-    // for additional details, see https://github.com/timberio/vector/issues/8606
+    // for additional details, see https://github.com/vectordotdev/vector/issues/8606
     let _ = log.remove(NEW_LINE_TAG);
     // Detect if this is a partial event.
     let multiline_tag = log
         .remove(MULTILINE_TAG)
-        .context(MultilineTagFieldMissing)?;
+        .context(MultilineTagFieldMissingSnafu)?;
     let multiline_tag = match multiline_tag {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::MultilineTagValueUnexpectedType),
@@ -95,10 +96,10 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::test_util;
-    use super::*;
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
     use bytes::Bytes;
+
+    use super::{super::test_util, *};
+    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

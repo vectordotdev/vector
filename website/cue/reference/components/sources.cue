@@ -46,7 +46,6 @@ components: sources: [Name=string]: {
 								halt_before:      "All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message."
 								halt_with:        "All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."
 							}
-							syntax: "literal"
 						}
 					}
 					start_pattern: {
@@ -71,6 +70,113 @@ components: sources: [Name=string]: {
 			}
 		}
 
+		if features.codecs != _|_ {
+			if features.codecs.enabled {
+				framing: {
+					common:      false
+					description: "Configures in which way incoming byte sequences are split up into byte frames."
+					required:    false
+					type: object: options: {
+						method: {
+							description: "The framing method."
+							required:    false
+							common:      true
+							type: string: {
+								default: features.codecs.default_framing
+								enum: {
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+									character_delimited: "Byte frames which are delimited by a chosen character."
+									length_delimited:    "Byte frames whose length is encoded in a header."
+									newline_delimited:   "Byte frames which are delimited by a newline character."
+									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
+								}
+							}
+						}
+						character_delimited: {
+							description:   "Options for `character_delimited` framing."
+							required:      true
+							relevant_when: "method = `character_delimited`"
+							type: object: options: {
+								delimiter: {
+									description: "The character used to separate frames."
+									required:    true
+									type: ascii_char: {
+										examples: ["\n", "\t"]
+									}
+								}
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+						newline_delimited: {
+							description:   "Options for `newline_delimited` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `newline_delimited`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+						octet_counting: {
+							description:   "Options for `octet_counting` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `octet_counting`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+					}
+				}
+				decoding: {
+					common:      false
+					description: "Configures in which way frames are decoded into events."
+					required:    false
+					type: object: options: {
+						codec: {
+							description: "The decoding method."
+							required:    false
+							common:      true
+							type: string: {
+								default: "bytes"
+								enum: {
+									bytes:  "Events containing the byte frame as-is."
+									json:   "Events being parsed from a JSON string."
+									syslog: "Events being parsed from a Syslog message."
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if features.encoding != _|_ {
 			if features.encoding.enabled {
 				encoding: {
@@ -85,7 +191,6 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: null
 								examples: ["utf-16le", "utf-16be"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -175,7 +280,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: [_values.local_host]
-						syntax: "literal"
 					}
 				}
 
@@ -184,7 +288,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						syntax: "literal"
 					}
 				}
 			}

@@ -57,7 +57,7 @@ since it includes all structured data.
 With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl_reference] (VRL), [pull request #5978][pr_5978]
 _deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
 `check_fields` conditions were limiting and suffered from many of the [pitfalls][config_synytax_pitfalls] outlined in
-the VRL announcement. Configuration languages, like TOML, are bad at expressing boolean conditions and severly
+the VRL announcement. Configuration languages, like TOML, are bad at expressing boolean conditions and severely
 limited how users could [route][route_transform], [filter][filter_transform], and [reduce][reduce_transform] data.
 
 While `check_fields` is deprecated and still supported, you will need to explicitly opt-into the feature by adding the

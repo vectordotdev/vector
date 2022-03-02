@@ -46,6 +46,10 @@ impl Function for IsArray {
 
         Ok(Box::new(IsArrayFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_array()))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -59,7 +63,7 @@ impl Expression for IsArrayFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -73,13 +77,13 @@ mod tests {
         array {
             args: func_args![value: value!([1, 2, 3])],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         integer {
             args: func_args![value: value!(1789)],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }
