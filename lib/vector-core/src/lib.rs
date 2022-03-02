@@ -25,6 +25,7 @@
 #![allow(clippy::non_ascii_literal)] // using unicode literals is a-okay in vector
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::needless_pass_by_value)] // false positives for traits
 
 pub mod config;
 pub mod event;

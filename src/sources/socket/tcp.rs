@@ -173,8 +173,7 @@ impl TcpSource for RawTcpSource {
                 let host_key = self
                     .config
                     .host_key
-                    .as_ref()
-                    .map(|x| x.as_str())
+                    .as_deref()
                     .unwrap_or_else(|| log_schema().host_key());
 
                 log.try_insert(host_key, host.clone());
