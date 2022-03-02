@@ -42,20 +42,9 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         None => return exitcode::UNAVAILABLE,
     };
 
-    // Create a metrics state updater
+    // Create a channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
-
-    // Get the initial component state
-    let sender = match metrics::init_components(&client).await {
-        Ok(state) => state::updater(state, rx).await,
-        _ => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Couldn't query Vector components.");
-            }
-            return exitcode::UNAVAILABLE;
-        }
-    };
+    let state_rx = state::updater(rx).await;
 
     // Change the HTTP schema to WebSockets
     let mut ws_url = url.clone();
@@ -72,6 +61,18 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // subscriptions in the case of a web socket disconnect
     let connection = tokio::spawn(async move {
         loop {
+            // Initialize state. On future reconnects, we re-initialize state in
+            // order to accurately capture added, removed, and edited
+            // components.
+            let state = match metrics::init_components(&client).await {
+                Ok(state) => state,
+                Err(_) => {
+                    tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                    continue;
+                }
+            };
+            let _ = tx.send(EventType::InitializeState(state)).await;
+
             let subscription_client = match connect_subscription_client(ws_url.clone()).await {
                 Ok(c) => c,
                 Err(_) => {
@@ -105,7 +106,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     });
 
     // Initialize the dashboard
-    match init_dashboard(url.as_str(), opts, sender, shutdown_rx).await {
+    match init_dashboard(url.as_str(), opts, state_rx, shutdown_rx).await {
         Ok(_) => {
             connection.abort();
             exitcode::OK

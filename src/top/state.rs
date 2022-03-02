@@ -20,6 +20,7 @@ pub struct SentEventsMetric {
 
 #[derive(Debug)]
 pub enum EventType {
+    InitializeState(State),
     ReceivedEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
     ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
@@ -128,18 +129,19 @@ impl ComponentRow {
     }
 }
 
-/// Takes the receiver `EventRx` channel, and returns a `StateTx` state transmitter. This
+/// Takes the receiver `EventRx` channel, and returns a `StateRx` state receiver. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
+pub async fn updater(mut event_rx: EventRx) -> StateRx {
     let (tx, rx) = mpsc::channel(20);
 
-    // Prime the receiver with the initial state
-    let _ = tx.send(state.clone()).await;
-
+    let mut state = State::new(BTreeMap::new());
     tokio::spawn(async move {
         while let Some(event_type) = event_rx.recv().await {
             match event_type {
+                EventType::InitializeState(new_state) => {
+                    state = new_state;
+                }
                 EventType::ReceivedEventsTotals(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
