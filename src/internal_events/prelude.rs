@@ -34,6 +34,8 @@ pub mod error_type {
     pub const READER_FAILED: &str = "reader_failed";
     // When the component was unable to perform a request or the request failed.
     pub const REQUEST_FAILED: &str = "request_failed";
+    // When the component depends on a script that failed
+    pub const SCRIPT_FAILED: &str = "script_failed";
     // When the component was unable to build a template or interpolate it.
     pub const TEMPLATE_FAILED: &str = "template_failed";
     // When an execution took longer than expected and failed.

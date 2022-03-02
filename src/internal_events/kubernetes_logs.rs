@@ -58,7 +58,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             message = "Failed to annotate event with pod metadata.",
             event = ?self.event,
             error_code = ANNOTATION_FAILED,
-            error_type = error_type::WRITER_FAILED,
+            error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
         );
     }
@@ -67,7 +67,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
         counter!(
             "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
-            "error_type" => error_type::WRITER_FAILED,
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_annotation_failures_total", 1);
@@ -85,7 +85,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             message = "Failed to annotate event with namespace metadata.",
             event = ?self.event,
             error_code = ANNOTATION_FAILED,
-            error_type = error_type::WRITER_FAILED,
+            error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
@@ -95,7 +95,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
         counter!(
             "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
-            "error_type" => error_type::WRITER_FAILED,
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!("k8s_event_namespace_annotation_failures_total", 1);
