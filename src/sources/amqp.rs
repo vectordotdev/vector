@@ -1,14 +1,14 @@
 use crate::config::SourceContext;
 use crate::{
     amqp::AmqpConfig,
-    config::{log_schema, DataType, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceDescription},
     event::{Event, Value},
     internal_events::source::{
         AmqpCommitFailed, AmqpConsumerFailed, AmqpDeliveryFailed, AmqpEventFailed,
         AmqpEventReceived,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -64,12 +64,16 @@ impl SourceConfig for AmqpSourceConfig {
         amqp_source(self, cx.shutdown, cx.out).await
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "amqp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -81,7 +85,7 @@ enum ShutdownOrMessage {
 pub(crate) async fn amqp_source(
     config: &AmqpSourceConfig,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> crate::Result<super::Source> {
     let config = config.clone();
     let (conn, channel) = config
@@ -98,7 +102,7 @@ pub(crate) async fn amqp_source(
 async fn run_amqp_source(
     config: AmqpSourceConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     _conn: Connection,
     channel: Channel,
 ) -> Result<(), ()> {
@@ -188,7 +192,7 @@ async fn run_amqp_source(
 #[cfg(test)]
 pub mod test {
     use super::{amqp_source, AmqpSourceConfig};
-    use crate::{shutdown::ShutdownSignal, Pipeline};
+    use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -210,7 +214,7 @@ pub mod test {
     async fn amqp_source_create_ok() {
         let config = make_config();
         assert!(
-            amqp_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0)
+            amqp_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0)
                 .await
                 .is_ok()
         );
@@ -225,7 +229,7 @@ mod integration_test {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
-        Pipeline,
+        SourceSender,
     };
     use chrono::Utc;
     use lapin::options::*;
@@ -317,7 +321,7 @@ mod integration_test {
         .await;
 
         println!("Receiving event...");
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
             amqp_source(&config, ShutdownSignal::noop(), tx)
                 .await

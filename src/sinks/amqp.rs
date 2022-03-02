@@ -1,13 +1,17 @@
 use crate::{
     amqp::AmqpConfig,
-    buffers::Acker,
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{
         sink::{AmqpAcknowledgementFailed, AmqpDeliveryFailed, AmqpNoAcknowledgement},
-        TemplateRenderingFailed,
+        TemplateRenderingError,
     },
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+    sinks::{
+        util::encoding::{EncodingConfig, EncodingConfiguration},
+        VectorSink,
+    },
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, ready, FutureExt, Sink};
@@ -21,6 +25,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -81,10 +86,10 @@ inventory::submit! {
 impl GenerateConfig for AmqpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"connection_string = "amqp://localhost:5672/%2f"
+            r#"connection.connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"
             exchange = "test"
-            encoding.codec = "protobuf""#,
+            encoding.codec = "json""#,
         )
         .unwrap()
     }
@@ -93,21 +98,22 @@ impl GenerateConfig for AmqpSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink = AmqpSink::new(self.clone(), cx.acker()).await?;
         let hc = healthcheck(self.clone(), sink.channel.clone()).boxed();
-        Ok((super::VectorSink::Sink(Box::new(sink)), hc))
+        Ok((VectorSink::from_event_sink(Box::new(sink)), hc))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::new(DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "amqp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -120,14 +126,14 @@ impl AmqpSink {
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
         Ok(AmqpSink {
             channel: Arc::new(channel),
-            exchange: Template::try_from(config.exchange).context(ExchangeTemplate)?,
+            exchange: Template::try_from(config.exchange).context(ExchangeTemplateSnafu)?,
             routing_key: config
                 .routing_key
-                .map(|k| Template::try_from(k).context(RoutingKeyTemplate))
+                .map(|k| Template::try_from(k).context(RoutingKeyTemplateSnafu))
                 .transpose()?,
             encoding: config.encoding,
             in_flight: None,
-            acker: acker,
+            acker,
         })
     }
 }
@@ -148,7 +154,7 @@ impl Sink<Event> for AmqpSink {
         let exchange = match self.exchange.render_string(&item) {
             Ok(e) => e,
             Err(missing_keys) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(&TemplateRenderingError {
                     error: missing_keys,
                     field: Some("exchange"),
                     drop_event: true,
@@ -161,7 +167,7 @@ impl Sink<Event> for AmqpSink {
             match t.render_string(&item) {
                 Ok(k) => k,
                 Err(error) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("routing_key"),
                         drop_event: true,
@@ -253,7 +259,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Vec<u8
             Encoding::Json => serde_json::to_vec(log).expect("JSON serialization should not fail"),
             Encoding::Text => log
                 .get(log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.as_bytes().unwrap().to_vec())
                 .unwrap_or_default(),
         },
         _ => panic!("Invalid DataType"),
@@ -341,13 +347,13 @@ mod integration_tests {
     use super::tests::make_config;
     use super::*;
     use crate::{
-        buffers::Acker,
         shutdown::ShutdownSignal,
         test_util::{random_lines_with_stream, random_string},
-        Pipeline,
+        SourceSender,
     };
     use futures::StreamExt;
     use std::time::Duration;
+    use vector_buffers::Acker;
 
     #[tokio::test]
     async fn healthcheck() {
@@ -392,8 +398,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = AmqpSink::new(config.clone(), acker).await.unwrap();
+        let (acker, ack_counter) = Acker::basic();
+        let sink = VectorSink::from_event_sink(AmqpSink::new(config.clone(), acker).await.unwrap());
 
         // prepare consumer
         let mut queue_opts = lapin::options::QueueDeclareOptions::default();
@@ -427,7 +433,7 @@ mod integration_tests {
 
         let num_events = 1000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
-        events.map(Ok).forward(sink).await.unwrap();
+        sink.run(events).await.unwrap();
 
         // loop instead of iter so we can set a timeout
         let mut failures = 0;
@@ -472,8 +478,9 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (amqp_acker, amqp_ack_counter) = Acker::new_for_testing();
+        let (amqp_acker, amqp_ack_counter) = Acker::basic();
         let amqp_sink = AmqpSink::new(config.clone(), amqp_acker).await.unwrap();
+        let amqp_sink = VectorSink::from_event_sink(amqp_sink);
 
         let source_cfg = crate::sources::amqp::AmqpSourceConfig {
             connection: config.connection.clone(),
@@ -483,7 +490,7 @@ mod integration_tests {
             exchange_key: None,
             offset_key: None,
         };
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         let amqp_source =
             crate::sources::amqp::amqp_source(&source_cfg, ShutdownSignal::noop(), tx)
                 .await
@@ -514,7 +521,7 @@ mod integration_tests {
         let events_fut = async move {
             let num_events = 1000;
             let (_, events) = random_lines_with_stream(100, num_events, None);
-            events.map(Ok).forward(amqp_sink).await.unwrap();
+            amqp_sink.run(events).await.unwrap();
             num_events
         };
         let nb_events_published = tokio::spawn(events_fut).await.unwrap();

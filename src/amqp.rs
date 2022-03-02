@@ -30,7 +30,7 @@ impl Default for AmqpConfig {
 }
 
 impl AmqpConfig {
-    pub async fn connect(
+    pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
         info!("Connecting to {}", self.connection_string);
@@ -45,20 +45,20 @@ impl AmqpConfig {
                 let identity = if let Some(identity) = &tls.options.key_file {
                     let der = tokio::fs::read(identity.to_owned()).await?;
                     Some(OwnedIdentity {
-                        der: der,
+                        der,
                         password: tls
                             .options
                             .key_pass
                             .as_ref()
                             .map(|s| s.to_string())
-                            .unwrap_or_else(|| String::default()),
+                            .unwrap_or_else(String::default),
                     })
                 } else {
                     None
                 };
                 let tls_config = OwnedTLSConfig {
-                    identity: identity,
-                    cert_chain: cert_chain,
+                    identity,
+                    cert_chain,
                 };
                 lapin::Connection::connect_with_config(
                     &addr,

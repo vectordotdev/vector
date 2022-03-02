@@ -69,7 +69,7 @@ dependencies = [
  "amq-protocol-types",
  "amq-protocol-uri",
  "cookie-factory",
- "nom 7.0.0",
+ "nom 7.1.0",
 ]
 
 [[package]]
@@ -80,7 +80,7 @@ checksum = "9797cd3a8f1491e4828818341aea5e1378029ec89dc2422cd85d62715f913080"
 dependencies = [
  "amq-protocol-uri",
  "tcp-stream",
- "tracing 0.1.27",
+ "tracing 0.1.31",
 ]
 
 [[package]]
@@ -90,7 +90,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "028cb766932137535fe8a320245e385bac379506d7e9e3d0375be069bb6fb0de"
 dependencies = [
  "cookie-factory",
- "nom 7.0.0",
+ "nom 7.1.0",
  "serde",
  "serde_json",
 ]
@@ -3672,11 +3672,11 @@ checksum = "9415085ce81a4290b36c73c03307ce2477b62fa45fba8a80a7f776837f950b74"
 dependencies = [
  "amq-protocol",
  "async-task",
- "crossbeam-channel 0.5.1",
+ "crossbeam-channel",
  "futures-core",
  "log",
- "mio 0.7.13",
- "parking_lot",
+ "mio 0.7.14",
+ "parking_lot 0.11.2",
  "pinky-swear",
  "serde",
 ]
@@ -5135,8 +5135,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9bf8cda6f8e1500338634e4e3ce90ac59eb7929a1e088b6946c742be1cc44dc1"
 dependencies = [
  "doc-comment",
- "parking_lot",
- "tracing 0.1.27",
+ "parking_lot 0.11.2",
+ "tracing 0.1.31",
 ]
 
 [[package]]
@@ -7311,6 +7311,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 
 [[package]]
+name = "tcp-stream"
+version = "0.20.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c839b9cf24db4225fa445589e014e6ecc4c42ba6ecf5db3e9fe38fbe8ea2377a"
+dependencies = [
+ "cfg-if 1.0.0",
+ "mio 0.7.14",
+]
+
+[[package]]
 name = "temp-dir"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7567,7 +7577,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a236324e1e84931e62c22e2ee47688e077aa33a2a95f14d29ab8ec4dbaf9845"
 dependencies = [
  "lapin",
- "parking_lot",
+ "parking_lot 0.11.2",
  "tokio",
 ]
 
@@ -8445,7 +8455,6 @@ dependencies = [
  "itertools",
  "k8s-openapi",
  "lapin",
- "lazy_static",
  "libc",
  "listenfd",
  "logfmt",

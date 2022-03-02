@@ -1,8 +1,8 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
-    use vector_core::internal_event::InternalEvent;
-    use crate::pipeline::ClosedError;
+    use crate::source_sender::ClosedError;
     use metrics::counter;
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct AmqpEventReceived {
@@ -94,8 +94,8 @@ pub mod source {
 
 #[cfg(feature = "sinks-amqp")]
 pub mod sink {
-    use vector_core::internal_event::InternalEvent;
     use metrics::counter;
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct AmqpDeliveryFailed {
