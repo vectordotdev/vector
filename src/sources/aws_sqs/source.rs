@@ -83,7 +83,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                error!("SQS receive message error: {:?}", err);
+                error!("SQS receive message error: {:?}.", err);
                 // prevent rapid errors from flooding the logs
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 return;

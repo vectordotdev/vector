@@ -12,7 +12,7 @@ pub struct KafkaEventsReceived {
 impl InternalEvent for KafkaEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
         );

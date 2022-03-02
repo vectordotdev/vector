@@ -129,8 +129,10 @@ where
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
-                                    Err(_) => {
-                                        emit!(&SplunkIndexerAcknowledgementUnavailableError);
+                                    Err(error) => {
+                                        emit!(&SplunkIndexerAcknowledgementUnavailableError {
+                                            error
+                                        });
                                         EventStatus::Delivered
                                     }
                                 }

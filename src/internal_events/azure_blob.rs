@@ -4,14 +4,14 @@ use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AzureBlobErrorResponse {
+pub struct AzureBlobResponseError {
     pub code: hyper::StatusCode,
 }
 
-impl InternalEvent for AzureBlobErrorResponse {
+impl InternalEvent for AzureBlobResponseError {
     fn emit_logs(&self) {
         error!(
-            message = "HTTP error response",
+            message = "HTTP error response.",
             error_code = %http_error_code(self.code.as_u16()),
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
@@ -64,7 +64,7 @@ pub struct AzureBlobEventsSent {
 
 impl InternalEvent for AzureBlobEventsSent {
     fn emit_logs(&self) {
-        trace!(message = "Events sent.", request_id = %self.request_id);
+        trace!(message = "Events sent.", request_id = %self.request_id, count = 1, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

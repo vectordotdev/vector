@@ -28,7 +28,7 @@ mod sink {
                 error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_secs = 30,
+                internal_log_rate_secs = 10,
             );
         }
 
@@ -132,12 +132,15 @@ mod sink {
     }
 
     #[derive(Debug)]
-    pub struct SplunkIndexerAcknowledgementUnavailableError;
+    pub struct SplunkIndexerAcknowledgementUnavailableError<E> {
+        pub error: E,
+    }
 
-    impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
+    impl<E: std::fmt::Display> InternalEvent for SplunkIndexerAcknowledgementUnavailableError<E> {
         fn emit_logs(&self) {
             error!(
                 message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
+                error = %self.error,
                 error_code = "indexer_ack_unavailable",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
@@ -250,6 +253,7 @@ mod source {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
+            // deprecated
             counter!("http_request_errors_total", 1);
         }
     }

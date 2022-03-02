@@ -10,7 +10,7 @@ pub struct JournaldEventsReceived {
 
 impl InternalEvent for JournaldEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received events.", count = %self.count, byte_size = %self.byte_size);
+        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

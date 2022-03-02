@@ -12,7 +12,10 @@ impl InternalEvent for InternalLogsBytesReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("component_received_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "internal",
+        );
     }
 }
 

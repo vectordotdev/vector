@@ -23,10 +23,13 @@ impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
+            "component_received_events_total", self.count as u64,
+            "http_path" => self.http_path.to_string(),
+        );
+        counter!(
+            "component_received_event_bytes_total", self.byte_size as u64,
+            "http_path" => self.http_path.to_string(),
         );
         // deprecated
         counter!("events_in_total", self.count as u64);

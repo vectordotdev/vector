@@ -24,11 +24,13 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "processing_errors_total", 1,
+            "component_errors_total", 1,
             "error_code" => "invalid_metric",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+        // deprecated
+        counter!("processing_errors_total", 1);
     }
 }
 
