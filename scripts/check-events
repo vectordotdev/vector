@@ -88,19 +88,18 @@ class Event
     end
 
     @counters.each do |name, tags|
-      # Make sure defined tags to counters are constants
-      tags.each do |tag, value|
-        if tag == 'stage'
-          if !value.start_with? 'error_stage::'
-            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
-          end
-        elsif tag == 'error_type'
-          if !value.start_with? 'error_type::'
-            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
-          end
-        elsif tag == 'error_code'
-          if !is_constant?(value)
-            @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be a constant.")
+      # Only component_errors_total and component_discarded_events_total metrics are considered
+      if ['component_errors_total', 'component_discarded_events_total'].include? name
+        # Make sure defined tags to counters are constants
+        tags.each do |tag, value|
+          if tag == 'stage'
+            if !value.start_with? 'error_stage::'
+              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
+            end
+          elsif tag == 'error_type'
+            if !value.start_with? 'error_type::'
+              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
+            end
           end
         end
       end
