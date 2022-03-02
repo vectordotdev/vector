@@ -345,26 +345,23 @@ impl EventArrayBuffer {
     fn push(&mut self, event: Event) -> Option<EventArray> {
         match (event, &mut self.buffer) {
             (Event::Log(event), Some(EventArray::Logs(array))) if array.len() < self.max_size => {
-                array.push(event)
+                array.push(event);
+                None
             }
             (Event::Metric(event), Some(EventArray::Metrics(array)))
                 if array.len() < self.max_size =>
             {
-                array.push(event)
+                array.push(event);
+                None
             }
             (Event::Trace(event), Some(EventArray::Traces(array)))
                 if array.len() < self.max_size =>
             {
-                array.push(event)
+                array.push(event);
+                None
             }
-            (event, current) => {
-                let array = EventArray::from(event);
-                if let Some(array) = current.replace(array) {
-                    return Some(array);
-                }
-            }
+            (event, current) => current.replace(EventArray::from(event)),
         }
-        None
     }
 
     fn take(&mut self) -> Option<EventArray> {
