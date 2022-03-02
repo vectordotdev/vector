@@ -20,7 +20,7 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, Finalizable},
     ByteSizeOf,
 };
@@ -96,6 +96,12 @@ pub struct DatadogArchivesSinkConfig {
     tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -151,6 +157,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             tls: None,
             azure_blob: None,
             batch: BatchConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -700,8 +707,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         "datadog_archives"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -962,6 +969,7 @@ mod tests {
                 gcp_cloud_storage: None,
                 tls: None,
                 batch: BatchConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

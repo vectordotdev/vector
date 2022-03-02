@@ -84,7 +84,7 @@ impl Function for Log {
     fn compile(
         &self,
         _state: &state::Compiler,
-        info: &FunctionCompileContext,
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let levels = vec![
@@ -104,7 +104,7 @@ impl Function for Log {
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
         Ok(Box::new(LogFn {
-            span: info.span,
+            span: ctx.span(),
             value,
             level,
             rate_limit_secs,
@@ -114,7 +114,7 @@ impl Function for Log {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        info: &FunctionCompileContext,
+        ctx: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -136,7 +136,7 @@ impl Function for Log {
 
             let level = LogInfo {
                 level,
-                span: info.span,
+                span: ctx.span(),
             };
             Ok(Some(Box::new(level) as Box<dyn std::any::Any + Send + Sync>))
         } else {

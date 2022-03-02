@@ -116,6 +116,13 @@ impl LogEvent {
         self.fields.get_by_path_v2(key)
     }
 
+    pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.fields.get_by_path(path))
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }

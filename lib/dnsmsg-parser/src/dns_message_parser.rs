@@ -149,10 +149,11 @@ impl DnsMessageParser {
     }
 
     fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
-        let record_data = match record.rdata() {
-            RData::Unknown { code, rdata } => self.format_unknown_rdata(*code, rdata)?,
-            _ => format_rdata(record.rdata())?,
-        };
+        let record_data = match record.data() {
+            Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
+            Some(rdata) => format_rdata(rdata),
+            None => Ok((Some(String::from("")), None)), // NULL record
+        }?;
 
         Ok(DnsRecord {
             name: record.name().to_string(),
@@ -338,290 +339,182 @@ impl DnsMessageParser {
         rdata: &NULL,
     ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         match code {
-            dns_message::RTYPE_MB => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let madname = parse_domain_name(&mut decoder)?;
-                    Ok((Some(madname.to_string()), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty MB rdata"),
-                }),
-            },
+            dns_message::RTYPE_MB => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let madname = parse_domain_name(&mut decoder)?;
+                Ok((Some(madname.to_string()), None))
+            }
 
-            dns_message::RTYPE_MG => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let mgname = parse_domain_name(&mut decoder)?;
-                    Ok((Some(mgname.to_string()), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty MG rdata"),
-                }),
-            },
+            dns_message::RTYPE_MG => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let mgname = parse_domain_name(&mut decoder)?;
+                Ok((Some(mgname.to_string()), None))
+            }
 
-            dns_message::RTYPE_MR => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let newname = parse_domain_name(&mut decoder)?;
-                    Ok((Some(newname.to_string()), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty MR rdata"),
-                }),
-            },
+            dns_message::RTYPE_MR => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let newname = parse_domain_name(&mut decoder)?;
+                Ok((Some(newname.to_string()), None))
+            }
 
-            dns_message::RTYPE_WKS => match rdata.anything() {
-                Some(raw_rdata) => self.parse_wks_rdata(raw_rdata),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty WKS rdata"),
-                }),
-            },
+            dns_message::RTYPE_WKS => self.parse_wks_rdata(rdata.anything()),
 
-            dns_message::RTYPE_HINFO => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let cpu = parse_character_string(&mut decoder)?;
-                    let os = parse_character_string(&mut decoder)?;
-                    Ok((
-                        Some(format!(
-                            "\"{}\" \"{}\"",
-                            escape_string_for_text_representation(cpu),
-                            escape_string_for_text_representation(os)
-                        )),
-                        None,
-                    ))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty HINFO rdata"),
-                }),
-            },
+            dns_message::RTYPE_HINFO => {
+                let mut decoder = BinDecoder::new(rdata.anything());
+                let cpu = parse_character_string(&mut decoder)?;
+                let os = parse_character_string(&mut decoder)?;
+                Ok((
+                    Some(format!(
+                        "\"{}\" \"{}\"",
+                        escape_string_for_text_representation(cpu),
+                        escape_string_for_text_representation(os)
+                    )),
+                    None,
+                ))
+            }
 
-            dns_message::RTYPE_MINFO => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let rmailbx = parse_domain_name(&mut decoder)?;
-                    let emailbx = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty MINFO rdata"),
-                }),
-            },
+            dns_message::RTYPE_MINFO => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let rmailbx = parse_domain_name(&mut decoder)?;
+                let emailbx = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
+            }
 
-            dns_message::RTYPE_RP => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let mbox = parse_domain_name(&mut decoder)?;
-                    let txt = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {}", mbox, txt)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty RP rdata"),
-                }),
-            },
+            dns_message::RTYPE_RP => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let mbox = parse_domain_name(&mut decoder)?;
+                let txt = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {}", mbox, txt)), None))
+            }
 
-            dns_message::RTYPE_AFSDB => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let subtype = parse_u16(&mut decoder)?;
-                    let hostname = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {}", subtype, hostname)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty AFSDB rdata"),
-                }),
-            },
+            dns_message::RTYPE_AFSDB => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let subtype = parse_u16(&mut decoder)?;
+                let hostname = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {}", subtype, hostname)), None))
+            }
 
-            dns_message::RTYPE_X25 => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let psdn_address = parse_character_string(&mut decoder)?;
+            dns_message::RTYPE_X25 => {
+                let mut decoder = BinDecoder::new(rdata.anything());
+                let psdn_address = parse_character_string(&mut decoder)?;
+                Ok((
+                    Some(format!(
+                        "\"{}\"",
+                        escape_string_for_text_representation(psdn_address)
+                    )),
+                    None,
+                ))
+            }
+
+            dns_message::RTYPE_ISDN => {
+                let mut decoder = BinDecoder::new(rdata.anything());
+                let address = parse_character_string(&mut decoder)?;
+                if decoder.is_empty() {
                     Ok((
                         Some(format!(
                             "\"{}\"",
-                            escape_string_for_text_representation(psdn_address)
+                            escape_string_for_text_representation(address)
+                        )),
+                        None,
+                    ))
+                } else {
+                    let sub_address = parse_character_string(&mut decoder)?;
+                    Ok((
+                        Some(format!(
+                            "\"{}\" \"{}\"",
+                            escape_string_for_text_representation(address),
+                            escape_string_for_text_representation(sub_address)
                         )),
                         None,
                     ))
                 }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty X25 rdata"),
-                }),
-            },
+            }
 
-            dns_message::RTYPE_ISDN => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let address = parse_character_string(&mut decoder)?;
-                    if decoder.is_empty() {
-                        Ok((
-                            Some(format!(
-                                "\"{}\"",
-                                escape_string_for_text_representation(address)
-                            )),
-                            None,
-                        ))
-                    } else {
-                        let sub_address = parse_character_string(&mut decoder)?;
-                        Ok((
-                            Some(format!(
-                                "\"{}\" \"{}\"",
-                                escape_string_for_text_representation(address),
-                                escape_string_for_text_representation(sub_address)
-                            )),
-                            None,
-                        ))
-                    }
+            dns_message::RTYPE_RT => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let preference = parse_u16(&mut decoder)?;
+                let intermediate_host = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {}", preference, intermediate_host)), None))
+            }
+
+            dns_message::RTYPE_NSAP => {
+                let raw_rdata = rdata.anything();
+                let mut decoder = BinDecoder::new(raw_rdata);
+                let rdata_len = raw_rdata.len() as u16;
+                let nsap_rdata = HEXUPPER.encode(&parse_vec_with_u16_len(&mut decoder, rdata_len)?);
+                Ok((Some(format!("0x{}", nsap_rdata)), None))
+            }
+
+            dns_message::RTYPE_PX => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let preference = parse_u16(&mut decoder)?;
+                let map822 = parse_domain_name(&mut decoder)?;
+                let mapx400 = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
+            }
+
+            dns_message::RTYPE_LOC => self.parse_loc_rdata(rdata.anything()),
+
+            dns_message::RTYPE_KX => {
+                let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
+                let preference = parse_u16(&mut decoder)?;
+                let exchanger = parse_domain_name(&mut decoder)?;
+                Ok((Some(format!("{} {}", preference, exchanger)), None))
+            }
+
+            dns_message::RTYPE_CERT => {
+                let raw_rdata = rdata.anything();
+                let mut decoder = BinDecoder::new(raw_rdata);
+                let cert_type = parse_u16(&mut decoder)?;
+                let key_tag = parse_u16(&mut decoder)?;
+                let algorithm = Algorithm::from_u8(parse_u8(&mut decoder)?).as_str();
+                let crl_len = raw_rdata.len() as u16 - 5;
+                let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
+                Ok((
+                    Some(format!("{} {} {} {}", cert_type, key_tag, algorithm, crl)),
+                    None,
+                ))
+            }
+
+            dns_message::RTYPE_A6 => self.parse_a6_rdata(rdata.anything()),
+
+            dns_message::RTYPE_SINK => {
+                let raw_rdata = rdata.anything();
+                let mut decoder = BinDecoder::new(raw_rdata);
+                let meaning = parse_u8(&mut decoder)?;
+                let coding = parse_u8(&mut decoder)?;
+                let subcoding = parse_u8(&mut decoder)?;
+                let data_len = raw_rdata.len() as u16 - 3;
+                let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
+
+                Ok((
+                    Some(format!("{} {} {} {}", meaning, coding, subcoding, data)),
+                    None,
+                ))
+            }
+
+            dns_message::RTYPE_APL => self.parse_apl_rdata(rdata.anything()),
+
+            dns_message::RTYPE_DHCID => {
+                let raw_rdata = rdata.anything();
+                let mut decoder = BinDecoder::new(raw_rdata);
+                let raw_data_len = raw_rdata.len() as u16;
+                let digest = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, raw_data_len)?);
+                Ok((Some(digest), None))
+            }
+
+            dns_message::RTYPE_SPF => {
+                let mut decoder = BinDecoder::new(rdata.anything());
+                let mut text = String::new();
+                while !decoder.is_empty() {
+                    text.push('\"');
+                    text.push_str(&parse_character_string(&mut decoder)?);
+                    text.push_str("\" ");
                 }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty ISDN rdata"),
-                }),
-            },
+                Ok((Some(text.trim_end().to_string()), None))
+            }
 
-            dns_message::RTYPE_RT => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let preference = parse_u16(&mut decoder)?;
-                    let intermediate_host = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {}", preference, intermediate_host)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty RT rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_NSAP => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let rdata_len = raw_rdata.len() as u16;
-                    let nsap_rdata =
-                        HEXUPPER.encode(&parse_vec_with_u16_len(&mut decoder, rdata_len)?);
-                    Ok((Some(format!("0x{}", nsap_rdata)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty NSAP rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_PX => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let preference = parse_u16(&mut decoder)?;
-                    let map822 = parse_domain_name(&mut decoder)?;
-                    let mapx400 = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty PX rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_LOC => match rdata.anything() {
-                Some(raw_rdata) => self.parse_loc_rdata(raw_rdata),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty LOC rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_KX => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
-                    let preference = parse_u16(&mut decoder)?;
-                    let exchanger = parse_domain_name(&mut decoder)?;
-                    Ok((Some(format!("{} {}", preference, exchanger)), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty KX rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_CERT => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let cert_type = parse_u16(&mut decoder)?;
-                    let key_tag = parse_u16(&mut decoder)?;
-                    let algorithm = Algorithm::from_u8(parse_u8(&mut decoder)?).as_str();
-                    let crl_len = raw_rdata.len() as u16 - 5;
-                    let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
-                    Ok((
-                        Some(format!("{} {} {} {}", cert_type, key_tag, algorithm, crl)),
-                        None,
-                    ))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty CERT rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_A6 => match rdata.anything() {
-                Some(raw_rdata) => self.parse_a6_rdata(raw_rdata),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty A6 rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_SINK => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let meaning = parse_u8(&mut decoder)?;
-                    let coding = parse_u8(&mut decoder)?;
-                    let subcoding = parse_u8(&mut decoder)?;
-                    let data_len = raw_rdata.len() as u16 - 3;
-                    let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
-
-                    Ok((
-                        Some(format!("{} {} {} {}", meaning, coding, subcoding, data)),
-                        None,
-                    ))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty SINK rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_APL => match rdata.anything() {
-                Some(raw_rdata) => self.parse_apl_rdata(raw_rdata),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty APL rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_DHCID => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let raw_data_len = raw_rdata.len() as u16;
-                    let digest =
-                        BASE64.encode(&parse_vec_with_u16_len(&mut decoder, raw_data_len)?);
-                    Ok((Some(digest), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty DHCID rdata"),
-                }),
-            },
-
-            dns_message::RTYPE_SPF => match rdata.anything() {
-                Some(raw_rdata) => {
-                    let mut decoder = BinDecoder::new(raw_rdata);
-                    let mut text = String::new();
-                    while !decoder.is_empty() {
-                        text.push('\"');
-                        text.push_str(&parse_character_string(&mut decoder)?);
-                        text.push_str("\" ");
-                    }
-                    Ok((Some(text.trim_end().to_string()), None))
-                }
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty SPF rdata"),
-                }),
-            },
-
-            _ => match rdata.anything() {
-                Some(raw_rdata) => Ok((None, Some(raw_rdata.to_vec()))),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Empty rdata"),
-                }),
-            },
+            _ => Ok((None, Some(rdata.anything().to_vec()))),
         }
     }
 }
@@ -636,10 +529,7 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             let srv_rdata = format!("{} {}", mx.preference(), mx.exchange(),);
             Ok((Some(srv_rdata), None))
         }
-        RData::NULL(null) => match null.anything() {
-            Some(raw_rdata) => Ok((Some(BASE64.encode(raw_rdata)), None)),
-            None => Ok((Some(String::from("")), None)),
-        },
+        RData::NULL(null) => Ok((Some(BASE64.encode(null.anything())), None)),
         RData::NS(ns) => Ok((Some(ns.to_string()), None)),
         RData::OPENPGPKEY(key) => {
             if let Ok(key_string) = String::from_utf8(Vec::from(key.public_key())) {
@@ -851,12 +741,7 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 );
                 Ok((Some(sig_rdata), None))
             }
-            DNSSECRData::Unknown { code, rdata } => match rdata.anything() {
-                Some(raw_rdata) => Ok((None, Some(raw_rdata.to_vec()))),
-                None => Err(DnsMessageParserError::SimpleError {
-                    cause: format!("Empty rdata with rcode {}", code),
-                }),
-            },
+            DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
             _ => Err(DnsMessageParserError::SimpleError {
                 cause: format!("Unsupported rdata {:?}", rdata),
             }),
@@ -952,6 +837,7 @@ fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
             | EdnsOption::DHU(algorithms)
             | EdnsOption::N3U(algorithms) => parse_edns_opt_dnssec_algorithms(*code, *algorithms),
             EdnsOption::Unknown(_, opt_data) => parse_edns_opt(*code, opt_data),
+            option => parse_edns_opt(*code, &Vec::<u8>::from(option)),
         })
         .collect()
 }

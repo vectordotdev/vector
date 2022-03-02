@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 data-encoding = "2.2"
 thiserror = "1.0"
-trust-dns-proto = { version = "0.20", features = ["dnssec"] }
+trust-dns-proto = { version = "0.21", features = ["dnssec"] }
 
 [dev-dependencies]
 criterion = "0.3"

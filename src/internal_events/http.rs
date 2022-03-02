@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -68,39 +68,70 @@ impl InternalEvent for HttpEventsReceived<'_> {
 
 #[derive(Debug)]
 pub struct HttpBadRequest<'a> {
-    pub error_code: u16,
-    pub error_message: &'a str,
+    pub code: u16,
+    pub message: &'a str,
+}
+
+impl<'a> HttpBadRequest<'a> {
+    fn error_code(&self) -> String {
+        http_error_code(self.code)
+    }
 }
 
 impl<'a> InternalEvent for HttpBadRequest<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Received bad request.",
-            code = ?self.error_code,
-            error_message = ?self.error_message,
+            error = %self.message,
+            error_code = %self.error_code(),
+            error_type = error_type::REQUEST_FAILED,
+            error_stage = error_stage::RECEIVING,
+            http_code = %self.code,
             internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error_code(),
+            "error_type" => error_type::REQUEST_FAILED,
+            "error_stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("http_bad_requests_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct HttpEventMissingMessage;
+pub struct HttpEventMissingMessageError;
 
-impl InternalEvent for HttpEventMissingMessage {
+impl InternalEvent for HttpEventMissingMessageError {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Event missing the message key; dropping event.",
-            internal_log_rate_secs = 30,
+            error_code = "missing_event_key",
+            error_type = error_type::ENCODER_FAILED,
+            error_stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "missing_event_key",
+            "error_type" => error_type::ENCODER_FAILED,
+            "error_stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_code" => "missing_event_key",
+            "error_type" => error_type::ENCODER_FAILED,
+            "error_stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("events_discarded_total", 1);
-        counter!("component_discarded_events_total", 1);
     }
 }
 
@@ -129,20 +160,23 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Failed decompressing payload.",
-            encoding= %self.encoding,
             error = %self.error,
+            error_code = "failed_decompressing_payload",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
+            encoding = %self.encoding,
             internal_log_rate_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
-            "error_type" => "parse_failed",
+            "error_code" => "failed_decompressing_payload",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
-            "encoding" => self.encoding.to_string(),
         );
+        // deprecated
+        counter!("parse_errors_total", 1);
     }
 }

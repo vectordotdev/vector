@@ -26,6 +26,8 @@ pub mod error_type {
     pub const ENCODER_FAILED: &str = "encoder_failed";
     // When the received event has an unexpected metric.
     pub const INVALID_METRIC: &str = "invalid_metric";
+    // When the component was unable to perform an IO.
+    pub const IO_FAILED: &str = "io_failed";
     // When the component is unable to parse a message to build an event.
     pub const PARSER_FAILED: &str = "parser_failed";
     // When the component was unable to read from the source.
@@ -38,4 +40,8 @@ pub mod error_type {
     pub const TIMED_OUT: &str = "timed_out";
     // When the component was unable to write some data.
     pub const WRITER_FAILED: &str = "writer_failed";
+}
+
+pub(crate) fn http_error_code(code: u16) -> String {
+    format!("http_response_{}", code)
 }
