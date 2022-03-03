@@ -45,7 +45,7 @@ jobs:
       coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
       erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
           path: baseline-vector
@@ -112,7 +112,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - uses: actions/github-script@v6
         id: set-matrix
@@ -146,9 +146,9 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-soak-meta.outputs.baseline-sha }}
           path: baseline-vector
@@ -191,9 +191,9 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
         with:
           ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
           path: comparison-vector
@@ -239,7 +239,7 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download baseline image
         uses: actions/download-artifact@v2
@@ -295,7 +295,7 @@ jobs:
           pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download captures artifact
         uses: actions/download-artifact@v2
@@ -325,7 +325,7 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download comparison image
         uses: actions/download-artifact@v2
@@ -381,7 +381,7 @@ jobs:
           pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download captures artifact
         uses: actions/download-artifact@v2
@@ -421,7 +421,7 @@ jobs:
           pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download captures artifact
         uses: actions/download-artifact@v2
@@ -489,7 +489,7 @@ jobs:
           pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download captures artifact
         uses: actions/download-artifact@v2
@@ -527,7 +527,7 @@ jobs:
           pip install scipy==1.7.* pandas==1.3.* seaborn==0.11.* tabulate==0.8.*
 
       - name: Check out the repo
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
 
       - name: Download captures artifact
         uses: actions/download-artifact@v2
