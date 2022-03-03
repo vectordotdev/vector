@@ -90,7 +90,7 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
-    #[instrument]
+    #[instrument(skip(self, body))]
     fn build_events(
         &self,
         body: Bytes,
@@ -98,6 +98,7 @@ impl HttpSource for SimpleHttpSource {
         query_parameters: HashMap<String, String>,
         request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
+        info!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa build_events");
         let mut decoder = self.decoder.clone();
         let mut events = Vec::new();
         let mut bytes = BytesMut::new();

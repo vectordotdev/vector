@@ -194,7 +194,9 @@ impl Inner {
         (Self { inner: tx, output }, ReceiverStream::new(rx))
     }
 
+    #[instrument(skip(self, event))]
     async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
+        tracing::info!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA send");
         let byte_size = event.size_of();
         self.inner.send(event).await?;
         emit!(&EventsSent {
@@ -205,11 +207,13 @@ impl Inner {
         Ok(())
     }
 
+    #[instrument(skip(self, events))]
     async fn send_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
+        tracing::info!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA send_stream");
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(events) = stream.next().await {
             self.send_batch(events.into_iter()).await?;
@@ -217,11 +221,13 @@ impl Inner {
         Ok(())
     }
 
+    #[instrument(skip(self, events))]
     async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
     {
+        tracing::info!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA send_batch");
         let mut count = 0;
         let mut byte_size = 0;
 

@@ -89,11 +89,11 @@ pub trait HttpSource: Clone + fmt::Debug + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-                        emit!(&HttpBytesReceived {
-                            byte_size: body.len(),
-                            http_path,
-                            protocol,
-                        });
+                        // emit!(&HttpBytesReceived {
+                        //     byte_size: body.len(),
+                        //     http_path,
+                        //     protocol,
+                        // });
 
                         let events = auth
                             .is_valid(&auth_header)
@@ -114,7 +114,10 @@ pub trait HttpSource: Clone + fmt::Debug + Send + Sync + 'static {
                         handle_request(events, acknowledgements, cx.out.clone())
                     },
                 )
-                .with(warp::trace(move |_info| span.clone()));
+                .with(warp::trace(move |info| {
+                    tracing::info!("PEER {:?}", info.remote_addr());
+                    span.clone()
+                }));
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
             let routes = svc.or(ping).recover(|r: Rejection| async move {
@@ -151,7 +154,7 @@ impl fmt::Debug for RejectShuttingDown {
 
 impl warp::reject::Reject for RejectShuttingDown {}
 
-#[instrument]
+#[instrument(skip(events))]
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
