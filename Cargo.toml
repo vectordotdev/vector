@@ -418,7 +418,15 @@ enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 codecs = ["smallvec"]
 
 # Sources
-sources = ["sources-logs", "sources-metrics"]
+#sources = ["sources-logs", "sources-metrics"]
+sources = ["custom-sources-logs"]
+
+custom-sources-logs = [
+  "sources-file",
+  "sources-demo_logs",
+  "sources-stdin",
+]
+
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
@@ -503,7 +511,13 @@ sources-utils-unix = []
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "protobuf-build", "codecs"]
 
 # Transforms
-transforms = ["transforms-logs", "transforms-metrics"]
+#transforms = ["transforms-logs", "transforms-metrics"]
+transforms = ["custom-transforms-logs"]
+
+custom-transforms-logs = [
+  "transforms-remap",
+]
+
 transforms-logs = [
   "transforms-add_fields",
   "transforms-ansi_stripper",
@@ -587,7 +601,16 @@ transforms-throttle = ["governor"]
 transforms-tokenizer = []
 
 # Sinks
-sinks = ["sinks-logs", "sinks-metrics"]
+#sinks = ["sinks-logs", "sinks-metrics"]
+sinks = ["custom-sinks-logs"]
+
+custom-sinks-logs = [
+  "sinks-clickhouse",
+  "sinks-console",
+  "sinks-file",
+  "sinks-kafka",
+]
+
 sinks-logs = [
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_kinesis_firehose",
