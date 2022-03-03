@@ -3,6 +3,7 @@ use std::{
     fmt,
 };
 
+use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note};
 use value::kind::Collection;
 
@@ -52,7 +53,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     fn compile(
         &self,
         state: &super::State,
-        info: &FunctionCompileContext,
+        info: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -69,7 +70,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
     ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
@@ -99,9 +100,45 @@ pub struct Example {
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct FunctionCompileContext {
-    pub span: Span,
+    span: Span,
+    external_context: AnyMap,
+}
+
+impl FunctionCompileContext {
+    pub fn new(span: Span) -> Self {
+        Self {
+            span,
+            external_context: AnyMap::new(),
+        }
+    }
+
+    /// Add an external context to the compile context.
+    pub fn with_external_context(mut self, context: AnyMap) -> Self {
+        self.external_context = context;
+        self
+    }
+
+    /// Span information for the function call.
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    /// Get an immutable reference to a stored external context, if one exists.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.external_context.get::<T>()
+    }
+
+    /// Get a mutable reference to a stored external context, if one exists.
+    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.external_context.get_mut::<T>()
+    }
+
+    /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
+    pub fn into_external_context(self) -> AnyMap {
+        self.external_context
+    }
 }
 
 // -----------------------------------------------------------------------------

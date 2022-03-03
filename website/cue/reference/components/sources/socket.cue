@@ -15,6 +15,7 @@ components: sources: socket: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

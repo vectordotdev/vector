@@ -2,7 +2,7 @@ use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
 };
 
@@ -18,6 +18,12 @@ pub struct BlackholeConfig {
     #[serde(default = "default_print_interval_secs")]
     pub print_interval_secs: u64,
     pub rate: Option<usize>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[async_trait::async_trait]
@@ -38,8 +44,8 @@ impl SinkConfig for BlackholeConfig {
         "blackhole"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

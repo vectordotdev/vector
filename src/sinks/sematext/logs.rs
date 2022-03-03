@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::EventArray,
     sinks::{
         elasticsearch::{ElasticsearchConfig, ElasticsearchEncoder},
@@ -37,6 +39,13 @@ pub struct SematextLogsConfig {
 
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -104,8 +113,8 @@ impl SinkConfig for SematextLogsConfig {
         "sematext_logs"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

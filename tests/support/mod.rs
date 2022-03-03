@@ -27,8 +27,8 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+        SourceContext, TransformConfig, TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -408,8 +408,8 @@ impl SinkConfig for MockSinkConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

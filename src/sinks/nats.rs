@@ -7,7 +7,9 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{NatsEventSendError, NatsEventSendSuccess, TemplateRenderingError},
     sinks::util::{
@@ -84,8 +86,8 @@ impl SinkConfig for NatsSinkConfig {
         "nats"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

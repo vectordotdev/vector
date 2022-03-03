@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -72,6 +72,12 @@ pub struct InfluxDbConfig {
     pub tls: Option<TlsOptions>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 pub fn default_summary_quantiles() -> Vec<f64> {
@@ -115,8 +121,8 @@ impl SinkConfig for InfluxDbConfig {
         "influxdb_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -974,6 +980,7 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
+            acknowledgements: Default::default(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -1066,6 +1073,7 @@ mod integration_tests {
             tags: None,
             tls: None,
             default_namespace: None,
+            acknowledgements: Default::default(),
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());

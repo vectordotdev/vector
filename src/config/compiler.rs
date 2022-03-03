@@ -234,8 +234,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-            TransformConfig, TransformContext,
+            AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+            SourceContext, TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -306,8 +306,8 @@ mod test {
             Input::all()
         }
 
-        fn can_acknowledge(&self) -> bool {
-            false
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
         }
     }
 

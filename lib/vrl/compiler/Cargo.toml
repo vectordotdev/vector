@@ -25,6 +25,7 @@ serde = { version = "1", default-features = false, features = ["derive"] }
 thiserror = "1"
 tracing = "0.1"
 serde_json = { version = "1", default-features = false, features = ["std"] }
+anymap = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"

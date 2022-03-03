@@ -13,6 +13,7 @@ components: sinks: aws_sqs: components._aws & {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

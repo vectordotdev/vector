@@ -133,9 +133,7 @@ where
     // in the tests if we don't work on our own copy.
     let mut args = args.clone();
     let mut result = BTreeMap::new();
-    let context = FunctionCompileContext {
-        span: Default::default(),
-    };
+    let context = FunctionCompileContext::new(Default::default());
     let params = function.parameters();
     let function_arguments: Vec<(&'static str, Option<FunctionArgument>)> = args.clone().into();
 
