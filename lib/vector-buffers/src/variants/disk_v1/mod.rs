@@ -24,7 +24,7 @@ use futures::task::AtomicWaker;
 use leveldb::{
     batch::{Batch, Writebatch},
     database::Database,
-    iterator::{Iterable, LevelDBIterator},
+    iterator::Iterable,
     options::{Options, ReadOptions, WriteOptions},
 };
 use parking_lot::Mutex;
@@ -249,82 +249,86 @@ where
         data_dir: path.parent().expect("always a parent"),
     })?;
 
-    let mut first_key = None;
-    let mut last_key = None;
-    let mut state = BufferState::default();
-    for (k, v) in db.iter(ReadOptions::new()) {
-        state.total_bytes += v.len() as u64;
-        state.total_records += 1;
-
-        if first_key.is_none() {
-            first_key = Some(k.0);
-        }
-        last_key = Some(k.0);
-    }
+    let (mut total_records, mut total_bytes, first_key, last_key, last_value) =
+        db.iter(ReadOptions::new()).fold(
+            (0, 0, None, None, None),
+            |(records, bytes, first, _, _), (k, v)| {
+                (
+                    records + 1,
+                    bytes + v.len() as u64,
+                    first.or(Some(k.0)),
+                    Some(k.0),
+                    Some(v),
+                )
+            },
+        );
 
     // Keys are assigned such that if we write an item that compromises 10 events, and that item has
     // key K, then the next key we generate will be K+10.  This lets us take the difference between
     // the last key and the first key to get the number of actual events in the buffer, minus the
     // events contained in the last key/value pair.  We decode it below to get that, too.
-    state.total_events = last_key.unwrap_or(0) as u64 - first_key.unwrap_or(0) as u64;
+    let mut total_events = last_key.unwrap_or(0) as u64 - first_key.unwrap_or(0) as u64;
 
-    state.read_offset = first_key;
-    if let Some(last_key) = last_key {
-        let iter = db.iter(ReadOptions::new());
-        iter.seek_to_last();
-        if iter.valid() {
-            let val = iter.value();
-            match T::decode(T::get_metadata(), &val[..]) {
-                Ok(record) => {
-                    let event_count = record.event_count();
-                    state.total_events += event_count as u64;
-                    state.write_offset = Some(last_key.wrapping_add(event_count));
-                }
-                Err(e) => {
-                    // If the last record couldn't be decoded, we know the reader is never going to
-                    // do anything with this read to begin with, so we make the conscious decision
-                    // to delete it here and now.
-                    //
-                    // If we don't delete it now, we have to compensate in the reader code when we
-                    // hit and make sure we don't count it as a true event for the purposes of
-                    // metrics, but do properly delete it, and so on.  We know we have to delete it,
-                    // so if we just do that now, then our reader logic can stay a bit cleaner.
-                    //
-                    // We also have to delete it now, rather than just setting the write offset to
-                    // overwrite it, because otherwise, the reader might get to it before a write
-                    // comes in that overwrites it.
-                    error!(
-                        decode_error = %e,
-                        "Detected undecodable record when querying initial state of buffer. Dropping record and continuing."
-                    );
+    let read_offset = first_key;
+    let write_offset = last_key.map(|key| {
+        let value = last_value.expect("can't have a last key without a last value");
+        match T::decode(T::get_metadata(), &value[..]) {
+            Ok(record) => {
+                let event_count = record.event_count();
+                total_events += event_count as u64;
+                key.wrapping_add(event_count)
+            }
+            Err(e) => {
+                // If the last record couldn't be decoded, we know the reader is never going to
+                // do anything with this read to begin with, so we make the conscious decision
+                // to delete it here and now.
+                //
+                // If we don't delete it now, we have to compensate in the reader code when we
+                // hit and make sure we don't count it as a true event for the purposes of
+                // metrics, but do properly delete it, and so on.  We know we have to delete it,
+                // so if we just do that now, then our reader logic can stay a bit cleaner.
+                //
+                // We also have to delete it now, rather than just setting the write offset to
+                // overwrite it, because otherwise, the reader might get to it before a write
+                // comes in that overwrites it.
+                error!(
+                    decode_error = %e,
+                    "Detected undecodable record when querying initial state of buffer. Dropping record and continuing."
+                );
 
-                    // Since we're deleting it, we'll reuse the key for the writer by setting the
-                    // write offset to overwrite it.  Adjust our statistics, as well.
-                    state.write_offset = Some(last_key);
-                    state.total_records -= 1;
-                    state.total_bytes -= val.len() as u64;
+                // Since we're deleting it, we'll reuse the key for the writer by setting the
+                // write offset to overwrite it.  Adjust our statistics, as well.
+                total_records -= 1;
+                total_bytes -= value.len() as u64;
 
-                    // Now go ahead and actually delete it so the reader can't pick it up.
-                    let mut delete_batch = Writebatch::new();
-                    delete_batch.delete(iter.key());
+                // Now go ahead and actually delete it so the reader can't pick it up.
+                let mut delete_batch = Writebatch::new();
+                delete_batch.delete(Key(key));
 
-                    db.write(WriteOptions::new(), &delete_batch)
-                        .expect("Failed to delete invalid/undecodable record from buffer.");
-                }
+                db.write(WriteOptions::new(), &delete_batch)
+                    .expect("Failed to delete invalid/undecodable record from buffer.");
+
+                key
             }
         }
-    }
+    });
 
     debug!(
         ?first_key,
         ?last_key,
         "Read {} records from database, with {} bytes total, comprising {} events total.",
-        state.total_records,
-        state.total_bytes,
-        state.total_events
+        total_records,
+        total_bytes,
+        total_events
     );
 
-    Ok(state)
+    Ok(BufferState {
+        total_records,
+        total_events,
+        total_bytes,
+        read_offset,
+        write_offset,
+    })
 }
 
 /// Build a new `DiskBuffer` rooted at `path`
