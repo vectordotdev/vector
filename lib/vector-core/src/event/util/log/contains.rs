@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use super::Value;
 
 /// Checks whether a field specified by a given path is present.
+#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
 pub fn contains<'a>(fields: &BTreeMap<String, Value>, path: impl Path<'a>) -> bool {
     let mut path_iter = path.segment_iter();
 

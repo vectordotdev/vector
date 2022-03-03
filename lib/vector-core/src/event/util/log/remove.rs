@@ -7,6 +7,7 @@ use super::Value;
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
+#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
 pub fn remove<'a>(value: &mut Value, path: impl Path<'a>, prune: bool) -> Option<Value> {
     let path_iter = path.segment_iter().peekable();
     remove_rec(value, path_iter, prune).map(|(value, _)| value)

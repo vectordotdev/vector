@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, iter::Peekable};
 use super::Value;
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
+#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
 pub fn insert<'a>(
     fields: &mut BTreeMap<String, Value>,
     path: impl Path<'a>,
