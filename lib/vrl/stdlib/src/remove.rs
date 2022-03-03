@@ -105,7 +105,7 @@ impl Function for Remove {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -121,7 +121,7 @@ impl Function for Remove {
 }
 
 #[derive(Debug, Clone)]
-pub struct RemoveFn {
+pub(crate) struct RemoveFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     compact: Box<dyn Expression>,
@@ -165,7 +165,7 @@ impl Expression for RemoveFn {
         let compact = self.compact.resolve(ctx)?.try_boolean()?;
 
         let mut value = self.value.resolve(ctx)?;
-        value.remove(&path, compact)?;
+        value.target_remove(&path, compact)?;
 
         Ok(value)
     }

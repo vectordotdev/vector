@@ -9,7 +9,7 @@ use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Finalizable},
     sinks::{
         azure_common::{
@@ -33,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     pub connection_string: String,
-    pub container_name: String,
+    pub(super) container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
     pub blob_append_uuid: Option<bool>,
@@ -44,6 +44,12 @@ pub struct AzureBlobSinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
@@ -58,6 +64,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -85,6 +92,10 @@ impl SinkConfig for AzureBlobSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "azure_blob"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -236,6 +247,7 @@ fn default_config(e: StandardEncodings) -> AzureBlobSinkConfig {
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -607,6 +619,7 @@ mod integration_tests {
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             config.ensure_container().await;

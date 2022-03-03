@@ -16,7 +16,7 @@ once_cell = { version = "1.9" }
 quickcheck = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
-serde_json = { version = "1.0.78", features = ["raw_value"] }
+serde_json = { version = "1.0.79", features = ["raw_value"] }
 quickcheck = { version = "1.0.3" }
 
 [build-dependencies]

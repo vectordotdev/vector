@@ -1,6 +1,6 @@
 use std::{env, time::Instant};
 
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
@@ -9,7 +9,6 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
@@ -116,6 +115,10 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
     fn source_type(&self) -> &'static str {
         "aws_ecs_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn aws_ecs_metrics(
@@ -160,8 +163,7 @@ async fn aws_ecs_metrics(
                                     http_path: uri.path(),
                                 });
 
-                                let mut events = stream::iter(metrics).map(Event::Metric);
-                                if let Err(error) = out.send_all(&mut events).await {
+                                if let Err(error) = out.send_batch(metrics).await {
                                     emit!(&StreamClosedError { error, count });
                                     return Err(());
                                 }
@@ -534,7 +536,7 @@ mod test {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -595,7 +597,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);

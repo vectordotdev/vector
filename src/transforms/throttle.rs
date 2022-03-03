@@ -11,6 +11,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
+    schema,
     template::Template,
     transforms::{TaskTransform, Transform},
 };
@@ -41,7 +42,7 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -55,7 +56,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     clock: C,
 }
 

@@ -18,6 +18,7 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

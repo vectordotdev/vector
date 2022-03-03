@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use structopt::{clap::AppSettings, StructOpt};
+use clap::{AppSettings, FromArgMatches, IntoApp, Parser};
 
 #[cfg(windows)]
 use crate::service;
@@ -10,25 +10,23 @@ use crate::tap;
 use crate::top;
 use crate::{config, generate, get_version, graph, list, unit_test, validate};
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub root: RootOpts,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub sub_command: Option<SubCommand>,
 }
 
 impl Opts {
-    pub fn get_matches() -> Self {
+    pub fn get_matches() -> Result<Self, clap::Error> {
         let version = get_version();
-        let app = Opts::clap().version(version.as_str()).global_settings(&[
-            AppSettings::ColoredHelp,
-            AppSettings::InferSubcommands,
-            AppSettings::DeriveDisplayOrder,
-        ]);
-        Opts::from_clap(&app.get_matches())
+        let app = Opts::command()
+            .version(version.as_str())
+            .global_setting(AppSettings::DeriveDisplayOrder);
+        Opts::from_arg_matches(&app.get_matches())
     }
 
     pub const fn log_level(&self) -> &'static str {
@@ -59,19 +57,19 @@ impl Opts {
     }
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(
+    #[clap(
         name = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_paths: Vec<PathBuf>,
 
@@ -79,63 +77,63 @@ pub struct RootOpts {
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// TOML file format is expected.
-    #[structopt(
+    #[clap(
         name = "config-toml",
         long,
         env = "VECTOR_CONFIG_TOML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_paths_toml: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// JSON file format is expected.
-    #[structopt(
+    #[clap(
         name = "config-json",
         long,
         env = "VECTOR_CONFIG_JSON",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_paths_json: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// YAML file format is expected.
-    #[structopt(
+    #[clap(
         name = "config-yaml",
         long,
         env = "VECTOR_CONFIG_YAML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_paths_yaml: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
-    #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
+    #[clap(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
 
     /// Number of threads to use for processing (default is number of available cores)
-    #[structopt(short, long, env = "VECTOR_THREADS")]
+    #[clap(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[clap(short, long, parse(from_occurrences))]
     pub verbose: u8,
 
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[clap(short, long, parse(from_occurrences))]
     pub quiet: u8,
 
     /// Set the logging format
-    #[structopt(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
+    #[clap(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
     pub log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
@@ -145,11 +143,11 @@ pub struct RootOpts {
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
     /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    #[structopt(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
+    #[clap(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
-    #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
+    #[clap(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 }
 
@@ -172,8 +170,8 @@ impl RootOpts {
     }
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),

@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -25,7 +27,7 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 const PATH: &str = "/logs/ingest";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LogdnaConfig {
+pub(super) struct LogdnaConfig {
     api_key: String,
     // Deprecated name
     #[serde(alias = "host")]
@@ -50,6 +52,13 @@ pub struct LogdnaConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -106,6 +115,10 @@ impl SinkConfig for LogdnaConfig {
 
     fn sink_type(&self) -> &'static str {
         "logdna"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

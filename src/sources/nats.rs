@@ -38,7 +38,7 @@ enum BuildError {
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct NatsSourceConfig {
+struct NatsSourceConfig {
     url: String,
     #[serde(alias = "name")]
     connection_name: String,
@@ -93,16 +93,20 @@ impl SourceConfig for NatsSourceConfig {
     fn source_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSourceConfig {
-    async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
+        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
         options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
-impl std::convert::TryFrom<&NatsSourceConfig> for async_nats::Options {
+impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
@@ -111,8 +115,8 @@ impl std::convert::TryFrom<&NatsSourceConfig> for async_nats::Options {
 }
 
 fn get_subscription_stream(
-    subscription: async_nats::Subscription,
-) -> impl Stream<Item = async_nats::Message> {
+    subscription: nats::asynk::Subscription,
+) -> impl Stream<Item = nats::asynk::Message> {
     stream::unfold(subscription, |subscription| async move {
         subscription.next().await.map(|msg| (msg, subscription))
     })
@@ -120,8 +124,8 @@ fn get_subscription_stream(
 
 async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: async_nats::Connection,
-    subscription: async_nats::Subscription,
+    _connection: nats::asynk::Connection,
+    subscription: nats::asynk::Subscription,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
@@ -145,15 +149,15 @@ async fn nats_source(
 
                     let now = Utc::now();
 
-                    let events = stream::iter(events.into_iter().map(|mut event| {
+                    let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
                         event
-                    }));
+                    });
 
-                    out.send_all(events).await.map_err(|error| {
+                    out.send_batch(events).await.map_err(|error| {
                         emit!(&StreamClosedError { error, count });
                     })?;
                 }
@@ -172,7 +176,7 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> Result<(async_nats::Connection, async_nats::Subscription), BuildError> {
+) -> Result<(nats::asynk::Connection, nats::asynk::Subscription), BuildError> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {

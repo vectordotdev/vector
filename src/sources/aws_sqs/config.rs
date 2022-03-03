@@ -46,7 +46,7 @@ impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let client = self.build_client(&cx).await?;
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(
             SqsSource {
@@ -55,7 +55,7 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: acknowledgements.enabled(),
+                acknowledgements,
             }
             .run(cx.out, cx.shutdown),
         ))
@@ -67,6 +67,10 @@ impl SourceConfig for AwsSqsConfig {
 
     fn source_type(&self) -> &'static str {
         "aws_sqs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

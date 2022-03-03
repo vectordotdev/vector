@@ -320,20 +320,8 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
+	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
-
-.PHONY: test-integration-kafka
-test-integration-kafka: ## Runs Kafka integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
 
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
@@ -358,14 +346,14 @@ ifeq ($(AUTODESPAWN), true)
 	make test-integration-dnstap-cleanup
 endif
 
+test-integration-%-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+
 test-integration-%:
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
-
-test-integration-%-cleanup:
-	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
@@ -373,15 +361,11 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 30 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
+	make test-integration-shutdown
+	make test-shutdown-cleanup
+
+test-shutdown-cleanup:
+	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
@@ -449,7 +433,7 @@ check-all: check-scripts
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy

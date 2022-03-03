@@ -41,7 +41,7 @@ impl Function for Merge {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");
@@ -68,7 +68,7 @@ impl Function for Merge {
 }
 
 #[derive(Debug, Clone)]
-pub struct MergeFn {
+pub(crate) struct MergeFn {
     to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Box<dyn Expression>,
@@ -128,8 +128,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use value::Kind;
     use vector_common::btreemap;
+    use vrl::value::Kind;
 
     use super::*;
 

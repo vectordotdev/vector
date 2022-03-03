@@ -831,7 +831,7 @@ pub(self) mod bin_serialization {
 
     use super::{Bin, BinMap};
 
-    pub fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
+    pub(crate) fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -843,7 +843,7 @@ pub(self) mod bin_serialization {
         bin_map.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
     where
         D: Deserializer<'de>,
     {

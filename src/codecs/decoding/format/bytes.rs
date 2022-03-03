@@ -1,11 +1,13 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use value::Kind;
 
 use super::Deserializer;
 use crate::{
     config::log_schema,
     event::{Event, LogEvent},
+    schema,
 };
 
 /// Config used to build a `BytesDeserializer`.
@@ -21,6 +23,15 @@ impl BytesDeserializerConfig {
     /// Build the `BytesDeserializer` from this configuration.
     pub fn build(&self) -> BytesDeserializer {
         BytesDeserializer::new()
+    }
+
+    /// The schema produced by the deserializer.
+    pub fn schema_definition(&self) -> schema::Definition {
+        schema::Definition::empty().required_field(
+            log_schema().message_key(),
+            Kind::bytes(),
+            Some("message"),
+        )
     }
 }
 

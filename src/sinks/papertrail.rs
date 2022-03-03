@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     internal_events::TemplateRenderingError,
     sinks::util::{
@@ -18,7 +21,7 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct PapertrailConfig {
+pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig<Encoding>,
     keepalive: Option<TcpKeepaliveConfig>,
@@ -80,6 +83,10 @@ impl SinkConfig for PapertrailConfig {
 
     fn sink_type(&self) -> &'static str {
         "papertrail"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

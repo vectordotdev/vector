@@ -228,6 +228,10 @@ impl SourceConfig for ExecConfig {
     fn source_type(&self) -> &'static str {
         EXEC
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run_scheduled(

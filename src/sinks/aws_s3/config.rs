@@ -8,7 +8,7 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::{
     aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -24,6 +24,7 @@ use crate::{
         },
         Healthcheck,
     },
+    tls::TlsOptions,
 };
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
@@ -49,10 +50,17 @@ pub struct S3SinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for S3SinkConfig {
@@ -69,8 +77,10 @@ impl GenerateConfig for S3SinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            tls: Some(TlsOptions::default()),
             assume_role: None,
             auth: AwsAuthentication::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -92,6 +102,10 @@ impl SinkConfig for S3SinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

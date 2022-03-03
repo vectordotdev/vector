@@ -1,11 +1,8 @@
 use async_graphql::Union;
 
-use super::{
-    log::Log,
-    metric::Metric,
-    notification::{EventNotification, EventNotificationType},
-};
-use crate::api::tap::{TapNotification, TapPayload};
+use super::{log::Log, metric::Metric, notification::EventNotification, trace::Trace};
+
+use crate::api::tap::TapPayload;
 
 #[derive(Union, Debug, Clone)]
 /// An event or a notification
@@ -18,24 +15,21 @@ pub enum OutputEventsPayload {
 
     // Notification
     Notification(EventNotification),
+
+    /// Trace event
+    Trace(Trace),
 }
 
 /// Convert an `api::TapPayload` to the equivalent GraphQL type.
 impl From<TapPayload> for OutputEventsPayload {
     fn from(t: TapPayload) -> Self {
         match t {
-            TapPayload::Log(output_id, ev) => Self::Log(Log::new(output_id, ev)),
-            TapPayload::Metric(output_id, ev) => Self::Metric(Metric::new(output_id, ev)),
-            TapPayload::Notification(component_key, n) => match n {
-                TapNotification::Matched => Self::Notification(EventNotification::new(
-                    component_key,
-                    EventNotificationType::Matched,
-                )),
-                TapNotification::NotMatched => Self::Notification(EventNotification::new(
-                    component_key,
-                    EventNotificationType::NotMatched,
-                )),
-            },
+            TapPayload::Log(output, ev) => Self::Log(Log::new(output, ev)),
+            TapPayload::Metric(output, ev) => Self::Metric(Metric::new(output, ev)),
+            TapPayload::Trace(output, ev) => Self::Trace(Trace::new(output, ev)),
+            TapPayload::Notification(notification) => {
+                Self::Notification(EventNotification { notification })
+            }
         }
     }
 }

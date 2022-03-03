@@ -179,7 +179,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
+    let unwrapped_fields = fields.unwrap_or_default();
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return Err("fields must not be empty");

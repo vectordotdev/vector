@@ -10,15 +10,16 @@ use crate::{
     },
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
-    pub tags: IndexMap<String, String>,
+    tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(super) overwrite: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -55,7 +56,7 @@ impl TransformConfig for AddTagsConfig {
         Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 

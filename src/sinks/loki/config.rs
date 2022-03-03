@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::sinks::util::Compression;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
@@ -45,6 +45,13 @@ pub struct LokiConfig {
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -129,6 +136,10 @@ impl SinkConfig for LokiConfig {
 
     fn sink_type(&self) -> &'static str {
         "loki"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

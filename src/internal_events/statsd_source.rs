@@ -1,38 +1,35 @@
-// ## skip check-events ##
-
+use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct StatsdEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for StatsdEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received packet.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64,);
-    }
-}
-
-#[derive(Debug)]
-pub struct StatsdInvalidRecord<'a> {
+pub struct StatsdInvalidRecordError<'a> {
     pub error: &'a crate::sources::statsd::parser::ParseError,
     pub bytes: Bytes,
 }
 
-impl<'a> InternalEvent for StatsdInvalidRecord<'a> {
+impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, bytes = %String::from_utf8_lossy(&self.bytes));
+        error!(
+            message = "Invalid packet from statsd, discarding.",
+            error = %self.error,
+            error_code = "invalid_packet",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            bytes = %String::from_utf8_lossy(&self.bytes),
+            rate_limit_secs = 10,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "invalid_packet",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("invalid_record_total", 1,);
         counter!("invalid_record_bytes_total", self.bytes.len() as u64);
     }
@@ -63,18 +60,42 @@ impl<T> StatsdSocketError<T> {
     pub fn read(error: T) -> Self {
         Self::new(StatsdSocketErrorType::Read, error)
     }
+
+    const fn error_code(&self) -> &'static str {
+        match self.r#type {
+            StatsdSocketErrorType::Bind => "failed_udp_binding",
+            StatsdSocketErrorType::Read => "failed_udp_datagram",
+        }
+    }
 }
 
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError<T> {
     fn emit_logs(&self) {
         let message = match self.r#type {
-            StatsdSocketErrorType::Bind => "Failed to bind to UDP listener socket.",
-            StatsdSocketErrorType::Read => "Failed to read UDP datagram.",
+            StatsdSocketErrorType::Bind => {
+                format!("Failed to bind to UDP listener socket: {:?}", self.error)
+            }
+            StatsdSocketErrorType::Read => format!("Failed to read UDP datagram: {:?}", self.error),
         };
-        error!(message, error = ?self.error);
+        let error = self.error_code();
+        error!(
+            message = %message,
+            error = %error,
+            error_code = %self.error_code(),
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+            rate_limit_secs = 10,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error_code(),
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("connection_errors_total", 1);
     }
 }

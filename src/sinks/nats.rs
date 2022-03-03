@@ -7,9 +7,11 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingError},
+    internal_events::{NatsEventSendError, NatsEventSendSuccess, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -91,9 +93,13 @@ impl SinkConfig for NatsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "nats"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
 }
 
-impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::Options {
+impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
@@ -102,8 +108,8 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::Options {
 }
 
 impl NatsSinkConfig {
-    async fn connect(&self) -> Result<async_nats::Connection, BuildError> {
-        let options: async_nats::Options = self.try_into().context(ConfigSnafu)?;
+    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
+        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
 
         options.connect(&self.url).await.context(ConnectSnafu)
     }
@@ -115,7 +121,7 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
 
 pub struct NatsSink {
     encoding: EncodingConfig<Encoding>,
-    connection: async_nats::Connection,
+    connection: nats::asynk::Connection,
     subject: Template,
     acker: Acker,
 }
@@ -160,7 +166,7 @@ impl StreamSink<Event> for NatsSink {
                     });
                 }
                 Err(error) => {
-                    emit!(&NatsEventSendFail { error });
+                    emit!(&NatsEventSendError { error });
                 }
             }
 

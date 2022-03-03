@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
     event::Event,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum EventType {
     Log,
     Metric,
@@ -20,14 +21,14 @@ impl Default for EventType {
 }
 
 impl EventType {
-    const fn validate(&self, event: &Event) -> bool {
+    const fn validate(self, event: &Event) -> bool {
         match self {
             Self::Log => matches!(event, Event::Log(_)),
             Self::Metric => matches!(event, Event::Metric(_)),
         }
     }
 
-    const fn data_type(&self) -> DataType {
+    const fn data_type(self) -> DataType {
         match self {
             Self::Log => DataType::Log,
             Self::Metric => DataType::Metric,
@@ -40,7 +41,7 @@ impl EventType {
 /// and then propagate them to the series of pipeline.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct EventRouterConfig {
+pub(super) struct EventRouterConfig {
     filter: EventType,
     // This inner field contains a list of pipelines that will be expanded.
     inner: Option<Box<dyn TransformConfig>>,
@@ -76,9 +77,7 @@ impl TransformConfig for EventRouterConfig {
             let mut res: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
             res.insert(
                 "filter".to_string(),
-                Box::new(EventFilterConfig {
-                    inner: self.filter.clone(),
-                }),
+                Box::new(EventFilterConfig { inner: self.filter }),
             );
             res.insert("pipelines".to_string(), inner.clone());
             Ok(Some((res, ExpandType::Serial { alias: true })))
@@ -88,10 +87,10 @@ impl TransformConfig for EventRouterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(self.filter.data_type())]
     }
 
@@ -115,10 +114,10 @@ impl TransformConfig for EventFilterConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(self.inner.data_type())]
     }
 

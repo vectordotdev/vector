@@ -28,7 +28,7 @@ impl Function for Floor {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -60,7 +60,11 @@ impl Expression for FloorFn {
         };
 
         match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::floor).into()),
+            Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+                *f,
+                precision,
+                f64::floor,
+            ))),
             value @ Value::Integer(_) => Ok(value),
             value => Err(value::Error::Expected {
                 got: value.kind(),

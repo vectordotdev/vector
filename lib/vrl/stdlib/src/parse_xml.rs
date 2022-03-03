@@ -50,7 +50,7 @@ impl Function for ParseXml {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -341,7 +341,7 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
 
             // Then a float.
             if let Ok(v) = text.parse::<f64>() {
-                return v.into();
+                return Value::from_f64_or_zero(v);
             }
 
             // Fall back to string.

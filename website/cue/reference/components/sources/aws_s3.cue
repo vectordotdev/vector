@@ -4,6 +4,7 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: true
 		collect: {
 			tls: enabled:        false
@@ -38,7 +39,7 @@ components: sources: aws_s3: components._aws & {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		strategy: {
 			common:      false
 			description: "The strategy to use to consume objects from AWS S3."

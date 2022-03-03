@@ -9,6 +9,7 @@ use crate::{
     internal_events::{
         AnsiStripperError, AnsiStripperFieldInvalidError, AnsiStripperFieldMissingError,
     },
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -45,7 +46,7 @@ impl TransformConfig for AnsiStripperConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -55,7 +56,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct AnsiStripper {
+pub(self) struct AnsiStripper {
     field: String,
 }
 

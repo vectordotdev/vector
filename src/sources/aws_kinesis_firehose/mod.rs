@@ -58,13 +58,13 @@ impl fmt::Display for Compression {
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out,
         );
 
@@ -94,6 +94,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -180,7 +184,7 @@ mod tests {
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,

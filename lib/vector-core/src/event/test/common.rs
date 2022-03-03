@@ -8,7 +8,8 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
 use crate::event::{
     metric::{Bucket, MetricData, MetricName, MetricSeries, Quantile, Sample},
-    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value,
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
+    Value,
 };
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
@@ -67,6 +68,7 @@ impl Arbitrary for Event {
         match self {
             Event::Log(log_event) => Box::new(log_event.shrink().map(Event::Log)),
             Event::Metric(metric) => Box::new(metric.shrink().map(Event::Metric)),
+            Event::Trace(trace) => Box::new(trace.shrink().map(Event::Trace)),
         }
     }
 }
@@ -86,6 +88,22 @@ impl Arbitrary for LogEvent {
             fields
                 .shrink()
                 .map(move |x| LogEvent::from_parts(x, metadata.clone())),
+        )
+    }
+}
+
+impl Arbitrary for TraceEvent {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Self::from(LogEvent::arbitrary(g))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        let (fields, metadata) = self.clone().into_parts();
+
+        Box::new(
+            fields
+                .shrink()
+                .map(move |x| TraceEvent::from_parts(x, metadata.clone())),
         )
     }
 }

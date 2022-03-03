@@ -10,6 +10,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -60,7 +61,7 @@ impl TransformConfig for ConcatConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -141,7 +142,7 @@ impl FunctionTransform for Concat {
 
         for substring in self.items.iter() {
             if let Some(value) = event.as_log().get(&substring.source) {
-                let b = value.as_bytes();
+                let b = value.coerce_to_bytes();
                 let start = match substring.start {
                     None => 0,
                     Some(s) => {

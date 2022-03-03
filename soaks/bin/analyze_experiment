@@ -12,7 +12,7 @@ parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline ex
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
 parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
-parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--mean-drift-percentage', type=float, default=5, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 5')
 parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
 parser.add_argument('--warmup-seconds', type=int, default=30, help='the number of seconds to treat as warmup')
@@ -74,6 +74,7 @@ for exp in bytes_written.experiment.unique():
     results.append({'experiment': exp,
                     'Δ mean': diff.mean(),
                     'Δ mean %': percent_change,
+                    'confidence': common.confidence(res.pvalue),
                     'baseline mean': baseline_mean,
                     'baseline stdev': baseline_stdev,
                     'baseline stderr': baseline_stderr,
@@ -127,16 +128,14 @@ p_value_violation = results['p-value'] < args.p_value
 erratic_violation = results.erratic == True
 
 changes = results[p_value_violation & drift_filter & ~declared_erratic].copy(deep=True)
-changes['Δ confidence'] = changes['p-value'].apply(common.confidence)
 changes = changes.drop(labels=['p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
                                'baseline outlier %', 'baseline CoV',
                                'comparison outlier %', 'comparison CoV', 'erratic',
-                               'comparison stdev', 'declared erratic'], axis=1)
+                               'comparison stdev', 'declared erratic', 'baseline stderr',
+                               'comparison stderr'], axis=1)
 changes = changes.sort_values('Δ mean %', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(common.human_bytes)
-changes['baseline stderr'] = changes['baseline stderr'].apply(common.human_bytes)
-changes['comparison stderr'] = changes['comparison stderr'].apply(common.human_bytes)
 
 no_longer_erratic = results[~erratic_violation & declared_erratic].copy(deep=True)
 no_longer_erratic = no_longer_erratic.drop(labels=['p-value', 'baseline mean',
@@ -159,12 +158,12 @@ detected_not_erratic = len(no_longer_erratic) > 0
 detected_actually_erratic = len(actually_erratic) > 0
 
 if detected_changes:
-    print(f"Changes in throughput with confidence ≥ {common.confidence(args.p_value)}:")
+    print(f"Changes in throughput with confidence ≥ {common.confidence(args.p_value)} and absolute Δ mean >= ±{args.mean_drift_percentage}%:")
     print()
     print(changes.to_markdown(index=False, tablefmt='github'))
     print()
 else:
-    print(f"No interesting changes with confidence ≥ {common.confidence(args.p_value)}:")
+    print(f"No interesting changes in throughput with confidence ≥ {common.confidence(args.p_value)} and absolute Δ mean >= ±{args.mean_drift_percentage}%:")
     print()
 
 if args.report_erratic and detected_not_erratic:
@@ -184,6 +183,7 @@ print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print()
 results = results.sort_values('Δ mean %', ascending=False)
+results = results.drop(labels=["p-value"], axis=1) # only used for detecting changes
 results['Δ mean'] = results['Δ mean'].apply(common.human_bytes)
 results['baseline mean'] = results['baseline mean'].apply(common.human_bytes)
 results['baseline stdev'] = results['baseline stdev'].apply(common.human_bytes)

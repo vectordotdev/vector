@@ -224,178 +224,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "ComponentEventsInThroughput",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "throughput",
-              "description": "Events processed throughput",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsInTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Total incoming events metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsInTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsOutThroughput",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "throughput",
-              "description": "Events processed throughput",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "ComponentEventsOutTotal",
-          "description": null,
-          "fields": [
-            {
-              "name": "componentId",
-              "description": "Component id",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "metric",
-              "description": "Total outgoing events metric",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsOutTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "ENUM",
           "name": "ComponentKind",
           "description": null,
@@ -1183,8 +1011,24 @@
           "description": "A notification regarding events observation",
           "fields": [
             {
-              "name": "pattern",
-              "description": "Pattern that raised the event",
+              "name": "notification",
+              "description": "Notification details",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "UNION",
+                  "name": "Notification",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "message",
+              "description": "The human-readable message associated with the notification",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1197,50 +1041,11 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "notification",
-              "description": "Event notification type",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "EventNotificationType",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [],
           "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "ENUM",
-          "name": "EventNotificationType",
-          "description": "Event notification type",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "MATCHED",
-              "description": "A component was found that matched the provided pattern",
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "NOT_MATCHED",
-              "description": "There isn't currently a component that matches this pattern",
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
           "possibleTypes": null
         },
         {
@@ -2338,6 +2143,57 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "InvalidMatch",
+          "description": "The pattern matched source(s) which cannot be tapped for inputs or sink(s)\nwhich cannot be tapped for outputs",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "invalidMatches",
+              "description": "Any invalid matches for the pattern",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Json",
           "description": "Raw JSON data`",
@@ -2414,6 +2270,38 @@
             {
               "name": "componentId",
               "description": "Id of the component associated with the log event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentType",
+              "description": "Type of component associated with the log event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the log event",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2505,6 +2393,33 @@
                 "kind": "SCALAR",
                 "name": "Json",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Matched",
+          "description": "A component was found that matched the provided pattern",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2705,6 +2620,38 @@
             {
               "name": "componentId",
               "description": "Id of the component associated with the metric event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentType",
+              "description": "Type of component associated with the metric event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the metric event",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3085,6 +3032,59 @@
         },
         {
           "kind": "OBJECT",
+          "name": "NotMatched",
+          "description": "There isn't currently a component that matches this pattern",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "UNION",
+          "name": "Notification",
+          "description": "A specific kind of notification with additional details",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Matched",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "NotMatched",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "InvalidMatch",
+              "ofType": null
+            }
+          ]
+        },
+        {
+          "kind": "OBJECT",
           "name": "Output",
           "description": null,
           "fields": [
@@ -3144,6 +3144,11 @@
             {
               "kind": "OBJECT",
               "name": "EventNotification",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Trace",
               "ofType": null
             }
           ]
@@ -4321,16 +4326,24 @@
               "deprecationReason": null
             },
             {
-              "name": "outputType",
+              "name": "outputTypes",
               "description": "Source output type",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "ENUM",
-                  "name": "SourceOutputType",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "SourceOutputType",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -4641,12 +4654,6 @@
           "interfaces": null,
           "enumValues": [
             {
-              "name": "ANY",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "LOG",
               "description": null,
               "isDeprecated": false,
@@ -4654,6 +4661,12 @@
             },
             {
               "name": "METRIC",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "TRACE",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -4671,6 +4684,42 @@
               "name": "equals",
               "description": null,
               "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "notEquals",
+              "description": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "ENUM",
+                    "name": "SourceOutputType",
+                    "ofType": null
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "contains",
+              "description": null,
+              "type": {
                 "kind": "ENUM",
                 "name": "SourceOutputType",
                 "ofType": null
@@ -4678,7 +4727,7 @@
               "defaultValue": null
             },
             {
-              "name": "notEquals",
+              "name": "notContains",
               "description": null,
               "type": {
                 "kind": "ENUM",
@@ -5132,37 +5181,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsInTotal",
-              "description": "Total incoming events metrics",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsInTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use received_events_total instead"
-            },
-            {
               "name": "receivedEventsTotal",
               "description": "Total received events metrics",
               "args": [
@@ -5190,39 +5208,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsInThroughput",
-              "description": "Total incoming events throughput sampled over the provided millisecond `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
               "isDeprecated": true,
-              "deprecationReason": "Use received_events_throughput instead"
+              "deprecationReason": "Use component_received_events_totals instead"
             },
             {
               "name": "receivedEventsThroughput",
@@ -5250,45 +5237,6 @@
                   "kind": "SCALAR",
                   "name": "Int",
                   "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentEventsInThroughputs",
-              "description": "Total incoming component events throughput metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsInThroughput",
-                      "ofType": null
-                    }
-                  }
                 }
               },
               "isDeprecated": true,
@@ -5334,45 +5282,6 @@
               "deprecationReason": null
             },
             {
-              "name": "componentEventsInTotals",
-              "description": "Total incoming component event metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsInTotal",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use component_received_events_totals instead"
-            },
-            {
               "name": "componentReceivedEventsTotals",
               "description": "Total received component event metrics over `interval`",
               "args": [
@@ -5412,37 +5321,6 @@
               "deprecationReason": null
             },
             {
-              "name": "eventsOutTotal",
-              "description": "Total outgoing events metrics",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "EventsOutTotal",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use sent_events_total instead"
-            },
-            {
               "name": "sentEventsTotal",
               "description": "Total sent events metrics",
               "args": [
@@ -5470,39 +5348,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "eventsOutThroughput",
-              "description": "Total outgoing events throughput sampled over the provided millisecond `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
               "isDeprecated": true,
-              "deprecationReason": "Use sent_events_throughput instead"
+              "deprecationReason": "Use component_sent_events_totals instead"
             },
             {
               "name": "sentEventsThroughput",
@@ -5530,45 +5377,6 @@
                   "kind": "SCALAR",
                   "name": "Int",
                   "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "componentEventsOutThroughputs",
-              "description": "Total outgoing component event throughput metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsOutThroughput",
-                      "ofType": null
-                    }
-                  }
                 }
               },
               "isDeprecated": true,
@@ -5612,45 +5420,6 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "componentEventsOutTotals",
-              "description": "Total outgoing component event metrics over `interval`",
-              "args": [
-                {
-                  "name": "interval",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": "1000"
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "ComponentEventsOutTotal",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "Use component_sent_events_totals instead"
             },
             {
               "name": "componentSentEventsTotals",
@@ -5969,7 +5738,7 @@
               "description": "A stream of events emitted from matched component ID patterns",
               "args": [
                 {
-                  "name": "patterns",
+                  "name": "outputsPatterns",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
@@ -5985,6 +5754,24 @@
                           "name": "String",
                           "ofType": null
                         }
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "inputsPatterns",
+                  "description": null,
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "String",
+                        "ofType": null
                       }
                     }
                   },
@@ -6117,6 +5904,123 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Trace",
+          "description": "Trace event with fields for querying trace data",
+          "fields": [
+            {
+              "name": "componentId",
+              "description": "Id of the component associated with the trace event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentType",
+              "description": "Type of component associated with the trace event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "componentKind",
+              "description": "Kind of component associated with the trace event",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "string",
+              "description": "Trace event as an encoded string format",
+              "args": [
+                {
+                  "name": "encoding",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "EventEncodingType",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "json",
+              "description": "Get JSON field data on the trace event, by field name",
+              "args": [
+                {
+                  "name": "field",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Json",
                 "ofType": null
               },
               "isDeprecated": false,

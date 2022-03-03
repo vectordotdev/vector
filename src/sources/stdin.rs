@@ -72,6 +72,10 @@ impl SourceConfig for StdinConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::Stdin]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 pub fn stdin_source<R>(
@@ -159,7 +163,7 @@ where
         }
         .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

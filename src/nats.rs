@@ -15,7 +15,7 @@ pub enum NatsConfigError {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub enum NatsAuthConfig {
+pub(crate) enum NatsAuthConfig {
     UserPassword { user: String, password: String },
     Token { token: String },
     CredentialsFile { path: String },
@@ -23,35 +23,35 @@ pub enum NatsAuthConfig {
 }
 
 impl NatsAuthConfig {
-    pub fn to_nats_options(&self) -> Result<async_nats::Options, NatsConfigError> {
+    pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
         match self {
             NatsAuthConfig::UserPassword { user, password } => {
-                Ok(async_nats::Options::with_user_pass(user, password))
+                Ok(nats::asynk::Options::with_user_pass(user, password))
             }
             NatsAuthConfig::CredentialsFile { path } => {
-                Ok(async_nats::Options::with_credentials(path))
+                Ok(nats::asynk::Options::with_credentials(path))
             }
             NatsAuthConfig::NKey { nkey, seed } => {
                 let kp = nkeys::KeyPair::from_seed(seed).context(AuthConfigSnafu)?;
                 // The following unwrap is safe because the only way the sign method can fail is if
                 // keypair does not contain a seed. We are constructing the keypair from a seed in
                 // the preceding line.
-                Ok(async_nats::Options::with_nkey(nkey, move |nonce| {
+                Ok(nats::asynk::Options::with_nkey(nkey, move |nonce| {
                     kp.sign(nonce).unwrap()
                 }))
             }
-            NatsAuthConfig::Token { token } => Ok(async_nats::Options::with_token(token)),
+            NatsAuthConfig::Token { token } => Ok(nats::asynk::Options::with_token(token)),
         }
     }
 }
 
-pub fn from_tls_auth_config(
+pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: &Option<NatsAuthConfig>,
     tls_config: &Option<TlsConfig>,
-) -> Result<async_nats::Options, NatsConfigError> {
+) -> Result<nats::asynk::Options, NatsConfigError> {
     let nats_options = match &auth_config {
-        None => async_nats::Options::new(),
+        None => nats::asynk::Options::new(),
         Some(auth) => auth.to_nats_options()?,
     };
 
