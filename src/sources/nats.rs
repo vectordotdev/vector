@@ -45,6 +45,7 @@ struct NatsSourceConfig {
     subject: String,
     queue: Option<String>,
     tls: Option<TlsConfig>,
+    #[serde(flatten)]
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -207,6 +208,10 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use super::*;
+    use crate::nats::{
+        NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthStrategy, NatsAuthToken,
+        NatsAuthUserPassword,
+    };
     use crate::test_util::{collect_n, random_string};
     use crate::tls::TlsOptions;
 
@@ -262,9 +267,13 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::UserPassword {
-                user: "natsuser".into(),
-                password: "natspass".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::UserPassword,
+                user_password: Some(NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "natspass".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -288,9 +297,13 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::UserPassword {
-                user: "natsuser".into(),
-                password: "wrongpass".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::UserPassword,
+                user_password: Some(NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "wrongpass".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -314,8 +327,12 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::Token {
-                token: "secret".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::Token,
+                token: Some(NatsAuthToken {
+                    value: "secret".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -339,8 +356,12 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::Token {
-                token: "wrongsecret".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::Token,
+                token: Some(NatsAuthToken {
+                    value: "wrongsecret".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -364,9 +385,13 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::NKey {
-                nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
-                seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::NKey,
+                nkey: Some(NatsAuthNKey {
+                    nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
+                    seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -390,9 +415,13 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig::NKey {
-                nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
-                seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::NKey,
+                nkey: Some(NatsAuthNKey {
+                    nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
+                    seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -534,8 +563,12 @@ mod integration_tests {
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig::CredentialsFile {
-                path: "tests/data/nats.creds".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::NKey,
+                credentials_file: Some(NatsAuthCredentialsFile {
+                    path: "tests/data/nats.creds".into(),
+                }),
+                ..Default::default()
             }),
         };
 
@@ -565,8 +598,12 @@ mod integration_tests {
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig::CredentialsFile {
-                path: "tests/data/nats-bad.creds".into(),
+            auth: Some(NatsAuthConfig {
+                strategy: NatsAuthStrategy::NKey,
+                credentials_file: Some(NatsAuthCredentialsFile {
+                    path: "tests/data/nats-bad.creds".into(),
+                }),
+                ..Default::default()
             }),
         };
 
