@@ -6,10 +6,7 @@ use url::Url;
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::{
-            EventNotificationType,
-            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
-        },
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         TapEncodingFormat, TapSubscriptionExt,
     },
     Client,
@@ -127,11 +124,7 @@ async fn run(
                         },
                         OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                             if !opts.quiet {
-                                match ev.notification {
-                                    EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
-                                    EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
-                                    EventNotificationType::Other(_) => {},
-                                }
+                                eprintln!("{}", ev.message);
                             }
                         },
                     }
