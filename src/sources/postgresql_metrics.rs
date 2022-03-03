@@ -511,7 +511,7 @@ impl PostgresqlMetrics {
                 });
                 emit!(&EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
-                Ok(result.into_iter().map(|(metrics, _)| metrics).flatten())
+                Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }
             Err(error) => Err(error.to_string()),
         }

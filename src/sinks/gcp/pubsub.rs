@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
     sinks::{
@@ -65,6 +65,13 @@ pub struct PubsubConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_skip_authentication() -> bool {
@@ -122,8 +129,8 @@ impl SinkConfig for PubsubConfig {
         "gcp_pubsub"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

@@ -85,7 +85,7 @@ impl Function for Set {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -97,7 +97,7 @@ impl Function for Set {
 }
 
 #[derive(Debug, Clone)]
-pub struct SetFn {
+pub(crate) struct SetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     data: Box<dyn Expression>,

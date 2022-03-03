@@ -48,6 +48,7 @@ async fn cloudwatch_insert_log_event() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -96,6 +97,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -163,6 +165,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -236,6 +239,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -289,6 +293,7 @@ async fn cloudwatch_insert_log_event_batched() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -338,6 +343,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -426,6 +432,7 @@ async fn cloudwatch_healthcheck() {
         tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).unwrap();

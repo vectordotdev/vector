@@ -7,17 +7,14 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::sync::Arc;
 use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticError, ExpressionError},
-    Program, Runtime, Terminate,
+    Program, Runtime, Terminate, Vm, VrlRuntime,
 };
-
-use std::sync::Arc;
-#[cfg(feature = "vrl-vm")]
-use vrl::Vm;
 
 use crate::{
     config::{
@@ -45,6 +42,8 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
+    #[serde(default)]
+    pub runtime: VrlRuntime,
 }
 
 impl RemapConfig {
@@ -77,7 +76,7 @@ impl RemapConfig {
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let mut state = vrl::state::Compiler::new_with_kind(merged_schema_definition.into());
-        state.set_external_context(Some(Box::new(enrichment_tables)));
+        state.set_external_context(enrichment_tables);
 
         vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| {
@@ -166,9 +165,7 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
-
-    #[cfg(feature = "vrl-vm")]
-    vm: Arc<Vm>,
+    vm: Option<Arc<Vm>>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -179,7 +176,6 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        #[allow(unused_variables /* `functions` is used by vrl-vm */)]
         let (program, functions, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
@@ -187,8 +183,10 @@ impl Remap {
 
         let runtime = Runtime::default();
 
-        #[cfg(feature = "vrl-vm")]
-        let vm = Arc::new(runtime.compile(functions, &program)?);
+        let vm = match config.runtime {
+            VrlRuntime::Vm => Some(Arc::new(runtime.compile(functions, &program)?)),
+            VrlRuntime::Ast => None,
+        };
 
         let default_schema_definition = context
             .schema_definitions
@@ -211,7 +209,6 @@ impl Remap {
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            #[cfg(feature = "vrl-vm")]
             vm,
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
@@ -223,27 +220,31 @@ impl Remap {
         &self.runtime
     }
 
+    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+        let message = error
+            .notes()
+            .iter()
+            .filter(|note| matches!(note, Note::UserErrorMessage(_)))
+            .last()
+            .map(|note| note.to_string())
+            .unwrap_or_else(|| error.to_string());
+        serde_json::json!({
+            "dropped": {
+                "reason": reason,
+                "message": message,
+                "component_id": self.component_key,
+                "component_type": "remap",
+                "component_kind": "transform",
+            }
+        })
+    }
+
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) | Event::Trace(ref mut log) => {
-                let message = error
-                    .notes()
-                    .iter()
-                    .filter(|note| matches!(note, Note::UserErrorMessage(_)))
-                    .last()
-                    .map(|note| note.to_string())
-                    .unwrap_or_else(|| error.to_string());
+            Event::Log(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
-                    serde_json::json!({
-                        "dropped": {
-                            "reason": reason,
-                            "message": message,
-                            "component_id": self.component_key,
-                            "component_type": "remap",
-                            "component_kind": "transform",
-                        }
-                    }),
+                    self.anotate_data(reason, error),
                 );
             }
             Event::Metric(ref mut metric) => {
@@ -259,19 +260,24 @@ impl Remap {
                 metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
                 metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
             }
+            Event::Trace(ref mut trace) => {
+                trace.insert(
+                    log_schema().metadata_key(),
+                    self.anotate_data(reason, error),
+                );
+            }
         }
     }
 
-    #[cfg(feature = "vrl-vm")]
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
-        self.runtime.run_vm(&self.vm, target, &self.timezone)
-    }
-
-    #[cfg(not(feature = "vrl-vm"))]
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
-        let result = self.runtime.resolve(target, &self.program, &self.timezone);
-        self.runtime.clear();
-        result
+        match &self.vm {
+            Some(vm) => self.runtime.run_vm(vm, target, &self.timezone),
+            None => {
+                let result = self.runtime.resolve(target, &self.program, &self.timezone);
+                self.runtime.clear();
+                result
+            }
+        }
     }
 }
 
@@ -285,8 +291,7 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
-            #[cfg(feature = "vrl-vm")]
-            vm: Arc::clone(&self.vm),
+            vm: self.vm.clone(),
             default_schema_definition: Arc::clone(&self.default_schema_definition),
             dropped_schema_definition: Arc::clone(&self.dropped_schema_definition),
         }

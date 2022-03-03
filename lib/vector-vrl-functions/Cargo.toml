@@ -7,4 +7,6 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
+lookup = { path = "../lookup" }
+value = { path = "../value" }
 vrl = { package = "vrl", path = "../vrl/vrl" }

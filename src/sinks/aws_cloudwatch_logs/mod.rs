@@ -20,15 +20,11 @@ pub enum CloudwatchLogsError {
     HttpClientError {
         source: rusoto_core::request::TlsError,
     },
+
     #[snafu(display("{}", source))]
     InvalidCloudwatchCredentials {
         source: rusoto_credential::CredentialsError,
     },
-    #[snafu(display("Encoded event is too long, length={}", length))]
-    EventTooLong { length: usize },
-
-    #[snafu(display("{}", source))]
-    IoError { source: std::io::Error },
 }
 
 inventory::submit! {
