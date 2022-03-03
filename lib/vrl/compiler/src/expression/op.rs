@@ -187,7 +187,8 @@ impl Expression for Op {
                 .with_kind(K::boolean()),
 
             // ... / ...
-            Div => {
+            // ... % ...
+            Div | Rem => {
                 let td = TypeDef::float();
 
                 // Division is infallible if the rhs is a literal normal float or integer.
@@ -216,7 +217,7 @@ impl Expression for Op {
             // 1.0 - ...
             // 1.0 * ...
             // 1.0 % ...
-            Add | Sub | Mul | Rem if lhs_def.is_float() || rhs_def.is_float() => lhs_def
+            Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
                 .fallible_unless(K::integer().or_float())
                 .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::float()),
@@ -225,7 +226,7 @@ impl Expression for Op {
             // 1 - 1
             // 1 * 1
             // 1 % 1
-            Add | Sub | Mul | Rem if lhs_def.is_integer() && rhs_def.is_integer() => {
+            Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
                 lhs_def.merge_deep(rhs_def).with_kind(K::integer())
             }
 
@@ -247,8 +248,7 @@ impl Expression for Op {
                 .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
-            // ... % ...
-            Sub | Rem => lhs_def
+            Sub => lhs_def
                 .merge_deep(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
