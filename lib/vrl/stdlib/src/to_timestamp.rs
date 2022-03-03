@@ -25,18 +25,45 @@ fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
             b"nanoseconds" => Utc.timestamp_nanos(v).into(),
             _ => unreachable!(),
         },
-        Float(v) => {
-            let t = Utc
-                .timestamp_opt(
-                    v.trunc() as i64,
-                    (v.fract() * 1_000_000_000.0).round() as u32,
-                )
-                .single();
-            match t {
-                Some(time) => time.into(),
-                None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+        Float(v) => match unit.as_ref() {
+            b"seconds" => {
+                let t = Utc
+                    .timestamp_opt(
+                        v.trunc() as i64,
+                        (v.fract() * 1_000_000_000.0).round() as u32,
+                    )
+                    .single();
+                match t {
+                    Some(time) => time.into(),
+                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                }
             }
-        }
+            b"milliseconds" => {
+                let t = Utc
+                    .timestamp_opt(
+                        (v.trunc() / 1_000.0) as i64,
+                        (v.fract() * 1_000_000.0).round() as u32,
+                    )
+                    .single();
+                match t {
+                    Some(time) => time.into(),
+                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                }
+            }
+            b"nanoseconds" => {
+                let t = Utc
+                    .timestamp_opt(
+                        (v.trunc() / 1_000_000_000.0) as i64,
+                        v.fract().round() as u32,
+                    )
+                    .single();
+                match t {
+                    Some(time) => time.into(),
+                    None => return Err(format!("unable to coerce {} into timestamp", v).into()),
+                }
+            }
+            _ => unreachable!(),
+        },
         Bytes(v) => Conversion::Timestamp(TimeZone::Local)
             .convert::<Value>(v)
             .map_err(|err| err.to_string())?,
