@@ -14,7 +14,7 @@ components: sinks: nats: {
 
 	features: {
 		acknowledgements: capable: false
-		healthcheck: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			compression: enabled: false
 			encoding: {

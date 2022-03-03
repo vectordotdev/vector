@@ -16,7 +16,7 @@ components: sources: http: {
 
 	features: {
 		acknowledgements: capable: true
-		multiline: enabled: false
+		multiline: enabled:        false
 		codecs: {
 			enabled:         true
 			default_framing: "newline_delimited"

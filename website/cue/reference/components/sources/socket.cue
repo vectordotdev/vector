@@ -16,7 +16,7 @@ components: sources: socket: {
 
 	features: {
 		acknowledgements: capable: false
-		multiline: enabled: false
+		multiline: enabled:        false
 		codecs: {
 			enabled:         true
 			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"

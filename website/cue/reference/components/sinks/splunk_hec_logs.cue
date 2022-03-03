@@ -15,7 +15,7 @@ components: sinks: splunk_hec_logs: {
 
 	features: {
 		acknowledgements: capable: true
-		healthcheck: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

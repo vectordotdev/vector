@@ -17,7 +17,7 @@ components: sinks: prometheus_exporter: {
 
 	features: {
 		acknowledgements: capable: false
-		healthcheck: enabled: false
+		healthcheck: enabled:      false
 		exposes: {
 			tls: {
 				enabled:                true

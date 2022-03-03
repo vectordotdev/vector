@@ -14,7 +14,7 @@ components: sinks: console: {
 
 	features: {
 		acknowledgements: capable: false
-		healthcheck: enabled: false
+		healthcheck: enabled:      false
 		send: {
 			compression: enabled: false
 			encoding: {

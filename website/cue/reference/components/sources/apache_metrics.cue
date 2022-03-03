@@ -14,7 +14,7 @@ components: sources: apache_metrics: {
 
 	features: {
 		acknowledgements: capable: false
-		multiline: enabled: false
+		multiline: enabled:        false
 		collect: {
 			checkpoint: enabled: false
 			from: {

@@ -16,7 +16,7 @@ components: sources: statsd: {
 
 	features: {
 		acknowledgements: capable: false
-		multiline: enabled: false
+		multiline: enabled:        false
 		receive: {
 			from: {
 				service: services.statsd

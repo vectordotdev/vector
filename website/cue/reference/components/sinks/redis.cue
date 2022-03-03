@@ -12,7 +12,7 @@ components: sinks: redis: {
 	}
 	features: {
 		acknowledgements: capable: true
-		healthcheck: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			compression: enabled: false
 			batch: {

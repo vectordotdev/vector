@@ -22,7 +22,7 @@ components: sources: heroku_logs: {
 
 	features: {
 		acknowledgements: capable: true
-		multiline: enabled: false
+		multiline: enabled:        false
 		codecs: {
 			enabled:         true
 			default_framing: "bytes"

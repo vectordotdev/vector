@@ -14,7 +14,7 @@ components: sinks: kafka: {
 
 	features: {
 		acknowledgements: capable: true
-		healthcheck: enabled: true
+		healthcheck: enabled:      true
 		send: {
 			batch: {
 				enabled:      true

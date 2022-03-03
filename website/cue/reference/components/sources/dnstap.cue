@@ -14,7 +14,7 @@ components: sources: dnstap: {
 
 	features: {
 		acknowledgements: capable: false
-		multiline: enabled: false
+		multiline: enabled:        false
 		receive: {
 			from: {
 				service: services.dnstap_data

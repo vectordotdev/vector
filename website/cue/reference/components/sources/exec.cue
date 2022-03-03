@@ -14,7 +14,7 @@ components: sources: exec: {
 
 	features: {
 		acknowledgements: capable: false
-		multiline: enabled: false
+		multiline: enabled:        false
 		codecs: {
 			enabled:         true
 			default_framing: "newline_delimited"

@@ -14,7 +14,7 @@ components: sinks: blackhole: {
 
 	features: {
 		acknowledgements: capable: true
-		healthcheck: enabled: false
+		healthcheck: enabled:      false
 		send: {
 			compression: enabled: false
 			encoding: enabled:    false

@@ -5,7 +5,7 @@ components: sources: aws_s3: components._aws & {
 
 	features: {
 		acknowledgements: capable: true
-		multiline: enabled: true
+		multiline: enabled:        true
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
