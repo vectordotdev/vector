@@ -103,14 +103,24 @@ impl Function for ToTimestamp {
                 result: Ok("t'2020-01-01T00:00:00Z'"),
             },
             Example {
-                title: "integer",
+                title: "integer as seconds",
                 source: "to_timestamp!(5)",
                 result: Ok("t'1970-01-01T00:00:05Z'"),
             },
             Example {
-                title: "float",
+                title: "float as seconds",
                 source: "to_timestamp!(5.6)",
                 result: Ok("t'1970-01-01T00:00:05.600Z'"),
+            },
+            Example {
+                title: "integer as milliseconds",
+                source: r#"to_timestamp!(5000, unit: "milliseconds")"#,
+                result: Ok("t'1970-01-01T00:00:05Z'"),
+            },
+            Example {
+                title: "float as nanoseconds",
+                source: r#"to_timestamp!(56000000000.7, unit: "nanoseconds")"#,
+                result: Ok("t'1970-01-01T00:00:56.000000001Z'"),
             },
             Example {
                 title: "string valid",
