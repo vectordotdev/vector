@@ -35,7 +35,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, LogEvent, Value},
+    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -287,88 +287,126 @@ impl JournaldSource {
         mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
         checkpointer: &'a mut StatefulCheckpointer,
     ) -> bool {
+        let batch_size = self.batch_size;
         loop {
-            let mut record_size = 0;
-            let mut count = 0;
-            let mut byte_size = 0;
-            let mut events = Vec::new();
-            let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-            let mut exiting = None;
+            let mut batch = Batch::new(self, checkpointer);
 
-            for _ in 0..self.batch_size {
-                let bytes = match stream.next().await {
-                    None => {
-                        warn!("Journalctl process stopped.");
-                        exiting = Some(true);
-                        break;
-                    }
-                    Some(Ok(text)) => text,
-                    Some(Err(error)) => {
-                        error!(
-                            message = "Could not read from journald source.",
-                            %error,
-                        );
-                        break;
-                    }
-                };
+            for _ in 0..batch_size {
+                if !batch.handle_result(stream.next().await) {
+                    break;
+                }
+            }
+            if let Some(x) = batch.finish().await {
+                break x;
+            }
+        }
+    }
+}
 
-                let mut record = match decode_record(&bytes, self.remap_priority) {
-                    Ok(record) => record,
+struct Batch<'a> {
+    events: Vec<LogEvent>,
+    record_size: usize,
+    exiting: Option<bool>,
+    batch: Option<Arc<BatchNotifier>>,
+    receiver: Option<BatchStatusReceiver>,
+    source: &'a mut JournaldSource,
+    checkpointer: &'a mut StatefulCheckpointer,
+}
+
+impl<'a> Batch<'a> {
+    fn new(source: &'a mut JournaldSource, checkpointer: &'a mut StatefulCheckpointer) -> Self {
+        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(source.acknowledgements);
+        Self {
+            events: Vec::new(),
+            record_size: 0,
+            exiting: None,
+            batch,
+            receiver,
+            source,
+            checkpointer,
+        }
+    }
+
+    fn handle_result(&mut self, result: Option<Result<Bytes, BoxedFramingError>>) -> bool {
+        match result {
+            None => {
+                warn!("Journalctl process stopped.");
+                self.exiting = Some(true);
+                false
+            }
+            Some(Err(error)) => {
+                error!(
+                    message = "Could not read from journald source.",
+                    %error,
+                );
+                false
+            }
+            Some(Ok(bytes)) => {
+                match decode_record(&bytes, self.source.remap_priority) {
+                    Ok(mut record) => {
+                        if let Some(tmp) = record.remove(&*CURSOR) {
+                            self.checkpointer.set(tmp);
+                        }
+
+                        if !filter_matches(
+                            &record,
+                            &self.source.include_matches,
+                            &self.source.exclude_matches,
+                        ) {
+                            self.record_size += bytes.len();
+                            let event = create_event(record, &self.batch);
+                            self.events.push(event);
+                        }
+                    }
                     Err(error) => {
                         emit!(&JournaldInvalidRecordError {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
-                        continue;
-                    }
-                };
-                if let Some(tmp) = record.remove(&*CURSOR) {
-                    checkpointer.set(tmp);
-                }
-
-                if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
-                    record_size += bytes.len();
-                    let event = create_event(record, &batch);
-                    count += 1;
-                    byte_size += event.size_of();
-                    events.push(event);
-                }
-            }
-            drop(batch);
-
-            if record_size > 0 {
-                emit!(&BytesReceived {
-                    byte_size: record_size,
-                    protocol: "journald",
-                });
-            }
-
-            if count > 0 {
-                emit!(&JournaldEventsReceived { count, byte_size });
-                if !events.is_empty() {
-                    match self.out.send_batch(events).await {
-                        Ok(_) => {
-                            if let Some(receiver) = receiver {
-                                // Ignore the received status, we can't do anything with failures here.
-                                receiver.await;
-                            }
-                        }
-                        Err(error) => {
-                            error!(message = "Could not send journald log.", %error);
-                            // `out` channel is closed, don't restart journalctl.
-                            exiting = Some(false);
-                        }
                     }
                 }
-                if exiting != Some(false) {
-                    checkpointer.sync().await;
-                }
-            }
-
-            if let Some(x) = exiting {
-                break x;
+                true
             }
         }
+    }
+
+    async fn finish(mut self) -> Option<bool> {
+        drop(self.batch);
+
+        if self.record_size > 0 {
+            emit!(&BytesReceived {
+                byte_size: self.record_size,
+                protocol: "journald",
+            });
+        }
+
+        if !self.events.is_empty() {
+            emit!(&JournaldEventsReceived {
+                count: self.events.len(),
+                byte_size: self.events.size_of(),
+            });
+
+            if !self.events.is_empty() {
+                match self.source.out.send_batch(self.events).await {
+                    Ok(_) => {
+                        if let Some(receiver) = self.receiver {
+                            // Ignore the received status, we can't do anything with failures here.
+                            receiver.await;
+                        }
+                    }
+                    Err(error) => {
+                        error!(message = "Could not send journald log.", %error);
+                        // `out` channel is closed, don't restart journalctl.
+                        self.exiting = Some(false);
+                    }
+                }
+            }
+
+            if self.exiting != Some(false) {
+                self.checkpointer.sync().await;
+            }
+        }
+        self.exiting
     }
 }
 
