@@ -6,10 +6,7 @@ use url::Url;
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::{
-            EventNotificationType,
-            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
-        },
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         TapEncodingFormat, TapSubscriptionExt,
     },
     Client,
@@ -92,7 +89,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
-                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                    for tap_event in d.output_events_by_component_id_patterns {
                         match tap_event {
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
                                 println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
@@ -105,11 +102,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
                             },
                             OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
                                 if !opts.quiet {
-                                    match ev.notification {
-                                        EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
-                                        EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
-                                        EventNotificationType::Other(_) => {},
-                                    }
+                                    eprintln!("{}", ev.message);
                                 }
                             },
                         }

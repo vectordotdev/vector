@@ -515,6 +515,16 @@ impl RunningTopology {
                 .send(TapResource {
                     outputs,
                     inputs: watch_inputs,
+                    source_keys: diff
+                        .sources
+                        .changed_and_added()
+                        .map(|key| key.to_string())
+                        .collect(),
+                    sink_keys: diff
+                        .sinks
+                        .changed_and_added()
+                        .map(|key| key.to_string())
+                        .collect(),
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
                     removals,
