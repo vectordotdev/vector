@@ -43,6 +43,7 @@ use crate::{
 };
 
 const DEFAULT_BATCH_SIZE: usize = 16;
+const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 const CURSOR: &str = "__CURSOR";
@@ -291,9 +292,19 @@ impl JournaldSource {
         loop {
             let mut batch = Batch::new(self, checkpointer);
 
-            for _ in 0..batch_size {
-                if !batch.handle_result(stream.next().await) {
-                    break;
+            if !batch.handle_next(stream.next().await) {
+                break true;
+            }
+
+            let timeout = tokio::time::sleep(BATCH_TIMEOUT);
+            tokio::pin!(timeout);
+
+            for _ in 1..batch_size {
+                tokio::select! {
+                    _ = &mut timeout => break,
+                    result = stream.next() => if !batch.handle_next(result) {
+                        break;
+                    }
                 }
             }
             if let Some(x) = batch.finish().await {
@@ -327,7 +338,7 @@ impl<'a> Batch<'a> {
         }
     }
 
-    fn handle_result(&mut self, result: Option<Result<Bytes, BoxedFramingError>>) -> bool {
+    fn handle_next(&mut self, result: Option<Result<Bytes, BoxedFramingError>>) -> bool {
         match result {
             None => {
                 warn!("Journalctl process stopped.");
