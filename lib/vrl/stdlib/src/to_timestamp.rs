@@ -1,32 +1,33 @@
+use std::str::FromStr;
+
 use chrono::{TimeZone as _, Utc};
 use vector_common::{conversion::Conversion, TimeZone};
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
 
-fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
+fn to_timestamp(value: Value, unit: Unit) -> Resolved {
     use Value::*;
 
     let value = match value {
         v @ Timestamp(_) => v,
-        Integer(v) => match unit.as_ref() {
-            b"seconds" => {
+        Integer(v) => match unit {
+            Unit::Seconds => {
                 let t = Utc.timestamp_opt(v, 0).single();
                 match t {
                     Some(time) => time.into(),
                     None => return Err(format!("unable to coerce {} into timestamp", v).into()),
                 }
             }
-            b"milliseconds" => {
+            Unit::Milliseconds => {
                 let t = Utc.timestamp_millis_opt(v).single();
                 match t {
                     Some(time) => time.into(),
                     None => return Err(format!("unable to coerce {} into timestamp", v).into()),
                 }
             }
-            b"nanoseconds" => Utc.timestamp_nanos(v).into(),
-            _ => unreachable!(),
+            Unit::Nanoseconds => Utc.timestamp_nanos(v).into(),
         },
-        Float(v) => match unit.as_ref() {
-            b"seconds" => {
+        Float(v) => match unit {
+            Unit::Seconds => {
                 let t = Utc
                     .timestamp_opt(
                         v.trunc() as i64,
@@ -38,7 +39,7 @@ fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
                     None => return Err(format!("unable to coerce {} into timestamp", v).into()),
                 }
             }
-            b"milliseconds" => {
+            Unit::Milliseconds => {
                 let t = Utc
                     .timestamp_opt(
                         (v.trunc() / 1_000.0) as i64,
@@ -50,7 +51,7 @@ fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
                     None => return Err(format!("unable to coerce {} into timestamp", v).into()),
                 }
             }
-            b"nanoseconds" => {
+            Unit::Nanoseconds => {
                 let t = Utc
                     .timestamp_opt(
                         (v.trunc() / 1_000_000_000.0) as i64,
@@ -62,7 +63,6 @@ fn to_timestamp(value: Value, unit: Bytes) -> Resolved {
                     None => return Err(format!("unable to coerce {} into timestamp", v).into()),
                 }
             }
-            _ => unreachable!(),
         },
         Bytes(v) => Conversion::Timestamp(TimeZone::Local)
             .convert::<Value>(v)
@@ -175,44 +175,116 @@ impl Function for ToTimestamp {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let units = vec![
-            value!("seconds"),
-            value!("milliseconds"),
-            value!("nanoseconds"),
-        ];
-
         let value = arguments.required("value");
 
         let unit = arguments
-            .optional_enum("unit", &units)?
-            .unwrap_or_else(|| value!("seconds"))
-            .try_bytes()
-            .expect("variant not bytes");
+            .optional_enum("unit", Unit::all_value().as_slice())?
+            .map(|s| {
+                Unit::from_str(&s.try_bytes_utf8_lossy().expect("unit not bytes"))
+                    .expect("validated enum")
+            })
+            .unwrap_or_default();
 
         Ok(Box::new(ToTimestampFn { value, unit }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("unit", Some(expr)) => match expr.as_value() {
+                None => Ok(None),
+                Some(value) => {
+                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
+                    Ok(Some(
+                        Unit::from_str(&s)
+                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
+                            .map_err(|_| Error::InvalidEnumVariant {
+                                keyword: "unit",
+                                value,
+                                variants: Unit::all_value(),
+                            })?,
+                    ))
+                }
+            },
+            _ => Ok(None),
+        }
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let unit = args
-            .optional("unit")
-            .unwrap_or_else(|| value!("seconds"))
-            .try_bytes()
-            .expect("variant not bytes");
+            .optional_any("unit")
+            .map(|unit| *unit.downcast_ref::<Unit>().unwrap())
+            .unwrap_or_default();
+
         to_timestamp(value, unit)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Unit {
+    Seconds,
+    Milliseconds,
+    Nanoseconds,
+}
+
+impl Unit {
+    fn all_value() -> Vec<Value> {
+        use Unit::*;
+
+        vec![Seconds, Milliseconds, Nanoseconds]
+            .into_iter()
+            .map(|u| u.as_str().into())
+            .collect::<Vec<_>>()
+    }
+
+    const fn as_str(self) -> &'static str {
+        use Unit::*;
+
+        match self {
+            Seconds => "seconds",
+            Milliseconds => "milliseconds",
+            Nanoseconds => "nanoseconds",
+        }
+    }
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Unit::Seconds
+    }
+}
+
+impl FromStr for Unit {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use Unit::*;
+
+        match s {
+            "seconds" => Ok(Seconds),
+            "milliseconds" => Ok(Milliseconds),
+            "nanoseconds" => Ok(Nanoseconds),
+            _ => Err("unit not recognized"),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 struct ToTimestampFn {
     value: Box<dyn Expression>,
-    unit: Bytes,
+    unit: Unit,
 }
 
 impl Expression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let unit = self.unit.clone();
+        let unit = self.unit;
 
         to_timestamp(value, unit)
     }
@@ -243,7 +315,7 @@ mod tests {
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Integer(9999999999999)),
-            unit: Bytes::from_static(b"seconds"),
+            unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
         assert_eq!(string, r#"unable to coerce 9999999999999 into timestamp"#)
@@ -257,7 +329,7 @@ mod tests {
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
             value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
-            unit: Bytes::from_static(b"seconds"),
+            unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
         assert_eq!(string, r#"unable to coerce 9999999999999.9 into timestamp"#)
@@ -272,26 +344,44 @@ mod tests {
              tdef: TypeDef::timestamp().fallible(),
         }
 
-        float {
-             args: func_args![value: 1431648000.5],
-             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
-             tdef: TypeDef::timestamp().fallible(),
-        }
-
-        seconds {
+        integer_seconds {
             args: func_args![value: 1609459200i64, unit: "seconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
-        milliseconds {
+        integer_milliseconds {
             args: func_args![value: 1609459200000i64, unit: "milliseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
-        nanoseconds {
+        integer_nanoseconds {
             args: func_args![value: 1609459200000000000i64, unit: "nanoseconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
+        }
+
+        float {
+            args: func_args![value: 1431648000.5],
+            want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
+            tdef: TypeDef::timestamp().fallible(),
+       }
+
+        float_seconds {
+            args: func_args![value: 1609459200.0f64, unit: "seconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
+        }
+
+        float_milliseconds {
+            args: func_args![value: 1609459200000.0f64, unit: "milliseconds"],
+            want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
+            tdef: TypeDef::timestamp().fallible(),
+        }
+
+        float_nanoseconds {
+            args: func_args![value: 1609459200000000000.0f64, unit: "nanoseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
