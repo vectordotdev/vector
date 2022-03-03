@@ -191,7 +191,7 @@ impl Expression for Op {
                 let td = TypeDef::float();
 
                 // Division is infallible if the rhs is a literal normal float or integer.
-                match dbg!(self.rhs.as_value()) {
+                match self.rhs.as_value() {
                     Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
                         Value::Float(v) if v.is_normal() => td.infallible(),
                         Value::Integer(v) if v != 0 => td.infallible(),
