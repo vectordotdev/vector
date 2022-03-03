@@ -948,7 +948,9 @@ async fn decode_traces() {
         assert_eq!(trace.as_map()["language"], "ada".into());
         assert!(trace.contains("spans"));
         assert_eq!(trace.as_map()["spans"].as_array().unwrap().len(), 1);
-        let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0].as_object().unwrap();
+        let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0]
+            .as_object()
+            .unwrap();
         assert_eq!(span_from_trace["service"], "a_service".into());
         assert_eq!(span_from_trace["name"], "a_name".into());
         assert_eq!(span_from_trace["resource"], "a_resource".into());
