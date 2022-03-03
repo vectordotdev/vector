@@ -1,17 +1,9 @@
-use std::{
-    error, fmt, mem,
-    num::{NonZeroU16, NonZeroU32, NonZeroU8},
-    ops::Range,
-};
+use std::{error, fmt, mem};
 
 use bytes::{Buf, BufMut};
-use proptest::{
-    arbitrary::{Arbitrary, StrategyFor},
-    strategy::Map,
-};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use crate::encoding::{DecodeBytes, EncodeBytes};
+use crate::{encoding::FixedEncodable, EventCount};
 
 #[derive(Debug)]
 pub struct EncodeError;
@@ -39,11 +31,16 @@ impl error::Error for DecodeError {}
 pub struct Record {
     id: u32,
     size: u32,
+    event_count: usize,
 }
 
 impl Record {
     pub(crate) const fn new(id: u32, size: u32) -> Self {
-        Record { id, size }
+        Record {
+            id,
+            size,
+            event_count: 1,
+        }
     }
 
     const fn header_len() -> usize {
@@ -55,16 +52,23 @@ impl Record {
     }
 }
 
+impl EventCount for Record {
+    fn event_count(&self) -> usize {
+        self.event_count
+    }
+}
+
 impl ByteSizeOf for Record {
     fn allocated_bytes(&self) -> usize {
         0
     }
 }
 
-impl EncodeBytes for Record {
-    type Error = EncodeError;
+impl FixedEncodable for Record {
+    type EncodeError = EncodeError;
+    type DecodeError = DecodeError;
 
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
@@ -82,14 +86,10 @@ impl EncodeBytes for Record {
     fn encoded_size(&self) -> Option<usize> {
         Some(self.len())
     }
-}
 
-impl DecodeBytes for Record {
-    type Error = DecodeError;
-
-    fn decode<B>(mut buffer: B) -> Result<Self, Self::Error>
+    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
     where
-        B: Buf,
+        B: Buf + Clone,
         Self: Sized,
     {
         if buffer.remaining() < Self::header_len() {

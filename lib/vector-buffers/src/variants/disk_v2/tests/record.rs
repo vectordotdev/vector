@@ -10,7 +10,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     // Create a duplex stream that's more than big enough to ship a record through.
     let (writer_io, reader_io) = tokio::io::duplex(4096);
 
-    let mut record_writer = RecordWriter::new(writer_io, 0, u64::MAX, 2048);
+    let mut record_writer = RecordWriter::new(writer_io, 0, 16_384, u64::MAX, 2048);
     let mut record_reader = RecordReader::new(reader_io);
 
     let record = SizedRecord(73);

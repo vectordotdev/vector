@@ -22,13 +22,16 @@ use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 use super::{
-    common::{create_crc32c_hasher, DiskBufferConfi, Filesystem},
+    common::{create_crc32c_hasher, DiskBufferConfig},
+    io::Filesystem,
     ledger::Ledger,
     record::{validate_record_archive, Record, RecordStatus},
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
-    variants::disk_v2::{io::AsyncFile, reader::decode_record_payload, record::try_as_record_archive},
+    variants::disk_v2::{
+        io::AsyncFile, reader::decode_record_payload, record::try_as_record_archive,
+    },
     Bufferable,
 };
 
@@ -165,11 +168,12 @@ where
     pub fn new(
         writer: W,
         current_data_file_size: u64,
+        write_buffer_size: usize,
         max_data_file_size: u64,
         max_record_size: usize,
     ) -> Self {
         Self {
-            writer: BufWriter::with_capacity(256 * 1024, writer),
+            writer: BufWriter::with_capacity(write_buffer_size, writer),
             encode_buf: Vec::with_capacity(16_384),
             ser_buf: AlignedVec::with_capacity(16_384),
             ser_scratch: AlignedVec::with_capacity(16_384),
@@ -181,7 +185,6 @@ where
         }
     }
 
-    
     /// Gets a reference to the underlying writer.
     pub fn get_ref(&self) -> &W {
         self.writer.get_ref()
@@ -275,7 +278,7 @@ where
             Infallible,
         );
 
-        let serializer_pos = match serializer.serialize_value(&record) {
+        let serializer_pos = match serializer.serialize_value(&wrapped_record) {
             Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
             Err(e) => match e {
                 CompositeSerializerError::ScratchSpaceError(sse) => {
@@ -297,11 +300,11 @@ where
                     serializer_pos,
                     self.ser_buf.len(),
                 ),
-            }
+            });
         }
 
         let archive_buf = self.ser_buf.as_slice();
-        debug_assert_eq!(archive_buf.len(), archive_len);
+        debug_assert_eq!(archive_buf.len(), serializer_pos);
 
         // With the record archived and serialized, do our final check to ensure we can fit this
         // write.  We always allow at least one write into an empty data file.
@@ -309,12 +312,11 @@ where
         // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
         // better/super low overhead way to capture "the bytes we wrote" rather than piecing
         // together what we _believe_ we should have written.
-        let archive_on_disk_len = archive_len + 8;
-        if !self.can_write(archive_on_disk_len) {
+        if !self.can_write(serializer_pos) {
             debug!(
                 current_data_file_size = self.current_data_file_size,
                 max_data_file_size = self.max_data_file_size,
-                archive_on_disk_len,
+                archive_on_disk_len = serializer_pos,
                 "Archived record is too large to fit in remaining free space of current data file."
             );
 
@@ -329,7 +331,7 @@ where
 
             return Err(WriterError::DataFileFull {
                 record,
-                serialized_size: archive_on_disk_len,
+                serialized_size: serializer_pos,
             });
         }
 
@@ -365,7 +367,7 @@ where
             .context(IoSnafu)?;
 
         // Update our current data file size.
-        self.current_data_file_size += serialized_len;
+        self.current_data_file_size += serialized_len as u64;
 
         Ok(serialized_len)
     }
@@ -419,7 +421,7 @@ where
 impl<T, FS> Writer<T, FS>
 where
     T: Bufferable,
-    FS: Filesystem,
+    FS: Filesystem + Clone,
     FS::File: Unpin,
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
@@ -599,7 +601,8 @@ where
                             "Ledger desynchronized from data files. Fast forwarding ledger state."
                         );
                         let ledger_record_delta = record_next - ledger_next;
-                        let next_record_id = self.ledger
+                        let next_record_id = self
+                            .ledger
                             .state()
                             .increment_next_writer_record_id(ledger_record_delta);
                         self.next_record_id = next_record_id;
@@ -780,7 +783,7 @@ where
                 self.writer = Some(RecordWriter::new(
                     data_file,
                     data_file_size,
-                    self.ledger.config().write_buffer_size,
+                    self.config.write_buffer_size,
                     self.config.max_data_file_size,
                     self.config.max_record_size,
                 ));
@@ -867,7 +870,7 @@ where
         // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
         // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
         self.increment_next_record_id(record_events);
-        self.track_write(record_events, bytes_written as u64);
+        self.track_write(bytes_written as u64);
 
         trace!(
             record_id,

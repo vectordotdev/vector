@@ -181,7 +181,7 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
     where
-        FS: Filesystem + 'static,
+        FS: Filesystem + Clone + 'static,
         FS::File: Unpin,
     {
         let ledger = Ledger::load_or_create(config, usage_handle)
@@ -225,7 +225,7 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
     where
-        FS: Filesystem + 'static,
+        FS: Filesystem + Clone + 'static,
         FS::File: Unpin,
     {
         let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
@@ -268,9 +268,9 @@ where
 
         // Create the actual buffer subcomponents.
         let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
-        let config = DiskBufferConfig::from_path(buffer_path)
+        let config = DiskBufferConfigBuilder::from_path(buffer_path)
             .max_buffer_size(self.max_size as u64)
-            .build();
+            .build()?;
         let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
 
         let wrapped_reader = WrappedReader::new(reader);
@@ -287,17 +287,22 @@ where
 }
 
 #[pin_project]
-struct WrappedReader<T> {
+struct WrappedReader<T, FS>
+where
+    FS: Filesystem,
+{
     #[pin]
-    reader: Option<Reader<T>>,
-    read_future: ReusableBoxFuture<'static, (Reader<T>, Option<T>)>,
+    reader: Option<Reader<T, FS>>,
+    read_future: ReusableBoxFuture<'static, (Reader<T, FS>, Option<T>)>,
 }
 
-impl<T> WrappedReader<T>
+impl<T, FS> WrappedReader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
-    pub fn new(reader: Reader<T>) -> Self {
+    pub fn new(reader: Reader<T, FS>) -> Self {
         Self {
             reader: Some(reader),
             read_future: ReusableBoxFuture::new(make_read_future(None)),
@@ -305,9 +310,11 @@ where
     }
 }
 
-impl<T> Stream for WrappedReader<T>
+impl<T, FS> Stream for WrappedReader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
     type Item = T;
 
@@ -326,9 +333,11 @@ where
     }
 }
 
-async fn make_read_future<T>(reader: Option<Reader<T>>) -> (Reader<T>, Option<T>)
+async fn make_read_future<T, FS>(reader: Option<Reader<T, FS>>) -> (Reader<T, FS>, Option<T>)
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     match reader {
         None => unreachable!("future should not be called in this state"),
@@ -380,11 +389,13 @@ where
     }
 }
 
-async fn drive_disk_v2_writer<T>(mut writer: Writer<T>, mut input: Receiver<T>)
+async fn drive_disk_v2_writer<T, FS>(mut writer: Writer<T, FS>, mut input: Receiver<T>)
 where
     T: Bufferable,
+    FS: Filesystem + Clone,
+    FS::File: Unpin,
 {
-    // TODO: Use a control message struct so callers can send both items to write and flush
+    // TODO: Use a control message approach so callers can send both items to write and flush
     // requests, facilitating the ability to allow for `send_all` at the frontend.
     while let Some(record) = input.recv().await {
         if let Err(e) = writer.write_record(record).await {

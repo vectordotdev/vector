@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use parking_lot::Mutex;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-use crate::disk_v2::{
+use crate::variants::disk_v2::{
     io::{AsyncFile, Metadata, ReadableMemoryMap, WritableMemoryMap},
     Filesystem,
 };

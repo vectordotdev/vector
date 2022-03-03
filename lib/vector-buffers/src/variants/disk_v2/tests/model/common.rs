@@ -3,7 +3,7 @@ use std::{num::NonZeroU16, time::Duration};
 use proptest::{arbitrary::any, strategy::Strategy};
 use quickcheck::Arbitrary;
 
-use crate::disk_v2::{
+use crate::variants::disk_v2::{
     DiskBufferConfig, DiskBufferConfigBuilder, Reader, ReaderError, Writer, WriterError,
 };
 

@@ -19,7 +19,8 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
 
         async move {
             // Create a normal buffer.
-            let (mut writer, mut reader, _, ledger) = create_default_buffer(data_dir.clone()).await;
+            let (mut writer, mut reader, _, ledger) =
+                create_default_buffer_v2(data_dir.clone()).await;
 
             // Attempt a read, which should block because there's no data yet.  We specifically want
             // to make sure we end up waiting for the writer to indicate that we're waiting

@@ -5,7 +5,9 @@ use tokio_test::{assert_pending, assert_ready, task::spawn};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     test::common::with_temp_dir,
-    variants::disk_v2::{acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfig},
+    variants::disk_v2::{
+        acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfigBuilder,
+    },
     WhenFull,
 };
 
@@ -17,7 +19,9 @@ async fn ack_updates_ledger_correctly() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
-            let config = DiskBufferConfig::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("creating buffer should not fail");
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");
@@ -45,7 +49,9 @@ async fn ack_wakes_reader() {
         async move {
             // Create a standalone ledger.
             let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
-            let config = DiskBufferConfig::from_path(data_dir).build();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .build()
+                .expect("creating buffer should not fail");
             let ledger = Ledger::load_or_create(config, usage_handle)
                 .await
                 .expect("ledger should not fail to load/create");

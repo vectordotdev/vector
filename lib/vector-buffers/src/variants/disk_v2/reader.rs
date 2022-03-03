@@ -8,25 +8,22 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use memmap2::Mmap;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{self, File},
-    io::{AsyncBufReadExt, AsyncRead, BufReader},
-};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::internal_event::emit;
 
 use super::{
     common::create_crc32c_hasher,
     ledger::Ledger,
     record::{validate_record_archive, ArchivedRecord, Record, RecordStatus},
+    Filesystem,
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
     internal_events::EventsCorrupted,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
-    variants::disk_v2::record::try_as_record_archive,
+    variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
     Bufferable,
 };
 
@@ -143,7 +140,6 @@ where
 }
 
 /// Buffered reader that handles deserialization, checksumming, and decoding of records.
-#[derive(Debug)]
 pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
@@ -154,7 +150,7 @@ pub(super) struct RecordReader<R, T> {
 
 impl<R, T> RecordReader<R, T>
 where
-    R: AsyncRead + Unpin + fmt::Debug,
+    R: AsyncRead + Unpin,
     T: Bufferable,
 {
     /// Creates a new [`RecordReader`] around the provided reader.
@@ -334,11 +330,29 @@ where
     }
 }
 
+impl<R, T> fmt::Debug for RecordReader<R, T>
+where
+    R: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecordReader")
+            .field("reader", &self.reader)
+            .field("aligned_buf", &self.aligned_buf)
+            .field("checksummer", &self.checksummer)
+            .field("current_record_id", &self.current_record_id)
+            .field("_t", &self._t)
+            .finish()
+    }
+}
+
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T> {
-    ledger: Arc<Ledger>,
-    reader: Option<RecordReader<File, T>>,
+pub struct Reader<T, FS>
+where
+    FS: Filesystem,
+{
+    ledger: Arc<Ledger<FS>>,
+    reader: Option<RecordReader<FS::File, T>>,
     bytes_read: u64,
     last_reader_record_id: u64,
     data_file_start_record_id: Option<u64>,
@@ -350,12 +364,14 @@ pub struct Reader<T> {
     _t: PhantomData<T>,
 }
 
-impl<T> Reader<T>
+impl<T, FS> Reader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     /// Creates a new [`Reader`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
 
@@ -458,7 +474,11 @@ where
         // occur at all, so we're relying on this method to correct the buffer size for us.  This is
         // why `bytes_read` is optional: when it's specified, we calculate a delta for handling
         // partial-read scenarios, otherwise, we just use the entire data file size as is.
-        let data_file = File::open(&data_file_path).await?;
+        let data_file = self
+            .ledger
+            .filesystem()
+            .open_file_readable(&data_file_path)
+            .await?;
         let metadata = data_file.metadata().await?;
 
         let decrease_amount = bytes_read.map_or_else(
@@ -484,7 +504,10 @@ where
         drop(data_file);
 
         // Delete the current data file, and increment our actual reader file ID.
-        fs::remove_file(&data_file_path).await?;
+        self.ledger
+            .filesystem()
+            .delete_file(&data_file_path)
+            .await?;
         self.ledger.increment_acked_reader_file_id();
         self.ledger.flush()?;
 
@@ -706,7 +729,12 @@ where
         loop {
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
             let data_file_path = self.ledger.get_current_reader_data_file_path();
-            let data_file = match File::open(&data_file_path).await {
+            let data_file = match self
+                .ledger
+                .filesystem()
+                .open_file_readable(&data_file_path)
+                .await
+            {
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
@@ -781,20 +809,15 @@ where
         //
         // Once the reader/writer file IDs are identical, we fall back to the slow path.
         while self.ledger.get_current_reader_file_id() != self.ledger.get_current_writer_file_id() {
-            let current_data_file_path = self.ledger.get_current_reader_data_file_path();
+            let data_file_path = self.ledger.get_current_reader_data_file_path();
             self.ensure_ready_for_read().await.context(IoSnafu)?;
-            let data_file_handle = self
-                .reader
-                .as_ref()
-                .expect("writer should exist after `ensure_ready_for_read`")
-                .get_ref()
-                .try_clone()
+            let data_file_mmap = self
+                .ledger
+                .filesystem()
+                .open_mmap_readable(&data_file_path)
                 .await
-                .context(IoSnafu)?
-                .into_std()
-                .await;
+                .context(IoSnafu)?;
 
-            let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };
             match validate_record_archive(data_file_mmap.as_ref(), &Hasher::new()) {
                 RecordStatus::Valid {
                     id: last_record_id, ..
@@ -828,7 +851,7 @@ where
                         // By passing 0 bytes, `delete_completed_data_file` does the work of
                         // ensuring the buffer size is updated to reflect the data file being
                         // deleted in its entirety.
-                        self.delete_completed_data_file(current_data_file_path, None)
+                        self.delete_completed_data_file(data_file_path, None)
                             .await
                             .context(IoSnafu)?;
                         self.reset();

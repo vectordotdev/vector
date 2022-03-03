@@ -16,11 +16,10 @@ use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    disk_v2::{
-        tests::install_tracing_helpers, writer::RecordWriter, Buffer, DiskBufferConfig,
-        DiskBufferConfigBuilder,
-    },
     quickcheck_assert_eq,
+    test::common::install_tracing_helpers,
+    variants::disk_v2::{writer::RecordWriter, Buffer, DiskBufferConfig, DiskBufferConfigBuilder},
+    WhenFull,
 };
 
 mod action;
@@ -166,7 +165,9 @@ impl Model {
             writer_woken: false,
             record_writer: RecordWriter::new(
                 Cursor::new(Vec::new()),
+                0,
                 config.write_buffer_size,
+                config.max_data_file_size,
                 config.max_record_size,
             ),
         }
@@ -304,7 +305,7 @@ proptest! {
             // type system constraints/SUT usage contract constraints in a step-wise fashion.
             //
             // The doc comments for `ActionSequencer` explain this in more detail.
-            let usage_handle = BufferUsageHandle::noop();
+            let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
             let (writer, reader, acker) =
                 Buffer::<Record>::from_config(config, usage_handle)
                     .await

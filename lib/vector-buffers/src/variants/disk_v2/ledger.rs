@@ -522,53 +522,6 @@ where
                 initial_buffer_size,
             );
     }
-
-    async fn update_buffer_size(&mut self) -> Result<(), LedgerLoadCreateError> {
-        // Under normal operation, the reader and writer maintain a consistent state within the
-        // ledger.  However, due to the nature of how we update the ledger, process crashes could
-        // lead to missed updates as we execute reads and writes as non-atomic units of execution:
-        // update a field, do the read/write, update some more fields depending on success or
-        // failure, etc.
-        //
-        // This is an issue because we depend on knowing the total buffer size (the total size of
-        // unread records, specifically) so that we can correctly limit writes when we've reached
-        // the configured maximum buffer size.
-        //
-        // While it's not terribly efficient, and I'd like to eventually formulate a better design,
-        // this approach is absolutely correct: get the file size of every data file on disk,
-        // and set the "total buffer size" to the sum of all of those file sizes.
-        //
-        // When the reader does any necessary seeking to get to the record it left off on, it will
-        // adjust the "total buffer size" downwards for each record it runs through, leaving "total
-        // buffer size" at the correct value.
-        let mut dat_reader = fs::read_dir(&self.config.data_dir).await.context(IoSnafu)?;
-
-        let mut total_buffer_size = 0;
-        while let Some(dir_entry) = dat_reader.next_entry().await.context(IoSnafu)? {
-            if let Some(file_name) = dir_entry.file_name().to_str() {
-                // I really _do_ want to only find files with a .dat extension, as that's what the
-                // code generates, and having them be .dAt or .Dat or whatever would indicate that
-                // the file is not related to our buffer.  If we had to cope with case-sensitivity
-                // of filenames from another program/OS, then it would be a different story.
-                #[allow(clippy::case_sensitive_file_extension_comparisons)]
-                if file_name.ends_with(".dat") {
-                    let file_size = dir_entry.metadata().await.context(IoSnafu)?;
-                    total_buffer_size += file_size.len();
-
-                    debug!(
-                        "found buffer data file '{}', {} bytes (total buffer size: {} bytes)",
-                        file_name,
-                        file_size.len(),
-                        total_buffer_size
-                    );
-                }
-            }
-        }
-
-        self.increment_total_buffer_size(total_buffer_size);
-
-        Ok(())
-    }
 }
 
 impl<FS> Ledger<FS>
