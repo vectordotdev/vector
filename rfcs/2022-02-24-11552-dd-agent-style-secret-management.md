@@ -110,16 +110,21 @@ get its config before further processing, ideally env var interpolating should b
 problem). In `./src/config/builder.rs`, `load_builder_from_paths` will still be returning a complete configuration with
 placeholders replaced by secrets.
 
-The `ConfigBuilder` struct will get a new `secret_backend` field (type to something like `SecretBackend`), this means
-that `load_builder_from_paths` will then assert if this field is present before returning to the caller, and if it, the
-config will be reloaded with this `SecretBackend` passed to downstream callee and hook the secret interpolation around
-the same point as [the environment variable interpolation][env-var-hook] it would then query this `SecretBackend` for
-each `ENC[secret_key]`, `ENC[backend_name/secret_key]` or `secret://backend_name/secret_key` (The placeholded choice
-remains TBC).
+The `ConfigBuilder` struct will get a new `secret` field (typed to something like
+`IndexMap<ComponentKey,SecretBackend>`), this means that `load_builder_from_paths` will then assert if this field is not
+empty  before returning to the caller, and if it, the config will be reloaded with this `SecretBackend` passed to
+downstream callee and hook the secret interpolation around the same point as [the environment variable
+interpolation][env-var-hook]:
+
+- All `SECRET[<backend>/<key>]` placeholders present in config will be collected.
+- Every backend that is specified in this secret list will be queried for all the secrets it should be used for retrieval.
+- And then the interpolation will actually happen (only if all secret were retrieved sucessfully).
+
+**Note**: As shown in the aforementioned config sample a secret backend shall itself be able to use other secret backend for its own initialisation.
 
 The implementation should ease future extension and split the internal API queried by the interpolation logic and the
-secret provider that may see other implementation like: `executable` (the one documented in this RFC), `vault`,
-`k8s-config-map`, `aws secretsmanager`, etc.
+secret provider that may see other implementation like: `exec` (the one we will focus on first), `vault`,
+`k8s-config-map`, `aws-secretsmanager`, etc.
 
 ## Rationale
 
@@ -145,6 +150,8 @@ secret provider that may see other implementation like: `executable` (the one do
 - Stick to environment variables interpolation and leverage [K8s ability to expose secret][k8s-env-var-from-secrets] as
   environment variables, relevant examples are already in the [Vector helm char][env-var-from-k8s-secrets]. Note that
   the Datadog Agent is now capable to [do that out-of-the-box][dd-agent-with-k8s-secret].
+- For the secret syntax in config other possible placeholder could have been used: the Datadog Agent uses
+  `ENC[secret_key]`, and another possible URI-like solution was mentioned (`secret://<backend>/<key>`).
 
 Note: doing nothing is not really an alternative here, as plain text secret in config is a strong blocker for some
 users.
@@ -153,14 +160,14 @@ users.
 
 - Sticking to env var from K8s secret still seems a reasonnable approach as K8s is the reference deployement in many
   situations.
-- Secret syntax in config, the Datadog Agent uses `ENC[secret_key]`, whereas an URL scheme like `secret://<backend>/<key>`
-  may be a more extensible and futur proof scheme. It would easily provide a convenient user facing syntax if multiple
-  backen are required in the future.
-- Specific security constraints that may have been missed.
+- Specific security constraints that may have been missed (enforcing the same set of constraints the Datadog Agent uses
+  sound like a reasonnable approach to start with, [windows][dd-agent-win-user-constraints] /
+  [others][dd-agent-unix-user-constraints]).
 
 ## Plan Of Attack
 
-- [ ] Implement the secret backend logic with the minimal set of options.
+- [ ] Implement the secret backend logic with the minimal set of options on all supported platform.
+- [ ] Allow a secret backend config to leverage another secret backend for its own config.
 - [ ] Document typical usecases.
 
 ## Future Improvements
@@ -180,3 +187,5 @@ users.
 [dd-secret-backend-exec-api]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#the-executable-api
 [env-var-from-k8s-secrets]: https://github.com/vectordotdev/helm-charts/blob/5a92272/charts/vector/values.yaml#L131-L143
 [env-var-in-vector-config]: https://vector.dev/docs/reference/configuration/#environment-variables
+[dd-agent-win-user-constraints]: https://github.com/DataDog/datadog-agent/blob/d05e41f/pkg/secrets/check_rights_windows.go
+[dd-agent-unix-user-constraints]: https://github.com/DataDog/datadog-agent/blob/main/pkg/secrets/check_rights_nix.go
