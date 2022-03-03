@@ -227,7 +227,7 @@ impl JournaldSource {
         shutdown: ShutdownSignal,
         start_journalctl: StartJournalctlFn,
     ) -> Result<(), ()> {
-        let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
+        let mut checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 error!(
@@ -237,48 +237,31 @@ impl JournaldSource {
                 );
             })?;
 
-        let mut cursor = match checkpointer.get().await {
-            Ok(cursor) => cursor,
-            Err(error) => {
-                error!(
-                    message = "Could not retrieve saved journald checkpoint.",
-                    %error
-                );
-                None
-            }
-        };
-
         let mut on_stop = None;
-        let run = Box::pin(self.run(
-            &mut checkpointer,
-            &mut cursor,
-            &mut on_stop,
-            start_journalctl,
-        ));
+        let run = Box::pin(self.run(&mut checkpointer, &mut on_stop, start_journalctl));
         future::select(run, shutdown).await;
 
         if let Some(stop) = on_stop {
             stop();
         }
 
-        Self::save_checkpoint(&mut checkpointer, &cursor).await;
+        checkpointer.sync().await;
 
         Ok(())
     }
 
     async fn run<'a>(
         mut self,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
+        checkpointer: &'a mut StatefulCheckpointer,
         on_stop: &'a mut Option<StopJournalctlFn>,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
-            match start_journalctl(&*cursor) {
+            match start_journalctl(&checkpointer.cursor) {
                 Ok((stream, stop)) => {
                     *on_stop = Some(stop);
-                    let should_restart = self.run_stream(stream, checkpointer, cursor).await;
+                    let should_restart = self.run_stream(stream, checkpointer).await;
                     if let Some(stop) = on_stop.take() {
                         stop();
                     }
@@ -302,8 +285,7 @@ impl JournaldSource {
     async fn run_stream<'a>(
         &'a mut self,
         mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
+        checkpointer: &'a mut StatefulCheckpointer,
     ) -> bool {
         loop {
             let mut record_size = 0;
@@ -341,7 +323,7 @@ impl JournaldSource {
                     }
                 };
                 if let Some(tmp) = record.remove(&*CURSOR) {
-                    *cursor = Some(tmp);
+                    checkpointer.set(tmp);
                 }
 
                 if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
@@ -379,24 +361,12 @@ impl JournaldSource {
                     }
                 }
                 if exiting != Some(false) {
-                    Self::save_checkpoint(checkpointer, &*cursor).await;
+                    checkpointer.sync().await;
                 }
             }
 
             if let Some(x) = exiting {
                 break x;
-            }
-        }
-    }
-
-    async fn save_checkpoint(checkpointer: &mut Checkpointer, cursor: &Option<String>) {
-        if let Some(cursor) = cursor {
-            if let Err(error) = checkpointer.set(cursor).await {
-                error!(
-                    message = "Could not set journald checkpoint.",
-                    %error,
-                    filename = ?checkpointer.filename,
-                );
             }
         }
     }
@@ -637,6 +607,38 @@ impl Checkpointer {
                     Some(nl) => Ok(Some(String::from(&text[..nl]))),
                     None => Ok(None), // Maybe return an error?
                 }
+            }
+        }
+    }
+}
+
+struct StatefulCheckpointer {
+    checkpointer: Checkpointer,
+    cursor: Option<String>,
+}
+
+impl StatefulCheckpointer {
+    async fn new(filename: PathBuf) -> Result<Self, io::Error> {
+        let mut checkpointer = Checkpointer::new(filename).await?;
+        let cursor = checkpointer.get().await?;
+        Ok(Self {
+            checkpointer,
+            cursor,
+        })
+    }
+
+    fn set(&mut self, token: impl Into<String>) {
+        self.cursor = Some(token.into());
+    }
+
+    async fn sync(&mut self) {
+        if let Some(token) = self.cursor.as_ref() {
+            if let Err(error) = self.checkpointer.set(token).await {
+                error!(
+                    message = "Could not set journald checkpoint.",
+                    %error,
+                    filename = ?self.checkpointer.filename,
+                );
             }
         }
     }
@@ -967,11 +969,9 @@ mod tests {
         let mut checkpoint_path = tempdir.path().to_path_buf();
         checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
+        let mut checkpointer = StatefulCheckpointer::new(checkpoint_path.clone())
             .await
             .expect("Creating checkpointer failed!");
-
-        let mut cursor = checkpointer.get().await.unwrap();
 
         let mut source = JournaldSource {
             include_matches: Default::default(),
@@ -982,9 +982,8 @@ mod tests {
             out: tx,
             acknowledgements: true,
         };
-        let (stream, _stop) = FakeJournal::new(&cursor);
-        let mut handle =
-            tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer, &mut cursor));
+        let (stream, _stop) = FakeJournal::new(&checkpointer.cursor);
+        let mut handle = tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer));
 
         // Drive the journal until it waits for the acknowledgement.
         assert_eq!(handle.poll(), Poll::Pending);
