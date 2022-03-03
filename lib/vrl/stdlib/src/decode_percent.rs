@@ -20,7 +20,7 @@ impl Function for DecodePercent {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -53,7 +53,7 @@ impl Expression for DecodePercentFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -67,7 +67,7 @@ mod test {
         decode {
             args: func_args![value: value!("foo%20%23%22%3C%3E%3F%60%7B%7D%2F%3A%3B%3D%40%5B%5C%5D%5E%7C%24%25%26%2B%2C%21%27%28%29%7Ebar")],
             want: Ok(value!(r#"foo #"<>?`{}/:;=@[\]^|$%&+,!'()~bar"#)),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

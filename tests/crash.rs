@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
-    config::{self, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{
+        self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SourceConfig, SourceContext,
+    },
     event::Event,
     sinks::{self, Healthcheck, VectorSink},
     sources,
@@ -32,12 +34,16 @@ impl SinkConfig for PanicSink {
         ))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "panic"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -118,12 +124,16 @@ impl SinkConfig for ErrorSink {
         ))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "panic"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -206,6 +216,10 @@ impl SourceConfig for ErrorSourceConfig {
     fn source_type(&self) -> &'static str {
         "tcp"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[tokio::test]
@@ -266,6 +280,10 @@ impl SourceConfig for PanicSourceConfig {
 
     fn source_type(&self) -> &'static str {
         "tcp"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

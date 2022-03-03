@@ -5,22 +5,20 @@
 
 pub mod decoding;
 pub mod encoding;
-mod format;
-mod framing;
 mod ready_frames;
 
-pub use decoding::Decoder;
-pub use format::{
-    BytesDeserializer, BytesDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
-    JsonSerializer, JsonSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
+pub use decoding::{
+    BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, JsonDeserializer,
+    JsonDeserializerConfig, LengthDelimitedDecoder, LengthDelimitedDecoderConfig,
+    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
+    OctetCountingDecoderConfig,
 };
 #[cfg(feature = "sources-syslog")]
-pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
-pub use framing::{
-    BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig,
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, LengthDelimitedDecoder,
-    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
-    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, OctetCountingDecoder,
-    OctetCountingDecoderConfig,
+pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
+pub use encoding::{
+    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
+    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    RawMessageSerializer, RawMessageSerializerConfig,
 };
 pub use ready_frames::ReadyFrames;

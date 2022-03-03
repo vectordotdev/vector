@@ -13,9 +13,12 @@ use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
-    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
+    internal_events::{RedisEventsSent, RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -102,6 +105,12 @@ pub struct RedisSinkConfig {
     batch: BatchConfig<RedisDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for RedisSinkConfig {
@@ -136,12 +145,16 @@ impl SinkConfig for RedisSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "redis"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -226,7 +239,7 @@ fn encode_event(
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(&TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,
@@ -244,7 +257,7 @@ fn encode_event(
         Encoding::Text => event
             .as_log()
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.coerce_to_bytes().to_vec())
             .unwrap_or_default(),
     };
 
@@ -335,14 +348,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(&RedisEventSent { count, byte_size });
+                        emit!(&RedisEventsSent { count, byte_size });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventFailed {
-                    error: error.to_string()
-                }),
+                Err(error) => emit!(&RedisSendEventError { error }),
             };
             result
         })
@@ -454,6 +465,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -512,6 +524,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -583,6 +596,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.

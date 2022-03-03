@@ -5,9 +5,9 @@ use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
         util::{
@@ -25,7 +25,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -41,6 +41,12 @@ pub(crate) struct KafkaSinkConfig {
     pub librdkafka_options: HashMap<String, String>,
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     pub headers_key: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_socket_timeout_ms() -> u64 {
@@ -165,6 +171,7 @@ impl GenerateConfig for KafkaSinkConfig {
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
             headers_key: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -179,12 +186,16 @@ impl SinkConfig for KafkaSinkConfig {
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "kafka"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

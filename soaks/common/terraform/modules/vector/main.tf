@@ -76,7 +76,7 @@ resource "kubernetes_deployment" "vector" {
           name              = "vector"
 
           env {
-            name = "VECTOR_THREADS"
+            name  = "VECTOR_THREADS"
             value = var.vector_cpus
           }
 

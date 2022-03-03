@@ -16,10 +16,12 @@ use vector_core::{event::Finalizable, ByteSizeOf};
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         gcs_common::{
             config::{
@@ -65,6 +67,12 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     auth: GcpAuthConfig,
     tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[cfg(test)]
@@ -84,6 +92,7 @@ fn default_config(e: StandardEncodings) -> GcsSinkConfig {
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -124,12 +133,16 @@ impl SinkConfig for GcsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         NAME
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

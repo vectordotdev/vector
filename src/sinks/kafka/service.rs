@@ -47,6 +47,7 @@ impl DriverResponse for KafkaResponse {
         EventsSent {
             count: 1,
             byte_size: self.event_byte_size,
+            output: None,
         }
     }
 }
@@ -69,7 +70,9 @@ pub struct KafkaService {
 }
 
 impl KafkaService {
-    pub const fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+    pub(crate) const fn new(
+        kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    ) -> KafkaService {
         KafkaService { kafka_producer }
     }
 }

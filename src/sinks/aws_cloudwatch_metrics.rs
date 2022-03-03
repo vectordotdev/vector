@@ -21,7 +21,9 @@ use crate::{
         auth::AwsAuthentication,
         rusoto::{self, RegionOrEndpoint},
     },
-    config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -33,6 +35,7 @@ use crate::{
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 
 #[derive(Clone)]
@@ -62,10 +65,17 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -87,12 +97,16 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_cloudwatch_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -126,7 +140,8 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

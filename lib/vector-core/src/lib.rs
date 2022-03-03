@@ -10,6 +10,11 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::default_trait_access)] // triggers on generated prost code
@@ -21,13 +26,11 @@
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
-#[cfg(feature = "api")]
-pub mod api;
 pub mod config;
 pub mod event;
 pub mod fanout;
-pub mod mapping;
 pub mod metrics;
+pub mod schema;
 pub mod sink;
 pub mod source;
 #[cfg(test)]
@@ -46,8 +49,6 @@ pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
 
 #[macro_use]
 extern crate derivative;
-#[macro_use]
-extern crate pest_derive;
 #[macro_use]
 extern crate tracing;
 

@@ -1,22 +1,19 @@
-use std::convert::TryFrom;
-
-use bytes::Bytes;
-use nom::{
-    branch::alt,
-    bytes::complete::{tag, take, take_until},
-    character::complete::char,
-    combinator::{cut, map},
-    multi::separated_list0,
-    sequence::{preceded, terminated},
-    IResult,
-};
-use vrl_compiler::Value;
-
 use crate::{
     ast::{Function, FunctionArgument},
     grok_filter::GrokFilter,
     parse_grok_rules::Error as GrokStaticError,
 };
+use bytes::Bytes;
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take, take_until},
+    combinator::map,
+    multi::separated_list0,
+    sequence::{preceded, terminated},
+    IResult,
+};
+use std::convert::TryFrom;
+use vrl_compiler::Value;
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     let args = f.args.as_ref();
@@ -68,23 +65,21 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
         return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
     }
 
-    let brackets = match brackets {
+    let brackets = match &brackets {
+        None => None,
+        Some(b) if b.is_empty() => Some(("", "")),
         Some(b) if b.len() == 1 => {
-            let char = b.chars().next().unwrap();
+            let char = &b[..1];
             Some((char, char))
         }
-        Some(b) if b.len() == 2 => {
-            let mut chars = b.chars();
-            Some((chars.next().unwrap(), chars.next().unwrap()))
-        }
-        None => None,
+        Some(b) if b.len() == 2 => Some((&b[..1], &b[1..2])),
         _ => {
             return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
         }
     };
 
     Ok(GrokFilter::Array(
-        brackets,
+        brackets.map(|(start, end)| (start.to_string(), end.to_string())),
         delimiter,
         Box::new(value_filter),
     ))
@@ -94,7 +89,7 @@ type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
 
 pub fn parse<'a>(
     input: &'a str,
-    brackets: Option<(char, char)>,
+    brackets: Option<(&'a str, &'a str)>,
     delimiter: Option<&'a str>,
 ) -> Result<Vec<Value>, String> {
     let result = parse_array(brackets, delimiter)(input)
@@ -110,39 +105,43 @@ pub fn parse<'a>(
 }
 
 fn parse_array<'a>(
-    brackets: Option<(char, char)>,
+    brackets: Option<(&'a str, &'a str)>,
     delimiter: Option<&'a str>,
 ) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
-    let brackets = brackets.unwrap_or(('[', ']'));
+    let brackets = brackets.unwrap_or(("[", "]"));
+    let delimiter = delimiter.unwrap_or(",");
     move |input| {
-        preceded(
-            char(brackets.0),
-            terminated(cut(parse_array_values(delimiter)), char(brackets.1)),
+        if brackets.0.is_empty() {
+            // no enclosed brackets
+            separated_list0(tag(delimiter), parse_value_no_brackets(delimiter))(input)
+        } else {
+            preceded(
+                tag(brackets.0),
+                terminated(
+                    separated_list0(tag(delimiter), parse_value(delimiter, brackets.1)),
+                    tag(brackets.1),
+                ),
+            )(input)
+        }
+    }
+}
+
+fn parse_value_no_brackets<'a>(delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
+    move |input| {
+        map(
+            alt((take_until(delimiter), take(input.len()))),
+            |value: &str| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
         )(input)
     }
 }
 
-fn parse_array_values<'a>(delimiter: Option<&'a str>) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
-    move |input| {
-        let delimiter = delimiter.unwrap_or(",");
-        // skip the last closing character
-        separated_list0(tag(delimiter), cut(parse_value(delimiter)))(&input[..input.len() - 1]).map(
-            |(rest, values)| {
-                if rest.is_empty() {
-                    // return the closing character
-                    (&input[input.len() - 1..], values)
-                } else {
-                    (rest, values) // will fail upstream
-                }
-            },
-        )
-    }
-}
-
-fn parse_value<'a>(delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
+fn parse_value<'a>(
+    delimiter: &'a str,
+    close_bracket: &'a str,
+) -> impl Fn(&'a str) -> SResult<Value> {
     move |input| {
         map(
-            alt((take_until(delimiter), take(input.len()))),
+            alt((take_until(delimiter), take_until(close_bracket))),
             |value: &str| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
         )(input)
     }
@@ -160,7 +159,7 @@ mod tests {
 
     #[test]
     fn parses_with_non_default_brackets() {
-        let result = parse("{1,2}", Some(('{', '}')), None).unwrap();
+        let result = parse("{1,2}", Some(("{", "}")), None).unwrap();
         assert_eq!(result, vec!["1".into(), "2".into()]);
     }
 

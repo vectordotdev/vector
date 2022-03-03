@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::{
     expression::{Not, Resolved},
+    vm::{OpCode, Vm},
     Context, Expression, State, TypeDef,
 };
 
@@ -36,6 +37,17 @@ impl Expression for Unary {
         match &self.variant {
             Not(v) => v.type_def(state),
         }
+    }
+
+    fn compile_to_vm(&self, vm: &mut Vm) -> std::result::Result<(), String> {
+        match &self.variant {
+            Variant::Not(v) => {
+                v.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::Not);
+            }
+        }
+
+        Ok(())
     }
 }
 

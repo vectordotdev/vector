@@ -5,10 +5,12 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::RouteEventDiscarded,
+    schema,
     transforms::Transform,
 };
 
@@ -16,7 +18,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Route {
-    conditions: IndexMap<String, Box<dyn Condition>>,
+    conditions: IndexMap<String, Condition>,
 }
 
 impl Route {
@@ -83,14 +85,14 @@ impl TransformConfig for RouteConfig {
         Ok(Transform::synchronous(route))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         self.route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::Any)))
+            .map(|output_name| Output::from((output_name, DataType::all())))
             .collect()
     }
 
@@ -110,12 +112,12 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -127,7 +129,13 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
+    use indoc::indoc;
     use vector_core::transform::TransformOutputsBuf;
+
+    use crate::{
+        config::{build_unit_tests, ConfigBuilder},
+        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+    };
 
     use super::*;
 
@@ -208,14 +216,14 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
@@ -243,19 +251,51 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
                 .collect(),
             1,
         );
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
             }
             assert_eq!(events.len(), 0);
         }
+    }
+
+    #[tokio::test]
+    async fn route_metrics_with_output_tag() {
+        init_test();
+
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [transforms.foo]
+            inputs = []
+            type = "route"
+            [transforms.foo.route.first]
+                type = "is_log"
+
+            [[tests]]
+            name = "metric output"
+
+            [tests.input]
+                insert_at = "foo"
+                value = "none"
+
+            [[tests.outputs]]
+                extract_from = "foo.first"
+                [[tests.outputs.conditions]]
+                type = "vrl"
+                source = "true"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
 }

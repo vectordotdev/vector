@@ -3,13 +3,17 @@ use std::{
     num::NonZeroU64,
 };
 
+use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -58,6 +62,12 @@ pub struct InfluxDbLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Debug)]
@@ -150,23 +160,27 @@ impl SinkConfig for InfluxDbLogsConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "influxdb_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 #[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
-        event.insert("metric_type".to_string(), "logs".to_string());
+        event.insert("metric_type", "logs".to_string());
         self.encoding.apply_rules(&mut event);
 
         // Timestamp
@@ -186,7 +200,7 @@ impl HttpSink for InfluxDbLogsSink {
             }
         });
 
-        let mut output = String::new();
+        let mut output = BytesMut::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
@@ -199,14 +213,14 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes())
+        Some(output)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         Request::post(&self.uri)
             .header("Content-Type", "text/plain")
             .header("Authorization", format!("Token {}", &self.token))
-            .body(events)
+            .body(events.freeze())
             .map_err(Into::into)
     }
 }
@@ -248,7 +262,7 @@ impl InfluxDbLogsConfig {
 fn to_field(value: &Value) -> Field {
     match value {
         Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
+        Value::Float(num) => Field::Float(num.into_inner()),
         Value::Boolean(b) => Field::Bool(*b),
         _ => Field::String(value.to_string_lossy()),
     }
@@ -745,6 +759,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             tls: None,
+            acknowledgements: Default::default(),
         };
 
         let (sink, _) = config.build(cx).await.unwrap();

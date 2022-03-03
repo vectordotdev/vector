@@ -1639,18 +1639,18 @@ See [motivation](#motivation).
 [helm_push]: https://github.com/chartmuseum/helm-push
 [honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [influx helm charts]: https://github.com/influxdata/helm-charts
-[issue#1293]: https://github.com/timberio/vector/issues/1293
-[issue#1635]: https://github.com/timberio/vector/issues/1635
-[issue#1816]: https://github.com/timberio/vector/issues/1867
-[issue#1867]: https://github.com/timberio/vector/issues/1867
-[issue#2170]: https://github.com/timberio/vector/issues/2170
-[issue#2171]: https://github.com/timberio/vector/issues/2171
-[issue#2193]: https://github.com/timberio/vector/issues/2193
-[issue#2216]: https://github.com/timberio/vector/issues/2216
-[issue#2218]: https://github.com/timberio/vector/issues/2218
-[issue#2223]: https://github.com/timberio/vector/issues/2223
-[issue#2224]: https://github.com/timberio/vector/issues/2224
-[issue#2225]: https://github.com/timberio/vector/issues/2225
+[issue#1293]: https://github.com/vectordotdev/vector/issues/1293
+[issue#1635]: https://github.com/vectordotdev/vector/issues/1635
+[issue#1816]: https://github.com/vectordotdev/vector/issues/1867
+[issue#1867]: https://github.com/vectordotdev/vector/issues/1867
+[issue#2170]: https://github.com/vectordotdev/vector/issues/2170
+[issue#2171]: https://github.com/vectordotdev/vector/issues/2171
+[issue#2193]: https://github.com/vectordotdev/vector/issues/2193
+[issue#2216]: https://github.com/vectordotdev/vector/issues/2216
+[issue#2218]: https://github.com/vectordotdev/vector/issues/2218
+[issue#2223]: https://github.com/vectordotdev/vector/issues/2223
+[issue#2224]: https://github.com/vectordotdev/vector/issues/2224
+[issue#2225]: https://github.com/vectordotdev/vector/issues/2225
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
 [k8s_api_capabilities]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#capabilities-v1-core
@@ -1709,15 +1709,15 @@ See [motivation](#motivation).
 [kube-bench]: https://github.com/aquasecurity/kube-bench
 [kubectl_rollout_restart]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#-em-restart-em-
 [kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
-[kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
+[kubernetes_version_comment]: https://github.com/vectordotdev/vector/pull/2188#discussion_r403120481
 [kustomize]: https://github.com/kubernetes-sigs/kustomize
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [man_7_capabilities]: https://man7.org/linux/man-pages/man7/capabilities.7.html
 [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 [netdata]: https://github.com/netdata/netdata
-[pr#2134]: https://github.com/timberio/vector/pull/2134
-[pr#2188]: https://github.com/timberio/vector/pull/2188
+[pr#2134]: https://github.com/vectordotdev/vector/pull/2134
+[pr#2188]: https://github.com/vectordotdev/vector/pull/2188
 [prometheus_kubernetes_sd_config]: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
 [redoctober]: https://github.com/cloudflare/redoctober
 [sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
@@ -1725,5 +1725,5 @@ See [motivation](#motivation).
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
 [vault]: https://www.vaultproject.io/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
-[why_so_much_configurations]: https://github.com/timberio/vector/pull/2134/files#r401634895
+[why_so_much_configurations]: https://github.com/vectordotdev/vector/pull/2134/files#r401634895
 [windows_in_kubernetes]: https://kubernetes.io/docs/setup/production-environment/windows/intro-windows-in-kubernetes/

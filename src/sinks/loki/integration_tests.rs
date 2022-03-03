@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
-use shared::encode_logfmt;
+use vector_common::encode_logfmt;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use super::config::{LokiConfig, OutOfOrderAction};
@@ -92,7 +92,7 @@ async fn json() {
     }
 }
 
-// https://github.com/timberio/vector/issues/7815
+// https://github.com/vectordotdev/vector/issues/7815
 #[tokio::test]
 async fn json_nested_fields() {
     let (stream, sink) = build_sink("json").await;
@@ -132,8 +132,7 @@ async fn logfmt() {
     let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
     assert_eq!(lines.len(), outputs.len());
     for (i, output) in outputs.iter().enumerate() {
-        let expected_logfmt =
-            encode_logfmt::to_string(lines[i].clone().into_log().into_parts().0).unwrap();
+        let expected_logfmt = encode_logfmt::to_string(lines[i].as_log().as_map()).unwrap();
         assert_eq!(output, &expected_logfmt);
     }
 }

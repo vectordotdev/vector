@@ -12,8 +12,6 @@ pub enum ParseError {
     EndpointParseError { source: InvalidUri },
     #[snafu(display("Failed to parse region: {}", source))]
     RegionParseError { source: ParseRegionError },
-    #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
-    BothRegionAndEndpoint,
     #[snafu(display("Must set either 'region' or 'endpoint'"))]
     MissingRegionAndEndpoint,
 }
@@ -25,7 +23,10 @@ impl TryFrom<&RegionOrEndpoint> for Region {
         match (&r.region, &r.endpoint) {
             (Some(region), None) => region.parse().context(RegionParseSnafu),
             (None, Some(endpoint)) => region_from_endpoint(endpoint),
-            (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
+            (Some(region), Some(endpoint)) => Ok(Region::Custom {
+                name: region.to_string(),
+                endpoint: endpoint.to_string(),
+            }),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
     }

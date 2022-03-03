@@ -3,20 +3,25 @@ use std::{
     fmt,
 };
 
+use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note};
+use value::kind::Collection;
 
 use crate::{
     expression::{
         container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
-    value::Kind,
-    Span, Value,
+    value::{kind, Kind},
+    vm::VmArgumentList,
+    Context, ExpressionError, Span, Value,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type CompiledArgument =
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
 
-pub trait Function: Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -48,7 +53,7 @@ pub trait Function: Sync + fmt::Debug {
     fn compile(
         &self,
         state: &super::State,
-        info: &FunctionCompileContext,
+        info: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -58,6 +63,31 @@ pub trait Function: Sync + fmt::Debug {
     /// and argument type definition.
     fn parameters(&self) -> &'static [Parameter] {
         &[]
+    }
+
+    /// Implement this function if you need to manipulate and store any function parameters
+    /// at compile time.
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &FunctionCompileContext,
+        _name: &str,
+        _expr: Option<&Expr>,
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+        Ok(None)
+    }
+
+    /// This function is called by the VM.
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        _args: &mut VmArgumentList,
+    ) -> Result<Value, ExpressionError> {
+        Err(ExpressionError::Error {
+            message: "unimplemented".to_string(),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        })
     }
 }
 
@@ -70,9 +100,45 @@ pub struct Example {
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct FunctionCompileContext {
-    pub span: Span,
+    span: Span,
+    external_context: AnyMap,
+}
+
+impl FunctionCompileContext {
+    pub fn new(span: Span) -> Self {
+        Self {
+            span,
+            external_context: AnyMap::new(),
+        }
+    }
+
+    /// Add an external context to the compile context.
+    pub fn with_external_context(mut self, context: AnyMap) -> Self {
+        self.external_context = context;
+        self
+    }
+
+    /// Span information for the function call.
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    /// Get an immutable reference to a stored external context, if one exists.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.external_context.get::<T>()
+    }
+
+    /// Get a mutable reference to a stored external context, if one exists.
+    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.external_context.get_mut::<T>()
+    }
+
+    /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
+    pub fn into_external_context(self) -> AnyMap {
+        self.external_context
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -99,14 +165,55 @@ pub struct Parameter {
 }
 
 impl Parameter {
+    #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        Kind::new(self.kind)
+        let mut kind = Kind::empty();
+
+        let n = self.kind;
+
+        if (n & kind::BYTES) == kind::BYTES {
+            kind.add_bytes();
+        }
+
+        if (n & kind::INTEGER) == kind::INTEGER {
+            kind.add_integer();
+        }
+
+        if (n & kind::FLOAT) == kind::FLOAT {
+            kind.add_float();
+        }
+
+        if (n & kind::BOOLEAN) == kind::BOOLEAN {
+            kind.add_boolean();
+        }
+
+        if (n & kind::OBJECT) == kind::OBJECT {
+            kind.add_object(Collection::any());
+        }
+
+        if (n & kind::ARRAY) == kind::ARRAY {
+            kind.add_array(Collection::any());
+        }
+
+        if (n & kind::TIMESTAMP) == kind::TIMESTAMP {
+            kind.add_timestamp();
+        }
+
+        if (n & kind::REGEX) == kind::REGEX {
+            kind.add_regex();
+        }
+
+        if (n & kind::NULL) == kind::NULL {
+            kind.add_null();
+        }
+
+        kind
     }
 }
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ArgumentList(HashMap<&'static str, Expr>);
 
 impl ArgumentList {
@@ -123,7 +230,7 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
+                    match var.value().unwrap().clone().into() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -137,6 +244,19 @@ impl ArgumentList {
                     expected: "literal",
                     expr,
                 }),
+            })
+            .transpose()
+    }
+
+    /// Returns the argument if it is a literal, an object or an array.
+    pub fn optional_value(&mut self, keyword: &'static str) -> Result<Option<Value>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| {
+                expr.try_into().map_err(|err| Error::UnexpectedExpression {
+                    keyword,
+                    expected: "literal",
+                    expr: err,
+                })
             })
             .transpose()
     }
@@ -277,7 +397,7 @@ impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
         Self(
             map.into_iter()
-                .map(|(k, v)| (k, v.into_expr()))
+                .map(|(k, v)| (k, v.into()))
                 .collect::<HashMap<_, _>>(),
         )
     }
@@ -298,6 +418,23 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
             .collect::<HashMap<_, _>>();
 
         Self(arguments)
+    }
+}
+
+impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+    fn from(args: ArgumentList) -> Self {
+        args.0
+            .iter()
+            .map(|(key, expr)| {
+                (
+                    *key,
+                    Some(FunctionArgument::new(
+                        None,
+                        Node::new(Span::default(), expr.clone()),
+                    )),
+                )
+            })
+            .collect()
     }
 }
 
@@ -413,5 +550,49 @@ impl diagnostic::DiagnosticError for Error {
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parameter_kind() {
+        struct TestCase {
+            parameter_kind: u16,
+            kind: Kind,
+        }
+
+        for (
+            title,
+            TestCase {
+                parameter_kind,
+                kind,
+            },
+        ) in HashMap::from([
+            (
+                "bytes",
+                TestCase {
+                    parameter_kind: kind::BYTES,
+                    kind: Kind::bytes(),
+                },
+            ),
+            (
+                "integer",
+                TestCase {
+                    parameter_kind: kind::INTEGER,
+                    kind: Kind::integer(),
+                },
+            ),
+        ]) {
+            let parameter = Parameter {
+                keyword: "",
+                kind: parameter_kind,
+                required: false,
+            };
+
+            assert_eq!(parameter.kind(), kind, "{}", title);
+        }
     }
 }

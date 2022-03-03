@@ -28,7 +28,7 @@ impl Function for Md5 {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -50,7 +50,7 @@ impl Expression for Md5Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -64,7 +64,7 @@ mod tests {
         md5 {
             args: func_args![value: "foo"],
             want: Ok(value!("acbd18db4cc2f85cedef654fccc4a4d8")),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

@@ -41,8 +41,10 @@ async fn kinesis_put_records() {
         compression: Compression::None,
         batch,
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();

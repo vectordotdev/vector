@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::{BufMut, BytesMut};
 use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tower::{Service, ServiceBuilder};
@@ -14,12 +15,14 @@ use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
     },
-    internal_events::StatsdInvalidMetricReceived,
+    internal_events::StatsdInvalidMetricError,
     sinks::util::{
         buffer::metrics::compress_distribution,
         encode_namespace,
@@ -140,12 +143,16 @@ impl SinkConfig for StatsdSinkConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "statsd"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -184,7 +191,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>> {
+fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMut> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -222,7 +229,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
             }
         }
         _ => {
-            emit!(&StatsdInvalidMetricReceived {
+            emit!(&StatsdInvalidMetricError {
                 value: metric.value(),
                 kind: &metric.kind(),
             });
@@ -233,13 +240,14 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
 
     let message = encode_namespace(metric.namespace().or(default_namespace), '.', buf.join("|"));
 
-    let mut body: Vec<u8> = message.into_bytes();
-    body.push(b'\n');
+    let mut body = BytesMut::new();
+    body.put_slice(&message.into_bytes());
+    body.put_u8(b'\n');
 
     Some(body)
 }
 
-impl Service<Vec<u8>> for StatsdSvc {
+impl Service<BytesMut> for StatsdSvc {
     type Response = ();
     type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
@@ -248,8 +256,8 @@ impl Service<Vec<u8>> for StatsdSvc {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
-        self.inner.call(frame.into()).err_into().boxed()
+    fn call(&mut self, frame: BytesMut) -> Self::Future {
+        self.inner.call(frame).err_into().boxed()
     }
 }
 
@@ -319,7 +327,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -349,7 +357,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -364,7 +372,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -393,7 +401,7 @@ mod test {
         let event = Event::Metric(metric1);
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1_compressed, metric2);
+        vector_common::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -410,7 +418,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]

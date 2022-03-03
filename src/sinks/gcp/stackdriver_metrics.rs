@@ -1,12 +1,13 @@
 use std::num::NonZeroU64;
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
     http::HttpClient,
     sinks::{
@@ -43,6 +44,12 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -102,12 +109,16 @@ impl SinkConfig for StackdriverConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -138,7 +149,7 @@ impl HttpSink for HttpEventSink {
     async fn build_request(
         &self,
         mut metrics: Self::Output,
-    ) -> crate::Result<hyper::Request<Vec<u8>>> {
+    ) -> crate::Result<hyper::Request<Bytes>> {
         let metric = metrics.pop().expect("only one metric");
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -199,7 +210,8 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = serde_json::to_vec(&series).unwrap();
+        let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
+
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
             self.config.project_id

@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use shared::TimeZone;
 use vector::{
     config::{DataType, Output},
     event::{Event, Value},
@@ -15,12 +14,13 @@ use vector::{
         SyncTransform, TransformOutputsBuf,
     },
 };
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
     targets = benchmark_remap
 );
@@ -31,10 +31,10 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
-        let output_1 = result[0].as_log();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
         debug_assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
@@ -101,10 +101,10 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs =
-            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
-        let output_1 = result[0].as_log();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(
             output_1.get("foo").unwrap().to_string_lossy(),
@@ -176,10 +176,10 @@ fn benchmark_remap(c: &mut Criterion) {
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
             let mut outputs =
-                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::Any)], 1);
+                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();
-            let output_1 = result[0].as_log();
+            let output_1 = result.first().unwrap().as_log();
 
             debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
             debug_assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));

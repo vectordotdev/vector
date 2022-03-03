@@ -3,17 +3,17 @@ use std::{collections::HashMap, str};
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::ResultExt;
+use vector_common::TimeZone;
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
-        RegexParserTargetExists,
+        ParserConversionError, ParserMatchError, ParserMissingFieldError, ParserTargetExistsError,
     },
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 
@@ -51,11 +51,11 @@ impl TransformConfig for RegexParserConfig {
         RegexParser::build(self, context.globals.timezone)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -128,7 +128,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(&RegexParserConversionFailed { name, error });
+                                        emit!(&ParserConversionError { name, error });
                                         None
                                     }
                                 }
@@ -137,7 +137,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(&RegexParserFailedMatch { value });
+                emit!(&ParserMatchError { value });
                 None
             }
         }
@@ -188,8 +188,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
-            .flatten()
+            .flat_map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         let types =
@@ -228,8 +227,7 @@ impl RegexParser {
         drop_field = drop_field
             && !patterns
                 .iter()
-                .map(|p| &p.capture_names)
-                .flatten()
+                .flat_map(|p| &p.capture_names)
                 .any(|(_, f, _)| *f == field);
 
         Self {
@@ -245,16 +243,16 @@ impl RegexParser {
 }
 
 impl FunctionTransform for RegexParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(&self.field).map(|s| s.coerce_to_bytes());
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(&RegexParserFailedMatch { value });
+                    emit!(&ParserMatchError { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -276,7 +274,7 @@ impl FunctionTransform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            emit!(&RegexParserTargetExists { target_field });
+                            emit!(&ParserTargetExistsError { target_field });
                             output.push(event);
                             return;
                         }
@@ -296,7 +294,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(&RegexParserMissingField { field: &self.field });
+            emit!(&ParserMissingFieldError { field: &self.field });
         }
 
         if !self.drop_failed {
@@ -311,7 +309,9 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
+    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -334,9 +334,9 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().map(|event| event.into_log());
+        let result = buf.into_events().next().map(|event| event.into_log());
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }
@@ -528,7 +528,7 @@ mod tests {
         .expect("Failed to parse log");
         assert_eq!(log["check"], Value::Boolean(false));
         assert_eq!(log["status"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(6789.01));
+        assert_eq!(log["time"], Value::Float(NotNan::new(6789.01).unwrap()));
     }
 
     #[tokio::test]
@@ -559,7 +559,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // https://github.com/timberio/vector/issues/3096
+    // https://github.com/vectordotdev/vector/issues/3096
     async fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
         let log = do_transform(
             "match1234 235.42 true",
@@ -581,7 +581,7 @@ mod tests {
 
         assert_eq!(log.get("id1"), None);
         assert_eq!(log["id2"], Value::Integer(1234));
-        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["time"], Value::Float(NotNan::new(235.42).unwrap()));
         assert_eq!(log["check"], Value::Boolean(true));
         assert!(log.get("message").is_some());
     }

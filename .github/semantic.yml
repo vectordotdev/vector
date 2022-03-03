@@ -124,7 +124,9 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - aws_sqs source # Anything `aws_sqs` source related
   - datadog_agent source # Anything `datadog_agent` source related
+  - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related

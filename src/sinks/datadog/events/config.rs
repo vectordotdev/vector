@@ -5,7 +5,7 @@ use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
@@ -31,10 +31,17 @@ pub struct DatadogEventsConfig {
     pub default_api_key: String,
 
     // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
-    pub tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsConfig>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -99,12 +106,16 @@ impl SinkConfig for DatadogEventsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_events"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

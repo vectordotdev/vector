@@ -7,6 +7,7 @@ import argparse
 import common
 import matplotlib.pyplot as plt
 import os
+import pathlib
 
 np.seterr(all='raise')
 
@@ -33,9 +34,23 @@ bytes_written['runtime'] = bytes_written['fetch_index']
 for exp in bytes_written.experiment.unique():
     print(exp)
     sns.set_theme()
-    sns.lmplot(data=bytes_written[bytes_written.experiment == exp].sort_values(by=['variant']),
+
+    pathlib.Path(os.path.join(args.output_dir, "{}".format(exp))).mkdir(parents=True, exist_ok=True)
+
+    data = bytes_written[bytes_written.experiment == exp].sort_values(by=['variant']).reset_index()
+
+    sns.lmplot(data=data,
                x="fetch_index", y="bytes/second per core",
                hue="run_id", col="variant",
                scatter=True)
-    plt.savefig(os.path.join(args.output_dir, "{}.png".format(exp)), dpi=200)
+    plt.savefig(os.path.join(args.output_dir, "{}/samples.png".format(exp)), dpi=200)
+    plt.close()
+
+    sns.displot(data=data,
+                hue="run_id",
+                col="variant",
+                multiple="dodge",
+                x="bytes/second per core",
+                kde=True)
+    plt.savefig(os.path.join(args.output_dir, "{}/histogram.png".format(exp)), dpi=200)
     plt.close()

@@ -8,6 +8,7 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use super::parser;
 use crate::{
@@ -16,8 +17,8 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
-        PrometheusParseError, PrometheusRequestCompleted,
+        BytesReceived, PrometheusEventsReceived, PrometheusHttpError, PrometheusHttpResponseError,
+        PrometheusParseError, PrometheusRequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -54,7 +55,7 @@ struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -112,6 +113,10 @@ impl SourceConfig for PrometheusScrapeConfig {
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -156,6 +161,10 @@ impl SourceConfig for PrometheusCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -236,6 +245,10 @@ fn prometheus(
                     .and_then(|response| async move {
                         let (header, body) = response.into_parts();
                         let body = hyper::body::to_bytes(body).await?;
+                        emit!(&BytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http"
+                        });
                         Ok((header, body))
                     })
                     .into_stream()
@@ -250,13 +263,12 @@ fn prometheus(
                                     end: Instant::now()
                                 });
 
-                                let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
-                                        emit!(&PrometheusEventReceived {
-                                            byte_size,
+                                        emit!(&PrometheusEventsReceived {
+                                            byte_size: events.size_of(),
                                             count: events.len(),
                                             uri: url.clone()
                                         });
@@ -319,7 +331,7 @@ fn prometheus(
                                     }
                                     Err(error) => {
                                         if url.path() == "/" {
-                                            // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                             warn!(
                                                 message = PARSE_ERROR_NO_PATH,
                                                 endpoint = %url,
@@ -338,7 +350,7 @@ fn prometheus(
                                 if header.status == hyper::StatusCode::NOT_FOUND
                                     && url.path() == "/"
                                 {
-                                    // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                     warn!(
                                         message = NOT_FOUND_NO_PATH,
                                         endpoint = %url,
@@ -364,13 +376,14 @@ fn prometheus(
             .flatten()
             .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(&StreamClosedError { error, count });
                 Err(())
             }
         }
@@ -423,7 +436,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -473,7 +489,10 @@ mod test {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -656,7 +675,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;

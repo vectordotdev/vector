@@ -42,7 +42,7 @@ impl Function for MatchAny {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -84,7 +84,7 @@ impl Expression for MatchAnyFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -106,7 +106,7 @@ mod tests {
                                  Value::Regex(Regex::new("baz").unwrap().into()),
                              ])],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         no {
@@ -116,7 +116,7 @@ mod tests {
                                  Value::Regex(Regex::new("foobar").unwrap().into()),
                              ])],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

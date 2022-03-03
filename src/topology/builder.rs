@@ -5,15 +5,14 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use futures_util::stream;
-use lazy_static::lazy_static;
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     time::{timeout, Duration},
 };
+use tracing_futures::Instrument;
 use vector_core::{
     buffers::{
         topology::{
@@ -28,26 +27,27 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
+    ready_events::ReadyEventsExt,
+    schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
         TransformContext,
     },
-    event::Event,
+    event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     SourceSender,
 };
 
-lazy_static! {
-    static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
-}
+static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
+    Lazy::new(enrichment::TableRegistry::default);
 
-pub const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -56,7 +56,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
         .unwrap_or_else(num_cpus::get)
 });
 
-pub async fn load_enrichment_tables<'a>(
+pub(self) async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
     diff: &'a ConfigDiff,
 ) -> (&'static enrichment::TableRegistry, Vec<String>) {
@@ -113,14 +113,13 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
-    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
-    pub tasks: HashMap<ComponentKey, Task>,
-    pub source_tasks: HashMap<ComponentKey, Task>,
-    pub healthchecks: HashMap<ComponentKey, Task>,
-    pub shutdown_coordinator: SourceShutdownCoordinator,
-    pub detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub enrichment_tables: enrichment::TableRegistry,
+    pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Vec<OutputId>)>,
+    pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
+    pub(super) tasks: HashMap<ComponentKey, Task>,
+    pub(crate) source_tasks: HashMap<ComponentKey, Task>,
+    pub(super) healthchecks: HashMap<ComponentKey, Task>,
+    pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
+    pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -154,17 +153,14 @@ pub async fn build_pieces(
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
+        let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
+
         for output in source_outputs {
             let rx = builder.add_output(output.clone());
 
-            let (mut fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new();
             let pump = async move {
-                let mut rx = rx.ready_chunks(128);
-                while let Some(events) = rx.next().await {
-                    let mut events = stream::iter(events).map(Ok);
-                    fanout.send_all(&mut events).await?;
-                }
-                fanout.flush().await?;
+                rx.map(EventArray::from).map(Ok).forward(fanout).await?;
                 Ok(TaskOutput::Source)
             };
 
@@ -172,10 +168,16 @@ pub async fn build_pieces(
             controls.insert(
                 OutputId {
                     component: key.clone(),
-                    port: output.port,
+                    port: output.port.clone(),
                 },
                 control,
             );
+
+            let schema_definition = output
+                .log_schema_definition
+                .unwrap_or_else(schema::Definition::empty);
+
+            schema_definitions.insert(output.port, schema_definition);
         }
 
         let pump = async move {
@@ -200,6 +202,8 @@ pub async fn build_pieces(
             shutdown: shutdown_signal,
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
+            acknowledgements: source.sink_acknowledgements,
+            schema_definitions,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -239,24 +243,44 @@ pub async fn build_pieces(
         source_tasks.insert(key.clone(), server);
     }
 
+    let mut definition_cache = HashMap::default();
+
     // Build transforms
     for (key, transform) in config
         .transforms
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let mut schema_definitions = HashMap::new();
+        let merged_definition = if config.schema.enabled {
+            schema::merged_definition(&transform.inputs, config, &mut definition_cache)
+        } else {
+            schema::Definition::empty()
+        };
+
+        for output in transform.inner.outputs(&merged_definition) {
+            let definition = match output.log_schema_definition {
+                Some(definition) => definition,
+                None => merged_definition.clone(),
+            };
+
+            schema_definitions.insert(output.port, definition);
+        }
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+            schema_definitions,
+            merged_schema_definition: merged_definition.clone(),
         };
 
         let node = TransformNode {
             key: key.clone(),
             typetag: transform.inner.transform_type(),
             inputs: transform.inputs.clone(),
-            input_type: transform.inner.input_type(),
-            outputs: transform.inner.outputs(),
+            input_details: transform.inner.input(),
+            outputs: transform.inner.outputs(&merged_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         };
 
@@ -268,7 +292,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -289,13 +313,13 @@ pub async fn build_pieces(
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
-        let input_type = sink.inner.input_type();
+        let input_type = sink.inner.input().data_type();
 
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::Memory { .. } => "memory",
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
@@ -353,14 +377,13 @@ pub async fn build_pieces(
 
             sink.run(
                 rx.by_ref()
-                    .filter(|event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
+                    .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                    .inspect(|events| {
                         emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
+                            count: events.len(),
+                            byte_size: events.size_of(),
                         })
                     })
-                    .map(Into::into) // Convert the `Event` into an `EventArray`
                     .take_until_if(tripwire),
             )
             .await
@@ -442,7 +465,6 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)
@@ -451,11 +473,11 @@ pub async fn build_pieces(
     }
 }
 
-const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
-    match data_type {
-        DataType::Any => true,
-        DataType::Log => matches!(event, Event::Log(_)),
-        DataType::Metric => matches!(event, Event::Metric(_)),
+const fn filter_events_type(events: &EventArray, data_type: DataType) -> bool {
+    match events {
+        EventArray::Logs(_) => data_type.contains(DataType::Log),
+        EventArray::Metrics(_) => data_type.contains(DataType::Metric),
+        EventArray::Traces(_) => data_type.contains(DataType::Trace),
     }
 }
 
@@ -464,7 +486,7 @@ struct TransformNode {
     key: ComponentKey,
     typetag: &'static str,
     inputs: Vec<OutputId>,
-    input_type: DataType,
+    input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
 }
@@ -472,26 +494,30 @@ struct TransformNode {
 fn build_transform(
     transform: Transform,
     node: TransformNode,
-    input_rx: BufferReceiver<Event>,
+    input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
         Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
-        Transform::Task(t) => {
-            build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
+        Transform::Task(t) => build_task_transform(
+            t,
+            input_rx,
+            node.input_details.data_type(),
+            node.typetag,
+            &node.key,
+        ),
     }
 }
 
 fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
-    input_rx: BufferReceiver<Event>,
+    input_rx: BufferReceiver<EventArray>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs);
 
-    let runner = Runner::new(t, input_rx, node.input_type, outputs);
+    let runner = Runner::new(t, input_rx, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
     } else {
@@ -513,7 +539,7 @@ fn build_sync_transform(
 
 struct Runner {
     transform: Box<dyn SyncTransform>,
-    input_rx: Option<BufferReceiver<Event>>,
+    input_rx: Option<BufferReceiver<EventArray>>,
     input_type: DataType,
     outputs: TransformOutputs,
     timer: crate::utilization::Timer,
@@ -523,7 +549,7 @@ struct Runner {
 impl Runner {
     fn new(
         transform: Box<dyn SyncTransform>,
-        input_rx: BufferReceiver<Event>,
+        input_rx: BufferReceiver<EventArray>,
         input_type: DataType,
         outputs: TransformOutputs,
     ) -> Self {
@@ -537,7 +563,7 @@ impl Runner {
         }
     }
 
-    fn on_events_received(&mut self, events: &[Event]) {
+    fn on_events_received(&mut self, events: &EventArray) {
         let stopped = self.timer.stop_wait();
         if stopped.duration_since(self.last_report).as_secs() >= 5 {
             self.timer.report();
@@ -551,15 +577,8 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
-        // TODO: account for named outputs separately?
-        let count = outputs_buf.len();
-        // TODO: do we only want allocated_bytes for events themselves?
-        let byte_size = outputs_buf.size_of();
-
         self.timer.start_wait();
         self.outputs.send(outputs_buf).await;
-
-        emit!(&EventsSent { count, byte_size });
     }
 
     async fn run_inline(mut self) -> Result<TaskOutput, ()> {
@@ -572,17 +591,13 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |event| ready(filter_event_type(event, self.input_type)))
-            .ready_chunks(INLINE_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)))
+            .ready_events(INLINE_BATCH_SIZE);
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
-
-            for event in events {
-                self.transform.transform(event, &mut outputs_buf);
-            }
-
+            self.transform.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf).await;
         }
 
@@ -599,8 +614,8 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |event| ready(filter_event_type(event, self.input_type)))
-            .ready_chunks(CONCURRENT_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)))
+            .ready_events(CONCURRENT_BATCH_SIZE);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -628,12 +643,9 @@ impl Runner {
                             let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
                             let task = tokio::spawn(async move {
-                                for event in events {
-                                    t.transform(event, &mut outputs_buf);
-                                }
-
+                                t.transform_all(events, &mut outputs_buf);
                                 outputs_buf
-                            });
+                            }.in_current_span());
                             in_flight.push(task);
                         }
                         None => {
@@ -657,34 +669,35 @@ impl Runner {
 }
 
 fn build_task_transform(
-    t: Box<dyn TaskTransform>,
-    input_rx: BufferReceiver<Event>,
+    t: Box<dyn TaskTransform<EventArray>>,
+    input_rx: BufferReceiver<EventArray>,
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (output, control) = Fanout::new();
+    let (fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .inspect(|event| {
+        .filter(move |events| ready(filter_events_type(events, input_type)))
+        .inspect(|events| {
             emit!(&EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
+                count: events.len(),
+                byte_size: events.size_of(),
             })
         });
     let transform = t
         .transform(Box::pin(filtered))
-        .map(Ok)
-        .forward(output.with(|event: Event| async {
+        .inspect(|events: &EventArray| {
             emit!(&EventsSent {
-                count: 1,
-                byte_size: event.size_of(),
+                count: events.len(),
+                byte_size: events.size_of(),
+                output: None,
             });
-            Ok(event)
-        }))
+        })
+        .map(Ok)
+        .forward(fanout)
         .boxed()
         .map_ok(|_| {
             debug!("Finished.");

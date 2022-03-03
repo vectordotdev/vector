@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -12,10 +13,12 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
@@ -55,6 +58,12 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[cfg(test)]
@@ -69,6 +78,7 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -161,19 +171,23 @@ impl SinkConfig for HttpSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "http"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
@@ -182,29 +196,28 @@ impl HttpSink for HttpSinkConfig {
         let body = match &self.encoding.codec() {
             Encoding::Text => {
                 if let Some(v) = event.get(crate::config::log_schema().message_key()) {
-                    let mut b = v.to_string_lossy().into_bytes();
-                    b.push(b'\n');
-                    b
+                    let mut body = BytesMut::new();
+                    body.put_slice(&v.to_string_lossy().into_bytes());
+                    body.put_u8(b'\n');
+                    body
                 } else {
-                    emit!(&HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessageError);
                     return None;
                 }
             }
-
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b'\n');
-                b
+                body.put_u8(b'\n');
+                body
             }
-
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event)
+                let mut body = crate::serde::json::to_bytes(&event)
                     .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
-                b.push(b',');
-                b
+                body.put_u8(b',');
+                body
             }
         };
 
@@ -215,7 +228,7 @@ impl HttpSink for HttpSinkConfig {
         Some(body)
     }
 
-    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
@@ -232,9 +245,17 @@ impl HttpSink for HttpSinkConfig {
             Encoding::Text => "text/plain",
             Encoding::Ndjson => "application/x-ndjson",
             Encoding::Json => {
-                body.insert(0, b'[');
-                body.pop(); // remove trailing comma from last record
-                body.push(b']');
+                // TODO(https://github.com/vectordotdev/vector/issues/11253):
+                // Prepend before building a request body to eliminate the
+                // additional copy here.
+                let message = body.split();
+                body.put_u8(b'[');
+                if !message.is_empty() {
+                    body.unsplit(message);
+                    // remove trailing comma from last record
+                    body.truncate(body.len() - 1);
+                }
+                body.put_u8(b']');
                 "application/json"
             }
         };
@@ -248,9 +269,10 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let mut w = GzEncoder::new(Vec::new(), level);
+                let buffer = BytesMut::new();
+                let mut w = GzEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
-                body = w.finish().expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
             Compression::None => {}
         }
@@ -259,7 +281,7 @@ impl HttpSink for HttpSinkConfig {
             builder = builder.header(header.as_str(), value.as_str());
         }
 
-        let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(body.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);

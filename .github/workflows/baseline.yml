@@ -14,7 +14,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -30,7 +30,7 @@ jobs:
       PROFILE: debug
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -41,7 +41,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -52,7 +52,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -65,7 +65,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean

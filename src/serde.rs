@@ -24,23 +24,52 @@ pub fn default_max_length() -> usize {
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_framing_message_based() -> Box<dyn FramingConfig> {
-    Box::new(BytesDecoderConfig::new())
+pub fn default_framing_message_based() -> FramingConfig {
+    BytesDecoderConfig::new().into()
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
-    Box::new(NewlineDelimitedDecoderConfig::new())
+pub fn default_framing_stream_based() -> FramingConfig {
+    NewlineDelimitedDecoderConfig::new().into()
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_decoding() -> Box<dyn DeserializerConfig> {
-    Box::new(BytesDeserializerConfig::new())
+pub fn default_decoding() -> DeserializerConfig {
+    BytesDeserializerConfig::new().into()
 }
 
-pub fn to_string(value: impl serde::Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
+/// Utilities for the `serde_json` crate.
+pub mod json {
+    use bytes::{BufMut, BytesMut};
+    use serde::Serialize;
+
+    /// Serialize the given data structure as JSON to `String`.
+    ///
+    /// # Panics
+    ///
+    /// Serialization can panic if `T`'s implementation of `Serialize` decides
+    /// to fail, or if `T` contains a map with non-string keys.
+    pub fn to_string(value: impl Serialize) -> String {
+        let value = serde_json::to_value(value).unwrap();
+        value.as_str().unwrap().into()
+    }
+
+    /// Serialize the given data structure as JSON to `BytesMut`.
+    ///
+    /// # Errors
+    ///
+    /// Serialization can fail if `T`'s implementation of `Serialize` decides to
+    /// fail, or if `T` contains a map with non-string keys.
+    pub fn to_bytes<T>(value: &T) -> serde_json::Result<BytesMut>
+    where
+        T: ?Sized + Serialize,
+    {
+        // Allocate same capacity as `serde_json::to_vec`:
+        // https://github.com/serde-rs/json/blob/5fe9bdd3562bf29d02d1ab798bbcff069173306b/src/ser.rs#L2195.
+        let mut bytes = BytesMut::with_capacity(128);
+        serde_json::to_writer((&mut bytes).writer(), value)?;
+        Ok(bytes)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -57,7 +86,7 @@ impl<V: 'static> Fields<V> {
     pub fn all_fields(self) -> impl Iterator<Item = (String, V)> {
         self.0
             .into_iter()
-            .map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
+            .flat_map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
                 match v {
                     // boxing is used as a way to avoid incompatible types of the match arms
                     FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
@@ -67,7 +96,6 @@ impl<V: 'static> Fields<V> {
                     ),
                 }
             })
-            .flatten()
     }
 }
 

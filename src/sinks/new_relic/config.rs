@@ -2,7 +2,7 @@ use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
 use crate::{
-    config::{DataType, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
         encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
@@ -75,6 +75,12 @@ pub struct NewRelicConfig {
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -85,7 +91,7 @@ impl NewRelicConfig {
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
     ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck(client, credentials).boxed())
+        Ok(healthcheck::healthcheck(client, credentials).boxed())
     }
 }
 
@@ -127,12 +133,16 @@ impl SinkConfig for NewRelicConfig {
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::new(DataType::Log | DataType::Metric)
     }
 
     fn sink_type(&self) -> &'static str {
         "new_relic"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

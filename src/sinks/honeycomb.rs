@@ -1,13 +1,18 @@
 use std::num::NonZeroU64;
 
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -16,12 +21,10 @@ use crate::{
     },
 };
 
-lazy_static::lazy_static! {
-    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
-}
+static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     api_key: String,
 
     // TODO: we probably want to make this a template
@@ -33,6 +36,13 @@ pub struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -87,12 +97,16 @@ impl SinkConfig for HoneycombConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "honeycomb"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -119,13 +133,12 @@ impl HttpSink for HoneycombConfig {
         Some(data)
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
-        let buf = serde_json::to_vec(&events).unwrap();
-
-        request.body(buf).map_err(Into::into)
+        request.body(body).map_err(Into::into)
     }
 }
 

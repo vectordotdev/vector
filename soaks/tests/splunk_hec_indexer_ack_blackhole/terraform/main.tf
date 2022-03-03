@@ -45,10 +45,10 @@ module "vector" {
   vector_cpus  = var.vector_cpus
 }
 module "splunk-hec-gen" {
-  source        = "../../../common/terraform/modules/lading_splunk_hec_gen"
-  type          = var.type
+  source              = "../../../common/terraform/modules/lading_splunk_hec_gen"
+  type                = var.type
   splunk-hec-gen-yaml = file("${path.module}/../../../common/configs/splunk_hec_gen.yaml")
-  namespace     = kubernetes_namespace.soak.metadata[0].name
-  lading_image  = var.lading_image
-  depends_on    = [module.vector]
+  namespace           = kubernetes_namespace.soak.metadata[0].name
+  lading_image        = var.lading_image
+  depends_on          = [module.vector]
 }

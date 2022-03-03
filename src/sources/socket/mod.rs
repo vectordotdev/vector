@@ -95,12 +95,10 @@ impl SourceConfig for SocketConfig {
 
                 let framing = match config.framing().as_ref() {
                     Some(framing) => framing.clone(),
-                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
-                        max_length,
-                    )),
+                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding().clone()).build()?;
+                let decoder = DecodingConfig::new(framing, config.decoding().clone()).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
@@ -122,7 +120,7 @@ impl SourceConfig for SocketConfig {
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 let decoder =
                     DecodingConfig::new(config.framing().clone(), config.decoding().clone())
-                        .build()?;
+                        .build();
                 Ok(udp::udp(
                     config.address(),
                     config.max_length(),
@@ -142,7 +140,7 @@ impl SourceConfig for SocketConfig {
                     config.framing.unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
                 )
-                .build()?;
+                .build();
                 Ok(unix::unix_datagram(
                     config.path,
                     config
@@ -166,12 +164,10 @@ impl SourceConfig for SocketConfig {
 
                 let framing = match config.framing.as_ref() {
                     Some(framing) => framing.clone(),
-                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
-                        max_length,
-                    )),
+                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding.clone()).build()?;
+                let decoder = DecodingConfig::new(framing, config.decoding.clone()).build();
 
                 let host_key = config
                     .host_key
@@ -205,11 +201,16 @@ impl SourceConfig for SocketConfig {
             Mode::UnixStream(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::{
+        collections::HashMap,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -270,7 +271,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -292,7 +293,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -316,7 +317,7 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -343,12 +344,12 @@ mod test {
 
         let mut config = TcpConfig::from_address(addr.into());
         config.set_max_length(None);
-        config.set_framing(Some(Box::new(
-            NewlineDelimitedDecoderConfig::new_with_max_length(10),
-        )));
+        config.set_framing(Some(
+            NewlineDelimitedDecoderConfig::new_with_max_length(10).into(),
+        ));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -384,7 +385,7 @@ mod test {
         config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -428,7 +429,7 @@ mod test {
         }));
 
         let server = SocketConfig::from(config)
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -619,6 +620,8 @@ mod test {
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -781,7 +784,7 @@ mod test {
             Mode::UnixDatagram(config)
         };
         let server = SocketConfig { mode }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
         tokio::spawn(server);

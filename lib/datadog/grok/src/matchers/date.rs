@@ -1,12 +1,11 @@
-use std::fmt::Formatter;
-
+use crate::parse_grok::Error as GrokRuntimeError;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
 use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
 use regex::Regex;
+use std::fmt::Formatter;
+use tracing::error;
 use vrl_compiler::Value;
-
-use crate::parse_grok::Error as GrokRuntimeError;
 
 /// converts Joda time format to strptime format
 pub fn convert_time_format(format: &str) -> std::result::Result<String, String> {
@@ -109,17 +108,12 @@ fn parse_tz_id_or_name(tz: &str) -> Result<FixedOffset, String> {
 }
 
 fn parse_offset(tz: &str) -> Result<FixedOffset, String> {
-    let offset_format;
     if tz.len() <= 3 {
         // +5, -12
         let hours_diff = tz.parse::<i32>().map_err(|e| e.to_string())?;
         return Ok(FixedOffset::east(hours_diff * 3600));
     }
-    if tz.contains(':') {
-        offset_format = "%:z";
-    } else {
-        offset_format = "%z";
-    }
+    let offset_format = if tz.contains(':') { "%:z" } else { "%z" };
     // apparently the easiest way to parse tz offset is parsing the complete datetime
     let date_str = format!("2020-04-12 22:10:57 {}", tz);
     let datetime =
@@ -140,8 +134,15 @@ pub fn time_format_to_regex(
         if ('A'..='Z').contains(&c) || ('a'..='z').contains(&c) {
             let token: String = chars.by_ref().peeking_take_while(|&cn| cn == c).collect();
             match token.chars().next().unwrap() {
-                'h' | 'H' | 'm' | 's' | 'S' | 'y' | 'Y' | 'x' | 'c' | 'C' | 'd' | 'e' | 'D'
-                | 'w' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                'h' | 'H' | 'm' | 's' | 'S' | 'Y' | 'x' | 'c' | 'C' | 'e' | 'D' | 'w' => {
+                    regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str())
+                }
+                // days
+                'd' if token.len() == 1 => regex.push_str("[\\d]{2}"), // expand d to dd
+                'd' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                // years
+                'y' if token.len() == 1 => regex.push_str("[\\d]{4}"), // expand y to yyyy
+                'y' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
                 'M' if token.len() == 2 =>
                 // Month number
                 {

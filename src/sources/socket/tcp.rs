@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use chrono::Utc;
-use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
@@ -11,35 +10,25 @@ use crate::{
     },
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TcpConfig {
-    #[get_copy = "pub"]
     address: SocketListenAddr,
-    #[get_copy = "pub"]
     keepalive: Option<TcpKeepaliveConfig>,
-    #[getset(get_copy = "pub", set = "pub")]
     max_length: Option<usize>,
     #[serde(default = "default_shutdown_timeout_secs")]
-    #[getset(get_copy = "pub", set = "pub")]
     shutdown_timeout_secs: u64,
-    #[get = "pub"]
     host_key: Option<String>,
-    #[getset(get = "pub", set = "pub")]
     tls: Option<TlsConfig>,
-    #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-    #[getset(get = "pub", set = "pub")]
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
-    #[getset(get = "pub", set = "pub")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     pub connection_limit: Option<u32>,
 }
 
@@ -48,7 +37,7 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(
+    pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: Option<usize>,
@@ -56,8 +45,8 @@ impl TcpConfig {
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Box<dyn DeserializerConfig>,
+        framing: Option<FramingConfig>,
+        decoding: DeserializerConfig,
         connection_limit: Option<u32>,
     ) -> Self {
         Self {
@@ -88,6 +77,67 @@ impl TcpConfig {
             connection_limit: None,
         }
     }
+
+    pub const fn host_key(&self) -> &Option<String> {
+        &self.host_key
+    }
+
+    pub const fn tls(&self) -> &Option<TlsConfig> {
+        &self.tls
+    }
+
+    pub const fn framing(&self) -> &Option<FramingConfig> {
+        &self.framing
+    }
+
+    pub const fn decoding(&self) -> &DeserializerConfig {
+        &self.decoding
+    }
+
+    pub const fn address(&self) -> SocketListenAddr {
+        self.address
+    }
+
+    pub const fn keepalive(&self) -> Option<TcpKeepaliveConfig> {
+        self.keepalive
+    }
+
+    pub const fn max_length(&self) -> Option<usize> {
+        self.max_length
+    }
+
+    pub const fn shutdown_timeout_secs(&self) -> u64 {
+        self.shutdown_timeout_secs
+    }
+
+    pub const fn receive_buffer_bytes(&self) -> Option<usize> {
+        self.receive_buffer_bytes
+    }
+
+    pub fn set_max_length(&mut self, val: Option<usize>) -> &mut Self {
+        self.max_length = val;
+        self
+    }
+
+    pub fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
+        self.shutdown_timeout_secs = val;
+        self
+    }
+
+    pub fn set_tls(&mut self, val: Option<TlsConfig>) -> &mut Self {
+        self.tls = val;
+        self
+    }
+
+    pub fn set_framing(&mut self, val: Option<FramingConfig>) -> &mut Self {
+        self.framing = val;
+        self
+    }
+
+    pub fn set_decoding(&mut self, val: DeserializerConfig) -> &mut Self {
+        self.decoding = val;
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,13 +162,7 @@ impl TcpSource for RawTcpSource {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
-        emit!(&SocketEventsReceived {
-            mode: SocketMode::Tcp,
-            byte_size,
-            count: events.len()
-        });
-
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         let now = Utc::now();
 
         for event in events {

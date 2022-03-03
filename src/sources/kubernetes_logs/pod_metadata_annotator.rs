@@ -212,7 +212,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 #[cfg(test)]
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::*;
 

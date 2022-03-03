@@ -23,7 +23,7 @@ use crate::{
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
+    event::{BatchNotifier, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },
@@ -83,7 +83,7 @@ pub struct FileConfig {
     pub glob_minimum_cooldown_ms: u64,
     // Deprecated name
     #[serde(alias = "fingerprinting")]
-    pub fingerprint: FingerprintConfig,
+    fingerprint: FingerprintConfig,
     pub ignore_not_found: bool,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
@@ -234,14 +234,14 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            acknowledgements.enabled(),
+            acknowledgements,
         ))
     }
 
@@ -251,6 +251,10 @@ impl SourceConfig for FileConfig {
 
     fn source_type(&self) -> &'static str {
         "file"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -392,7 +396,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
+        tokio::spawn(async move { out.send_stream(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
@@ -457,7 +461,7 @@ fn create_event(
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
-) -> Event {
+) -> LogEvent {
     emit!(&FileEventsReceived {
         count: 1,
         file: &file,
@@ -477,7 +481,7 @@ fn create_event(
         event.insert(host_key, hostname.clone());
     }
 
-    event.into()
+    event
 }
 
 #[cfg(test)]
@@ -497,7 +501,7 @@ mod tests {
     use super::*;
     use crate::{
         config::Config,
-        event::{EventStatus, Value},
+        event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
         test_util::components::{self, SOURCE_TESTS},
@@ -635,8 +639,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
 
-        let event = create_event(line, file, &host_key, &hostname, &file_key);
-        let log = event.into_log();
+        let log = create_event(line, file, &host_key, &hostname, &file_key);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
@@ -697,7 +700,7 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    // https://github.com/timberio/vector/issues/8363
+    // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
         let n = 5;
@@ -1465,7 +1468,7 @@ mod tests {
         );
     }
 
-    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    // Ignoring on mac: https://github.com/vectordotdev/vector/issues/8373
     #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {

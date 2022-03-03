@@ -3,7 +3,11 @@ use std::{
     mem,
 };
 
-use serde_json::{value::RawValue, Value};
+use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use serde_json::{value::RawValue, Value as JsonValue};
+use smallvec::SmallVec;
+use value::Value;
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
@@ -27,9 +31,27 @@ pub trait ByteSizeOf {
     fn allocated_bytes(&self) -> usize;
 }
 
+impl ByteSizeOf for Bytes {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ByteSizeOf for BytesMut {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
 impl ByteSizeOf for String {
     fn allocated_bytes(&self) -> usize {
         self.len()
+    }
+}
+
+impl<'a> ByteSizeOf for &'a str {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -62,10 +84,32 @@ where
     }
 }
 
+impl<A: smallvec::Array> ByteSizeOf for SmallVec<A>
+where
+    A::Item: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
 impl<T> ByteSizeOf for &[T]
 where
     T: ByteSizeOf,
 {
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+impl<T, const N: usize> ByteSizeOf for [T; N]
+where
+    T: ByteSizeOf,
+{
+    fn size_of(&self) -> usize {
+        self.allocated_bytes()
+    }
+
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
@@ -109,13 +153,30 @@ impl ByteSizeOf for Box<RawValue> {
     }
 }
 
+impl ByteSizeOf for JsonValue {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            JsonValue::Null | JsonValue::Bool(_) | JsonValue::Number(_) => 0,
+            JsonValue::String(s) => s.len(),
+            JsonValue::Array(a) => a.size_of(),
+            JsonValue::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
+        }
+    }
+}
+
 impl ByteSizeOf for Value {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Value::Null | Value::Bool(_) | Value::Number(_) => 0,
-            Value::String(s) => s.len(),
-            Value::Array(a) => a.size_of(),
-            Value::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
+            Value::Bytes(bytes) => bytes.len(),
+            Value::Object(map) => map.size_of(),
+            Value::Array(arr) => arr.size_of(),
+            _ => 0,
         }
+    }
+}
+
+impl ByteSizeOf for DateTime<Utc> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }

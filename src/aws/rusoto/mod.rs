@@ -45,8 +45,8 @@ use crate::{config::ProxyConfig, http::HttpError, tls::MaybeTlsSettings};
 
 pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
 
-pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
-    let settings = MaybeTlsSettings::enable_client()?;
+pub fn client(tls_setting: Option<MaybeTlsSettings>, proxy: &ProxyConfig) -> crate::Result<Client> {
+    let settings = tls_setting.unwrap_or(MaybeTlsSettings::enable_client()?);
     let client = crate::http::HttpClient::new(settings, proxy)?;
     Ok(HttpClient { client })
 }

@@ -2,11 +2,12 @@ use std::collections::VecDeque;
 
 use super::Progress;
 use crate::{
+    encoding::Encodable,
     test::{
         common::Variant,
         model::{Message, Model},
     },
-    EncodeBytes, WhenFull,
+    WhenFull,
 };
 
 /// `OnDiskV1` is the `Model` for on-disk buffer for the LevelDB-based implementation (v1)
@@ -37,7 +38,7 @@ impl OnDiskV1 {
 
 impl Model for OnDiskV1 {
     fn send(&mut self, item: Message) -> Progress {
-        let byte_size = EncodeBytes::encoded_size(&item).unwrap();
+        let byte_size = Encodable::encoded_size(&item).unwrap();
         match self.when_full {
             WhenFull::DropNewest => {
                 if self.is_full() {
@@ -63,7 +64,7 @@ impl Model for OnDiskV1 {
 
     fn recv(&mut self) -> Option<Message> {
         self.inner.pop_front().map(|msg| {
-            let byte_size = EncodeBytes::encoded_size(&msg).unwrap();
+            let byte_size = Encodable::encoded_size(&msg).unwrap();
             self.current_bytes -= byte_size;
             msg
         })

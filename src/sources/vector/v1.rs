@@ -1,11 +1,14 @@
 use bytes::Bytes;
-use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
 use crate::{
-    codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
+    codecs::{
+        self,
+        decoding::{self, Deserializer, Framer},
+        LengthDelimitedDecoder,
+    },
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -17,14 +20,13 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfig {
+pub(crate) struct VectorConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    #[set = "pub"]
     tls: Option<TlsConfig>,
     receive_buffer_bytes: Option<usize>,
 }
@@ -34,6 +36,13 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
+    #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our cargo-hack run
+    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+        self.tls = config;
+    }
+
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -71,7 +80,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -86,7 +95,7 @@ impl VectorConfig {
 #[derive(Debug, Clone)]
 struct VectorDeserializer;
 
-impl Deserializer for VectorDeserializer {
+impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
@@ -113,8 +122,8 @@ impl TcpSource for VectorSource {
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(LengthDelimitedDecoder::new()),
-            Box::new(VectorDeserializer),
+            Framer::LengthDelimited(LengthDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(VectorDeserializer)),
         )
     }
 
@@ -126,14 +135,14 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
-    use shared::assert_event_data_eq;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
+    use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -165,7 +174,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -249,6 +261,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -286,6 +300,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();

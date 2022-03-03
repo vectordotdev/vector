@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::prelude::{error_stage, error_type};
+use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -37,6 +39,60 @@ impl InternalEvent for FileBytesSent<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct FileIoError<'a> {
+    pub error: std::io::Error,
+    pub code: &'static str,
+    pub message: &'static str,
+    pub path: Option<&'a Bytes>,
+}
+
+impl<'a> InternalEvent for FileIoError<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_code = %self.code,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.code,
+            "error_type" => error_type::IO_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct FileExpiringError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed expiring a file.",
+            error = %self.error,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
@@ -46,6 +102,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
+    use crate::internal_events::prelude::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -141,25 +198,30 @@ mod source {
             error!(
                 message = "Failed reading file for fingerprinting.",
                 file = %self.file.display(),
-                error_type = "read_failed",
                 error = %self.error,
-                stage = "receiving",
+                error_code = "reading_fingerprint",
+                error_type = error_type::READER_FAILED,
+                stage = error_stage::RECEIVING,
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
+                "component_errors_total", 1,
+                "error_code" => "reading_fingerprint",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+                "file" => self.file.to_string_lossy().into_owned(),
+            );
+            // deprecated
+            counter!(
                 "fingerprint_read_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
-            counter!(
-                "component_errors_total", 1,
-                "error_type" => "read_failed",
-                "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving",
-            );
         }
     }
+
+    const DELETION_FAILED: &str = "deletion_failed";
 
     #[derive(Debug)]
     pub struct FileDeleteError<'a> {
@@ -173,20 +235,25 @@ mod source {
                 message = "Failed in deleting file.",
                 file = %self.file.display(),
                 error = %self.error,
+                error_code = DELETION_FAILED,
+                error_type = error_type::COMMAND_FAILED,
+                stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 1
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
+                "component_errors_total", 1,
+                "file" => self.file.to_string_lossy().into_owned(),
+                "error_code" => DELETION_FAILED,
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
+            // deprecated
+            counter!(
                 "file_delete_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
-            );
-            counter!(
-                "component_errors_total", 1,
-                "error_type" => "delete_failed",
-                "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving"
             );
         }
     }
@@ -234,7 +301,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct FileWatchError<'a> {
+    struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
     }
@@ -243,23 +310,26 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed to watch file.",
-                file = %self.file.display(),
-                error_type = "watch_failed",
                 error = %self.error,
-                stage = "receiving"
+                error_code = "watching",
+                error_type = error_type::COMMAND_FAILED,
+                stage = error_stage::RECEIVING,
+                file = %self.file.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "file_watch_errors_total", 1,
+                "component_errors_total", 1,
+                "error_code" => "watching",
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
             );
+            // deprecated
             counter!(
-                "component_errors_total", 1,
-                "error_type" => "watch_failed",
+                "file_watch_errors_total", 1,
                 "file" => self.file.to_string_lossy().into_owned(),
-                "stage" => "receiving"
             );
         }
     }
@@ -337,9 +407,10 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed writing checkpoints.",
-                error_type = "write_error",
                 error = %self.error,
-                stage = "receiving"
+                error_code = "writing_checkpoints",
+                error_type = error_type::WRITER_FAILED,
+                stage = error_stage::RECEIVING
             );
         }
 
@@ -347,8 +418,9 @@ mod source {
             counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
-                "error_type" => "write_error",
-                "stage" => "receiving"
+                "error_code" => "writing_checkpoints",
+                "error_type" => error_type::WRITER_FAILED,
+                "stage" => error_stage::RECEIVING,
             );
         }
     }
@@ -363,23 +435,26 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed to glob path.",
-                path = %self.path.display(),
-                error_type = "glob_failed",
                 error = %self.error,
-                stage = "receiving"
+                error_code = "globbing",
+                error_type = error_type::READER_FAILED,
+                stage = error_stage::RECEIVING,
+                path = %self.path.display(),
             );
         }
 
         fn emit_metrics(&self) {
             counter!(
-                "glob_errors_total", 1,
+                "component_errors_total", 1,
+                "error_code" => "globbing",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
                 "path" => self.path.to_string_lossy().into_owned(),
             );
+            // deprecated
             counter!(
-                "component_errors_total", 1,
-                "error_type" => "glob_failed",
+                "glob_errors_total", 1,
                 "path" => self.path.to_string_lossy().into_owned(),
-                "stage" => "receiving"
             );
         }
     }

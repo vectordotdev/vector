@@ -1,5 +1,6 @@
 #[cfg(feature = "datadog-pipelines")]
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
     HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
     TransformOuter,
 };
@@ -23,6 +24,8 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[serde(default)]
+    pub schema: schema::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
     pub datadog: Option<datadog::Options>,
@@ -74,6 +77,7 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             healthchecks,
@@ -101,6 +105,7 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             healthchecks,
@@ -180,6 +185,10 @@ impl ConfigBuilder {
 
         self.transforms
             .insert(ComponentKey::from(id.into()), transform);
+    }
+
+    pub fn set_data_dir(&mut self, path: &Path) {
+        self.global.data_dir = Some(path.to_owned());
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

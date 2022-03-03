@@ -4,6 +4,7 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{
@@ -15,7 +16,7 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::NatsEventsReceived,
+    internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
@@ -33,7 +34,7 @@ enum BuildError {
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct NatsSourceConfig {
+struct NatsSourceConfig {
     url: String,
     #[serde(alias = "name")]
     connection_name: String,
@@ -41,10 +42,10 @@ pub struct NatsSourceConfig {
     queue: Option<String>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 inventory::submit! {
@@ -68,7 +69,7 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -86,18 +87,22 @@ impl SourceConfig for NatsSourceConfig {
     fn source_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSourceConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
+    fn to_nats_options(&self) -> nats::asynk::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
+    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
         self.to_nats_options()
             .connect(&self.url)
             .await
@@ -105,17 +110,17 @@ impl NatsSourceConfig {
     }
 }
 
-impl From<NatsSourceConfig> for async_nats::Options {
+impl From<NatsSourceConfig> for nats::asynk::Options {
     fn from(config: NatsSourceConfig) -> Self {
-        async_nats::Options::new()
+        nats::asynk::Options::new()
             .with_name(&config.connection_name)
             .reconnect_buffer_size(0)
     }
 }
 
 fn get_subscription_stream(
-    subscription: async_nats::Subscription,
-) -> impl Stream<Item = async_nats::Message> {
+    subscription: nats::asynk::Subscription,
+) -> impl Stream<Item = nats::asynk::Message> {
     stream::unfold(subscription, |subscription| async move {
         subscription.next().await.map(|msg| (msg, subscription))
     })
@@ -123,8 +128,8 @@ fn get_subscription_stream(
 
 async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: async_nats::Connection,
-    subscription: async_nats::Subscription,
+    _connection: nats::asynk::Connection,
+    subscription: nats::asynk::Subscription,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
@@ -132,29 +137,33 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
+        emit!(&BytesReceived {
+            byte_size: msg.data.len(),
+            protocol: "tcp",
+        });
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
                     emit!(&NatsEventsReceived {
-                        byte_size,
-                        count: events.len()
+                        byte_size: events.size_of(),
+                        count
                     });
 
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
+                        event
+                    });
 
-                        out.send(event).await.map_err(
-                            |error: crate::source_sender::ClosedError| {
-                                error!(message = "Error sending to sink.", %error);
-                            },
-                        )?;
-                    }
+                    out.send_batch(events).await.map_err(|error| {
+                        emit!(&StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further
@@ -171,7 +180,7 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> crate::Result<(async_nats::Connection, async_nats::Subscription)> {
+) -> crate::Result<(nats::asynk::Connection, nats::asynk::Subscription)> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {
@@ -221,9 +230,7 @@ mod integration_tests {
         let nc_pub = nc.clone();
 
         let (tx, rx) = SourceSender::new_test();
-        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
-            .build()
-            .unwrap();
+        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
         tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
         let msg = "my message";
         nc_pub.publish(&subject, msg).await.unwrap();
