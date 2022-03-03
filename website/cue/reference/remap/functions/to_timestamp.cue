@@ -5,7 +5,7 @@ remap: functions: to_timestamp: {
 	description: """
 		Coerces the `value` into a timestamp.
 		"""
-	notices: ["There is the possibility of precision loss due to float arithmetic when coercing floats"]
+	notices: ["There is the possibility of precision loss due to float arithmetic when coercing floats."]
 
 	arguments: [
 		{
