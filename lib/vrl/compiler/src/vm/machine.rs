@@ -77,7 +77,8 @@ pub enum OpCode {
 
     /// If the top element of the stack is not truthy (not null or false) advances the instruction
     /// pointer by the amount set by the ensuing primitive instruction.
-    JumpIfFalsey,
+    /// The value at the top of the stack is swapped for False.
+    JumpAndSwapIfFalsey,
 
     /// If the error field of the VM is not set advances the instruction pointer by the amount
     /// set by the ensuing primitive instruction.
@@ -347,10 +348,12 @@ impl Vm {
                         state.instruction_pointer += jump;
                     }
                 }
-                OpCode::JumpIfFalsey => {
+                OpCode::JumpAndSwapIfFalsey => {
                     // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if !is_truthy(state.peek_stack()?) {
+                        state.pop_stack()?;
+                        state.push_stack(Value::Boolean(false));
                         state.instruction_pointer += jump;
                     }
                 }
