@@ -18,6 +18,7 @@ components: sinks: vector: {
 		stateful: false
 	}
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
