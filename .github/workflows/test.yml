@@ -117,7 +117,7 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
-      - run: make test-doc
+      - run: make test-docs
         env:
           CARGO_BUILD_JOBS: 5
       - run: make test-benches
