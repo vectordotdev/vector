@@ -205,7 +205,7 @@ impl Expression for Op {
             Rem => {
                 // Division is infallible if the rhs is a literal normal float or integer.
                 match self.rhs.as_value() {
-                    Some(value) => match value {
+                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
                         Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
                         Value::Float(_) => TypeDef::float().fallible(),
                         Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
