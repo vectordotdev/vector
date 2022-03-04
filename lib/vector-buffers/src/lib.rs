@@ -23,15 +23,12 @@ use encoding::Encodable;
 
 pub mod encoding;
 
-pub(crate) mod disk;
-pub(crate) mod disk_v2;
-
 mod internal_events;
 #[cfg(test)]
-mod test;
+pub mod test;
 pub mod topology;
 
-pub(crate) mod variant;
+pub(crate) mod variants;
 
 use std::fmt::Debug;
 
@@ -72,23 +69,16 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + EventCount + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
+    ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + EventCount + Encodable + Debug + Send + Sync + Unpin + Sized + 'static
+    T: ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
-}
-
-#[cfg(test)]
-impl EventCount for u64 {
-    fn event_count(&self) -> usize {
-        1
-    }
 }

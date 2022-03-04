@@ -2,7 +2,7 @@ use bytes::Bytes;
 use std::collections::BTreeMap;
 
 use super::{Error, Value};
-use crate::value::{VrlValueConvert, VrlValueKind};
+use crate::value::VrlValueConvert;
 use crate::ExpressionError;
 
 pub trait VrlValueArithmetic: Sized {
@@ -175,6 +175,12 @@ impl VrlValueArithmetic for Value {
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
     fn try_rem(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Rem(self.kind(), rhs.kind());
+
+        let rhv = rhs.try_into_f64().map_err(|_| err())?;
+
+        if rhv == 0.0 {
+            return Err(Error::DivideByZero);
+        }
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {

@@ -7,7 +7,7 @@ use vector_core::config::log_schema;
 
 use crate::{
     aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
@@ -44,6 +44,12 @@ pub struct CloudwatchLogsSinkConfig {
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -94,6 +100,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_cloudwatch_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
@@ -117,6 +127,7 @@ fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
         tls: Default::default(),
         assume_role: Default::default(),
         auth: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 

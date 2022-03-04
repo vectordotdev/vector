@@ -13,7 +13,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

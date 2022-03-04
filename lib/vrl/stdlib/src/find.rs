@@ -1,4 +1,5 @@
-use vrl::{prelude::*, value::Regex};
+use ::value::ValueRegex;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
@@ -39,7 +40,7 @@ impl Function for Find {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -62,7 +63,7 @@ struct FindFn {
 }
 
 impl FindFn {
-    fn find_regex_in_str(value: &str, regex: Regex, offset: usize) -> Option<usize> {
+    fn find_regex_in_str(value: &str, regex: ValueRegex, offset: usize) -> Option<usize> {
         regex.find_at(value, offset).map(|found| found.start())
     }
 

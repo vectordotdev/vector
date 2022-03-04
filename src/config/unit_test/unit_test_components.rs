@@ -11,7 +11,7 @@ use vector_core::{
 
 use crate::{
     conditions::Condition,
-    config::{SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext},
     sinks::Healthcheck,
     sources,
 };
@@ -44,6 +44,10 @@ impl SourceConfig for UnitTestSourceConfig {
 
     fn source_type(&self) -> &'static str {
         "unit_test"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -107,6 +111,10 @@ impl SinkConfig for UnitTestSinkConfig {
 
     fn input(&self) -> Input {
         Input::all()
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

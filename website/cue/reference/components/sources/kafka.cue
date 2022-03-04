@@ -4,6 +4,7 @@ components: sources: kafka: {
 	title: "Kafka"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
 			tls: {
@@ -38,7 +39,7 @@ components: sources: kafka: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		auto_offset_reset: {
 			common:      false
 			description: """

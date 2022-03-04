@@ -20,6 +20,7 @@ components: sources: datadog_agent: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
@@ -57,7 +58,7 @@ components: sources: datadog_agent: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address:          sources.http.configuration.address
 		multiple_outputs: {
 			common: false
@@ -67,6 +68,24 @@ components: sources: datadog_agent: {
 				respectively, as the input to another component.
 				"""
 			required: false
+			type: bool: default: false
+		}
+		disable_logs: {
+			common:      false
+			description: "If this settings is set to `true`, logs won't be accepted by the component."
+			required:    false
+			type: bool: default: false
+		}
+		disable_metrics: {
+			common:      false
+			description: "If this settings is set to `true`, metrics won't be accepted by the component."
+			required:    false
+			type: bool: default: false
+		}
+		disable_traces: {
+			common:      false
+			description: "If this settings is set to `true`, traces won't be accepted by the component."
+			required:    false
 			type: bool: default: false
 		}
 		store_api_key: {
@@ -94,6 +113,12 @@ components: sources: datadog_agent: {
 			name: "metrics"
 			description: """
 				If [multiple_outputs](#multiple_outputs) is enabled, received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "traces"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
 	]

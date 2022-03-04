@@ -129,6 +129,10 @@ impl SourceConfig for NginxMetricsConfig {
     fn source_type(&self) -> &'static str {
         "nginx_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -272,7 +276,7 @@ mod integration_tests {
 
         let (sender, mut recv) = SourceSender::new_test();
 
-        let mut ctx = SourceContext::new_test(sender);
+        let mut ctx = SourceContext::new_test(sender, None);
         ctx.proxy = proxy;
 
         tokio::spawn(async move {

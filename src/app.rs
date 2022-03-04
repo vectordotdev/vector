@@ -47,7 +47,12 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
-        let opts = Opts::get_matches();
+        let opts = Opts::get_matches().map_err(|error| {
+            // Printing to stdout/err can itself fail; ignore it.
+            let _ = error.print();
+            exitcode::USAGE
+        })?;
+
         Self::prepare_from_opts(opts)
     }
 
@@ -139,6 +144,7 @@ impl Application {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::Graph(g) => graph::cmd(&g),
+                        SubCommand::Config(c) => config::cmd(&c, &config_paths),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         #[cfg(windows)]

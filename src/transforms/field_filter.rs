@@ -6,6 +6,7 @@ use crate::{
         TransformDescription,
     },
     event::Event,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -48,7 +49,7 @@ impl TransformConfig for FieldFilterConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

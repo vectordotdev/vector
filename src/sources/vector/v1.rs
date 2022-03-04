@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -21,14 +20,13 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    #[set = "pub"]
     tls: Option<TlsConfig>,
     receive_buffer_bytes: Option<usize>,
 }
@@ -38,6 +36,13 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
+    #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our cargo-hack run
+    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+        self.tls = config;
+    }
+
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -130,7 +135,7 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use tokio::{
         io::AsyncWriteExt,
@@ -169,7 +174,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -253,6 +261,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -290,6 +300,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();

@@ -26,6 +26,7 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -181,7 +182,7 @@ impl TransformConfig for Ec2Metadata {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
@@ -646,7 +647,7 @@ mod integration_tests {
 
         let metric = make_metric();
         let mut expected_metric = metric.clone();
-        for (k, v) in TEST_METADATA.iter().cloned() {
+        for (k, v) in TEST_METADATA.iter() {
             expected_metric.insert_tag(k.to_string(), v.to_string());
         }
 

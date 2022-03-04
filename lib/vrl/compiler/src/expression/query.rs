@@ -80,7 +80,7 @@ impl Expression for Query {
             External => {
                 return Ok(ctx
                     .target()
-                    .get(&self.path)
+                    .target_get(&self.path)
                     .ok()
                     .flatten()
                     .unwrap_or(Value::Null))
@@ -90,7 +90,7 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::get(&value, &self.path)
+        Ok(crate::Target::target_get(&value, &self.path)
             .ok()
             .flatten()
             .unwrap_or(Value::Null))

@@ -45,7 +45,7 @@ impl Function for Unnest {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
@@ -95,7 +95,7 @@ impl Expression for UnnestFn {
         };
 
         let root = target
-            .get(&LookupBuf::root())
+            .target_get(&LookupBuf::root())
             .expect("must never fail")
             .expect("always a value");
 
@@ -146,8 +146,8 @@ impl Expression for UnnestFn {
 ///    { "nonk" => { "shnoog" => { "noog" => 3 } } },
 ///  ]`
 ///
-pub fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    use value::kind::insert;
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+    use self::value::kind::insert;
 
     let type_def = typedef.at_path(&path.to_lookup());
 
@@ -510,7 +510,7 @@ mod tests {
             ),
         ];
 
-        let compiler = state::Compiler::new_with_type_def(TypeDef::object(btreemap! {
+        let compiler = state::Compiler::new_with_kind(Kind::object(btreemap! {
             "hostname" => Kind::bytes(),
             "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
                 Field::from("message") => Kind::bytes(),

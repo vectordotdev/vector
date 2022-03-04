@@ -230,6 +230,10 @@ impl SourceConfig for DemoLogsConfig {
     fn source_type(&self) -> &'static str {
         "demo_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -249,6 +253,10 @@ impl SourceConfig for DemoLogsCompatConfig {
 
     fn source_type(&self) -> &'static str {
         self.0.source_type()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

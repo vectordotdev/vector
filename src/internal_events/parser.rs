@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use std::borrow::Cow;
 use vector_core::internal_event::InternalEvent;
@@ -25,8 +25,8 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Pattern failed to match.",
-            error = "No match found in specified field",
-            error_type = "condition_failed",
+            error_code = "no_match_found",
+            error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
@@ -36,8 +36,8 @@ impl InternalEvent for ParserMatchError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "No match found in specified field",
-            "error_type" => "condition_failed",
+            "error_code" => "no_match_found",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -55,8 +55,8 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         error!(
             message = "Field does not exist.",
             field = %self.field,
-            error = "Field not found",
-            error_type = "condition_failed",
+            error_code = "field_not_found",
+            error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
         );
@@ -65,8 +65,8 @@ impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Field not found",
-            "error_type" => "condition_failed",
+            "error_code" => "field_not_found",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
@@ -84,19 +84,19 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
     fn emit_logs(&self) {
         error!(
             message = format!("Target field {:?} already exists.", self.target_field).as_str(),
-            error = "Target field already exists",
-            error_type = "condition_failed",
+            error_code = "target_field_exists",
+            error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             target_field = %self.target_field,
-            internal_log_rate_secs = 30
+            internal_log_rate_secs = 10
         )
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Target field already exists",
-            "error_type" => "condition_failed",
+            "error_code" => "target_field_exists",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "target_field" => self.target_field.to_string(),
         );
@@ -117,7 +117,8 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             message = "Could not convert types.",
             name = %self.name,
             error = ?self.error,
-            error_type = "conversion_failed",
+            error_code = "type_conversion",
+            error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
@@ -126,8 +127,8 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => "conversion_failed",
+            "error_code" => "type_conversion",
+            "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
             "name" => self.name.to_string(),
         );

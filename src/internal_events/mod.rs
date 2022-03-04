@@ -9,7 +9,10 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
@@ -19,9 +22,7 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(feature = "sources-aws_s3")]
-pub(crate) mod aws_s3;
-#[cfg(feature = "sinks-aws_sqs")]
+#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
@@ -93,6 +94,7 @@ mod nats;
 mod nginx_metrics;
 mod open;
 #[cfg(any(
+    feature = "sinks-datadog_events",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",
@@ -168,7 +170,10 @@ pub(crate) use self::ansi_stripper::*;
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub(crate) use self::api::*;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
@@ -178,7 +183,7 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(feature = "sinks-aws_sqs")]
+#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sinks-blackhole")]
 pub(crate) use self::blackhole::*;
@@ -256,6 +261,7 @@ pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
+    feature = "sinks-datadog_events",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",

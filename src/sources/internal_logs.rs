@@ -46,6 +46,10 @@ impl SourceConfig for InternalLogsConfig {
     fn source_type(&self) -> &'static str {
         "internal_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
@@ -154,7 +158,7 @@ mod tests {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(source);

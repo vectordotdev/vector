@@ -15,6 +15,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -79,7 +80,7 @@ components: sources: aws_kinesis_firehose: {
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		record_compression: {
 			common:      true
 			description: """

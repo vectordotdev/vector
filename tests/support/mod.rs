@@ -27,13 +27,14 @@ use snafu::Snafu;
 use tracing::{error, info};
 use vector::{
     config::{
-        DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+        SourceContext, TransformConfig, TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
         Event, Value,
     },
+    schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     source_sender::{ReceiverStream, SourceSender},
     sources::Source,
@@ -218,6 +219,10 @@ impl SourceConfig for MockSourceConfig {
     fn source_type(&self) -> &'static str {
         "mock"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -310,7 +315,7 @@ impl TransformConfig for MockTransformConfig {
         Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
@@ -401,6 +406,10 @@ impl SinkConfig for MockSinkConfig {
 
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

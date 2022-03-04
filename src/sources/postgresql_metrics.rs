@@ -181,6 +181,10 @@ impl SourceConfig for PostgresqlMetricsConfig {
     fn source_type(&self) -> &'static str {
         "postgresql_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -507,7 +511,7 @@ impl PostgresqlMetrics {
                 });
                 emit!(&EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
-                Ok(result.into_iter().map(|(metrics, _)| metrics).flatten())
+                Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }
             Err(error) => Err(error.to_string()),
         }
@@ -969,7 +973,7 @@ mod integration_tests {
                 exclude_databases,
                 ..Default::default()
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

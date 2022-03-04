@@ -13,7 +13,7 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

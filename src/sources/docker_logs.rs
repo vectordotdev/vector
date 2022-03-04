@@ -166,6 +166,10 @@ impl SourceConfig for DockerLogsConfig {
     fn source_type(&self) -> &'static str {
         "docker_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
@@ -189,6 +193,10 @@ impl SourceConfig for DockerCompatConfig {
 
     fn source_type(&self) -> &'static str {
         "docker"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -472,7 +480,13 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(&DockerLogsCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => {
+                            emit!(&DockerLogsCommunicationError {
+                                error,
+                                container_id: None,
+                            });
+                            return;
+                        },
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");
@@ -548,7 +562,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(async move { this.run_event_stream(info).await });
+            tokio::spawn(this.run_event_stream(info));
         }
     }
 
@@ -1073,7 +1087,7 @@ mod integration_tests {
         let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await
@@ -1588,7 +1602,7 @@ mod integration_tests {
         assert!(log
             .get("label")
             .unwrap()
-            .as_map()
+            .as_object()
             .unwrap()
             .get(label)
             .is_some());

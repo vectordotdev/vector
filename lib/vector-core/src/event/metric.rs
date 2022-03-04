@@ -9,10 +9,10 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use float_eq::FloatEq;
-use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
-use vrl_core::prelude::VrlValueConvert;
+#[cfg(feature = "vrl")]
+use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
@@ -20,19 +20,38 @@ use crate::{
     ByteSizeOf,
 };
 
-#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Metric {
-    #[getset(get = "pub")]
     #[serde(flatten)]
     pub(super) series: MetricSeries,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub(super) data: MetricData,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip_serializing, default = "EventMetadata::default")]
     metadata: EventMetadata,
+}
+
+impl Metric {
+    pub fn series(&self) -> &MetricSeries {
+        &self.series
+    }
+
+    pub fn data(&self) -> &MetricData {
+        &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut MetricData {
+        &mut self.data
+    }
+
+    pub fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        &mut self.metadata
+    }
 }
 
 impl ByteSizeOf for Metric {
@@ -90,18 +109,29 @@ impl ByteSizeOf for MetricName {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MetricData {
-    #[getset(get = "pub")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
 
-    #[getset(get = "pub")]
     pub kind: MetricKind,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub value: MetricValue,
+}
+
+impl MetricData {
+    pub fn timestamp(&self) -> &Option<DateTime<Utc>> {
+        &self.timestamp
+    }
+
+    pub fn value(&self) -> &MetricValue {
+        &self.value
+    }
+
+    pub fn value_mut(&mut self) -> &mut MetricValue {
+        &mut self.value
+    }
 }
 
 impl PartialOrd for MetricData {
@@ -127,10 +157,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<vrl_core::Value> for MetricKind {
+impl TryFrom<vrl_lib::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_lib::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -144,7 +174,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for vrl_core::Value {
+impl From<MetricKind> for vrl_lib::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -469,7 +499,7 @@ pub fn zip_quantiles(
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for vrl_core::Value {
+impl From<MetricValue> for vrl_lib::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -524,7 +554,7 @@ impl ByteSizeOf for MetricSketch {
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for vrl_core::Value {
+impl From<MetricSketch> for vrl_lib::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }
@@ -559,18 +589,21 @@ impl Metric {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.series.name.name = name.into();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
@@ -580,23 +613,27 @@ impl Metric {
         self.metadata.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
@@ -617,6 +654,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
@@ -626,6 +664,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             series: self.series,
@@ -810,6 +849,7 @@ impl MetricSeries {
 
 impl MetricData {
     /// Rewrite this data to mark it as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -819,6 +859,7 @@ impl MetricData {
     }
 
     /// Rewrite this data to mark it as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,

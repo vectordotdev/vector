@@ -9,7 +9,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
     Acker, Bufferable, WhenFull,
 };
 
@@ -335,7 +335,7 @@ impl BufferConfig {
     {
         let mut builder = TopologyBuilder::default();
 
-        for stage in self.stages.iter().copied() {
+        for stage in &self.stages {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 

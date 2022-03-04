@@ -10,7 +10,10 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -59,6 +62,12 @@ pub struct InfluxDbLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Debug)]
@@ -158,6 +167,10 @@ impl SinkConfig for InfluxDbLogsConfig {
     fn sink_type(&self) -> &'static str {
         "influxdb_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 #[async_trait::async_trait]
@@ -167,7 +180,7 @@ impl HttpSink for InfluxDbLogsSink {
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
-        event.insert("metric_type".to_string(), "logs".to_string());
+        event.insert("metric_type", "logs".to_string());
         self.encoding.apply_rules(&mut event);
 
         // Timestamp
@@ -746,6 +759,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             tls: None,
+            acknowledgements: Default::default(),
         };
 
         let (sink, _) = config.build(cx).await.unwrap();

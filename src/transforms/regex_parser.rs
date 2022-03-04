@@ -12,6 +12,7 @@ use crate::{
     internal_events::{
         ParserConversionError, ParserMatchError, ParserMissingFieldError, ParserTargetExistsError,
     },
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -54,7 +55,7 @@ impl TransformConfig for RegexParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -187,8 +188,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
-            .flatten()
+            .flat_map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         let types =
@@ -227,8 +227,7 @@ impl RegexParser {
         drop_field = drop_field
             && !patterns
                 .iter()
-                .map(|p| &p.capture_names)
-                .flatten()
+                .flat_map(|p| &p.capture_names)
                 .any(|(_, f, _)| *f == field);
 
         Self {
@@ -337,7 +336,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().map(|event| event.into_log());
+        let result = buf.into_events().next().map(|event| event.into_log());
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }

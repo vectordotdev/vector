@@ -10,7 +10,7 @@ use snafu::Snafu;
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -57,6 +57,13 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -156,6 +163,10 @@ impl SinkConfig for StackdriverConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 #[async_trait::async_trait]
@@ -252,7 +263,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
                     s if s.starts_with("ALERT") => 700,
                     s if s.starts_with("CRIT") => 600,
-                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("ERR") || s == "ER" => 500,
                     s if s.starts_with("WARN") => 400,
                     s if s.starts_with("NOTICE") => 300,
                     s if s.starts_with("INFO") => 200,

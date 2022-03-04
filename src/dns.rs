@@ -15,7 +15,7 @@ pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 pub(super) struct Resolver;
 
 impl Resolver {
-    pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
+    pub(crate) async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
         // We need to add port with the name so that `to_socket_addrs`
         // resolves it properly. We will be discarding the port afterwards.
         //
