@@ -453,9 +453,11 @@ impl Vm {
                         }
                         Variable::None => state.stack.push(Value::Null),
                         Variable::Stack(path) => {
-                            let value = state.pop_stack()?;
-                            let value = value.get_by_path(path).cloned().unwrap_or(Value::Null);
-                            state.stack.push(value);
+                            if state.error.is_none() {
+                                let value = state.pop_stack()?;
+                                let value = value.get_by_path(path).cloned().unwrap_or(Value::Null);
+                                state.stack.push(value);
+                            }
                         }
                     }
                 }
