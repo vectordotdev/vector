@@ -106,7 +106,12 @@ impl<'a> VmArgumentList<'a> {
             match args.as_ref() {
                 None if param.required => return Err("parameter is required".into()),
                 Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(&kind)) => {
-                    return Err("parameter type mismatch".into())
+                    return Err(format!(
+                        "expected {}, got {}",
+                        param.kind(),
+                        arg.kind().expect("argument has valid kind"),
+                    )
+                    .into());
                 }
                 _ => (),
             }
