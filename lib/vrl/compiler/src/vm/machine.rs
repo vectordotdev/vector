@@ -330,14 +330,14 @@ impl Vm {
                 OpCode::JumpIfFalse => {
                     // If the value at the top of the stack is false, jump by the given amount.
                     let jump = state.next_primitive()?;
-                    if !is_true(state.peek_stack()?) {
+                    if !is_true(state.peek_stack()?)? {
                         state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
                     // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
-                    if is_true(state.peek_stack()?) {
+                    if is_true(state.peek_stack()?)? {
                         state.instruction_pointer += jump;
                     }
                 }
@@ -613,8 +613,11 @@ fn set_variable<'a>(
     Ok(())
 }
 
-fn is_true(object: &Value) -> bool {
-    matches!(object, Value::Boolean(true))
+fn is_true(object: &Value) -> Result<bool, ExpressionError> {
+    match object {
+        Value::Boolean(value) => Ok(*value),
+        _ => Err(format!("expected boolean, got {}", object.kind()).into()),
+    }
 }
 
 fn is_truthy(object: &Value) -> bool {
