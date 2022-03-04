@@ -285,10 +285,14 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run -- --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches codecs-benches language-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+
+.PHONY: test-benches
+test-benches: ## Run the bench test suite
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --benches --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches codecs-benches language-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE} -- --bench
 
 .PHONY: test-all
-test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
+test-all: test test-benches test-behavior test-integration ## Runs all tests, unit, benches, behaviorial, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
