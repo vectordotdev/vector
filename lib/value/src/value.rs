@@ -771,6 +771,7 @@ impl Value {
     }
 
     /// Returns a reference to a field value specified by a path iter.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn get_by_path_v2<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();
@@ -894,6 +895,7 @@ impl Value {
     }
 
     /// Get a mutable borrow of the value by path
+    #[allow(clippy::needless_pass_by_value)]
     pub fn get_mut_by_path_v2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();

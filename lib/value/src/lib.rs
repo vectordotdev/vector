@@ -31,7 +31,6 @@
     clippy::missing_const_for_fn,
     clippy::multiple_crate_versions,
     clippy::fallible_impl_from,
-    clippy::needless_pass_by_value,
     unreachable_code,
     unused_variables
 )]
