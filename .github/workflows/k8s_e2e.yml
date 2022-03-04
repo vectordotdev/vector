@@ -165,11 +165,11 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
-          CARGO_INCREMENTAL: 0
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
+          CARGO_INCREMENTAL: 0
 
   master-failure:
     name: master-failure
