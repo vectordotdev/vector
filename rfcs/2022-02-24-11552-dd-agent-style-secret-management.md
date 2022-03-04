@@ -43,8 +43,9 @@ and the syntax to retrieve encrypted config value.
 - Use the same kind of API between Vector and a user-provided executable as the [one between the Agent and the secret
   retrieving executable][dd-secret-backend-exec-api].
 - A set of top level options like the ones the Datadog Agent [exposes][dd-agent-secret-knobs].
-- A convenient syntax for config option to indicate Vector that a secret should be retrieved for this option (Subject to
-  be changed but the Datadog Agent uses `ENC[secret_key]`)
+- The user will use the following placeholder : `SECRET[<backend>.<secret_key>]` to indicate Vector that a secret should
+  be retrieved for this option (the Datadog Agent uses `ENC[secret_key]`, ENC stands for encrypted, but that can be
+  confusing, hence the current suggestion to use `SECRET[<backend>.<secret_key>]` instead).
 
 Datadog Secret API, as per the official [doc][dd-secret-backend-exec-api]:
 
@@ -67,9 +68,14 @@ a JSON formatted string:
 }
 ```
 
-**Note**: The version field can be used to introduce specific behaviour, one major useful thing that could be introduced
+**Note**:
+
+- The version field can be used to introduce specific behaviour, one major useful thing that could be introduced
 is the ability for the user provided executable to provide a secrete expiration date. This is mentioned in the
 improvements section.
+- In the placeholder syntax `SECRET[<backend>.<secret_key>]`, dots are not allowed in `<backend>` but can be used in
+  `<secret_key>`, this means that `SECRET[mul.ti.ple.dots]` will cause Vector to query the backend named `mul` (it shall
+  be defined) for the secret key `ti.ple.dots`
 
 New top level options to be added will be sitting inside the `secret` namespace, this would lead to something like:
 
@@ -83,7 +89,7 @@ timeout = 5
 [secret.prod_vault]
 type = "vault"
 address = "https://vault.corp.tld/"
-token = "secret://local_exec/vault_token"
+token = "SECRET[local_exec.vault_token]"
 timeout = 5
 
 [sources.system_logs]
@@ -92,7 +98,7 @@ includes = ["/var/log/system.log"]
 
 [sinks.app_logs]
 type = "datadog_logs"
-default_api_key = "secret://prod_vault/dd_api_2022_02"
+default_api_key = "SECRET[prod_vault.dd_api_2022_02]"
 inputs = ["system_logs"]
 ```
 
@@ -116,7 +122,7 @@ empty  before returning to the caller, and if it, the config will be reloaded wi
 downstream callee and hook the secret interpolation around the same point as [the environment variable
 interpolation][env-var-hook]:
 
-- All `SECRET[<backend>/<key>]` placeholders present in config will be collected.
+- All `SECRET[<backend>.<key>]` placeholders present in config will be collected.
 - Every backend that is specified in this secret list will be queried for all the secrets it should be used for retrieval.
 - And then the interpolation will actually happen (only if all secret were retrieved sucessfully).
 
