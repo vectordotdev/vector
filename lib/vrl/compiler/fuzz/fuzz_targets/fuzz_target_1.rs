@@ -24,7 +24,7 @@ fuzz_target!(|data: Vec<parser::Program>| {
         let exprdebug = format!("{:?}", expr);
         dump(&format!("Compiling {:?}", exprstr));
 
-        match vrl::compile(expr, &vec![]) {
+        match vrl_compiler::compile(expr, &stdlib::all()) {
             Ok(program) => {
                 dump(&format!("Compiled {:?}", exprstr));
                 let timezone = Default::default();
@@ -34,7 +34,7 @@ fuzz_target!(|data: Vec<parser::Program>| {
                 let mut target_resolve = vrl::Value::Object(BTreeMap::new());
 
                 // Run the VRL in the VM
-                let vm = runtime.compile(vec![], &program).unwrap();
+                let vm = runtime.compile(stdlib::all(), &program).unwrap();
                 let result_vm = runtime.run_vm(&vm, &mut target_vm, &timezone);
 
                 // Resolve the VRL

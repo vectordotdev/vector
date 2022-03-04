@@ -11,11 +11,23 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
-parser = { package = "vrl-parser", path = "../../parser", features = ["fuzz"] }
-core =  { package = "vrl", path = "../../core" }
+
+[dependencies.parser]
+package = "vrl-parser"
+path = "../../parser"
+features = ["fuzz"] 
+
+[dependencies.vrl]
+package = "vrl"
+path = "../../vrl" 
 
 [dependencies.vrl-compiler]
 path = ".."
+
+[dependencies.stdlib]
+package = "vrl-stdlib"
+path = "../../stdlib"
+
 
 # Prevent this from interfering with workspaces
 [workspace]

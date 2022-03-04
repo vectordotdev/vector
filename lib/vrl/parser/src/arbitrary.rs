@@ -7,8 +7,9 @@
 use crate::{
     arbitrary_depth::ArbitraryDepth,
     ast::{
-        Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, Group, Ident,
-        IfStatement, Node, Op, Opcode, Predicate, Query, RootExpr,
+        Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,
+        FunctionCall, Group, Ident, IfStatement, Node, Op, Opcode, Predicate, Query, QueryTarget,
+        RootExpr,
     },
     Literal, Program,
 };
@@ -17,6 +18,13 @@ use diagnostic::Span;
 use lookup::LookupBuf;
 
 const DEPTH: isize = 4;
+
+/// Choose a random item from the given array.
+/// (Make sure the array doesn't exceed 255 items.)
+fn choose<'a, 'b, T>(u: &mut Unstructured<'a>, choices: &'b [T]) -> arbitrary::Result<&'b T> {
+    let idx = u8::arbitrary(u)? % choices.len() as u8;
+    Ok(&choices[idx as usize])
+}
 
 fn node<T>(expr: T) -> Node<T> {
     Node::new(Span::default(), expr)
@@ -57,7 +65,7 @@ impl<'a> ArbitraryDepth<'a> for Expr {
                 u,
                 depth - 1,
             )?))),
-            // 5 => Ok(Expr::Query(node(Query::arbitrary(u)?))),
+            5 => Ok(Expr::Query(node(Query::arbitrary_depth(u, depth - 1)?))),
             _ => Ok(Expr::Literal(node(Literal::arbitrary(u)?))),
         }
     }
@@ -66,12 +74,7 @@ impl<'a> ArbitraryDepth<'a> for Expr {
 impl<'a> Arbitrary<'a> for Ident {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         // Limit the number of identifiers to increase the chances of reusing the same one in the generated program.
-        let path = match u8::arbitrary(u)? % 3 {
-            0 => "noog",
-            1 => "flork",
-            _ => "shning",
-        };
-
+        let path = choose(u, &["noog", "flork", "shning"])?;
         Ok(Ident(path.to_string()))
     }
 }
@@ -166,11 +169,7 @@ impl<'a> ArbitraryDepth<'a> for Assignment {
 
 impl<'a> Arbitrary<'a> for AssignmentTarget {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let path = match u8::arbitrary(u)? % 3 {
-            0 => "noog",
-            1 => "flork",
-            _ => "shning",
-        };
+        let path = choose(u, &["noog", "flork", "shning"])?;
 
         Ok(AssignmentTarget::External(Some(
             LookupBuf::from_str(path).unwrap(),
@@ -196,5 +195,49 @@ impl<'a> ArbitraryDepth<'a> for Container {
 impl<'a> ArbitraryDepth<'a> for Group {
     fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
         Ok(Group(node(Expr::arbitrary_depth(u, depth - 1)?)))
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for Query {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let target = node(QueryTarget::arbitrary_depth(u, depth - 1)?);
+        let path = node(LookupBuf::from_str("thing").unwrap());
+
+        Ok(Self { target, path })
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for QueryTarget {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        match u8::arbitrary(u)? % 4 {
+            0 => Ok(QueryTarget::Internal(Ident::arbitrary(u)?)),
+            1 => Ok(QueryTarget::External),
+            2 => Ok(QueryTarget::FunctionCall(FunctionCall::arbitrary_depth(
+                u,
+                depth - 1,
+            )?)),
+            _ => Ok(QueryTarget::Container(Container::arbitrary_depth(
+                u,
+                depth - 1,
+            )?)),
+        }
+    }
+}
+
+impl<'a> ArbitraryDepth<'a> for FunctionCall {
+    fn arbitrary_depth(u: &mut Unstructured<'a>, depth: isize) -> arbitrary::Result<Self> {
+        let function = choose(u, &["encode_json", "upcase", "downcase"])?;
+        let ident = node(Ident(function.to_string()));
+        let abort_on_error = false;
+        let arguments = vec![node(FunctionArgument {
+            ident: None,
+            expr: node(Expr::arbitrary_depth(u, depth - 1)?),
+        })];
+
+        Ok(Self {
+            ident,
+            abort_on_error,
+            arguments,
+        })
     }
 }
