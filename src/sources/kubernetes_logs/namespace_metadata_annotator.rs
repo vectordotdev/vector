@@ -64,7 +64,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     let prefix_path = parse_path(&fields_spec.namespace_labels);
     if let Some(labels) = &metadata.labels {
         for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone();
+            let mut path = prefix_path.clone().segments;
             path.push(OwnedSegment::Field(key.clone()));
             log.insert(&path, val.to_owned());
         }

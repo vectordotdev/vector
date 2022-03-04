@@ -130,7 +130,7 @@ pub trait EncodingConfiguration {
                     let field_path = parse_path(field);
                     !only_fields.iter().any(|only| {
                         // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                        field_path.starts_with(&only[..])
+                        field_path.segments.starts_with(&only[..])
                     })
                 })
                 .collect::<Vec<_>>();
@@ -183,7 +183,7 @@ pub trait EncodingConfiguration {
         {
             if except_fields.iter().any(|f| {
                 let path_iter = parse_path(f);
-                only_fields.iter().any(|v| v == &path_iter)
+                only_fields.iter().any(|v| v == &path_iter.segments)
             }) {
                 return Err(
                     "`except_fields` and `only_fields` should be mutually exclusive.".into(),
@@ -280,7 +280,12 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let fields: Option<Vec<String>> = serde::de::Deserialize::deserialize(deserializer)?;
-    Ok(fields.map(|fields| fields.iter().map(|only| parse_path(only)).collect()))
+    Ok(fields.map(|fields| {
+        fields
+            .iter()
+            .map(|only| parse_path(only).segments)
+            .collect()
+    }))
 }
 
 #[cfg(test)]
@@ -305,7 +310,7 @@ mod tests {
 
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn as_path_components(a: &str) -> Vec<OwnedSegment> {
-        parse_path(a)
+        parse_path(a).segments
     }
 
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;

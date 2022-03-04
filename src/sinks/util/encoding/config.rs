@@ -161,9 +161,12 @@ where
             codec: inner.codec,
             schema: inner.schema,
             // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-            only_fields: inner
-                .only_fields
-                .map(|fields| fields.iter().map(|only| parse_path(only)).collect()),
+            only_fields: inner.only_fields.map(|fields| {
+                fields
+                    .iter()
+                    .map(|only| parse_path(only).segments)
+                    .collect()
+            }),
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };

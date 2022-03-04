@@ -130,7 +130,7 @@ impl FunctionTransform for GrokParser {
                                 event.insert(path, value);
                             } else {
                                 let path = parse_path(name);
-                                self.paths.insert(name.to_string(), path.clone());
+                                self.paths.insert(name.to_string(), path.segments.clone());
                                 event.insert(&path, value);
                             }
                         }

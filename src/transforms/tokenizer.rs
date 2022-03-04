@@ -88,7 +88,7 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path = parse_path(&name);
+                let path = parse_path(&name).segments;
                 (name, path, conversion)
             })
             .collect();

@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
+#[derive(Debug, Clone)]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
 }
