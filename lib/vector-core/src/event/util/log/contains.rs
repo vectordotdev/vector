@@ -9,7 +9,7 @@ pub fn contains<'a>(fields: &BTreeMap<String, Value>, path: impl Path<'a>) -> bo
     let mut path_iter = path.segment_iter();
 
     match path_iter.next() {
-        Some(BorrowedSegment::Field(key)) => match fields.get(key) {
+        Some(BorrowedSegment::Field(key)) => match fields.get(key.as_ref()) {
             None => false,
             Some(value) => value_contains(value, path_iter),
         },
@@ -24,10 +24,12 @@ fn value_contains<'a>(
     loop {
         value = match (path_iter.next(), value) {
             (None, _) => return true,
-            (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get(key) {
-                None => return false,
-                Some(nested_value) => nested_value,
-            },
+            (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                match map.get(key.as_ref()) {
+                    None => return false,
+                    Some(nested_value) => nested_value,
+                }
+            }
             (Some(BorrowedSegment::Index(index)), Value::Array(array)) => match array.get(index) {
                 None => return false,
                 Some(nested_value) => nested_value,

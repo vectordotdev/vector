@@ -48,7 +48,7 @@ enum JitState {
     Index { value: usize },
     Field { start: usize },
     Quote { start: usize },
-    EscapedQuote { start: usize },
+    EscapedQuote,
     End,
 }
 
@@ -79,7 +79,7 @@ impl<'a> Iterator for JitLookup<'a> {
                     let (result, state) = match self.state {
                         JitState::Start | JitState::Continue => match c {
                             '.' => (None, JitState::Dot),
-                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
+                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
                                 (None, JitState::Field { start: index })
                             }
                             '[' => (None, JitState::IndexStart),
@@ -87,14 +87,14 @@ impl<'a> Iterator for JitLookup<'a> {
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::Dot => match c {
-                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
+                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
                                 (None, JitState::Field { start: index })
                             }
                             '\"' => (None, JitState::Quote { start: index + 1 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::Field { start } => match c {
-                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' => {
+                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
                                 (None, JitState::Field { start })
                             }
                             '.' => (
@@ -122,28 +122,24 @@ impl<'a> Iterator for JitLookup<'a> {
                                 // Character escaping requires copying chars to a new String.
                                 // State is reverted back to the start of the quote to start over
                                 // with the copy method (which is slower)
-                                self.chars = self.path[start..].char_indices();
-                                self.escape_buffer.clear();
-                                (None, JitState::EscapedQuote { start: 0 })
+                                self.path = &self.path[start..];
+                                self.chars = self.path.char_indices();
+                                (None, JitState::EscapedQuote)
                             }
                             _ => (None, JitState::Quote { start }),
                         },
-                        JitState::EscapedQuote { start } => match c {
-                            '\"' => {
-                                unimplemented!()
-                                // (
-                                //     (Some(Some(BorrowedSegment::Field(self.escape_buffer.as_str())))),
-                                //     JitState::EscapedQuote { start },
-                                // )
-                            }
+                        JitState::EscapedQuote => match c {
+                            '\"' => (
+                                (Some(Some(BorrowedSegment::Field(
+                                    std::mem::take(&mut self.escape_buffer).into(),
+                                )))),
+                                JitState::Continue,
+                            ),
                             '\\' => match self.chars.next() {
                                 Some((_, c)) => match c {
                                     '\\' | '\"' => {
                                         self.escape_buffer.push(c);
-                                        (
-                                            Some(Some(BorrowedSegment::Invalid)),
-                                            JitState::EscapedQuote { start },
-                                        )
+                                        (None, JitState::EscapedQuote)
                                     }
                                     _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                                 },
@@ -151,10 +147,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             },
                             _ => {
                                 self.escape_buffer.push(c);
-                                (
-                                    Some(Some(BorrowedSegment::Invalid)),
-                                    JitState::EscapedQuote { start },
-                                )
+                                (None, JitState::EscapedQuote)
                             }
                         },
                         JitState::IndexStart => match c {
@@ -215,6 +208,10 @@ mod test {
             ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
             (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
             (
+                ".@timestamp",
+                vec![BorrowedSegment::Field(Cow::from("@timestamp"))],
+            ),
+            (
                 "foo[",
                 vec![
                     BorrowedSegment::Field(Cow::from("foo")),
@@ -266,6 +263,23 @@ mod test {
             (
                 ".\"[42]. {}-_\"",
                 vec![BorrowedSegment::Field(Cow::from("[42]. {}-_"))],
+            ),
+            (
+                "\"a\\\"a\"",
+                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
+            ),
+            (
+                ".\"a\\\"a\"",
+                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
+            ),
+            (
+                ".foo.\"a\\\"a\".\"b\\\\b\".bar",
+                vec![
+                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(Cow::from("a\"a")),
+                    BorrowedSegment::Field(Cow::from("b\\b")),
+                    BorrowedSegment::Field(Cow::from("bar")),
+                ],
             ),
         ];
 

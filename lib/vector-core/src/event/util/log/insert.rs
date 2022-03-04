@@ -20,23 +20,23 @@ fn map_insert<'a>(
     value: Value,
 ) -> Option<Value> {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(BorrowedSegment::Field(current)), None) => fields.insert(current.to_owned(), value),
+        (Some(BorrowedSegment::Field(current)), None) => fields.insert(current.to_string(), value),
         (Some(BorrowedSegment::Field(current)), Some(BorrowedSegment::Field(_))) => {
-            if let Some(Value::Object(map)) = fields.get_mut(current) {
+            if let Some(Value::Object(map)) = fields.get_mut(current.as_ref()) {
                 map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                fields.insert(current.to_owned(), Value::Object(map))
+                fields.insert(current.to_string(), Value::Object(map))
             }
         }
         (Some(BorrowedSegment::Field(current)), Some(&BorrowedSegment::Index(next))) => {
-            if let Some(Value::Array(array)) = fields.get_mut(current) {
+            if let Some(Value::Array(array)) = fields.get_mut(current.as_ref()) {
                 array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity((next as usize) + 1);
                 array_insert(&mut array, path_iter, value);
-                fields.insert(current.to_owned(), Value::Array(array))
+                fields.insert(current.to_string(), Value::Array(array))
             }
         }
         _ => None,

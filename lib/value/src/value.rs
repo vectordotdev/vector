@@ -777,12 +777,14 @@ impl Value {
         loop {
             match (path_iter.next(), value) {
                 (None, _) => return Some(value),
-                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get(key) {
-                    None => return None,
-                    Some(nested_value) => {
-                        value = nested_value;
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                    match map.get(key.as_ref()) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
                     }
-                },
+                }
                 (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
                     match array.get(index as usize) {
                         None => return None,
@@ -898,12 +900,14 @@ impl Value {
         loop {
             match (path_iter.next(), value) {
                 (None, value) => return Some(value),
-                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => match map.get_mut(key) {
-                    None => return None,
-                    Some(nested_value) => {
-                        value = nested_value;
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                    match map.get_mut(key.as_ref()) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
                     }
-                },
+                }
                 (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
                     match array.get_mut(index as usize) {
                         None => return None,

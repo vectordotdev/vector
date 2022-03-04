@@ -105,6 +105,12 @@ pub enum BorrowedSegment<'a> {
     Invalid,
 }
 
+impl BorrowedSegment<'_> {
+    pub fn field(value: &str) -> BorrowedSegment {
+        BorrowedSegment::Field(Cow::Borrowed(value))
+    }
+}
+
 impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
     fn from(x: BorrowedSegment<'a>) -> Self {
         match x {
