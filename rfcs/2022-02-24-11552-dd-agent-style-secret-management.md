@@ -1,6 +1,6 @@
 # RFC 11552 - 2022-02-24 - Datadog Agent style secret management
 
-The Datadog Agent has a straighforward secret resolution facility to avoid having sensitive information stored directly
+The Datadog Agent has a straightforward secret resolution facility to avoid having sensitive information stored directly
 in its config, it relies on a user-provided external program that is run to retrieve sensitive value from a third party
 system. This RFC aims to propose a similar mechanism for Vector.
 
@@ -13,7 +13,7 @@ and the syntax to retrieve encrypted config value.
 ## Cross cutting concerns
 
 - The ongoing [configuration schema work][vector-config-schema-work].
-- `vector config` and related Vector enterprise work.
+- `vector config` ([PR][vector-config-subcommand])and related Vector enterprise work.
 
 ## Scope
 
@@ -184,6 +184,7 @@ users.
 [dd-agent-with-k8s-secret]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#script-for-reading-from-multiple-secret-providers
 [dd-agent-secret-helper]: https://github.com/DataDog/datadog-agent/tree/331a3fc2c6f4f49f9bcc06c4f0675f6a8b65a523/cmd/secrets
 [vector-config-schema-work]: https://github.com/vectordotdev/vector/issues/9115
+[vector-config-subcommand]: https://github.com/vectordotdev/vector/pull/11442
 [dd-secret-backend-exec-api]: https://docs.datadoghq.com/agent/guide/secrets-management/?tab=linux#the-executable-api
 [env-var-from-k8s-secrets]: https://github.com/vectordotdev/helm-charts/blob/5a92272/charts/vector/values.yaml#L131-L143
 [env-var-in-vector-config]: https://vector.dev/docs/reference/configuration/#environment-variables
