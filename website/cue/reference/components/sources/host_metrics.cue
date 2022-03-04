@@ -19,6 +19,7 @@ components: sources: host_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.host
@@ -98,8 +99,8 @@ components: sources: host_metrics: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
 			required:    false
-			type: uint: {
-				default: 15
+			type: float: {
+				default: 15.0
 				unit:    "seconds"
 			}
 		}

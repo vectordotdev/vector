@@ -13,6 +13,7 @@ use crate::{
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
     },
+    schema,
     serde::Fields,
     template::Template,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -76,7 +77,7 @@ impl TransformConfig for AddFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -210,7 +211,7 @@ mod tests {
         );
         expected.insert(
             "table",
-            Value::Map(vec![("key".into(), "value".into())].into_iter().collect()),
+            Value::Object(vec![("key".into(), "value".into())].into_iter().collect()),
         );
 
         let mut fields = IndexMap::new();

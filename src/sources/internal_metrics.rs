@@ -16,8 +16,8 @@ use crate::{
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[derivative(Default(value = "2"))]
-    scrape_interval_secs: u64,
+    #[derivative(Default(value = "2.0"))]
+    scrape_interval_secs: f64,
     tags: TagsConfig,
     namespace: Option<String>,
     #[serde(skip)]
@@ -38,7 +38,7 @@ impl InternalMetricsConfig {
     }
 
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 }
@@ -61,12 +61,12 @@ impl_generate_config_from_default!(InternalMetricsConfig);
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        if self.scrape_interval_secs == 0 {
+        if self.scrape_interval_secs == 0.0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
-        let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
         let version = self.version.clone();
         let configuration_key = self.configuration_key.clone();
@@ -103,6 +103,10 @@ impl SourceConfig for InternalMetricsConfig {
     fn source_type(&self) -> &'static str {
         "internal_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
@@ -126,34 +130,31 @@ async fn run(
         let byte_size = metrics.size_of();
         emit!(&EventsReceived { count, byte_size });
 
-        let batch = metrics
-            .into_iter()
-            .map(|mut metric| {
-                // A metric starts out with a default "vector" namespace, but will be overridden
-                // if an explicit namespace is provided to this source.
-                if namespace.is_some() {
-                    metric = metric.with_namespace(namespace.as_ref());
-                }
+        let batch = metrics.into_iter().map(|mut metric| {
+            // A metric starts out with a default "vector" namespace, but will be overridden
+            // if an explicit namespace is provided to this source.
+            if namespace.is_some() {
+                metric = metric.with_namespace(namespace.as_ref());
+            }
 
-                // Version and configuration key are reported in enterprise.
-                if let Some(version) = &version {
-                    metric.insert_tag("version".to_owned(), version.clone());
-                }
-                if let Some(configuration_key) = &configuration_key {
-                    metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-                }
+            // Version and configuration key are reported in enterprise.
+            if let Some(version) = &version {
+                metric.insert_tag("version".to_owned(), version.clone());
+            }
+            if let Some(configuration_key) = &configuration_key {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
+            }
 
-                if let Some(host_key) = host_key {
-                    if let Ok(hostname) = &hostname {
-                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
-                    }
+            if let Some(host_key) = host_key {
+                if let Ok(hostname) = &hostname {
+                    metric.insert_tag(host_key.to_owned(), hostname.to_owned());
                 }
-                if let Some(pid_key) = pid_key {
-                    metric.insert_tag(pid_key.to_owned(), pid.clone());
-                }
-                metric.into()
-            })
-            .collect();
+            }
+            if let Some(pid_key) = pid_key {
+                metric.insert_tag(pid_key.to_owned(), pid.clone());
+            }
+            metric
+        });
 
         if let Err(error) = out.send_batch(batch).await {
             emit!(&StreamClosedError { error, count });
@@ -262,7 +263,7 @@ mod tests {
 
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await

@@ -18,6 +18,7 @@ components: sources: internal_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.vector
@@ -48,8 +49,8 @@ components: sources: internal_metrics: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
 			required:    false
-			type: uint: {
-				default: 2
+			type: float: {
+				default: 2.0
 				unit:    "seconds"
 			}
 		}

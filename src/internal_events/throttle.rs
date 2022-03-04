@@ -2,7 +2,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ThrottleEventDiscarded {
+pub(crate) struct ThrottleEventDiscarded {
     pub key: String,
 }
 

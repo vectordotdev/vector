@@ -19,6 +19,7 @@ use crate::{
     sinks::util::{encoding::StandardEncodings, BatchConfig},
     template::Template,
     test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+    tls::{MaybeTlsSettings, TlsSettings},
 };
 
 const GROUP_NAME: &str = "vector-cw";
@@ -44,8 +45,10 @@ async fn cloudwatch_insert_log_event() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -91,8 +94,10 @@ async fn cloudwatch_insert_log_events_sorted() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -157,8 +162,10 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -229,8 +236,10 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -281,8 +290,10 @@ async fn cloudwatch_insert_log_event_batched() {
         compression: Default::default(),
         batch,
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -329,8 +340,10 @@ async fn cloudwatch_insert_log_event_partitioned() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -416,8 +429,10 @@ async fn cloudwatch_healthcheck() {
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).unwrap();
@@ -431,7 +446,9 @@ fn create_client_test() -> CloudWatchLogsClient {
     };
 
     let proxy = ProxyConfig::default();
-    let client = rusoto::client(&proxy).unwrap();
+    let tls_settings = MaybeTlsSettings::from(TlsSettings::default());
+
+    let client = rusoto::client(Some(tls_settings), &proxy).unwrap();
     let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
     CloudWatchLogsClient::new_with(client, creds, region)
 }

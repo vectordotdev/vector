@@ -9,7 +9,10 @@ use serde_json::json;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -21,7 +24,7 @@ use crate::{
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HoneycombConfig {
+pub(super) struct HoneycombConfig {
     api_key: String,
 
     // TODO: we probably want to make this a template
@@ -33,6 +36,13 @@ pub struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -93,6 +103,10 @@ impl SinkConfig for HoneycombConfig {
 
     fn sink_type(&self) -> &'static str {
         "honeycomb"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

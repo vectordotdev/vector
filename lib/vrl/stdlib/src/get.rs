@@ -90,7 +90,7 @@ impl Function for Get {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -101,7 +101,7 @@ impl Function for Get {
 }
 
 #[derive(Debug, Clone)]
-pub struct GetFn {
+pub(crate) struct GetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
 }
@@ -141,7 +141,11 @@ impl Expression for GetFn {
             }
         };
 
-        Ok(self.value.resolve(ctx)?.get(&path)?.unwrap_or(Value::Null))
+        Ok(self
+            .value
+            .resolve(ctx)?
+            .target_get(&path)?
+            .unwrap_or(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

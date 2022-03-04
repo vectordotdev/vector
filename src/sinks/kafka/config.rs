@@ -5,7 +5,7 @@ use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -25,7 +25,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -41,6 +41,12 @@ pub(crate) struct KafkaSinkConfig {
     pub librdkafka_options: HashMap<String, String>,
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     pub headers_key: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_socket_timeout_ms() -> u64 {
@@ -165,6 +171,7 @@ impl GenerateConfig for KafkaSinkConfig {
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
             headers_key: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -180,11 +187,15 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "kafka"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

@@ -79,7 +79,7 @@ impl Function for ParseUrl {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -213,7 +213,7 @@ mod tests {
                 host: "vector.dev",
                 password: "",
                 path: "/",
-                port: 443,
+                port: 443_i64,
                 query: {},
                 scheme: "https",
                 username: "",

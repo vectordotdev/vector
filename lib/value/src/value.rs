@@ -1,8 +1,11 @@
 //! Contains the main "Value" type for Vector and VRL, as well as helper methods.
 
 mod convert;
+mod display;
 mod error;
+mod path;
 mod regex;
+mod target;
 
 #[cfg(feature = "api")]
 mod api;
@@ -29,7 +32,7 @@ use ordered_float::NotNan;
 use std::result::Result as StdResult;
 use tracing::{instrument, trace, trace_span};
 
-use crate::value::regex::ValueRegex;
+pub use crate::value::regex::ValueRegex;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -57,8 +60,8 @@ pub enum Value {
     /// Timetamp (UTC).
     Timestamp(DateTime<Utc>),
 
-    /// Map.
-    Map(BTreeMap<String, Value>),
+    /// Object.
+    Object(BTreeMap<String, Value>),
 
     /// Array.
     Array(Vec<Value>),
@@ -93,7 +96,7 @@ impl PartialEq<Self> for Value {
                 }
             }
             (Value::Integer(a), Value::Integer(b)) => a.eq(b),
-            (Value::Map(a), Value::Map(b)) => a.eq(b),
+            (Value::Object(a), Value::Object(b)) => a.eq(b),
             (Value::Null, Value::Null) => true,
             (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
             _ => false,
@@ -134,7 +137,7 @@ impl Hash for Value {
             Value::Integer(v) => {
                 v.hash(state);
             }
-            Value::Map(v) => {
+            Value::Object(v) => {
                 v.hash(state);
             }
             Value::Null => {
@@ -149,14 +152,14 @@ impl Hash for Value {
 
 impl Value {
     /// Returns a string description of the value type
-    pub const fn kind(&self) -> &str {
+    pub const fn kind_str(&self) -> &str {
         match self {
             Value::Bytes(_) | Value::Regex(_) => "string",
             Value::Timestamp(_) => "timestamp",
             Value::Integer(_) => "integer",
             Value::Float(_) => "float",
             Value::Boolean(_) => "boolean",
-            Value::Map(_) => "map",
+            Value::Object(_) => "map",
             Value::Array(_) => "array",
             Value::Null => "null",
         }
@@ -209,7 +212,7 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_) => false,
             Value::Null => true,
-            Value::Map(v) => v.is_empty(),
+            Value::Object(v) => v.is_empty(),
             Value::Array(v) => v.is_empty(),
         }
     }
@@ -245,11 +248,11 @@ impl Value {
             SegmentBuf::Index(next_len) if !matches!(value, Value::Array(_)) => {
                 *value = Self::Array(Vec::with_capacity(next_len.abs() as usize));
             }
-            SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
-                *value = Self::Map(BTreeMap::default());
+            SegmentBuf::Field(_) if !matches!(value, Value::Object(_)) => {
+                *value = Self::Object(BTreeMap::default());
             }
-            SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
-                *value = Self::Map(BTreeMap::default());
+            SegmentBuf::Coalesce(_set) if !matches!(value, Value::Object(_)) => {
+                *value = Self::Object(BTreeMap::default());
             }
             _ => (),
         }
@@ -279,7 +282,7 @@ impl Value {
                         Self::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Self::Map(BTreeMap::default())
+                        Self::Object(BTreeMap::default())
                     }
                 }
             })
@@ -378,7 +381,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Self::Map(BTreeMap::default());
+                    let mut inner = Self::Object(BTreeMap::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -402,7 +405,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Self::Map(BTreeMap::default());
+                        let mut inner = Self::Object(BTreeMap::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {
@@ -501,9 +504,9 @@ impl Value {
                     ref name,
                     ref requires_quoting,
                 })),
-                Value::Map(ref mut map),
+                Value::Object(ref mut map),
             ) => Self::insert_map(name, *requires_quoting, working_lookup, map, value),
-            (Some(SegmentBuf::Index(_)), Value::Map(_)) => {
+            (Some(SegmentBuf::Index(_)), Value::Object(_)) => {
                 trace!("Mismatched index trying to access map.");
                 Ok(None)
             }
@@ -606,7 +609,7 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
+            (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => {
                 if working_lookup.is_empty() {
                     Ok(map.remove(name))
                 } else {
@@ -627,7 +630,7 @@ impl Value {
                     retval
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_))
+            (Some(Segment::Index(_)), Value::Object(_))
             | (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
@@ -723,11 +726,11 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => match map.get(name) {
+            (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => match map.get(name) {
                 Some(inner) => inner.get(working_lookup.clone()),
                 None => Ok(None),
             },
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Object(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 let index = if i.is_negative() {
@@ -833,13 +836,13 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(Segment::Field(Field { name, .. })), Value::Map(map)) => {
+            (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => {
                 match map.get_mut(name) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_))
+            (Some(Segment::Index(_)), Value::Object(_))
             | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
@@ -925,7 +928,7 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_)
             | Value::Null => Box::new(prefix.into_iter()),
-            Value::Map(m) => {
+            Value::Object(m) => {
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1032,7 +1035,7 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_)
             | Value::Null => Box::new(prefix.map(move |v| (v, self)).into_iter()),
-            Value::Map(m) => {
+            Value::Object(m) => {
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1156,7 +1159,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_map().unwrap()[key], marker);
+            assert_eq!(value.as_object().unwrap()[key], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1170,7 +1173,7 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map().unwrap()["root"].as_map().unwrap()["doot"],
+                value.as_object().unwrap()["root"].as_object().unwrap()["doot"],
                 marker
             );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
@@ -1186,8 +1189,8 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map().unwrap()["root"].as_map().unwrap()["doot"]
-                    .as_map()
+                value.as_object().unwrap()["root"].as_object().unwrap()["doot"]
+                    .as_object()
                     .unwrap()["toot"],
                 marker
             );
@@ -1203,7 +1206,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.as_array_unwrap()[0], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1220,17 +1223,17 @@ mod test {
                 value.insert(lookup.clone(), marker.clone()).unwrap(),
                 Some(Value::from(2))
             );
-            assert_eq!(value.as_array().len(), 3);
-            assert_eq!(value.as_array()[0], Value::from(1));
-            assert_eq!(value.as_array()[1], marker);
-            assert_eq!(value.as_array()[2], Value::from(3));
+            assert_eq!(value.as_array_unwrap().len(), 3);
+            assert_eq!(value.as_array_unwrap()[0], Value::from(1));
+            assert_eq!(value.as_array_unwrap()[1], marker);
+            assert_eq!(value.as_array_unwrap()[2], Value::from(3));
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
 
             let lookup = Lookup::from_str(key).unwrap();
             assert_eq!(value.remove(lookup, true).unwrap(), Some(marker));
-            assert_eq!(value.as_array().len(), 2);
-            assert_eq!(value.as_array()[0], Value::from(1));
-            assert_eq!(value.as_array()[1], Value::from(3));
+            assert_eq!(value.as_array_unwrap().len(), 2);
+            assert_eq!(value.as_array_unwrap()[0], Value::from(1));
+            assert_eq!(value.as_array_unwrap()[1], Value::from(3));
         }
 
         #[test]
@@ -1241,10 +1244,10 @@ mod test {
             let marker = Value::from(true);
 
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array().len(), 3);
-            assert_eq!(value.as_array()[0], marker);
-            assert_eq!(value.as_array()[1], Value::Null);
-            assert_eq!(value.as_array()[2], Value::Null);
+            assert_eq!(value.as_array_unwrap().len(), 3);
+            assert_eq!(value.as_array_unwrap()[0], marker);
+            assert_eq!(value.as_array_unwrap()[1], Value::Null);
+            assert_eq!(value.as_array_unwrap()[2], Value::Null);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
         }
 
@@ -1255,7 +1258,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0].as_array()[0], marker);
+            assert_eq!(value.as_array_unwrap()[0].as_array_unwrap()[0], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1268,7 +1271,10 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_map().unwrap()["root"].as_array()[0], marker);
+            assert_eq!(
+                value.as_object().unwrap()["root"].as_array_unwrap()[0],
+                marker
+            );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1282,7 +1288,10 @@ mod test {
             let marker = Value::from(true);
 
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None,);
-            assert_eq!(value.as_map().unwrap()["root"].as_array()[0], marker);
+            assert_eq!(
+                value.as_object().unwrap()["root"].as_array_unwrap()[0],
+                marker
+            );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker),);
             assert_eq!(value, Value::from(BTreeMap::default()),);
@@ -1295,7 +1304,10 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0].as_map().unwrap()["boot"], marker);
+            assert_eq!(
+                value.as_array_unwrap()[0].as_object().unwrap()["boot"],
+                marker
+            );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1309,7 +1321,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_array()[0].as_array()[0].as_map().unwrap()["boot"],
+                value.as_array_unwrap()[0].as_array_unwrap()[0]
+                    .as_object()
+                    .unwrap()["boot"],
                 marker
             );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
@@ -1325,7 +1339,7 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map().unwrap()["field"].as_array()[0].as_array()[0],
+                value.as_object().unwrap()["field"].as_array_unwrap()[0].as_array_unwrap()[0],
                 marker
             );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker),);
@@ -1341,8 +1355,8 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map().unwrap()["root"].as_array()[0].as_array()[0]
-                    .as_map()
+                value.as_object().unwrap()["root"].as_array_unwrap()[0].as_array_unwrap()[0]
+                    .as_object()
                     .unwrap()["boot"],
                 marker
             );
@@ -1364,10 +1378,13 @@ mod test {
                 Some(Value::Null)
             );
 
-            assert_eq!(value.as_map().unwrap()["a"].as_array().len(), 3);
-            assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);
-            assert_eq!(value.as_map().unwrap()["a"].as_array()[1], Value::Null);
-            assert_eq!(value.as_map().unwrap()["a"].as_array()[2], marker);
+            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap().len(), 3);
+            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
+            assert_eq!(
+                value.as_object().unwrap()["a"].as_array_unwrap()[1],
+                Value::Null
+            );
+            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[2], marker);
 
             // Replace the value at 0.
             let lookup = LookupBuf::from_str("a[0]").unwrap();
@@ -1376,7 +1393,7 @@ mod test {
                 value.insert(lookup, marker.clone()).unwrap(),
                 Some(Value::from(true))
             );
-            assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);
+            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
         }
     }
 

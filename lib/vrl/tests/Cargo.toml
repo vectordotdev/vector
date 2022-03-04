@@ -10,22 +10,21 @@ enrichment = { path = "../../enrichment" }
 parser = { package = "vrl-parser", path = "../parser" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vector_common = { path = "../../vector-common", default-features = false }
-vrl = { path = "../core" }
+vrl = { path = "../vrl" }
 
 ansi_term = "0.12"
 chrono = "0.4"
 chrono-tz = "0.6"
+clap = { version = "3.1.5", features = ["derive"] }
 glob = "0.3"
 prettydiff = "0.6"
 regex = "1"
 serde = "1"
 serde_json = "1"
-structopt = { version = "0.3", default-features = false }
-tracing-subscriber = { version = "0.3.8", default-features = false, features = ["fmt"] }
+tracing-subscriber = { version = "0.3.9", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.4.1" }
+tikv-jemallocator = { version = "0.4.3" }
 
 [features]
 default = []
-vrl-vm = []

@@ -53,7 +53,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -111,7 +111,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements.enabled(), cx.out.clone())
+                        handle_request(events, acknowledgements, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -160,7 +160,7 @@ async fn handle_request(
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-            out.send_all(&mut futures::stream::iter(events))
+            out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
@@ -173,8 +173,8 @@ async fn handle_request(
         }
         Err(error) => {
             emit!(&HttpBadRequest {
-                error_code: error.code(),
-                error_message: error.message(),
+                code: error.code(),
+                message: error.message(),
             });
             Err(warp::reject::custom(error))
         }

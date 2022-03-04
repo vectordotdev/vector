@@ -82,6 +82,10 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +101,7 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: Bytes) {
         for event in events {
             let log = event.as_mut_log();
 
@@ -752,7 +756,7 @@ mod tests {
             acknowledgements: true.into(),
             connection_limit: None,
         }
-        .build(SourceContext::new_test(sender))
+        .build(SourceContext::new_test(sender, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -997,7 +1001,7 @@ mod integration_tests {
                 acknowledgements: false.into(),
                 connection_limit: None,
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

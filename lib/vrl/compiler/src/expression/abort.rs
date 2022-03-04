@@ -3,6 +3,7 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast::Node;
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{ExpressionError, Resolved},
     value::Kind,
@@ -108,7 +109,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("unhandled fallible expression")]
     FallibleExpr,
     #[error("non-string abort message")]

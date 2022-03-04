@@ -10,7 +10,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::FramedRead;
-use vector_core::internal_event::EventsReceived;
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_core::{self, internal_event::EventsReceived};
 
 use super::events::*;
 use crate::{
@@ -19,7 +20,6 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    vector_core::ByteSizeOf,
     SourceSender,
 };
 
@@ -33,7 +33,7 @@ pub struct SqsSource {
     pub decoder: Decoder,
     pub poll_secs: u32,
     pub concurrency: u32,
-    pub acknowledgements: bool,
+    pub(super) acknowledgements: bool,
 }
 
 impl SqsSource {
@@ -106,9 +106,9 @@ impl SqsSource {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         batch_receiver = Some(receiver);
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     } else {
-                        out.send_all(&mut stream).await
+                        out.send_stream(&mut stream).await
                     };
 
                     match send_result {

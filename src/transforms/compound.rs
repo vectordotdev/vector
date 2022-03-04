@@ -6,11 +6,12 @@ use crate::{
         DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
+    schema,
     transforms::Transform,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CompoundConfig {
+struct CompoundConfig {
     steps: Vec<TransformStep>,
 }
 
@@ -63,11 +64,11 @@ impl TransformConfig for CompoundConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

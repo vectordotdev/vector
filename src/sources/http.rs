@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct SimpleHttpConfig {
+pub(super) struct SimpleHttpConfig {
     address: SocketAddr,
     #[serde(default)]
     encoding: Option<Encoding>,
@@ -202,6 +202,10 @@ impl SourceConfig for SimpleHttpConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn add_path(events: &mut [Event], key: &str, path: &str) {
@@ -270,7 +274,7 @@ mod tests {
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,

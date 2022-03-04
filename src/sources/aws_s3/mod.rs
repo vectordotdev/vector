@@ -81,13 +81,12 @@ impl SourceConfig for AwsS3Config {
             .as_ref()
             .map(|config| config.try_into())
             .transpose()?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx, acknowledgements),
+                    .run(cx, self.acknowledgements),
             )),
         }
     }
@@ -98,6 +97,10 @@ impl SourceConfig for AwsS3Config {
 
     fn source_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -111,7 +114,7 @@ impl AwsS3Config {
 
         let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(proxy).with_context(|_| ClientSnafu {})?;
+        let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> = self
             .auth
             .build(&region, self.assume_role.clone())
@@ -307,6 +310,10 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::fs::File;
+    use std::io::{self, BufRead};
+    use std::path::Path;
+
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
@@ -319,11 +326,14 @@ mod integration_tests {
         event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
-        test_util::{
-            collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,
-        },
+        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
         SourceSender,
     };
+
+    fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
+        let file = io::BufReader::new(File::open(path).unwrap());
+        file.lines().map(|x| x.unwrap()).collect()
+    }
 
     #[tokio::test]
     async fn s3_process_message() {
@@ -405,7 +415,7 @@ mod integration_tests {
 
         trace_init();
 
-        let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
+        let logs = lines_from_plaintext("tests/data/multipart-zst.log");
 
         let buffer = {
             let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
@@ -536,7 +546,7 @@ mod integration_tests {
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
         let (tx, rx) = SourceSender::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx);
+        let cx = SourceContext::new_test(tx, None);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
 

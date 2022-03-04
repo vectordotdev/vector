@@ -11,7 +11,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream, stream::BoxStream, StreamExt};
+use futures::{future, stream::BoxStream, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -35,7 +35,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, Event, LogEvent, Value},
+    event::{BatchNotifier, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -172,7 +172,7 @@ impl SourceConfig for JournaldConfig {
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
         let journal_dir = self.journal_directory.clone();
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let start: StartJournalctlFn = Box::new(move |cursor| {
             let mut command = create_command(
@@ -192,7 +192,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: acknowledgements.enabled(),
+                acknowledgements,
             }
             .run_shutdown(cx.shutdown, start),
         ))
@@ -204,6 +204,10 @@ impl SourceConfig for JournaldConfig {
 
     fn source_type(&self) -> &'static str {
         "journald"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -360,7 +364,7 @@ impl JournaldSource {
             if count > 0 {
                 emit!(&JournaldEventsReceived { count, byte_size });
                 if !events.is_empty() {
-                    match self.out.send_all(&mut stream::iter(events)).await {
+                    match self.out.send_batch(events).await {
                         Ok(_) => {
                             if let Some(receiver) = receiver {
                                 // Ignore the received status, we can't do anything with failures here.
@@ -468,7 +472,7 @@ fn create_command(
     command
 }
 
-fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
+fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> LogEvent {
     let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
@@ -494,7 +498,7 @@ fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
     // Add source type
     log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
-    log.into()
+    log
 }
 
 /// Map the given unit name into a valid systemd unit
@@ -696,7 +700,7 @@ mod tests {
     use tokio::time::{sleep, timeout, Duration};
 
     use super::*;
-    use crate::{event::EventStatus, test_util::components};
+    use crate::{event::Event, event::EventStatus, test_util::components};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -1044,7 +1048,7 @@ mod tests {
         };
 
         let hashset =
-            |v: &[&str]| -> HashSet<String> { v.to_vec().into_iter().map(String::from).collect() };
+            |v: &[&str]| -> HashSet<String> { v.iter().copied().map(String::from).collect() };
 
         let matches = journald_config.merged_include_matches().unwrap();
         let units = matches.get("_SYSTEMD_UNIT").unwrap();

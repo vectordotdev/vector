@@ -20,7 +20,7 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, Finalizable},
     ByteSizeOf,
 };
@@ -93,9 +93,15 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -151,6 +157,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             tls: None,
             azure_blob: None,
             batch: BatchConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -404,7 +411,7 @@ impl Default for DatadogArchivesEncoding {
     fn default() -> Self {
         Self {
             inner: StandardEncodings::Ndjson,
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
             log_schema: log_schema(),
@@ -699,6 +706,10 @@ impl SinkConfig for DatadogArchivesSinkConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 // Make a header pair from a key-value string pair
@@ -958,6 +969,7 @@ mod tests {
                 gcp_cloud_storage: None,
                 tls: None,
                 batch: BatchConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

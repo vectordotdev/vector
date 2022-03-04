@@ -191,6 +191,10 @@ impl SourceConfig for Config {
     fn source_type(&self) -> &'static str {
         COMPONENT_ID
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -446,7 +450,7 @@ impl Source {
         let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
-        let event_processing_loop = out.send_all(&mut stream);
+        let event_processing_loop = out.send_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
         {

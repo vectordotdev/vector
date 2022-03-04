@@ -2,6 +2,7 @@ use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{Expr, Noop, Resolved},
     parser::Node,
@@ -10,7 +11,7 @@ use crate::{
     Context, Expression, Span, State, TypeDef,
 };
 
-pub type Result = std::result::Result<Not, Error>;
+pub(crate) type Result = std::result::Result<Not, Error>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Not {
@@ -78,7 +79,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("non-boolean negation")]
     NonBoolean(Kind),
 }

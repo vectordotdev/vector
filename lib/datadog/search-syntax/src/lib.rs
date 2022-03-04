@@ -1,3 +1,9 @@
+#![deny(clippy::all)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 #[macro_use]
 extern crate pest_derive;
 

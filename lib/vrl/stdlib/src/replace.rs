@@ -61,7 +61,7 @@ impl Function for Replace {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -109,11 +109,14 @@ impl Expression for ReplaceFn {
             }
             Value::Regex(regex) => {
                 let replaced = match count {
-                    i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_ref())
-                        .as_bytes()
-                        .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
+                    i if i > 0 => Bytes::copy_from_slice(
+                        regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
+                    )
+                    .into(),
+                    i if i < 0 => {
+                        Bytes::copy_from_slice(regex.replace_all(&value, with.as_ref()).as_bytes())
+                            .into()
+                    }
                     _ => value.into(),
                 };
 

@@ -204,7 +204,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
+    ) -> Result<BTreeMap<String, vrl::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -226,7 +226,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
+    ) -> Result<Vec<BTreeMap<String, vrl::Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -272,7 +272,7 @@ fn fmt_enrichment_table(
 #[cfg(test)]
 mod tests {
     use vector_common::btreemap;
-    use vrl_core::Value;
+    use vrl::Value;
 
     use super::*;
     use crate::test_util::DummyEnrichmentTable;

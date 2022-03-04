@@ -13,6 +13,7 @@ components: sources: eventstoredb_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

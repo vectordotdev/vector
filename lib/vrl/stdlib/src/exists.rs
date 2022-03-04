@@ -34,7 +34,7 @@ impl Function for Exists {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -69,7 +69,7 @@ impl Function for Exists {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("field")?;
@@ -79,7 +79,7 @@ impl Function for Exists {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExistsFn {
+pub(crate) struct ExistsFn {
     query: expression::Query,
 }
 
@@ -87,7 +87,13 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
     if query.is_external() {
-        return Ok(ctx.target_mut().get(path).ok().flatten().is_some().into());
+        return Ok(ctx
+            .target_mut()
+            .target_get(path)
+            .ok()
+            .flatten()
+            .is_some()
+            .into());
     }
 
     if let Some(ident) = query.variable_ident() {

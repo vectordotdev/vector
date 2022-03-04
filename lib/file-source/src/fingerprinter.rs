@@ -455,12 +455,7 @@ mod test {
         let mut buf = Vec::new();
         let mut small_files = HashSet::new();
         assert!(fingerprinter
-            .get_fingerprint_or_log_error(
-                &target_dir.path().to_owned(),
-                &mut buf,
-                &mut small_files,
-                &NoErrors
-            )
+            .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
             .is_none());
     }
 

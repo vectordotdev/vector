@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -37,10 +37,11 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         error!(
             message = "Error occurred while handling request.",
             error = ?self.error,
-            error_type = "http_error",
-            error_code = %self.code,
+            error_code = %http_error_code(self.code.as_u16()),
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
+            request_id = %self.request_id.unwrap_or(""),
         );
     }
 
@@ -48,9 +49,8 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error" => self.code.canonical_reason().unwrap_or("unknown status code"),
-            "error_code" => self.code.to_string(),
-            "error_type" => "http_error",
+            "error_code" => http_error_code(self.code.as_u16()),
+            "error_type" => error_type::REQUEST_FAILED,
         );
         // deprecated
         counter!("request_read_errors_total", 1);
@@ -68,18 +68,20 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
         error!(
             message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
             error = ?self.error,
+            error_code = "automatic_record_decode",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            error_type = "decoding_error",
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
+            compression = %self.compression,
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
+            "error_code" => "automatic_record_decode",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-            "error" => self.error.to_string(),
-            "error_type" => "decoding_error",
         );
         // deprecated
         counter!("request_automatic_decode_errors_total", 1);

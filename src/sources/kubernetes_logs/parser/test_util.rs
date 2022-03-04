@@ -35,7 +35,7 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event_with_byte_message(
+pub(crate) fn make_log_event_with_byte_message(
     message: Bytes,
     timestamp: &str,
     stream: &str,

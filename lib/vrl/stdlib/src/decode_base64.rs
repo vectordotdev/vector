@@ -30,7 +30,7 @@ impl Function for DecodeBase64 {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -76,7 +76,7 @@ impl Expression for DecodeBase64Fn {
         };
 
         match base64::decode_config(value, config) {
-            Ok(s) => Ok(Value::from(s)),
+            Ok(s) => Ok(Value::from(Bytes::from(s))),
             Err(_) => Err("unable to decode value to base64".into()),
         }
     }

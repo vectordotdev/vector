@@ -437,6 +437,7 @@ urls: {
 	socket:                                                   "\(wikipedia)/wiki/Network_socket"
 	splunk:                                                   "https://www.splunk.com"
 	splunk_hec:                                               "https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/"
+	splunk_hec_channel_header:                                "https://docs.splunk.com/Documentation/Splunk/8.2.4/Data/FormateventsforHTTPEventCollector#Channel_identifier_header"
 	splunk_hec_event_endpoint:                                "https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fevent"
 	splunk_hec_indexed_fields:                                "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC"
 	splunk_hec_indexer_acknowledgements:                      "https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck"

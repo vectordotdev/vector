@@ -10,6 +10,7 @@ use crate::{
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -49,7 +50,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -98,7 +99,7 @@ impl MetricToLog {
                         .remove(&self.timestamp_key)
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
-                                .convert(value.as_bytes())
+                                .convert(value.coerce_to_bytes())
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
