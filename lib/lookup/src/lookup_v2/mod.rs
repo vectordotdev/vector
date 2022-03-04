@@ -6,13 +6,18 @@ use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
+pub struct OwnedPath {
+    pub segments: Vec<OwnedSegment>,
+}
+
 /// Use if you want to pre-parse paths so it can be used multiple times
 /// The return value implements `Path` so it can be used directly
-pub fn parse_path(path: &str) -> Vec<OwnedSegment> {
-    JitPath::new(path)
+pub fn parse_path(path: &str) -> OwnedPath {
+    let segments = JitPath::new(path)
         .segment_iter()
         .map(|segment| segment.into())
-        .collect()
+        .collect();
+    OwnedPath { segments }
 }
 
 /// A path is simply the data describing how to look up a value.
@@ -31,6 +36,14 @@ impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
             segments: self.as_slice(),
             index: 0,
         }
+    }
+}
+
+impl<'a> Path<'a> for &'a OwnedPath {
+    type Iter = OwnedSegmentSliceIter<'a>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        (&self.segments).segment_iter()
     }
 }
 
@@ -88,6 +101,18 @@ pub enum OwnedSegment {
     Invalid,
 }
 
+impl OwnedSegment {
+    pub fn is_field(&self) -> bool {
+        matches!(self, OwnedSegment::Field(_))
+    }
+    pub fn is_index(&self) -> bool {
+        matches!(self, OwnedSegment::Index(_))
+    }
+    pub fn is_invalid(&self) -> bool {
+        matches!(self, OwnedSegment::Invalid)
+    }
+}
+
 impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     fn from(segment: &'b OwnedSegment) -> Self {
         match segment {
@@ -108,6 +133,15 @@ pub enum BorrowedSegment<'a> {
 impl BorrowedSegment<'_> {
     pub fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
+    }
+    pub fn is_field(&self) -> bool {
+        matches!(self, BorrowedSegment::Field(_))
+    }
+    pub fn is_index(&self) -> bool {
+        matches!(self, BorrowedSegment::Index(_))
+    }
+    pub fn is_invalid(&self) -> bool {
+        matches!(self, BorrowedSegment::Invalid)
     }
 }
 
