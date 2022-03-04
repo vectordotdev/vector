@@ -9,11 +9,11 @@ use std::{
     },
 };
 
-use futures::{future, StreamExt};
+use futures::{future, stream, StreamExt};
 use tokio::time::{sleep, Duration};
 use vector::{
     config::{Config, SinkOuter},
-    event::Event,
+    event::{into_event_stream, Event, EventArray, EventContainer},
     test_util::start_topology,
     topology,
 };
@@ -46,12 +46,16 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
+fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {
+    stream::iter(array.into_events().map(into_message))
+}
+
 #[tokio::test]
 async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let (mut in1, rx) = vector::SourceSender::new_with_buffer(1000);
+    let (mut in1, rx) = vector::SourceSender::new_with_buffer(10);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
     let transform1 = transform(" transformed", 0.0);
@@ -85,7 +89,10 @@ async fn topology_shutdown_while_active() {
         processed_events.len(),
         source_event_total.load(Ordering::Relaxed)
     );
-    for event in processed_events {
+    for event in processed_events
+        .into_iter()
+        .flat_map(EventArray::into_events)
+    {
         assert_eq!(
             event.as_log()[&vector::config::log_schema().message_key()],
             "test transformed".to_owned().into()
@@ -115,7 +122,7 @@ async fn topology_source_and_sink() {
 
     topology.stop().await;
 
-    let res = out1.collect::<Vec<_>>().await;
+    let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event], res);
 }
@@ -146,8 +153,8 @@ async fn topology_multiple_sources() {
 
     topology.stop().await;
 
-    assert_eq!(out_event1, Some(event1));
-    assert_eq!(out_event2, Some(event2));
+    assert_eq!(out_event1, Some(event1.into()));
+    assert_eq!(out_event2, Some(event2.into()));
 }
 
 #[tokio::test]
@@ -169,8 +176,8 @@ async fn topology_multiple_sinks() {
 
     topology.stop().await;
 
-    let res1 = out1.collect::<Vec<_>>().await;
-    let res2 = out2.collect::<Vec<_>>().await;
+    let res1 = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
+    let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
@@ -197,7 +204,7 @@ async fn topology_transform_chain() {
 
     topology.stop().await;
 
-    let res = out1.map(into_message).collect::<Vec<_>>().await;
+    let res = out1.flat_map(into_message_stream).collect::<Vec<_>>().await;
 
     assert_eq!(vec!["this first second"], res);
 }
@@ -228,7 +235,7 @@ async fn topology_remove_one_source() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap();
     in2.send(event2.clone()).await.unwrap_err();
     topology.stop().await;
@@ -265,8 +272,8 @@ async fn topology_remove_one_sink() {
 
     topology.stop().await;
 
-    let res1 = out1.collect::<Vec<_>>().await;
-    let res2 = out2.collect::<Vec<_>>().await;
+    let res1 = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
+    let res2 = out2.flat_map(into_event_stream).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -300,7 +307,7 @@ async fn topology_remove_one_transform() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1 = tokio::spawn(out1.map(into_message).collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(out1.flat_map(into_message_stream).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
     let res = h_out1.await.unwrap();
@@ -333,8 +340,8 @@ async fn topology_swap_source() {
     let event1 = Event::from("this");
     let event2 = Event::from("that");
 
-    let h_out1v1 = tokio::spawn(out1v1.collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.collect::<Vec<_>>());
+    let h_out1v1 = tokio::spawn(out1v1.flat_map(into_event_stream).collect::<Vec<_>>());
+    let h_out1v2 = tokio::spawn(out1v2.flat_map(into_event_stream).collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap_err();
     in2.send(event2.clone()).await.unwrap();
     topology.stop().await;
@@ -368,8 +375,8 @@ async fn topology_swap_sink() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
-    let h_out2 = tokio::spawn(out2.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
+    let h_out2 = tokio::spawn(out2.flat_map(into_event_stream).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
 
@@ -407,8 +414,8 @@ async fn topology_swap_transform() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1v1 = tokio::spawn(out1v1.map(into_message).collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.map(into_message).collect::<Vec<_>>());
+    let h_out1v1 = tokio::spawn(out1v1.flat_map(into_message_stream).collect::<Vec<_>>());
+    let h_out1v2 = tokio::spawn(out1v2.flat_map(into_message_stream).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
@@ -512,7 +519,10 @@ async fn topology_rebuild_connected() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(
+        out1.flat_map(|a| stream::iter(a.into_events()))
+            .collect::<Vec<_>>(),
+    );
     in1.send(event1.clone()).await.unwrap();
     in1.send(event2.clone()).await.unwrap();
     topology.stop().await;
@@ -666,7 +676,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
     let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
         .await
         .expect("timeout 1")
-        .map(into_message)
+        .map(|array| into_message(array.into_events().next().unwrap()))
         .expect("no output");
     assert_eq!("foo", res);
 
@@ -674,7 +684,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
     let res = tokio::time::timeout(Duration::from_secs(1), out1.next())
         .await
         .expect("timeout 2")
-        .map(into_message)
+        .map(|array| into_message(array.into_events().next().unwrap()))
         .expect("no output");
     assert_eq!("foo", res);
 
