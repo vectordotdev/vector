@@ -1,4 +1,8 @@
 # result: 0
 # object: { "zero": 0 }
 
+<<<<<<< HEAD
 x = 43 % int!(.zero) ?? 0
+=======
+x = 43 % int!(.zero) ?? 0
+>>>>>>> 44b67cecc (Add vrl tests.)
