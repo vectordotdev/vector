@@ -567,7 +567,10 @@ async fn topology_rebuild_connected_transform() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(
+        out1.flat_map(|a| stream::iter(a.into_events()))
+            .collect::<Vec<_>>(),
+    );
     in1.send(event1.clone()).await.unwrap();
     in1.send(event2.clone()).await.unwrap();
     topology.stop().await;
