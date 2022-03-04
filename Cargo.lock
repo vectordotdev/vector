@@ -4700,11 +4700,11 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
 dependencies = [
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
 ]
 
 [[package]]
@@ -6010,9 +6010,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.33"
+version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf98e3e6c7ed44e474b454b1ebded3193ee5aba3428e29c55d59b1d65e49945e"
+checksum = "2cdcf5caf69bcc87b1e3f5427b4f21a32fdd53c2847687bdf9861abb1cdaa0d8"
 dependencies = [
  "bytecheck",
  "hashbrown 0.12.0",
@@ -6024,9 +6024,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.33"
+version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc9940ec6a7c62b1d1f476f607c6caf0d7fbf74e43f77bc022143b878fcd3266"
+checksum = "a6cf557da1f81b8c7e889c59c9c3abaf6978f7feb156b9579e4f8bf6d7a2bada"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
