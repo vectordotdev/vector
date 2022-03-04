@@ -13,6 +13,7 @@ components: sources: journald: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {

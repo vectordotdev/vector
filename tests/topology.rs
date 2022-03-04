@@ -55,7 +55,7 @@ async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let (mut in1, rx) = vector::SourceSender::new_with_buffer(1000);
+    let (mut in1, rx) = vector::SourceSender::new_with_buffer(10);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
     let transform1 = transform(" transformed", 0.0);
@@ -510,6 +510,54 @@ async fn topology_rebuild_connected() {
     let mut config = Config::builder();
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
+
+    assert!(topology
+        .reload_config_and_respawn(config.build().unwrap())
+        .await
+        .unwrap());
+    sleep(Duration::from_millis(10)).await;
+
+    let event1 = Event::from("this");
+    let event2 = Event::from("that");
+    let h_out1 = tokio::spawn(
+        out1.flat_map(|a| stream::iter(a.into_events()))
+            .collect::<Vec<_>>(),
+    );
+    in1.send_event(event1.clone()).await.unwrap();
+    in1.send_event(event2.clone()).await.unwrap();
+    topology.stop().await;
+
+    let res = h_out1.await.unwrap();
+    assert_eq!(vec![event1, event2], res);
+}
+
+#[tokio::test]
+async fn topology_rebuild_connected_transform() {
+    vector::trace::init(true, false, "info");
+
+    let (mut in1, source1) = source_with_data("v1");
+    let transform1 = transform(" transformed", 0.0);
+    let transform2 = transform(" transformed", 0.0);
+    let (_out1, sink1) = sink_with_data(10, "v1");
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform1);
+    config.add_transform("t2", &["t1"], transform2);
+    config.add_sink("out1", &["t2"], sink1);
+
+    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    let (_in1, source1) = source_with_data("v1"); // not changing
+    let transform1 = transform("", 0.0);
+    let transform2 = transform("", 0.0);
+    let (out1, sink1) = sink_with_data(10, "v2");
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform1);
+    config.add_transform("t2", &["t1"], transform2);
+    config.add_sink("out1", &["t2"], sink1);
 
     assert!(topology
         .reload_config_and_respawn(config.build().unwrap())

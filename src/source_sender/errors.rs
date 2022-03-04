@@ -1,6 +1,7 @@
 use std::fmt;
 
 use tokio::sync::mpsc;
+use vector_buffers::topology::channel::SendError;
 
 use crate::event::{Event, EventArray};
 
@@ -23,6 +24,12 @@ impl From<mpsc::error::SendError<Event>> for ClosedError {
 
 impl From<mpsc::error::SendError<EventArray>> for ClosedError {
     fn from(_: mpsc::error::SendError<EventArray>) -> Self {
+        Self
+    }
+}
+
+impl<T> From<SendError<T>> for ClosedError {
+    fn from(_: SendError<T>) -> Self {
         Self
     }
 }

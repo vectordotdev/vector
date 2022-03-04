@@ -86,7 +86,7 @@ impl<V: 'static> Fields<V> {
     pub fn all_fields(self) -> impl Iterator<Item = (String, V)> {
         self.0
             .into_iter()
-            .map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
+            .flat_map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
                 match v {
                     // boxing is used as a way to avoid incompatible types of the match arms
                     FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
@@ -96,7 +96,6 @@ impl<V: 'static> Fields<V> {
                     ),
                 }
             })
-            .flatten()
     }
 }
 

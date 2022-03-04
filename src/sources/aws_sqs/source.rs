@@ -10,7 +10,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::FramedRead;
-use vector_core::internal_event::EventsReceived;
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_core::{self, internal_event::EventsReceived};
 
 use super::events::*;
 use crate::{
@@ -19,7 +20,6 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
-    vector_core::ByteSizeOf,
     SourceSender,
 };
 

@@ -13,6 +13,7 @@ components: sinks: honeycomb: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

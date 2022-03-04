@@ -53,35 +53,35 @@ impl Input {
     pub fn new(ty: DataType) -> Self {
         Self {
             ty,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn trace() -> Self {
         Self {
             ty: DataType::Trace,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn all() -> Self {
         Self {
             ty: DataType::all(),
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 }
@@ -119,6 +119,7 @@ impl Output {
     }
 
     /// Set the schema definition for this output.
+    #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
         self.log_schema_definition = Some(schema_definition);
         self
@@ -141,6 +142,7 @@ pub struct AcknowledgementsConfig {
 }
 
 impl AcknowledgementsConfig {
+    #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);
         Self { enabled }

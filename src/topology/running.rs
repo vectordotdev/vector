@@ -29,7 +29,7 @@ use crate::{
     trigger::DisabledTrigger,
 };
 
-use super::TapResource;
+use super::{TapOutput, TapResource};
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -426,7 +426,14 @@ impl RunningTopology {
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(key) {
-                    let tx = self.inputs.remove(key).unwrap();
+                    // We clone instead of removing here because otherwise the input will be
+                    // missing for the rest of the reload process, which violates the assumption
+                    // that all previous inputs for components not being removed are still
+                    // available. It's simpler to allow the "old" input to stick around and be
+                    // replaced (even though that's basically a no-op since we're reusing the same
+                    // buffer) than it is to pass around info about which sinks are having their
+                    // buffers reused and treat them differently at other stages.
+                    let tx = self.inputs.get(key).unwrap().clone();
                     let (rx, acker) = match buffer {
                         TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
                         _ => unreachable!(),
@@ -442,6 +449,7 @@ impl RunningTopology {
 
     /// Rewires topology
     pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+        let mut tap_metadata = HashMap::new();
         let mut watch_inputs = HashMap::new();
         if !self.watch.0.is_closed() {
             watch_inputs = new_pieces
@@ -453,6 +461,9 @@ impl RunningTopology {
 
         // Sources
         for key in diff.sources.changed_and_added() {
+            if let Some(task) = new_pieces.tasks.get(key) {
+                tap_metadata.insert(key, ("source", task.typetag().to_string()));
+            }
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -460,11 +471,14 @@ impl RunningTopology {
         // Make sure all transform outputs are set up before another transform
         // might try use it as an input
         for key in diff.transforms.changed_and_added() {
+            if let Some(task) = new_pieces.tasks.get(key) {
+                tap_metadata.insert(key, ("transform", task.typetag().to_string()));
+            }
             self.setup_outputs(key, new_pieces).await;
         }
 
         for key in &diff.transforms.to_change {
-            self.replace_inputs(key, new_pieces, diff).await;
+            self.replace_inputs(key, new_pieces).await;
         }
 
         for key in &diff.transforms.to_add {
@@ -473,7 +487,7 @@ impl RunningTopology {
 
         // Sinks
         for key in &diff.sinks.to_change {
-            self.replace_inputs(key, new_pieces, diff).await;
+            self.replace_inputs(key, new_pieces).await;
         }
 
         for key in &diff.sinks.to_add {
@@ -482,11 +496,45 @@ impl RunningTopology {
 
         // Broadcast changes to subscribers.
         if !self.watch.0.is_closed() {
+            let outputs = self
+                .outputs
+                .clone()
+                .into_iter()
+                .flat_map(|(output_id, control_tx)| {
+                    tap_metadata.get(&output_id.component).map(
+                        |(component_kind, component_type)| {
+                            (
+                                TapOutput {
+                                    output_id,
+                                    component_kind,
+                                    component_type: component_type.clone(),
+                                },
+                                control_tx,
+                            )
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            let mut removals = diff.sources.to_remove.clone();
+            removals.extend(diff.transforms.to_remove.iter().cloned());
             self.watch
                 .0
                 .send(TapResource {
-                    outputs: self.outputs.clone(),
+                    outputs,
                     inputs: watch_inputs,
+                    source_keys: diff
+                        .sources
+                        .changed_and_added()
+                        .map(|key| key.to_string())
+                        .collect(),
+                    sink_keys: diff
+                        .sinks
+                        .changed_and_added()
+                        .map(|key| key.to_string())
+                        .collect(),
+                    // Note, only sources and transforms are relevant. Sinks do
+                    // not have outputs to tap.
+                    removals,
                 })
                 .expect("Couldn't broadcast config changes.");
         }
@@ -665,12 +713,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(key.clone(), trigger.into()));
     }
 
-    async fn replace_inputs(
-        &mut self,
-        key: &ComponentKey,
-        new_pieces: &mut builder::Pieces,
-        diff: &ConfigDiff,
-    ) {
+    async fn replace_inputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
         let sink_inputs = self.config.sinks.get(key).map(|s| &s.inputs);
@@ -684,24 +727,8 @@ impl RunningTopology {
         let new_inputs = inputs.iter().collect::<HashSet<_>>();
 
         let inputs_to_remove = &old_inputs - &new_inputs;
-        let mut inputs_to_add = &new_inputs - &old_inputs;
-        let replace_candidates = old_inputs.intersection(&new_inputs);
-        let mut inputs_to_replace = HashSet::new();
-
-        // If the source component of an input was also rebuilt, we need to send an add message
-        // instead of a replace message.
-        for input in replace_candidates {
-            if diff
-                .sources
-                .changed_and_added()
-                .chain(diff.transforms.changed_and_added())
-                .any(|key| key == &input.component)
-            {
-                inputs_to_add.insert(input);
-            } else {
-                inputs_to_replace.insert(input);
-            }
-        }
+        let inputs_to_add = &new_inputs - &old_inputs;
+        let inputs_to_replace = old_inputs.intersection(&new_inputs);
 
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {

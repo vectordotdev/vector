@@ -1,16 +1,16 @@
 use chrono::Utc;
-use snafu::ResultExt;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
-use super::{CloudwatchLogsError, TemplateRenderingError};
+use super::TemplateRenderingError;
 use crate::{
     config::LogSchema,
     event::{Event, Value},
+    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
     sinks::{
-        aws_cloudwatch_logs::{CloudwatchKey, IoSnafu},
+        aws_cloudwatch_logs::CloudwatchKey,
         util::encoding::{Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings},
     },
     template::Template,
@@ -44,10 +44,7 @@ pub struct CloudwatchRequestBuilder {
 }
 
 impl CloudwatchRequestBuilder {
-    pub fn build(
-        &self,
-        mut event: Event,
-    ) -> Result<Option<CloudwatchRequest>, CloudwatchLogsError> {
+    pub fn build(&self, mut event: Event) -> Option<CloudwatchRequest> {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
@@ -56,7 +53,7 @@ impl CloudwatchRequestBuilder {
                     field: Some("group"),
                     drop_event: true,
                 });
-                return Ok(None);
+                return None;
             }
         };
 
@@ -68,7 +65,7 @@ impl CloudwatchRequestBuilder {
                     field: Some("stream"),
                     drop_event: true,
                 });
-                return Ok(None);
+                return None;
             }
         };
         let key = CloudwatchKey { group, stream };
@@ -82,23 +79,26 @@ impl CloudwatchRequestBuilder {
         let event_byte_size = event.size_of();
         self.encoding.apply_rules(&mut event);
         let mut message_bytes = vec![];
-        self.encoding
-            .encode_input(event, &mut message_bytes)
-            .context(IoSnafu)?;
+        if let Err(error) = self.encoding.encode_input(event, &mut message_bytes) {
+            emit!(&AwsCloudwatchLogsEncoderError { error });
+            return None;
+        }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
         if message.len() > MAX_MESSAGE_SIZE {
-            return Err(CloudwatchLogsError::EventTooLong {
-                length: message.len(),
+            emit!(&AwsCloudwatchLogsMessageSizeError {
+                size: message.len(),
+                max_size: MAX_MESSAGE_SIZE,
             });
+            return None;
         }
-        Ok(Some(CloudwatchRequest {
+        Some(CloudwatchRequest {
             key,
             message,
             event_byte_size,
             timestamp,
             finalizers,
-        }))
+        })
     }
 }
 
@@ -136,7 +136,7 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key(), timestamp);
 
-        let request = request_builder.build(event).unwrap().unwrap();
+        let request = request_builder.build(event).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
     }

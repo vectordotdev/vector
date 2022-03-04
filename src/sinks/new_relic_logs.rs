@@ -7,7 +7,9 @@ use snafu::Snafu;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -65,6 +67,12 @@ pub struct NewRelicLogsConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -112,8 +120,8 @@ impl SinkConfig for NewRelicLogsConfig {
         "new_relic_logs"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -127,6 +135,7 @@ impl NewRelicLogsConfig {
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -161,6 +170,7 @@ impl NewRelicLogsConfig {
             batch: batch_settings.into(),
             request,
             tls: None,
+            acknowledgements: self.acknowledgements,
         })
     }
 }
