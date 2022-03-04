@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, io::Write, sync::Arc};
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use vector_core::event::EventFinalizers;
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
@@ -15,7 +15,6 @@ use crate::{
         datadog::traces::sink::PartitionKey,
         util::{Compression, Compressor, IncrementalRequestBuilder},
     },
-    vector_core::event::Finalizable,
 };
 mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));

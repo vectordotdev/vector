@@ -6,7 +6,7 @@ components: sinks: datadog_traces: {
 	classes: sinks._datadog.classes
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -24,7 +24,15 @@ components: sinks: datadog_traces: {
 			}
 			encoding: enabled: false
 			proxy: enabled:    true
-			request: enabled:  true
+			request: {
+				enabled:                    true
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    300
+				timeout_secs:               60
+				headers:                    false
+			}
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -39,7 +47,7 @@ components: sinks: datadog_traces: {
 					socket: {
 						api: {
 							title: "Datadog traces API"
-							url:   urls.datadog_traces_endpoints
+							url:   urls.datadog_traces
 						}
 						direction: "outgoing"
 						protocols: ["http"]

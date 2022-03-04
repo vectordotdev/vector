@@ -6,7 +6,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_core::config::proxy::ProxyConfig;
+use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
 use super::service::TraceApiRetry;
 use crate::{
@@ -38,8 +38,9 @@ pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 10;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = TowerRequestConfig::new(Concurrency::None)
+    .retry_attempts(5)
+    .retry_max_duration_secs(300);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogTracesDefaultBatchSettings;
@@ -68,6 +69,13 @@ pub struct DatadogTracesConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
@@ -179,6 +187,10 @@ impl SinkConfig for DatadogTracesConfig {
 
     fn sink_type(&self) -> &'static str {
         "datadog_traces"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
