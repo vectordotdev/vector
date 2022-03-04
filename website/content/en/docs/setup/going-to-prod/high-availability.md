@@ -1,7 +1,7 @@
 ---
 title: High Availability
 description: Meet the stringent uptime requirements of infrastructure-level software.
-short: HA
+short: High Availability
 weight: 3
 ---
 

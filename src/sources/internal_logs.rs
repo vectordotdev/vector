@@ -101,11 +101,12 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use futures::Stream;
     use tokio::time::{sleep, Duration};
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, source_sender::ReceiverStream, test_util::collect_ready, trace};
+    use crate::{event::Event, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {
@@ -154,7 +155,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> ReceiverStream<Event> {
+    async fn start_source() -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

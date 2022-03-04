@@ -8,7 +8,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
@@ -25,6 +25,7 @@ use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
+        into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
         Event, EventStatus, Value,
     },
@@ -146,8 +147,16 @@ async fn source(
     let mut logs_output = None;
     let mut metrics_output = None;
     if multiple_outputs {
-        logs_output = Some(sender.add_outputs(status, "logs".to_string()));
-        metrics_output = Some(sender.add_outputs(status, "metrics".to_string()));
+        logs_output = Some(
+            sender
+                .add_outputs(status, "logs".to_string())
+                .flat_map(into_event_stream),
+        );
+        metrics_output = Some(
+            sender
+                .add_outputs(status, "metrics".to_string())
+                .flat_map(into_event_stream),
+        );
     }
     let address = next_addr();
     let config = toml::from_str::<DatadogAgentConfig>(&format!(

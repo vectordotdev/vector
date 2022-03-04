@@ -91,7 +91,11 @@ async fn wait_for_message() {
 async fn wait_for_traces() {
     wait_for_agent(Some(8183)).await;
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-    let context = SourceContext::new_test(sender, None);
+    let schema_definitions = HashMap::from([
+        (Some(LOGS.to_owned()), schema::Definition::empty()),
+        (Some(METRICS.to_owned()), schema::Definition::empty()),
+    ]);
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
         let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
                 address = "0.0.0.0:8081"

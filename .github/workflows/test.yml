@@ -86,6 +86,8 @@ jobs:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: [self-hosted, linux, x64, general]
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: colpal/actions-clean@v1
@@ -112,7 +114,6 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: make slim-builds
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
@@ -123,6 +124,8 @@ jobs:
     name: Miscellaneous - Linux
     runs-on: [self-hosted, linux, x64, general]
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: colpal/actions-clean@v1
@@ -150,7 +153,6 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: make slim-builds
       - run: make test-shutdown
       - run: make test-cli
       - run: make test-behavior
@@ -162,6 +164,8 @@ jobs:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-20.04
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
     strategy:
       matrix:
         target:
@@ -188,7 +192,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
       # Why is this build, not check? Because we need to make sure the linking phase works.
       # aarch64 and musl in particular are notoriously hard to link.
       # While it may be tempting to slot a `check` in here for quickness, please don't.
@@ -215,6 +218,8 @@ jobs:
     continue-on-error: true
     runs-on: macos-latest
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
@@ -230,7 +235,6 @@ jobs:
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
       - run: make test
       - run: make test-behavior
 
@@ -343,6 +347,8 @@ jobs:
     runs-on: ubuntu-20.04
     container: timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
     needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
     steps:
       - uses: actions/checkout@v3
         with:
@@ -359,8 +365,6 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Make slim-builds
-        run: make slim-builds
       - name: Check style
         run: make check-style
       - name: Check code format || needs.changes.outputs.source == 'true'

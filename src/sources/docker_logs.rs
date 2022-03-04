@@ -1067,7 +1067,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::Event,
-        source_sender::ReceiverStream,
         test_util::{collect_n, collect_ready, trace_init},
         SourceSender,
     };
@@ -1076,7 +1075,7 @@ mod integration_tests {
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> ReceiverStream<Event> {
+    ) -> impl Stream<Item = Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -1084,7 +1083,7 @@ mod integration_tests {
         })
     }
 
-    fn source_with_config(config: DockerLogsConfig) -> ReceiverStream<Event> {
+    fn source_with_config(config: DockerLogsConfig) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test();
         tokio::spawn(async move {
             config
@@ -1306,7 +1305,7 @@ mod integration_tests {
         id
     }
 
-    fn is_empty<T>(mut rx: ReceiverStream<T>) -> bool {
+    fn is_empty<T>(mut rx: impl Stream<Item = T> + Unpin) -> bool {
         rx.next().now_or_never().is_none()
     }
 

@@ -57,7 +57,7 @@ impl Fanout {
     pub fn add(&mut self, id: ComponentKey, sink: GenericEventSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
-            "Duplicate output id in fanout"
+            "Duplicate output id in fanout: {id}"
         );
 
         self.sinks.push((id, Some(sink)));
@@ -82,7 +82,7 @@ impl Fanout {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == id) {
             *existing = sink;
         } else {
-            panic!("Tried to replace a sink that's not already present");
+            panic!("Tried to replace a sink that's not already present: {id}");
         }
     }
 

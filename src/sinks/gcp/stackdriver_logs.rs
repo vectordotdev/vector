@@ -263,7 +263,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
                     s if s.starts_with("ALERT") => 700,
                     s if s.starts_with("CRIT") => 600,
-                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("ERR") || s == "ER" => 500,
                     s if s.starts_with("WARN") => 400,
                     s if s.starts_with("NOTICE") => 300,
                     s if s.starts_with("INFO") => 200,

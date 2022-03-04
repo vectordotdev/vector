@@ -640,10 +640,6 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
 
-.PHONY: slim-builds
-slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
-
 ifeq (${CI}, true)
 .PHONY: ci-sweep
 ci-sweep: ## Sweep up the CI to try to get more disk space.

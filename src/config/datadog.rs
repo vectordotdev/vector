@@ -24,7 +24,7 @@ pub struct Options {
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
-    pub reporting_interval_secs: u64,
+    pub reporting_interval_secs: f64,
 }
 
 impl Default for Options {
@@ -44,8 +44,8 @@ const fn default_enabled() -> bool {
 }
 
 /// By default, report to Datadog every 5 seconds.
-const fn default_reporting_interval_secs() -> u64 {
-    5
+const fn default_reporting_interval_secs() -> f64 {
+    5.0
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
