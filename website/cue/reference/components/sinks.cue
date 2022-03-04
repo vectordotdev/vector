@@ -190,10 +190,10 @@ components: sinks: [Name=string]: {
 											}
 											if codec == "logfmt" {
 												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt]\(urls.logfmt)."
+													logfmt: "Newline delimited list of events encoded by [logfmt](\(urls.logfmt))."
 												}
 												if !batched {
-													logfmt: "[logfmt]\(urls.logfmt) encoded event."
+													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 												}
 											}
 											if codec == "json" {

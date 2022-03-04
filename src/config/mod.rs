@@ -17,6 +17,7 @@ use crate::{conditions, event::Metric};
 
 pub mod api;
 mod builder;
+mod cmd;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -27,7 +28,6 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
-mod recursive;
 mod schema;
 mod sink;
 mod source;
@@ -38,12 +38,13 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};

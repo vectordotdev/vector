@@ -11,4 +11,4 @@ pest_derive = "2.1.0"
 ordered-float = "2"
 regex = "1"
 itertools = "0.10.3"
-once_cell = { version = "1.9", default-features = false, features = ["std"] }
+once_cell = { version = "1.10", default-features = false, features = ["std"] }
