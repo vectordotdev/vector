@@ -2,6 +2,7 @@ mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
@@ -90,16 +91,16 @@ pub enum OwnedSegment {
 impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     fn from(segment: &'b OwnedSegment) -> Self {
         match segment {
-            OwnedSegment::Field(value) => BorrowedSegment::Field(value.as_str()),
+            OwnedSegment::Field(value) => BorrowedSegment::Field(value.as_str().into()),
             OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
             OwnedSegment::Invalid => BorrowedSegment::Invalid,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {
-    Field(&'a str),
+    Field(Cow<'a, str>),
     Index(usize),
     Invalid,
 }

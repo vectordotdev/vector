@@ -1,4 +1,5 @@
 use crate::lookup_v2::{BorrowedSegment, Path};
+use std::borrow::Cow;
 use std::str::CharIndices;
 
 #[derive(Clone)]
@@ -17,6 +18,7 @@ pub struct JitLookup<'a> {
     path: &'a str,
     chars: CharIndices<'a>,
     state: JitState,
+    escape_buffer: String,
 }
 
 impl<'a> JitLookup<'a> {
@@ -25,6 +27,7 @@ impl<'a> JitLookup<'a> {
             chars: path.char_indices(),
             path,
             state: JitState::Start,
+            escape_buffer: String::new(),
         }
     }
 }
@@ -45,27 +48,29 @@ enum JitState {
     Index { value: usize },
     Field { start: usize },
     Quote { start: usize },
+    EscapedQuote { start: usize },
     End,
 }
 
 impl<'a> Iterator for JitLookup<'a> {
     type Item = BorrowedSegment<'a>;
 
-    fn next(&mut self) -> Option<BorrowedSegment<'a>> {
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.chars.next() {
                 None => {
                     let result = match self.state {
-                        JitState::Start => Some(BorrowedSegment::Invalid),
-                        JitState::Continue => None,
-                        JitState::Dot => None,
-                        JitState::IndexStart => Some(BorrowedSegment::Invalid),
-                        JitState::Index { .. } => Some(BorrowedSegment::Invalid),
+                        JitState::Start
+                        | JitState::IndexStart
+                        | JitState::Index { .. }
+                        | JitState::Quote { .. }
+                        | JitState::EscapedQuote { .. } => Some(BorrowedSegment::Invalid),
+
+                        JitState::Continue | JitState::Dot | JitState::End => None,
+
                         JitState::Field { start } => {
-                            Some(BorrowedSegment::Field(&self.path[start..]))
+                            Some(BorrowedSegment::Field(Cow::Borrowed(&self.path[start..])))
                         }
-                        JitState::Quote { .. } => Some(BorrowedSegment::Invalid),
-                        JitState::End => None,
                     };
                     self.state = JitState::End;
                     return result;
@@ -93,21 +98,64 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::Field { start })
                             }
                             '.' => (
-                                Some(Some(BorrowedSegment::Field(&self.path[start..index]))),
+                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
+                                    &self.path[start..index],
+                                )))),
                                 JitState::Dot,
                             ),
                             '[' => (
-                                Some(Some(BorrowedSegment::Field(&self.path[start..index]))),
+                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
+                                    &self.path[start..index],
+                                )))),
                                 JitState::IndexStart,
                             ),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::Quote { start } => match c {
                             '\"' => (
-                                Some(Some(BorrowedSegment::Field(&self.path[start..index]))),
+                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
+                                    &self.path[start..index],
+                                )))),
                                 JitState::Continue,
                             ),
+                            '\\' => {
+                                // Character escaping requires copying chars to a new String.
+                                // State is reverted back to the start of the quote to start over
+                                // with the copy method (which is slower)
+                                self.chars = self.path[start..].char_indices();
+                                self.escape_buffer.clear();
+                                (None, JitState::EscapedQuote { start: 0 })
+                            }
                             _ => (None, JitState::Quote { start }),
+                        },
+                        JitState::EscapedQuote { start } => match c {
+                            '\"' => {
+                                unimplemented!()
+                                // (
+                                //     (Some(Some(BorrowedSegment::Field(self.escape_buffer.as_str())))),
+                                //     JitState::EscapedQuote { start },
+                                // )
+                            }
+                            '\\' => match self.chars.next() {
+                                Some((_, c)) => match c {
+                                    '\\' | '\"' => {
+                                        self.escape_buffer.push(c);
+                                        (
+                                            Some(Some(BorrowedSegment::Invalid)),
+                                            JitState::EscapedQuote { start },
+                                        )
+                                    }
+                                    _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
+                                },
+                                None => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
+                            },
+                            _ => {
+                                self.escape_buffer.push(c);
+                                (
+                                    Some(Some(BorrowedSegment::Invalid)),
+                                    JitState::EscapedQuote { start },
+                                )
+                            }
                         },
                         JitState::IndexStart => match c {
                             '0'..='9' => (
@@ -149,6 +197,7 @@ impl<'a> Iterator for JitLookup<'a> {
 #[cfg(test)]
 mod test {
     use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
+    use std::borrow::Cow;
 
     #[test]
     fn parsing() {
@@ -159,31 +208,37 @@ mod test {
             ("]foo", vec![BorrowedSegment::Invalid]),
             ("..", vec![BorrowedSegment::Invalid]),
             ("...", vec![BorrowedSegment::Invalid]),
-            ("f", vec![BorrowedSegment::Field("f")]),
-            (".f", vec![BorrowedSegment::Field("f")]),
+            ("f", vec![BorrowedSegment::Field(Cow::from("f"))]),
+            (".f", vec![BorrowedSegment::Field(Cow::from("f"))]),
             (".[", vec![BorrowedSegment::Invalid]),
-            ("f.", vec![BorrowedSegment::Field("f")]),
-            ("foo", vec![BorrowedSegment::Field("foo")]),
-            (".foo", vec![BorrowedSegment::Field("foo")]),
+            ("f.", vec![BorrowedSegment::Field(Cow::from("f"))]),
+            ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
+            (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
             (
                 "foo[",
-                vec![BorrowedSegment::Field("foo"), BorrowedSegment::Invalid],
+                vec![
+                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Invalid,
+                ],
             ),
             ("foo$", vec![BorrowedSegment::Invalid]),
             (
                 "\"$peci@l chars\"",
-                vec![BorrowedSegment::Field("$peci@l chars")],
+                vec![BorrowedSegment::Field(Cow::from("$peci@l chars"))],
             ),
             (
                 ".foo.foo bar",
-                vec![BorrowedSegment::Field("foo"), BorrowedSegment::Invalid],
+                vec![
+                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Invalid,
+                ],
             ),
             (
                 ".foo.\"foo bar\".bar",
                 vec![
-                    BorrowedSegment::Field("foo"),
-                    BorrowedSegment::Field("foo bar"),
-                    BorrowedSegment::Field("bar"),
+                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(Cow::from("foo bar")),
+                    BorrowedSegment::Field(Cow::from("bar")),
                 ],
             ),
             ("[1]", vec![BorrowedSegment::Index(1)]),
@@ -191,11 +246,17 @@ mod test {
             (".[42]", vec![BorrowedSegment::Invalid]),
             (
                 "[42].foo",
-                vec![BorrowedSegment::Index(42), BorrowedSegment::Field("foo")],
+                vec![
+                    BorrowedSegment::Index(42),
+                    BorrowedSegment::Field(Cow::from("foo")),
+                ],
             ),
             (
                 "[42]foo",
-                vec![BorrowedSegment::Index(42), BorrowedSegment::Field("foo")],
+                vec![
+                    BorrowedSegment::Index(42),
+                    BorrowedSegment::Field(Cow::from("foo")),
+                ],
             ),
             ("[-1]", vec![BorrowedSegment::Invalid]),
             ("[-42]", vec![BorrowedSegment::Invalid]),
@@ -204,7 +265,7 @@ mod test {
             ("[-42]foo", vec![BorrowedSegment::Invalid]),
             (
                 ".\"[42]. {}-_\"",
-                vec![BorrowedSegment::Field("[42]. {}-_")],
+                vec![BorrowedSegment::Field(Cow::from("[42]. {}-_"))],
             ),
         ];
 
