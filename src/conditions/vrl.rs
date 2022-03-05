@@ -85,7 +85,7 @@ impl Vrl {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlTarget::new(event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
         Runtime::default().resolve(&mut target, &self.program, &timezone)
