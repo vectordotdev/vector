@@ -1,12 +1,12 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use vector_common::EventDataEq;
 
 use crate::{
     config::Output,
-    event::{Event, EventArray, EventContainer, EventRef},
+    event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
     fanout::{self, Fanout},
     ByteSizeOf,
 };
@@ -170,8 +170,7 @@ pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
         T::IntoIter: Send,
     {
         self.transform(task.map(Into::into).boxed())
-            .map(EventContainer::into_events)
-            .flat_map(stream::iter)
+            .flat_map(into_event_stream)
             .boxed()
     }
 }
@@ -496,9 +495,7 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
         // This is an aweful lot of boxes
-        let stream = stream
-            .flat_map(|events| stream::iter(events.into_events()))
-            .boxed();
+        let stream = stream.flat_map(into_event_stream).boxed();
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }
 }

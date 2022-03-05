@@ -53,35 +53,35 @@ impl Input {
     pub fn new(ty: DataType) -> Self {
         Self {
             ty,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn trace() -> Self {
         Self {
             ty: DataType::Trace,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn all() -> Self {
         Self {
             ty: DataType::all(),
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 }

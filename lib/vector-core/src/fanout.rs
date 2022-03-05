@@ -151,7 +151,7 @@ impl Fanout {
         self.wait_for_replacements().await;
 
         // If any sink/sender is either paused or still has an active input, that's a bug.
-        debug_assert!(self.senders.values().all(|s| s.is_idle()));
+        debug_assert!(self.senders.values().all(Sender::is_idle));
 
         if self.senders.is_empty() {
             return;

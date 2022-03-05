@@ -14,6 +14,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
