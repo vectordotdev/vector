@@ -35,8 +35,9 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    sinks: IndexMap<ComponentKey, Option<BufferSender<EventArray>>>,
+    senders: IndexMap<ComponentKey, Sender>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    waker: Arc<AtomicWaker>,
 }
 
 impl Fanout {
@@ -44,8 +45,9 @@ impl Fanout {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         let fanout = Self {
-            sinks: Default::default(),
+            senders: Default::default(),
             control_channel: control_rx,
+            waker: Arc::new(AtomicWaker::new()),
         };
 
         (fanout, control_tx)
@@ -58,10 +60,11 @@ impl Fanout {
     /// Function will panic if a sink with the same ID is already present.
     pub fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
         assert!(
-            !self.sinks.contains_key(&id),
+            !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.sinks.insert(id, Some(sink));
+        self.senders
+            .insert(id, Sender::idle(sink, Arc::clone(&self.waker)));
     }
 
     /// Remove an existing sink as an output.
@@ -71,7 +74,7 @@ impl Fanout {
     /// Will panic if there is no sink with the given ID.
     fn remove(&mut self, id: &ComponentKey) {
         assert!(
-            self.sinks.remove(id).is_some(),
+            self.senders.remove(id).is_some(),
             "Removing non-existent sink from fanout: {id}"
         );
     }
@@ -86,8 +89,13 @@ impl Fanout {
     ///
     /// Will panic if there is no sink with the given ID.
     fn replace(&mut self, id: &ComponentKey, sink: Option<BufferSender<EventArray>>) {
-        if let Some(existing) = self.sinks.get_mut(id) {
-            *existing = sink;
+        if let Some(existing) = self.senders.get_mut(id) {
+            if let Some(sink) = sink {
+                existing.replace(sink);
+                self.waker.wake();
+            } else {
+                existing.pause();
+            }
         } else {
             panic!("Replacing non-existent sink from fanout: {id}");
         }
@@ -107,7 +115,7 @@ impl Fanout {
     /// If any sink is awaiting replacement (i.e. it was temporarily replaced with `None`), read
     /// and process messages from the control channel until that is no longer true.
     async fn wait_for_replacements(&mut self) {
-        while self.sinks.iter().any(|x| x.1.is_none()) {
+        while self.senders.values().any(Sender::is_paused) {
             if let Some(msg) = self.control_channel.recv().await {
                 self.apply_control_message(msg);
             } else {
@@ -142,32 +150,21 @@ impl Fanout {
         // initiating the send operation.
         self.wait_for_replacements().await;
 
-        // The call to `wait_for_replacements` above ensures that all replacement operations are
-        // complete at this point, and we don't need to worry about any of the sinks being `None`.
-        let sink_count = self.sinks.iter().filter(|x| x.1.is_some()).count();
-        debug_assert_eq!(sink_count, self.sinks.len());
+        // If any sink/sender is either paused or still has an active input, that's a bug.
+        debug_assert!(self.senders.values().all(|s| s.is_idle()));
 
-        if self.sinks.is_empty() {
+        if self.senders.is_empty() {
             return;
         }
 
-        let mut clone_army: Vec<EventArray> = Vec::with_capacity(sink_count);
-        for _ in 0..(sink_count - 1) {
-            clone_army.push(events.clone());
+        let sink_count = self.senders.len();
+
+        for i in 1..sink_count {
+            self.senders.get_index_mut(i).unwrap().1.input = Some(events.clone());
         }
-        clone_army.push(events);
+        self.senders.first_mut().unwrap().1.input = Some(events);
 
-        let sinks = self
-            .sinks
-            .drain(..)
-            .map(|(id, sink)| (id, sink.expect("no replacements in progress")))
-            .zip(clone_army);
-
-        let mut send_group = SendGroup::with_capacity(sink_count);
-
-        for ((id, sink), events) in sinks {
-            send_group.push(id, sink, events);
-        }
+        let mut send_group = SendGroup::new(&mut self.senders, Arc::clone(&self.waker));
 
         // Keep track of whether the control channel has returned `Ready(None)`, and stop polling
         // it once it has. If we don't do this check, it will continue to return `Ready(None)` any
@@ -185,9 +182,20 @@ impl Fanout {
                 biased;
 
                 maybe_msg = self.control_channel.recv(), if control_channel_open => {
+                    // During a send operation, control messages must be applied via the
+                    // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
-                        Some(msg) => {
-                            route_control_message(msg, self, &mut send_group);
+                        Some(ControlMessage::Add(id, sink)) => {
+                            send_group.add(id, sink);
+                        },
+                        Some(ControlMessage::Remove(id)) => {
+                            send_group.remove(&id);
+                        },
+                        Some(ControlMessage::Replace(id, Some(sink))) => {
+                            send_group.replace(&id, sink);
+                        },
+                        Some(ControlMessage::Replace(id, None)) => {
+                            send_group.pause(&id);
                         },
                         None => {
                             // Control channel is closed, process must be shutting down
@@ -196,11 +204,10 @@ impl Fanout {
                     }
                 }
 
-                sinks = &mut send_group => {
+                () = &mut send_group => {
                     // All in-flight sends have completed, so return sinks to the base collection.
                     // We extend instead of assign here because other sinks could have been added
                     // while the send was in-flight.
-                    self.sinks.extend(sinks);
                     break;
                 }
             }
@@ -208,107 +215,61 @@ impl Fanout {
     }
 }
 
-/// Apply a given control message to either the active `SendGroup` or the `Fanout` itself.
-///
-/// Given the way that send operations move their respective sinks into the `SendOp` future, it can
-/// be complex to apply control messages while sends are in-flight in a way that upholds
-/// invariants. This functions handles the task of conditionally applying messages to the
-/// `SendGroup` and falling back to applying them to the `Fanout` if the return value indicates
-/// they were not applicable to the `SendGroup`.
-///
-/// # Panics
-///
-/// If a message is received that violates an invariant (e.g. adding a duplicate sink, removing one
-/// that doesn't exist, etc), then this function will panic. Generally, the invariant itself is
-/// upheld by the modification methods on `Fanout`, which will panic if incorrectly used. We
-/// inherit that behavior here by attempting to apply the `SendGroup` methods first (which use
-/// return values to indicate failure rather than panicking) and then falling back to the `Fanout`
-/// equivalent methods.
-fn route_control_message(message: ControlMessage, fanout: &mut Fanout, send_group: &mut SendGroup) {
-    match message {
-        ControlMessage::Add(id, sink) => {
-            // Ensure we don't already have a sink with the same id as part of the send operation
-            assert!(!send_group.contains(&id));
-            fanout.add(id, sink);
-        }
-        ControlMessage::Remove(id) => {
-            if !send_group.remove(&id) {
-                fanout.remove(&id);
-            }
-        }
-        ControlMessage::Replace(id, None) => {
-            if !send_group.pause(&id) {
-                fanout.replace(&id, None);
-            }
-        }
-        ControlMessage::Replace(id, Some(sink)) => {
-            if let Err(sink) = send_group.replace(&id, sink) {
-                fanout.replace(&id, Some(sink));
-            }
-        }
-    }
-}
-
-#[pin_project]
-struct SendGroup {
-    #[pin]
-    sends: IndexMap<ComponentKey, SendOp>,
+struct SendGroup<'a> {
+    sends: &'a mut IndexMap<ComponentKey, Sender>,
     waker: Arc<AtomicWaker>,
 }
 
-impl SendGroup {
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            sends: IndexMap::with_capacity(capacity),
-            waker: Arc::new(AtomicWaker::new()),
-        }
-    }
-
-    fn push(&mut self, id: ComponentKey, sink: BufferSender<EventArray>, input: EventArray) {
-        let send = SendOp::new(sink, input, Arc::clone(&self.waker));
-        self.sends.insert(id, send);
+impl<'a> SendGroup<'a> {
+    fn new(sends: &'a mut IndexMap<ComponentKey, Sender>, waker: Arc<AtomicWaker>) -> Self {
+        Self { sends, waker }
     }
 
     fn contains(&mut self, id: &ComponentKey) -> bool {
         self.sends.contains_key(id)
     }
 
-    fn remove(&mut self, id: &ComponentKey) -> bool {
-        self.sends.remove(id).is_some()
+    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+        assert!(
+            !self.contains(&id),
+            "Adding duplicate output id to fanout: {id}"
+        );
+        self.sends
+            .insert(id, Sender::idle(sink, Arc::clone(&self.waker)));
     }
 
-    fn replace(
-        &mut self,
-        id: &ComponentKey,
-        sink: BufferSender<EventArray>,
-    ) -> Result<(), BufferSender<EventArray>> {
+    fn remove(&mut self, id: &ComponentKey) {
+        assert!(
+            self.sends.remove(id).is_some(),
+            "Removing non-existent sink from fanout: {id}"
+        );
+    }
+
+    fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
         if let Some(send) = self.sends.get_mut(id) {
             send.replace(sink);
             // This may have unpaused a send operation, so make sure it is woken up.
             self.waker.wake();
-            Ok(())
         } else {
-            Err(sink)
+            panic!("Replacing non-existent sink from fanout: {id}");
         }
     }
 
-    fn pause(&mut self, id: &ComponentKey) -> bool {
+    fn pause(&mut self, id: &ComponentKey) {
         if let Some(send) = self.sends.get_mut(id) {
             send.pause();
-            true
         } else {
-            false
+            panic!("Replacing non-existent sink from fanout: {id}");
         }
     }
 }
 
-impl Future for SendGroup {
-    type Output = Vec<(ComponentKey, Option<BufferSender<EventArray>>)>;
+impl<'a> Future for SendGroup<'a> {
+    type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut pending = false;
-        let this = self.as_mut().project();
-        for (_key, send) in this.sends.get_mut() {
+        for send in self.sends.values_mut() {
             let send = Pin::new(send);
             if send.poll(cx).is_pending() {
                 pending = true;
@@ -318,21 +279,16 @@ impl Future for SendGroup {
         if pending {
             Poll::Pending
         } else {
-            Poll::Ready(
-                self.sends
-                    .drain(..)
-                    .map(|(id, send)| (id, Some(send.take())))
-                    .collect(),
-            )
+            Poll::Ready(())
         }
     }
 }
 
 #[pin_project]
-struct SendOp {
+struct Sender {
     #[pin]
     state: SendState<BufferSender<EventArray>>,
-    slot: Option<EventArray>,
+    input: Option<EventArray>,
     waker: Arc<AtomicWaker>,
 }
 
@@ -342,15 +298,14 @@ enum SendState<T> {
     Paused,
 }
 
-impl SendOp {
-    fn new(sink: BufferSender<EventArray>, input: EventArray, waker: Arc<AtomicWaker>) -> Self {
+impl Sender {
+    fn idle(sink: BufferSender<EventArray>, waker: Arc<AtomicWaker>) -> Self {
         Self {
             state: SendState::Active(sink),
-            slot: Some(input),
+            input: None,
             waker,
         }
     }
-
     fn replace(&mut self, sink: BufferSender<EventArray>) {
         self.state = SendState::Active(sink);
     }
@@ -359,15 +314,16 @@ impl SendOp {
         self.state = SendState::Paused;
     }
 
-    fn take(self) -> BufferSender<EventArray> {
-        match self.state {
-            SendState::Active(sink) => sink,
-            SendState::Paused => panic!("attempting to take a paused sink"),
-        }
+    fn is_paused(&self) -> bool {
+        matches!(self.state, SendState::Paused)
+    }
+
+    fn is_idle(&self) -> bool {
+        matches!((&self.state, &self.input), (SendState::Active(_), None))
     }
 }
 
-impl Future for SendOp {
+impl Future for Sender {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -375,7 +331,7 @@ impl Future for SendOp {
         loop {
             match this.state.as_mut().project() {
                 SendStateProj::Active(mut sink) => {
-                    if let Some(event_array) = this.slot.take() {
+                    if let Some(event_array) = this.input.take() {
                         match sink.as_mut().poll_ready(cx) {
                             Poll::Ready(Ok(())) => {
                                 sink.start_send(event_array).expect("unit error");
@@ -384,7 +340,7 @@ impl Future for SendOp {
                                 panic!("unit error");
                             }
                             Poll::Pending => {
-                                *this.slot = Some(event_array);
+                                *this.input = Some(event_array);
                                 return Poll::Pending;
                             }
                         }
