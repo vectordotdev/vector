@@ -3,8 +3,8 @@ use std::{collections::BTreeMap, time::Duration};
 
 use bytes::Bytes;
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
+    Criterion, SamplingMode, Throughput,
 };
 use value::Value;
 use vector::transforms::{
@@ -158,7 +158,7 @@ fn route(c: &mut Criterion) {
                     (route, param.input.clone(), param.output_buffer.clone())
                 },
                 |(mut route, input, mut output_buffer)| {
-                    route.transform(input, &mut output_buffer);
+                    black_box(route.transform(input, &mut output_buffer));
                 },
                 BatchSize::SmallInput,
             )
