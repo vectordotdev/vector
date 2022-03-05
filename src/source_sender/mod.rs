@@ -129,23 +129,15 @@ impl SourceSender {
         recv
     }
 
-    pub async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
+    pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
         self.inner
             .as_mut()
             .expect("no default output")
-            .send(event)
+            .send_event(event)
             .await
     }
 
-    pub async fn send_named(&mut self, name: &str, event: Event) -> Result<(), ClosedError> {
-        self.named_inners
-            .get_mut(name)
-            .expect("unknown output")
-            .send(event)
-            .await
-    }
-
-    pub async fn send_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
@@ -153,7 +145,7 @@ impl SourceSender {
         self.inner
             .as_mut()
             .expect("no default output")
-            .send_stream(events)
+            .send_event_stream(events)
             .await
     }
 
@@ -194,18 +186,23 @@ impl Inner {
         (Self { inner: tx, output }, rx)
     }
 
-    async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
-        let byte_size = event.size_of();
-        self.inner.send(EventArray::from(event)).await?;
+    async fn send(&mut self, events: EventArray) -> Result<(), ClosedError> {
+        let byte_size = events.size_of();
+        let count = events.len();
+        self.inner.send(events).await?;
         emit!(&EventsSent {
-            count: 1,
+            count,
             byte_size,
             output: Some(self.output.as_ref()),
         });
         Ok(())
     }
 
-    async fn send_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
+        self.send(event.into()).await
+    }
+
+    async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,

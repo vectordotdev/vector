@@ -642,10 +642,13 @@ impl EventStreamBuilder {
         let result = {
             let mut stream =
                 events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
-            self.out.send_stream(&mut stream).await.map_err(|error| {
-                let (count, _) = stream.size_hint();
-                emit!(&StreamClosedError { error, count });
-            })
+            self.out
+                .send_event_stream(&mut stream)
+                .await
+                .map_err(|error| {
+                    let (count, _) = stream.size_hint();
+                    emit!(&StreamClosedError { error, count });
+                })
         };
 
         // End of stream
