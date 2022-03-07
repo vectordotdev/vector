@@ -736,3 +736,10 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
     let parent = trace_span!("23456");
     fut.instrument(parent).await;
 }
+
+// TODO: Write a test that ensures that when the buffered writer tells us it had to preemptively
+// flush, that we correctly integrate its result by updating the ledger.  For example, if we do 10
+// writes without a subsequent flush, and they're all buffered, but an 11th write forces us to flush
+// the buffer before we can actually buffer that 11th write, we should update the ledger to indicate
+// that those 10 initial writes are now "live": updated next record ID, updated buffer size, and so
+// on.
