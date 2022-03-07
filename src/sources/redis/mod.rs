@@ -188,7 +188,7 @@ async fn handle_line(
                         log.try_insert(log_schema().source_type_key(), Bytes::from("redis"));
                         log.try_insert(log_schema().timestamp_key(), now);
                         if let Some(redis_key) = redis_key {
-                            event.as_mut_log().insert(redis_key.clone(), key);
+                            event.as_mut_log().insert(redis_key, key);
                         }
                     }
                     event
