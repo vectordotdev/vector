@@ -83,11 +83,19 @@ impl InternalEvent for RedisReceiveEventFailed {
         error!(
             message = "Failed to read message.",
             error = %self.error,
-            rate_limit_secs = 30,
+            error_code = %self.error.code().unwrap_or_default(),
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::SENDING,
+            rate_limit_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error.code().unwrap_or_default().to_string(),
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
     }
 }

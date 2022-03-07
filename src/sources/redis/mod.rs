@@ -42,12 +42,12 @@ pub enum Method {
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
     #[serde(default)]
-    pub data_type: DataTypeConfig,
+    data_type: DataTypeConfig,
     #[serde(alias = "list")]
     list_option: Option<ListOption>,
-    pub url: String,
-    pub key: String,
-    pub redis_key: Option<String>,
+    url: String,
+    key: String,
+    redis_key: Option<String>,
 }
 
 impl GenerateConfig for RedisSourceConfig {
@@ -73,7 +73,7 @@ inventory::submit! {
 #[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        redis_source(self, cx.shutdown, cx.out)
+        redis_source(self, cx.shutdown, cx.out).await
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -89,7 +89,7 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-fn redis_source(
+async fn redis_source(
     config: &RedisSourceConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
@@ -120,7 +120,7 @@ fn redis_source(
                 panic!("When `data_type` is `list`, `method` cannot be empty.")
             }
         },
-        DataTypeConfig::Channel => Ok(channel::subscribe(client, key, redis_key, shutdown, out)),
+        DataTypeConfig::Channel => channel::subscribe(client, key, redis_key, shutdown, out).await,
     }
 }
 
