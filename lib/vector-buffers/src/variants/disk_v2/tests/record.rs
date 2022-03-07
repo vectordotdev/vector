@@ -15,7 +15,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
 
     let record = SizedRecord(73);
 
-    let bytes_written = record_writer
+    let (bytes_written, flush_result) = record_writer
         .write_record(314, record.clone())
         .await
         .expect("write should not fail");
@@ -29,6 +29,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
 
     let read_token = read_token.unwrap();
     assert_eq!(bytes_written, read_token.record_bytes());
+    assert_eq!(flush_result, None);
     assert_eq!(314, read_token.record_id());
 
     let roundtrip_record = record_reader

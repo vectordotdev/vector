@@ -28,9 +28,9 @@ pub const TEST_WRITE_BUFFER_SIZE: u64 = 60 * 1024;
 #[derive(Debug, PartialEq)]
 pub enum Progress {
     RecordWritten(usize),
-    WriteError,
+    WriteError(WriterError<Record>),
     RecordRead(Option<Record>),
-    ReadError,
+    ReadError(ReaderError<Record>),
     Blocked,
 }
 
@@ -68,10 +68,6 @@ impl Arbitrary for DiskBufferConfigBuilder<TestFilesystem> {
 
 pub fn arb_buffer_config() -> impl Strategy<Value = DiskBufferConfig<TestFilesystem>> {
     any::<(u16, u16, u16)>()
-        .prop_filter(
-            "buffer configuration values cannot be zero".to_owned(),
-            |(n1, n2, n3)| *n1 != 0 && *n2 != 0 && *n3 != 0,
-        )
         .prop_map(|(n1, n2, n3)| {
             let max_buffer_size = n1 as u64 * 64;
             let max_data_file_size = n2 as u64 * 2;
@@ -91,9 +87,11 @@ pub fn arb_buffer_config() -> impl Strategy<Value = DiskBufferConfig<TestFilesys
                 // ledger makes it to disk durably.
                 .flush_interval(Duration::from_secs(10))
                 .filesystem(TestFilesystem::default())
-                .build()
-                .expect("config should not fail to build")
         })
+        .prop_filter_map(
+            "maximum size limits were too high, or zero",
+            validate_buffer_config,
+        )
 }
 
 /// Validates the given buffer config builder and generates a resulting configuration.

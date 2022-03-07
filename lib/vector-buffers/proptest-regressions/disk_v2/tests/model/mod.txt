@@ -1,7 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc c670890153b77588bc03af14a4c1e8bb3860aa9251fd9c7b181a1ddb7cf6cc61 # shrinks to config = DiskBufferConfig { data_dir: "/tmp/vector-disk-v2-model", max_buffer_size: 5152, max_data_file_size: 5152, max_record_size: 5113, write_buffer_size: 61440, flush_interval: 10s, filesystem: TestFilesystem { inner: Mutex { data: FilesystemInner { files: {} } } } }, actions = [WriteRecord(Record { id: 0, size: 5105 }), WriteRecord(Record { id: 0, size: 0 }), ReadRecord]

@@ -3,7 +3,7 @@ use std::{io, mem, task::Poll};
 use futures::{future::BoxFuture, Future, FutureExt};
 use tokio_test::task::{spawn, Spawn};
 
-use crate::Acker;
+use crate::{Acker, EventCount};
 
 use super::{
     action::{sanitize_raw_actions, Action},
@@ -202,7 +202,7 @@ pub struct ActionSequencer {
     read_state: ReadState,
     write_state: WriteState,
     acker: Acker,
-    unacked_reads: u64,
+    unacked_events: usize,
 }
 
 impl ActionSequencer {
@@ -213,14 +213,17 @@ impl ActionSequencer {
             read_state: ReadState::Idle(reader),
             write_state: WriteState::Idle(writer),
             acker,
-            unacked_reads: 0,
+            unacked_events: 0,
         }
     }
 
     /// Whether or not there are any further write actions or any in-flight write operations.
     pub fn all_write_operations_finished(&self) -> bool {
         (self.write_state.is_idle() || self.write_state.is_closed())
-            && self.actions.iter().all(|a| !a.is_write())
+            && self
+                .actions
+                .iter()
+                .all(|a| !matches!(a, Action::WriteRecord(_)))
     }
 
     /// Transition the writer to the closed state.
@@ -236,7 +239,7 @@ impl ActionSequencer {
             Action::WriteRecord(_) => allow_write,
             Action::FlushWrites => allow_write,
             Action::ReadRecord => allow_read,
-            Action::AcknowledgeRead => self.unacked_reads > 0,
+            Action::AcknowledgeRead(amount) => self.unacked_events >= *amount,
         })
     }
 
@@ -248,7 +251,7 @@ impl ActionSequencer {
     /// Triggers the next runnable action.
     ///
     /// If an action is eligible to run, then it will be automatically run and the action itself
-    /// will be returned to the caller so it may be applied against the model.  If none of ther
+    /// will be returned to the caller so it may be applied against the model.  If none of the
     /// remaining actions are eligible to run, then `None` is returned.
     ///
     /// For example, if there's an in-flight write, we can't execute another write, or a flush.
@@ -283,14 +286,10 @@ impl ActionSequencer {
                     self.read_state.transition_to_read();
                     Some(a)
                 }
-                a @ Action::AcknowledgeRead => {
-                    if self.unacked_reads > 0 {
-                        self.unacked_reads -= 1;
-                        self.acker.ack(1);
-                        Some(a)
-                    } else {
-                        None
-                    }
+                Action::AcknowledgeRead(amount) => {
+                    self.unacked_events -= amount;
+                    self.acker.ack(amount);
+                    Some(Action::AcknowledgeRead(amount))
                 }
             }
         } else {
@@ -384,10 +383,8 @@ impl ActionSequencer {
                         // The `read` call completed.
                         Poll::Ready((reader, result)) => {
                             // If a record was actually read back, track it as an unacknowledged read.
-                            if let Ok(record) = &result {
-                                if record.is_some() {
-                                    self.unacked_reads += 1;
-                                }
+                            if let Ok(Some(record)) = &result {
+                                self.unacked_events += record.event_count();
                             }
 
                             (

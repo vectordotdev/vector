@@ -1,5 +1,7 @@
 use std::{
     cmp::Ordering,
+    convert::Infallible as StdInfallible,
+    fmt,
     io::{self, ErrorKind},
     marker::PhantomData,
     num::NonZeroUsize,
@@ -11,7 +13,7 @@ use crc32fast::Hasher;
 use rkyv::{
     ser::{
         serializers::{
-            AlignedSerializer, AllocScratch, BufferScratch, CompositeSerializer,
+            AlignedSerializer, AllocScratch, AllocScratchError, BufferScratch, CompositeSerializer,
             CompositeSerializerError, FallbackScratch,
         },
         Serializer,
@@ -19,7 +21,7 @@ use rkyv::{
     AlignedVec, Infallible,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{
     common::{create_crc32c_hasher, DiskBufferConfig},
@@ -133,6 +135,68 @@ where
     EmptyRecord,
 }
 
+impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Io { source: l_source }, Self::Io { source: r_source }) => {
+                l_source.kind() == r_source.kind()
+            }
+            (Self::RecordTooLarge { limit: l_limit }, Self::RecordTooLarge { limit: r_limit }) => {
+                l_limit == r_limit
+            }
+            (
+                Self::DataFileFull {
+                    record: l_record,
+                    serialized_size: l_serialized_size,
+                },
+                Self::DataFileFull {
+                    record: r_record,
+                    serialized_size: r_serialized_size,
+                },
+            ) => l_record == r_record && l_serialized_size == r_serialized_size,
+            (
+                Self::NonsensicalEventCount {
+                    encoded_len: l_encoded_len,
+                    event_count: l_event_count,
+                },
+                Self::NonsensicalEventCount {
+                    encoded_len: r_encoded_len,
+                    event_count: r_event_count,
+                },
+            ) => l_encoded_len == r_encoded_len && l_event_count == r_event_count,
+            (
+                Self::FailedToSerialize { reason: l_reason },
+                Self::FailedToSerialize { reason: r_reason },
+            )
+            | (
+                Self::FailedToValidate { reason: l_reason },
+                Self::FailedToValidate { reason: r_reason },
+            )
+            | (
+                Self::InconsistentState { reason: l_reason },
+                Self::InconsistentState { reason: r_reason },
+            ) => l_reason == r_reason,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl<T> From<CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>>
+    for WriterError<T>
+where
+    T: Bufferable,
+{
+    fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
+        match e {
+            CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
+                reason: format!("insufficient space to serialize encoded record: {}", sse),
+            },
+            // Only our scratch space strategy is fallible, so we should never get here.
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<T> From<io::Error> for WriterError<T>
 where
     T: Bufferable,
@@ -142,10 +206,145 @@ where
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub(super) struct FlushResult {
+    pub events_flushed: u64,
+    pub bytes_flushed: u64,
+}
+
+/// Wraps an [`AsyncWrite`] value and buffers individual writes, while signalling implicit flushes.
+///
+/// As the [`Writer`] must track when writes have theoretically made it to disk, we care about
+/// situations where the internal write buffer for a data file has been flushed to make room.  In
+/// order to provide this information, we track the number of events represented by a record when
+/// writing its serialized form.
+///
+/// If an implicit buffer flush must be performed before a write can complete, or a manual flush is
+/// requested, we return this information to the caller, letting them know how many events, and how
+/// many bytes, were flushed.
+struct TrackingBufWriter<W> {
+    inner: W,
+    buf: Vec<u8>,
+    unflushed_events: usize,
+}
+
+impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
+    /// Creates a new `TrackingBufWriter` with the specified buffer capacity.
+    fn with_capacity(cap: usize, inner: W) -> Self {
+        Self {
+            inner,
+            buf: Vec::with_capacity(cap),
+            unflushed_events: 0,
+        }
+    }
+
+    /// Writes the given buffer.
+    ///
+    /// If enough internal buffer capacity is available, then this write will be buffered internally
+    /// until [`flush`] is called.  If there's not enough remaining internal buffer capacity, then
+    /// the internal buffer will be flushed to the inner writer first.  If the given buffer is
+    /// larger than the internal buffer capacity, then it will be written directly to the inner
+    /// writer.
+    ///
+    /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
+    /// count is incremented every time `write` can fully buffer the record without having to flush
+    /// to the inner writer.
+    ///
+    /// If this call requires the internal buffer to be flushed out to the inner writer, then the
+    /// write result will indicate how many buffered events were flushed, and their total size in
+    /// bytes.  Additionally, if the given buffer is larger than the internal buffer itself, it will
+    /// also be included in the write result as well.
+    ///
+    /// # Errors
+    ///
+    /// If a write to the inner writer occurs, and that write encounters an error, an error variant
+    /// will be returned describing the error.
+    async fn write(&mut self, event_count: usize, buf: &[u8]) -> io::Result<Option<FlushResult>> {
+        let mut flush_result = None;
+
+        // If this write would cause us to exceed our internal buffer capacity, flush whatever we
+        // have buffered already.
+        if self.buf.len() + buf.len() > self.buf.capacity() {
+            flush_result = self.flush().await?;
+        }
+
+        // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
+        if buf.len() > self.buf.capacity() {
+            self.inner.write_all(buf).await?;
+
+            let flush_result = flush_result.get_or_insert(FlushResult::default());
+            flush_result.events_flushed += event_count as u64;
+            flush_result.bytes_flushed += buf.len() as u64;
+        } else {
+            self.buf.extend_from_slice(buf);
+            self.unflushed_events += event_count;
+        }
+
+        Ok(flush_result)
+    }
+
+    /// Flushes the internal buffer to the underlying writer.
+    ///
+    /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
+    /// count is incremented every time `write` can fully buffer the record without having to flush
+    /// to the inner writer.
+    ///
+    /// If any buffered record are present, then the write result will indicate how many
+    /// individual events were flushed, including their total size in bytes.
+    ///
+    /// # Errors
+    ///
+    /// If a write to the underlying writer occurs, and that write encounters an error, an error variant
+    /// will be returned describing the error.
+    async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
+        if self.buf.is_empty() {
+            return Ok(None);
+        }
+
+        let events_flushed = self.unflushed_events as u64;
+        let bytes_flushed = self.buf.len() as u64;
+
+        let result = self.inner.write_all(&self.buf[..]).await;
+        self.unflushed_events = 0;
+        self.buf.clear();
+
+        result.map(|_| {
+            Some(FlushResult {
+                events_flushed,
+                bytes_flushed,
+            })
+        })
+    }
+
+    /// Gets a reference to the underlying writer.
+    #[cfg(test)]
+    fn get_ref(&self) -> &W {
+        &self.inner
+    }
+
+    /// Gets a mutable reference to the underlying writer.
+    fn get_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+}
+
+impl<W: fmt::Debug> fmt::Debug for TrackingBufWriter<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrackingBufWriter")
+            .field("writer", &self.inner)
+            .field(
+                "buffer",
+                &format_args!("{}/{}", self.buf.len(), self.buf.capacity()),
+            )
+            .field("unflushed_events", &self.unflushed_events)
+            .finish()
+    }
+}
+
 /// Buffered writer that handles encoding, checksumming, and serialization of records.
 #[derive(Debug)]
 pub(super) struct RecordWriter<W, T> {
-    writer: BufWriter<W>,
+    writer: TrackingBufWriter<W>,
     encode_buf: Vec<u8>,
     ser_buf: AlignedVec,
     ser_scratch: AlignedVec,
@@ -173,7 +372,7 @@ where
         max_record_size: usize,
     ) -> Self {
         Self {
-            writer: BufWriter::with_capacity(write_buffer_size, writer),
+            writer: TrackingBufWriter::with_capacity(write_buffer_size, writer),
             encode_buf: Vec::with_capacity(16_384),
             ser_buf: AlignedVec::with_capacity(16_384),
             ser_scratch: AlignedVec::with_capacity(16_384),
@@ -186,6 +385,7 @@ where
     }
 
     /// Gets a reference to the underlying writer.
+    #[cfg(test)]
     pub fn get_ref(&self) -> &W {
         self.writer.get_ref()
     }
@@ -252,7 +452,7 @@ where
         // - correctly size the archived record (can already do)
         // - getting the length of DST fields like slices (can do by hand, not resilient to `Record`
         //   changing, though)
-        // - getting the serializer alignment  (doable by hand, but also subject to impl details
+        // - getting the serializer alignment (doable by hand, but also subject to impl details
         //   hidden under-the-hood)
         //
         // Since that stuff is tricky, it's easiest to just rely on the fully serialized archive,
@@ -278,19 +478,9 @@ where
             Infallible,
         );
 
-        let serializer_pos = match serializer.serialize_value(&wrapped_record) {
-            Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
-            Err(e) => match e {
-                CompositeSerializerError::ScratchSpaceError(sse) => {
-                    return Err(WriterError::FailedToSerialize {
-                        reason: format!("insufficient space to serialize encoded record: {}", sse),
-                    })
-                }
-                // Only our scratch space strategy is fallible, so we should never get here.
-                CompositeSerializerError::SerializerError(_)
-                | CompositeSerializerError::SharedError(_) => unreachable!(),
-            },
-        }?;
+        let serializer_pos = serializer
+            .serialize_value(&wrapped_record)
+            .map(|_| serializer.pos())?;
 
         // Sanity check before we do our length math.
         if serializer_pos <= 8 || self.ser_buf.len() != serializer_pos {
@@ -350,26 +540,40 @@ where
 
     /// Writes a record.
     ///
-    /// Returns the total number of bytes written to disk for this record. Writes are not
-    /// automatically flushed, so `flush` must be called after any record write if there is a
-    /// requirement for the record to immediately be written all the way to the underlying writer.
+    /// If the write is successful, the number of bytes written to the buffer are returned.
+    /// Additionally, if any internal buffers required an implicit flush, the result of that flush
+    /// operation is returned as well.
+    ///
+    /// As we internally buffers write to the underlying data file, to reduce the number of syscalls
+    /// required to pushed serialized records to the data file, we sometimes will write a record
+    /// which would overflow the internal buffer.  Doing so means we have to first flush the buffer
+    /// before continuing with buffering the current write.  As some invariants are based on knowing
+    /// when a record has actually been written to the data file, we return any information of
+    /// implicit flushes so that the writer can be aware of when data has actually made it to the
+    /// data file or not.
     ///
     /// # Errors
     ///
     /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
     #[instrument(skip(self, record), level = "trace")]
-    pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+    pub async fn write_record(
+        &mut self,
+        id: u64,
+        record: T,
+    ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
+        let event_count = record.event_count();
         let serialized_len = self.archive_record(id, record)?;
-        self.writer
-            .write_all(self.ser_buf.as_slice())
+        let flush_result = self
+            .writer
+            .write(event_count, self.ser_buf.as_slice())
             .await
             .context(IoSnafu)?;
 
         // Update our current data file size.
         self.current_data_file_size += serialized_len as u64;
 
-        Ok(serialized_len)
+        Ok((serialized_len, flush_result))
     }
 
     /// Flushes the writer.
@@ -381,7 +585,7 @@ where
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
     #[instrument(skip(self), level = "debug")]
-    pub async fn flush(&mut self) -> io::Result<()> {
+    pub async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
         self.writer.flush().await
     }
 
@@ -410,7 +614,7 @@ where
     config: DiskBufferConfig<FS>,
     writer: Option<RecordWriter<FS::File, T>>,
     next_record_id: u64,
-    next_record_id_offset: u64,
+    unflushed_events: u64,
     data_file_size: u64,
     unflushed_bytes: u64,
     data_file_full: bool,
@@ -437,38 +641,43 @@ where
             unflushed_bytes: 0,
             skip_to_next: false,
             next_record_id,
-            next_record_id_offset: 0,
+            unflushed_events: 0,
             _t: PhantomData,
         }
     }
 
     fn get_next_record_id(&mut self) -> u64 {
-        self.next_record_id.wrapping_add(self.next_record_id_offset)
+        self.next_record_id.wrapping_add(self.unflushed_events)
     }
 
-    fn increment_next_record_id(&mut self, amount: u64) {
-        self.next_record_id_offset += amount;
-    }
-
-    fn track_write(&mut self, record_size: u64) {
+    fn track_write(&mut self, event_count: usize, record_size: u64) {
         self.data_file_size += record_size;
+        self.unflushed_events += event_count as u64;
         self.unflushed_bytes += record_size;
     }
 
-    fn flush_writes(&mut self) {
-        let next_record_id = self
+    fn flush_write_state(&mut self) {
+        self.flush_write_state_partial(self.unflushed_events, self.unflushed_bytes);
+    }
+
+    fn flush_write_state_partial(&mut self, flushed_events: u64, flushed_bytes: u64) {
+        assert!(
+            flushed_events <= self.unflushed_events,
+            "tried to flush more events than are currently unflushed"
+        );
+        assert!(
+            flushed_bytes <= self.unflushed_bytes,
+            "tried to flush more bytes than are currently unflushed"
+        );
+
+        self.next_record_id = self
             .ledger
             .state()
-            .increment_next_writer_record_id(self.next_record_id_offset);
-        self.next_record_id = next_record_id;
+            .increment_next_writer_record_id(flushed_events);
+        self.unflushed_events -= flushed_events;
+        self.unflushed_bytes -= flushed_bytes;
 
-        let unflushed_events = self.next_record_id_offset;
-        self.next_record_id_offset = 0;
-
-        let unflushed_bytes = self.unflushed_bytes;
-        self.unflushed_bytes = 0;
-
-        self.ledger.track_write(unflushed_events, unflushed_bytes);
+        self.ledger.track_write(flushed_events, flushed_bytes);
     }
 
     fn can_write(&mut self) -> bool {
@@ -606,7 +815,7 @@ where
                             .state()
                             .increment_next_writer_record_id(ledger_record_delta);
                         self.next_record_id = next_record_id;
-                        self.next_record_id_offset = 0;
+                        self.unflushed_events = 0;
 
                         false
                     }
@@ -697,6 +906,7 @@ where
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
             self.flush_inner(true).await?;
+            self.flush_write_state();
 
             self.reset();
         }
@@ -826,15 +1036,11 @@ where
             .event_count()
             .try_into()
             .map_err(|_| WriterError::EmptyRecord)?;
-        let record_events = record_events
-            .get()
-            .try_into()
-            .expect("Vector does not support 128-bit platforms.");
 
         // Grab the next record ID and attempt to write the record.
         let record_id = self.get_next_record_id();
 
-        let bytes_written = loop {
+        let (bytes_written, flush_result) = loop {
             // Make sure we have an open data file to write to, which might also be us opening the
             // next data file because our first attempt at writing had to finalize a data file that
             // was already full.
@@ -845,7 +1051,7 @@ where
                 .as_mut()
                 .expect("writer should exist after `ensure_ready_for_write`");
             match writer.write_record(record_id, record).await {
-                Ok(n) => break n,
+                Ok(result) => break result,
                 Err(WriterError::DataFileFull {
                     record: old_record,
                     serialized_size,
@@ -866,11 +1072,19 @@ where
             }
         };
 
-        // Since we succeeded in writing the record, increment the next record ID and metadata for
-        // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
-        // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
-        self.increment_next_record_id(record_events);
-        self.track_write(bytes_written as u64);
+        // Track our write since things appear to have succeeded. This only updates our internal
+        // state as we have not yet authoritatively flushed the write to the data file. This tracks
+        // not only how many bytes we have buffered, but also how many events, which in turn drives
+        // record ID generation.  We do this after the write appears to succeed to avoid issues with
+        // setting the ledger state to a record ID that we may never have actually written, which
+        // could lead to record ID gaps.
+        self.track_write(record_events.get(), bytes_written as u64);
+
+        // If we did flush some buffered writes during this write, however, we now compensate for
+        // that after updating our internal state.
+        if let Some(flush_result) = flush_result {
+            self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
 
         trace!(
             record_id,
@@ -922,7 +1136,7 @@ where
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await?;
-        self.flush_writes();
+        self.flush_write_state();
         Ok(())
     }
 }

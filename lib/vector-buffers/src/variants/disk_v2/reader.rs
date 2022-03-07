@@ -139,6 +139,35 @@ where
     }
 }
 
+impl<T: Bufferable> PartialEq for ReaderError<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Io { source: l_source }, Self::Io { source: r_source }) => {
+                l_source.kind() == r_source.kind()
+            }
+            (
+                Self::Deserialization { reason: l_reason },
+                Self::Deserialization { reason: r_reason },
+            ) => l_reason == r_reason,
+            (
+                Self::Checksum {
+                    calculated: l_calculated,
+                    actual: l_actual,
+                },
+                Self::Checksum {
+                    calculated: r_calculated,
+                    actual: r_actual,
+                },
+            ) => l_calculated == r_calculated && l_actual == r_actual,
+            (Self::Decode { .. }, Self::Decode { .. }) => true,
+            (Self::Incompatible { reason: l_reason }, Self::Incompatible { reason: r_reason }) => {
+                l_reason == r_reason
+            }
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 /// Buffered reader that handles deserialization, checksumming, and decoding of records.
 pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
@@ -165,11 +194,6 @@ where
             current_record_id: 0,
             _t: PhantomData,
         }
-    }
-
-    /// Gets a reference to the underlying reader.
-    pub fn get_ref(&self) -> &R {
-        self.reader.get_ref()
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
@@ -340,7 +364,6 @@ where
             .field("aligned_buf", &self.aligned_buf)
             .field("checksummer", &self.checksummer)
             .field("current_record_id", &self.current_record_id)
-            .field("_t", &self._t)
             .finish()
     }
 }

@@ -2,7 +2,7 @@ use std::{
     cmp,
     collections::HashMap,
     fmt, io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -219,10 +219,10 @@ struct FilesystemInner {
 }
 
 impl FilesystemInner {
-    fn open_file_writable(&mut self, path: &PathBuf) -> TestFile {
+    fn open_file_writable(&mut self, path: &Path) -> TestFile {
         let file = self
             .files
-            .entry(path.clone())
+            .entry(path.to_owned())
             .or_insert_with(|| TestFile::new());
         let mut new_file = file.clone();
         new_file.set_writable();
@@ -230,35 +230,35 @@ impl FilesystemInner {
         new_file
     }
 
-    fn open_file_writable_atomic(&mut self, path: &PathBuf) -> Option<TestFile> {
+    fn open_file_writable_atomic(&mut self, path: &Path) -> Option<TestFile> {
         if self.files.contains_key(path) {
             None
         } else {
             let mut new_file = TestFile::new();
             new_file.set_writable();
 
-            self.files.insert(path.clone(), new_file.clone());
+            self.files.insert(path.to_owned(), new_file.clone());
 
             Some(new_file)
         }
     }
 
-    fn open_file_readable(&mut self, path: &PathBuf) -> Option<TestFile> {
+    fn open_file_readable(&mut self, path: &Path) -> Option<TestFile> {
         self.files.get(path).cloned().map(|mut f| {
             f.set_readable();
             f
         })
     }
 
-    fn open_mmap_readable(&mut self, path: &PathBuf) -> Option<TestMmap> {
+    fn open_mmap_readable(&mut self, path: &Path) -> Option<TestMmap> {
         self.files.get(path).map(|f| f.as_mmap())
     }
 
-    fn open_mmap_writable(&mut self, path: &PathBuf) -> Option<TestMmap> {
+    fn open_mmap_writable(&mut self, path: &Path) -> Option<TestMmap> {
         self.files.get(path).map(|f| f.as_mmap())
     }
 
-    fn delete_file(&mut self, path: &PathBuf) -> bool {
+    fn delete_file(&mut self, path: &Path) -> bool {
         self.files.remove(path).is_some()
     }
 }
@@ -289,12 +289,12 @@ impl Filesystem for TestFilesystem {
     type MemoryMap = TestMmap;
     type MutableMemoryMap = TestMmap;
 
-    async fn open_file_writable(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
         let mut inner = self.inner.lock();
         Ok(inner.open_file_writable(path))
     }
 
-    async fn open_file_writable_atomic(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
         let mut inner = self.inner.lock();
         match inner.open_file_writable_atomic(path) {
             Some(file) => Ok(file),
@@ -302,7 +302,7 @@ impl Filesystem for TestFilesystem {
         }
     }
 
-    async fn open_file_readable(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File> {
         let mut inner = self.inner.lock();
         match inner.open_file_readable(path) {
             Some(file) => Ok(file),
@@ -310,7 +310,7 @@ impl Filesystem for TestFilesystem {
         }
     }
 
-    async fn open_mmap_readable(&self, path: &PathBuf) -> io::Result<Self::MemoryMap> {
+    async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap> {
         let mut inner = self.inner.lock();
         match inner.open_mmap_readable(path) {
             Some(mmap) => Ok(mmap),
@@ -318,7 +318,7 @@ impl Filesystem for TestFilesystem {
         }
     }
 
-    async fn open_mmap_writable(&self, path: &PathBuf) -> io::Result<Self::MutableMemoryMap> {
+    async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap> {
         let mut inner = self.inner.lock();
         match inner.open_mmap_writable(path) {
             Some(mmap) => Ok(mmap),
@@ -326,7 +326,7 @@ impl Filesystem for TestFilesystem {
         }
     }
 
-    async fn delete_file(&self, path: &PathBuf) -> io::Result<()> {
+    async fn delete_file(&self, path: &Path) -> io::Result<()> {
         let mut inner = self.inner.lock();
         if inner.delete_file(path) {
             Ok(())

@@ -175,7 +175,7 @@ async fn initial_size_correct_with_multievents() {
                 .filter_map(|record| async move {
                     let mut record_writer =
                         RecordWriter::new(Cursor::new(Vec::new()), 0, 16_384, u64::MAX, usize::MAX);
-                    let bytes_written = record_writer
+                    let (bytes_written, flush_result) = record_writer
                         .write_record(0, record)
                         .await
                         .expect("record writing should not fail");
@@ -185,6 +185,7 @@ async fn initial_size_correct_with_multievents() {
                     // The bytes that it reports writing should be identical to what the underlying
                     // write buffer has, since this is a fresh record writer.
                     assert_eq!(bytes_written, inner_buf_len);
+                    assert_eq!(flush_result, None);
 
                     Some(inner_buf_len)
                 })

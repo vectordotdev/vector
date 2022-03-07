@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf};
+use std::{io, path::Path};
 
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -32,7 +32,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for writing, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_writable(&self, path: &PathBuf) -> io::Result<Self::File>;
+    async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File>;
 
     /// Opens a file for writing, creating it if it does not already exist, but atomically.
     ///
@@ -46,7 +46,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If a general I/O error occurred when attempting to open the file for writing, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_writable_atomic(&self, path: &PathBuf) -> io::Result<Self::File>;
+    async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File>;
 
     /// Opens a file for reading, creating it if it does not exist.
     ///
@@ -56,7 +56,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, an error variant will
     /// be returned describing the underlying error.
-    async fn open_file_readable(&self, path: &PathBuf) -> io::Result<Self::File>;
+    async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File>;
 
     /// Opens a file as a readable memory-mapped region.
     ///
@@ -64,7 +64,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, or attempting to
     /// memory map the file, an error variant will be returned describing the underlying error.
-    async fn open_mmap_readable(&self, path: &PathBuf) -> io::Result<Self::MemoryMap>;
+    async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap>;
 
     /// Opens a file as a writable memory-mapped region.
     ///
@@ -72,7 +72,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to open the file for reading, or attempting to
     /// memory map the file, an error variant will be returned describing the underlying error.
-    async fn open_mmap_writable(&self, path: &PathBuf) -> io::Result<Self::MutableMemoryMap>;
+    async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap>;
 
     /// Deletes a file.
     ///
@@ -80,7 +80,7 @@ pub trait Filesystem: Send + Sync {
     ///
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
     /// returned describing the underlying error.     
-    async fn delete_file(&self, path: &PathBuf) -> io::Result<()>;
+    async fn delete_file(&self, path: &Path) -> io::Result<()>;
 }
 
 #[async_trait]
@@ -128,7 +128,7 @@ impl Filesystem for ProductionFilesystem {
     type MemoryMap = memmap2::Mmap;
     type MutableMemoryMap = memmap2::MmapMut;
 
-    async fn open_file_writable(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
         tokio::fs::OpenOptions::new()
             .append(true)
             .read(true)
@@ -137,7 +137,7 @@ impl Filesystem for ProductionFilesystem {
             .await
     }
 
-    async fn open_file_writable_atomic(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
         tokio::fs::OpenOptions::new()
             .append(true)
             .read(true)
@@ -146,17 +146,17 @@ impl Filesystem for ProductionFilesystem {
             .await
     }
 
-    async fn open_file_readable(&self, path: &PathBuf) -> io::Result<Self::File> {
+    async fn open_file_readable(&self, path: &Path) -> io::Result<Self::File> {
         tokio::fs::OpenOptions::new().read(true).open(path).await
     }
 
-    async fn open_mmap_readable(&self, path: &PathBuf) -> io::Result<Self::MemoryMap> {
+    async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap> {
         let file = tokio::fs::OpenOptions::new().read(true).open(path).await?;
         let std_file = file.into_std().await;
         unsafe { memmap2::Mmap::map(&std_file) }
     }
 
-    async fn open_mmap_writable(&self, path: &PathBuf) -> io::Result<Self::MutableMemoryMap> {
+    async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap> {
         let file = tokio::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -166,7 +166,7 @@ impl Filesystem for ProductionFilesystem {
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
 
-    async fn delete_file(&self, path: &PathBuf) -> io::Result<()> {
+    async fn delete_file(&self, path: &Path) -> io::Result<()> {
         tokio::fs::remove_file(path).await
     }
 }
