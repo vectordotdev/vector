@@ -1,7 +1,6 @@
 use std::num::NonZeroU64;
 
 use futures::FutureExt;
-use rusoto_logs::CloudWatchLogsClient;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
