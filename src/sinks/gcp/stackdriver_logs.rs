@@ -17,7 +17,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
         },
@@ -169,12 +169,13 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for StackdriverSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+struct StackdriverEventEncoder {
+    config: StackdriverConfig,
+    severity_key: Option<String>,
+}
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
         let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
         for (key, template) in &self.config.resource.labels {
             let value = template
@@ -232,6 +233,20 @@ impl HttpSink for StackdriverSink {
         }
 
         Some(json!(entry))
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for StackdriverSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = StackdriverEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverEventEncoder {
+            config: self.config.clone(),
+            severity_key: self.severity_key.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
@@ -346,6 +361,7 @@ mod tests {
             severity_key: Some("anumber".into()),
             uri: ENDPOINT_URI.parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log = [
             ("message", "hello world"),
@@ -356,7 +372,7 @@ mod tests {
         .iter()
         .copied()
         .collect::<LogEvent>();
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -387,6 +403,7 @@ mod tests {
             severity_key: Some("anumber".into()),
             uri: ENDPOINT_URI.parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let mut log = LogEvent::default();
         log.insert("message", Value::Bytes("hello world".into()));
@@ -396,7 +413,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -455,11 +472,12 @@ mod tests {
             severity_key: None,
             uri: ENDPOINT_URI.parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = encoder.encode_event(Event::from(log1)).unwrap();
+        let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

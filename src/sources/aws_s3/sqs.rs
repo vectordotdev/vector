@@ -485,7 +485,7 @@ impl IngestorProcess {
                     ready(Some(log))
                 });
 
-                let send_error = match self.out.send_stream(&mut stream).await {
+                let send_error = match self.out.send_event_stream(&mut stream).await {
                     Ok(_) => None,
                     Err(error) => {
                         // count is set to 0 to have no discarded events considering

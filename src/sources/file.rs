@@ -396,7 +396,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_stream(&mut messages).instrument(span).await });
+        tokio::spawn(async move { out.send_event_stream(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {

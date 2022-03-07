@@ -349,7 +349,7 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         );
 
-                        let res = out.send(event).await;
+                        let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }

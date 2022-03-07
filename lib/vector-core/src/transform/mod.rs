@@ -284,6 +284,7 @@ impl TransformOutputs {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TransformOutputsBuf {
     primary_buffer: Option<OutputBuffer>,
     named_buffers: HashMap<String, OutputBuffer>,
@@ -386,7 +387,7 @@ impl ByteSizeOf for TransformOutputsBuf {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct OutputBuffer(Vec<EventArray>);
 
 impl OutputBuffer {
