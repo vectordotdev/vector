@@ -1,16 +1,27 @@
 use crate::{
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{
         log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
     SourceSender,
 };
 use bytes::Bytes;
+use chrono::Utc;
+use futures::StreamExt;
 use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 mod channel;
 mod list;
@@ -45,7 +56,7 @@ pub enum Method {
     Rpop,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
     #[serde(default)]
@@ -54,6 +65,12 @@ pub struct RedisSourceConfig {
     url: String,
     key: String,
     redis_key: Option<String>,
+    #[serde(default = "default_framing_message_based")]
+    #[derivative(Default(value = "default_framing_message_based()"))]
+    framing: FramingConfig,
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    decoding: DeserializerConfig,
 }
 
 impl GenerateConfig for RedisSourceConfig {
@@ -79,7 +96,8 @@ inventory::submit! {
 #[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        redis_source(self, cx.shutdown, cx.out).await
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        redis_source(self, decoder, cx.shutdown, cx.out).await
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -97,6 +115,7 @@ impl SourceConfig for RedisSourceConfig {
 
 async fn redis_source(
     config: &RedisSourceConfig,
+    decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<super::Source> {
@@ -114,6 +133,7 @@ async fn redis_source(
                 config.key.clone(),
                 config.redis_key.clone(),
                 list.method,
+                decoder,
                 shutdown,
                 out,
             )
@@ -124,6 +144,7 @@ async fn redis_source(
                 client,
                 config.key.clone(),
                 config.redis_key.clone(),
+                decoder,
                 shutdown,
                 out,
             )
@@ -139,15 +160,55 @@ fn build_client(config: &RedisSourceConfig) -> RedisResult<Client> {
     client
 }
 
-fn create_event(line: &str, key: &str, redis_key: Option<&str>) -> Event {
-    let mut event = Event::from(line);
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("redis"));
-    if let Some(redis_key) = redis_key {
-        event.as_mut_log().insert(redis_key.clone(), key);
+async fn handle_line(
+    line: String,
+    key: &str,
+    redis_key: Option<&str>,
+    decoder: codecs::Decoder,
+    out: &mut SourceSender,
+) -> Result<(), ()> {
+    let now = Utc::now();
+
+    emit!(&BytesReceived {
+        byte_size: line.len(),
+        protocol: "tcp",
+    });
+    let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
+    while let Some(next) = stream.next().await {
+        match next {
+            Ok((events, _byte_size)) => {
+                let count = events.len();
+                emit!(&EventsReceived {
+                    byte_size: events.size_of(),
+                    count,
+                });
+
+                let events = events.into_iter().map(|mut event| {
+                    if let Event::Log(ref mut log) = event {
+                        log.try_insert(log_schema().source_type_key(), Bytes::from("redis"));
+                        log.try_insert(log_schema().timestamp_key(), now);
+                        if let Some(redis_key) = redis_key {
+                            event.as_mut_log().insert(redis_key.clone(), key);
+                        }
+                    }
+                    event
+                });
+
+                if let Err(error) = out.send_batch(events).await {
+                    emit!(&StreamClosedError { error, count });
+                    return Err(());
+                }
+            }
+            Err(error) => {
+                // Error is logged by `crate::codecs::Decoder`, no further
+                // handling is needed here.
+                if !error.can_continue() {
+                    break;
+                }
+            }
+        }
     }
-    event
+    Ok(())
 }
 
 #[cfg(test)]

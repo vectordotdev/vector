@@ -52,28 +52,6 @@ impl<E: std::fmt::Display> InternalEvent for RedisSendEventError<E> {
 }
 
 #[derive(Debug)]
-pub struct RedisEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for RedisEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.", rate_limit_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        // deprecated
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct RedisReceiveEventFailed {
     pub error: redis::RedisError,
 }

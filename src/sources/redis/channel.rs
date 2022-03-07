@@ -1,11 +1,9 @@
+use super::handle_line;
 use crate::{
-    internal_events::{RedisEventReceived, RedisReceiveEventFailed, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::redis::create_event,
-    sources::Source,
+    codecs, internal_events::RedisReceiveEventFailed, shutdown::ShutdownSignal, sources::Source,
     SourceSender,
 };
-use futures::StreamExt;
+use futures_util::StreamExt;
 use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
@@ -20,6 +18,7 @@ pub async fn subscribe(
     client: redis::Client,
     key: String,
     redis_key: Option<String>,
+    decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> crate::Result<Source> {
@@ -40,17 +39,15 @@ pub async fn subscribe(
         let mut pubsub_stream = pubsub_conn.on_message().take_until(shutdown.clone());
         while let Some(msg) = pubsub_stream.next().await {
             match msg.get_payload::<String>() {
-                Err(error) => emit!(&RedisReceiveEventFailed { error }),
                 Ok(line) => {
-                    emit!(&RedisEventReceived {
-                        byte_size: line.len()
-                    });
-                    let event = create_event(&line, &key, redis_key.as_deref());
-                    if let Err(error) = out.send(event).await {
-                        emit!(&StreamClosedError { error, count: 1 });
+                    if let Err(()) =
+                        handle_line(line, &key, redis_key.as_deref(), decoder.clone(), &mut out)
+                            .await
+                    {
                         break;
                     }
                 }
+                Err(error) => emit!(&RedisReceiveEventFailed { error }),
             }
         }
         Ok(())

@@ -26,6 +26,10 @@ components: sources: redis: {
 			}
 		}
 		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 	}
 
 	classes: {
