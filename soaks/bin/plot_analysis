@@ -46,11 +46,15 @@ for exp in bytes_written.experiment.unique():
     plt.savefig(os.path.join(args.output_dir, "{}/samples.png".format(exp)), dpi=200)
     plt.close()
 
-    sns.displot(data=data,
-                hue="run_id",
-                col="variant",
-                multiple="dodge",
-                x="bytes/second per core",
-                kde=True)
-    plt.savefig(os.path.join(args.output_dir, "{}/histogram.png".format(exp)), dpi=200)
+    try:
+        sns.displot(data=data,
+                    hue="run_id",
+                    col="variant",
+                    multiple="dodge",
+                    x="bytes/second per core",
+                    kde=True)
+        plt.savefig(os.path.join(args.output_dir, "{}/histogram.png".format(exp)), dpi=200)
+    except np.linalg.LinAlgError:
+        print("ERROR: histogram plotting failed, skipping")
+
     plt.close()

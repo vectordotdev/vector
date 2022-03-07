@@ -201,7 +201,7 @@ impl SourceConfig for MockSourceConfig {
             })
             .flat_map(into_event_stream);
 
-            match out.send_stream(&mut stream).await {
+            match out.send_event_stream(&mut stream).await {
                 Ok(()) => {
                     info!("Finished sending.");
                     Ok(())
@@ -427,7 +427,7 @@ impl StreamSink<Event> for MockSink {
             Mode::Normal(mut sink) => {
                 // We have an inner sink, so forward the input normally
                 while let Some(event) = input.next().await {
-                    if let Err(error) = sink.send(event).await {
+                    if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
 
