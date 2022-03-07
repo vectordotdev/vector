@@ -294,7 +294,14 @@ impl util::http::HttpSink for HttpSink {
             use encoding::{Framer::*, Serializer::*};
             match (self.encoder.serializer(), self.encoder.framer()) {
                 (RawMessage(_), _) => Some("text/plain"),
-                (Json(_), NewlineDelimited(_)) => Some("application/x-ndjson"),
+                (Json(_), NewlineDelimited(_)) => {
+                    if !body.is_empty() {
+                        // Remove trailing newline for backwards-compatibility
+                        // with Vector `0.20.x`.
+                        body.truncate(body.len() - 1);
+                    }
+                    Some("application/x-ndjson")
+                }
                 (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                     // TODO(https://github.com/vectordotdev/vector/issues/11253):
                     // Prepend before building a request body to eliminate the
@@ -425,7 +432,7 @@ mod tests {
     fn http_encode_event_ndjson() {
         let event = Event::from("hello world");
 
-        let sink = default_sink(Encoding::Json);
+        let sink = default_sink(Encoding::Ndjson);
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -437,7 +444,7 @@ mod tests {
             timestamp: chrono::DateTime<chrono::Utc>,
         }
 
-        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..bytes.len() - 1]).unwrap();
+        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
 
         assert_eq!(output.message, "hello world".to_string());
     }
