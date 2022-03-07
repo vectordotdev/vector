@@ -4,6 +4,7 @@ components: sources: redis: {
 	title: "Redis"
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			tls: {
@@ -108,10 +109,10 @@ components: sources: redis: {
 						description: "The method (`rpop` or `lpop`) to pop messages when `data_type` is list."
 						required:    false
 						type: string: {
-							default: "blpop"
+							default: "lpop"
 							enum: {
-								lpop: "Use the `lpop` method to pop messages."
-								rpop: "Use the `rpop` method to pop messages."
+								lpop: "Pop messages from the head of the list."
+								rpop: "Pop messages from the tail of the list."
 							}
 							syntax: "literal"
 						}
