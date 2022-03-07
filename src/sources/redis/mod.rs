@@ -280,24 +280,11 @@ mod integration_test {
 
     const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
 
-    async fn send_event_by_list(key: String, text: &str) {
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
-        trace!("Get redis connection manager.");
-        let mut conn = client.get_tokio_connection_manager().await.unwrap();
-        trace!("Get redis connection manager success.");
-        let res: RedisResult<i32> = conn.lpush(key, text).await;
-        match res {
-            Ok(len) => {
-                debug!("Send event for list success, len: {:?}.", len);
-            }
-            Err(err) => {
-                panic!("Send event for list error: {:?}.", err);
-            }
-        }
-    }
-
     #[tokio::test]
     async fn redis_source_list_rpop() {
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
 
@@ -313,10 +300,10 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        debug!("Sending event.");
-        send_event_by_list(key.clone(), "test message for list(rpop)").await;
+        let _: i32 = conn.rpush(&key, "1").await.unwrap();
+        let _: i32 = conn.rpush(&key, "2").await.unwrap();
+        let _: i32 = conn.rpush(&key, "3").await.unwrap();
 
-        debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
             redis_source(
@@ -328,20 +315,18 @@ mod integration_test {
             .await
             .unwrap(),
         );
-        let events = collect_n(rx, 1).await;
+        let events = collect_n(rx, 3).await;
 
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test message for list(rpop)".into()
-        );
-        assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "redis".into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
+        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
+        assert_eq!(events[2].as_log()[log_schema().message_key()], "1".into());
     }
 
     #[tokio::test]
-    async fn redis_source_list_blpop() {
+    async fn redis_source_list_lpop() {
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
 
@@ -357,10 +342,10 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        debug!("Sending event.");
-        send_event_by_list(key.clone(), "test message for list(blpop)").await;
+        let _: i32 = conn.rpush(&key, "1").await.unwrap();
+        let _: i32 = conn.rpush(&key, "2").await.unwrap();
+        let _: i32 = conn.rpush(&key, "3").await.unwrap();
 
-        debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
             redis_source(
@@ -372,16 +357,11 @@ mod integration_test {
             .await
             .unwrap(),
         );
-        let events = collect_n(rx, 1).await;
+        let events = collect_n(rx, 3).await;
 
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test message for list(blpop)".into()
-        );
-        assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "redis".into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
+        assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
+        assert_eq!(events[2].as_log()[log_schema().message_key()], "3".into());
     }
 
     #[tokio::test]
