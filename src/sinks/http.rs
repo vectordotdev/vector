@@ -437,7 +437,7 @@ mod tests {
             timestamp: chrono::DateTime<chrono::Utc>,
         }
 
-        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
+        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..bytes.len() - 1]).unwrap();
 
         assert_eq!(output.message, "hello world".to_string());
     }
