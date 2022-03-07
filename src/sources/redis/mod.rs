@@ -10,9 +10,16 @@ use crate::{
 use bytes::Bytes;
 use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 
 mod channel;
 mod list;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Failed to build redis client: {}", source))]
+    Client { source: redis::RedisError },
+}
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -23,7 +30,7 @@ pub enum DataTypeConfig {
     Channel,
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub struct ListOption {
     method: Method,
@@ -43,8 +50,7 @@ pub enum Method {
 pub struct RedisSourceConfig {
     #[serde(default)]
     data_type: DataTypeConfig,
-    #[serde(alias = "list")]
-    list_option: Option<ListOption>,
+    list: Option<ListOption>,
     url: String,
     key: String,
     redis_key: Option<String>,
@@ -96,38 +102,26 @@ async fn redis_source(
 ) -> crate::Result<super::Source> {
     if config.key.is_empty() {
         return Err("`key` cannot be empty.".into());
-    } else if let DataTypeConfig::List = config.data_type {
-        if config.list_option.is_none() {
-            return Err("When `data_type` is `list`, `list.method` cannot be empty.".into());
-        }
     }
 
-    let client = build_client(config).map_err(|_| "Failed to open redis client.")?;
+    let client = build_client(config).context(ClientSnafu {})?;
+
     let key = config.key.clone();
     let redis_key = config.redis_key.clone();
+    let list = config.list.unwrap_or_default();
 
     match config.data_type {
-        DataTypeConfig::List => match config.list_option {
-            Some(option) => Ok(list::watch(
-                client,
-                key,
-                redis_key,
-                option.method,
-                shutdown,
-                out,
-            )),
-            None => {
-                panic!("When `data_type` is `list`, `method` cannot be empty.")
-            }
-        },
+        DataTypeConfig::List => {
+            list::watch(client, key, redis_key, list.method, shutdown, out).await
+        }
         DataTypeConfig::Channel => channel::subscribe(client, key, redis_key, shutdown, out).await,
     }
 }
 
 fn build_client(config: &RedisSourceConfig) -> RedisResult<Client> {
-    trace!("Open redis client.");
+    trace!("Opening redis client.");
     let client = redis::Client::open(config.url.as_str());
-    trace!("Open redis client successed.");
+    trace!("Opened redis client.");
     client
 }
 
@@ -156,7 +150,7 @@ mod test {
     fn redis_list_source_create_ok() {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
-            list_option: Some(ListOption {
+            list: Some(ListOption {
                 method: Method::Brpop,
             }),
             url: String::from("redis://127.0.0.1:6379/0"),
@@ -170,7 +164,7 @@ mod test {
     fn redis_channel_source_create_ok() {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
-            list_option: None,
+            list: None,
             url: String::from("redis://127.0.0.1:6379/0"),
             key: String::from("vector"),
             redis_key: None,
@@ -218,7 +212,7 @@ mod integration_test {
 
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
-            list_option: Some(ListOption {
+            list: Some(ListOption {
                 method: Method::Brpop,
             }),
             url: REDIS_SERVER.to_owned(),
@@ -251,7 +245,7 @@ mod integration_test {
 
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
-            list_option: Some(ListOption {
+            list: Some(ListOption {
                 method: Method::Blpop,
             }),
             url: REDIS_SERVER.to_owned(),
@@ -286,7 +280,7 @@ mod integration_test {
 
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
-            list_option: None,
+            list: None,
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             redis_key: None,

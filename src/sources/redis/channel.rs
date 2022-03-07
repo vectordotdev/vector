@@ -10,9 +10,9 @@ use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Could not get connection : {}", source))]
+    #[snafu(display("Failed to create connection : {}", source))]
     Connection { source: redis::RedisError },
-    #[snafu(display("Could not subscribe to channel: {}", source))]
+    #[snafu(display("Failed to subscribe to channel: {}", source))]
     Subscribe { source: redis::RedisError },
 }
 

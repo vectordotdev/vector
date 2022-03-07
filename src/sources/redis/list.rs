@@ -1,82 +1,64 @@
 use crate::{
-    internal_events::{RedisEventReceived, RedisReceiveEventFailed},
+    internal_events::{RedisEventReceived, RedisReceiveEventFailed, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::redis::{create_event, Method},
     sources::Source,
     SourceSender,
 };
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
+use snafu::{ResultExt, Snafu};
 
-pub fn watch(
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Failed to create connection : {}", source))]
+    Connection { source: redis::RedisError },
+}
+
+pub async fn watch(
     client: redis::Client,
     key: String,
     redis_key: Option<String>,
     method: Method,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Source {
+) -> crate::Result<Source> {
+    trace!(message = "Get redis connection manager.");
+    let mut conn = client
+        .get_tokio_connection_manager()
+        .await
+        .context(ConnectionSnafu {})?;
+    trace!(message = "Got redis connection manager.");
+
     let fut = async move {
-        trace!("Get redis connection manager.");
-        let mut conn = client
-            .get_tokio_connection_manager()
-            .await
-            .map_err(|_| ())?;
-        trace!("Get redis connection manager success.");
-        match method {
-            Method::Brpop => loop {
-                tokio::select! {
-                    res = brpop(&mut conn,key.as_str()) => {
-                        match res {
-                            Ok(line) => {
-                                emit!(&RedisEventReceived {
-                                    byte_size: line.len()
-                                });
-                                let event = create_event(line.as_str(),key.clone(),&redis_key);
-                                tokio::select! {
-                                    result = out.send(event) => {match result {
-                                        Ok(()) => { },
-                                        Err(err) => error!(message = "Error sending event.", error = %err),
-                                    }}
-                                    _ = &mut shutdown => return Ok(()),
-                                }
-                            }
-                            Err(error) => {
-                                error!(message = "Redis source generated an error.", %error);
-                                emit!(&RedisReceiveEventFailed { error });
-                            }
-                        }
+        loop {
+            let res = match method {
+                Method::Brpop => tokio::select! {
+                    res = brpop(&mut conn, key.as_str()) => res,
+                    _ = &mut shutdown => break
+                },
+                Method::Blpop => tokio::select! {
+                    res = blpop(&mut conn, key.as_str()) => res,
+                    _ = &mut shutdown => break
+                },
+            };
+
+            match res {
+                Err(error) => emit!(&RedisReceiveEventFailed { error }),
+                Ok(line) => {
+                    emit!(&RedisEventReceived {
+                        byte_size: line.len()
+                    });
+                    let event = create_event(line.as_str(), key.clone(), &redis_key);
+                    if let Err(error) = out.send(event).await {
+                        emit!(&StreamClosedError { error, count: 1 });
+                        break;
                     }
-                    _ = &mut shutdown => return Ok(()),
                 }
-            },
-            Method::Blpop => loop {
-                tokio::select! {
-                    res = blpop(&mut conn,key.as_str()) => {
-                        match res {
-                            Ok(line) => {
-                                emit!(&RedisEventReceived {
-                                    byte_size: line.len()
-                                });
-                                let event = create_event(line.as_str(),key.clone(),&redis_key);
-                                tokio::select! {
-                                    result = out.send(event) => {match result {
-                                        Ok(()) => { },
-                                        Err(err) => error!(message = "Error sending event.", error = %err),
-                                    }}
-                                    _ = &mut shutdown => return Ok(()),
-                                }
-                            }
-                            Err(error) => {
-                                emit!(&RedisReceiveEventFailed {error});
-                            }
-                        }
-                    }
-                    _ = &mut shutdown => return Ok(()),
-                }
-            },
+            }
         }
+        Ok(())
     };
-    Box::pin(fut)
+    Ok(Box::pin(fut))
 }
 
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {
