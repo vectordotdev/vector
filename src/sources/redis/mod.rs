@@ -356,9 +356,14 @@ mod integration_test {
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
-            redis_source(&config, ShutdownSignal::noop(), tx)
-                .await
-                .unwrap(),
+            redis_source(
+                &config,
+                codecs::Decoder::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap(),
         );
         let events = collect_n(rx, 1).await;
 
@@ -411,44 +416,6 @@ mod integration_test {
                 event.as_log()[log_schema().source_type_key()],
                 "redis".into()
             );
-        }
-    }
-
-    #[tokio::test]
-    async fn redis_source_channel_product_event() {
-        debug!("Sending event by channel.");
-        let key = "test-channel".to_owned();
-        debug!("Test key name: {}.", key);
-        let text = "test message for channel";
-
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
-
-        // must subscribe the channel before publish msg
-        let mut conn = client.get_connection().unwrap();
-        let mut pubsub = conn.as_pubsub();
-        pubsub.subscribe(key.clone()).unwrap();
-
-        trace!("Get redis async connection.");
-        let mut async_conn = client
-            .get_async_connection()
-            .await
-            .expect("Failed to get redis async connection.");
-        trace!("Get redis async connection success.");
-
-        // wait fo redis_source subscribe the channel.
-        thread::sleep(time::Duration::from_secs(1));
-
-        for _i in 0..10000 {
-            let res: RedisResult<i32> = async_conn.publish(key.clone(), text).await;
-            match res {
-                Ok(len) => {
-                    debug!("Send event by channel success, len: {:?}.", len);
-                    assert_ne!(len, 0);
-                }
-                Err(err) => {
-                    panic!("Send event by channel error: {:?}.", err);
-                }
-            }
         }
     }
 }
