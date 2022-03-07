@@ -190,7 +190,7 @@ async fn multiple_inputs_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    tokio::time::sleep(Duration::from_millis(600)).await;
 
     let sourced_events_1 = source_counter_1.load(Ordering::Relaxed);
     let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
