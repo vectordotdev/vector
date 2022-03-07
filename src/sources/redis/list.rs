@@ -59,11 +59,13 @@ pub async fn watch(
 }
 
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {
-    let res: RedisResult<(String, String)> = conn.brpop(key, 0).await;
-    res.map(|(_, value)| value)
+    conn.brpop(key, 0)
+        .await
+        .map(|(_, value): (String, String)| value)
 }
 
 async fn blpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {
-    let res: RedisResult<(String, String)> = conn.blpop(key, 0).await;
-    res.map(|(_, value)| value)
+    conn.blpop(key, 0)
+        .await
+        .map(|(_, value): (String, String)| value)
 }
