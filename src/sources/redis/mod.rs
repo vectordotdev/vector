@@ -231,6 +231,8 @@ mod test {
             url: String::from("redis://127.0.0.1:6379/0"),
             key: String::from("vector"),
             redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
         assert!(redis_source(
             &config,
@@ -250,6 +252,8 @@ mod test {
             url: String::from("redis://127.0.0.1:6379/0"),
             key: String::from("vector"),
             redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
         assert!(redis_source(
             &config,
@@ -272,9 +276,7 @@ mod integration_test {
         test_util::{collect_n, random_string},
         SourceSender,
     };
-    use core::time;
-    use redis::{AsyncCommands, RedisResult};
-    use std::thread;
+    use redis::AsyncCommands;
 
     const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
 
@@ -317,9 +319,14 @@ mod integration_test {
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
-            redis_source(&config, ShutdownSignal::noop(), tx)
-                .await
-                .unwrap(),
+            redis_source(
+                &config,
+                codecs::Decoder::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap(),
         );
         let events = collect_n(rx, 1).await;
 
