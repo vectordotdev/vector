@@ -46,7 +46,7 @@ async fn serial_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Acquire);
 
@@ -92,7 +92,7 @@ async fn default_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -145,7 +145,7 @@ async fn buffer_drop_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -165,18 +165,17 @@ async fn multiple_inputs_backpressure() {
         + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
-    let source_counter_1 = Arc::new(AtomicUsize::new(0));
-    let source_counter_2 = Arc::new(AtomicUsize::new(0));
+    let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source(
         "in1",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_1),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_source(
         "in2",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_2),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -190,13 +189,18 @@ async fn multiple_inputs_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(600)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
-    let sourced_events_1 = source_counter_1.load(Ordering::Relaxed);
-    let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
-    let sourced_events_sum = sourced_events_1 + sourced_events_2;
+    let sourced_events_sum = source_counter.load(Ordering::Relaxed);
 
     assert_eq!(sourced_events_sum, expected_sourced_events);
+}
+
+// Wait until the source has sent at least the expected number of events, plus a small additional
+// margin to ensure we allow it to run over the expected amount if it's going to.
+async fn wait_until_expected(source_counter: impl AsRef<AtomicUsize>, expected: usize) {
+    crate::test_util::wait_for_atomic_usize(source_counter, |count| count >= expected).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
 mod test_sink {
