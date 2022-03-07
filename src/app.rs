@@ -144,6 +144,7 @@ impl Application {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::Graph(g) => graph::cmd(&g),
+                        SubCommand::Config(c) => config::cmd(&c, &config_paths),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         #[cfg(windows)]

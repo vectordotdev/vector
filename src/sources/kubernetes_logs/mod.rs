@@ -450,7 +450,7 @@ impl Source {
         let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
-        let event_processing_loop = out.send_stream(&mut stream);
+        let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
         {

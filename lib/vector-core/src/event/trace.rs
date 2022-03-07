@@ -78,6 +78,12 @@ impl From<LogEvent> for TraceEvent {
     }
 }
 
+impl From<BTreeMap<String, Value>> for TraceEvent {
+    fn from(map: BTreeMap<String, Value>) -> Self {
+        Self(map.into())
+    }
+}
+
 impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()

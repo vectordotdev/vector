@@ -30,7 +30,7 @@ Instances with at least 8 vCPUs and 16 GiB of memory are good units for scaling.
 
 | Cloud | Recommendations |
 | --- | --- |
-| AWS | c6g.2xlarge (recommended) or c6i.2xlarge |
+| AWS | c6i.2xlarge (recommended) or c6g.2xlarge |
 | Azure | f8 |
 | GCP | c2 (8 vCPUs, 16 GiB memory) |
 

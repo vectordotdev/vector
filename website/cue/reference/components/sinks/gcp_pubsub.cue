@@ -13,6 +13,7 @@ components: sinks: gcp_pubsub: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

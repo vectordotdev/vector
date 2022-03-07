@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    fmt,
     future::Future,
     marker::PhantomData,
     pin::Pin,
@@ -271,9 +272,9 @@ impl<T> Reader<T> {
         // See if any pending deletes actually qualify for deletion, and if so, capture them and
         // actually execute a batch delete operation.
         let mut delete_batch = Writebatch::new();
-        let mut total_keys = 0;
-        let mut total_items_len = 0;
-        let mut total_item_bytes = 0;
+        let mut total_records = 0;
+        let mut total_events = 0;
+        let mut total_bytes = 0;
         while let Some(marker) = self.record_acks.get_next_eligible_marker() {
             let EligibleMarker { id: key, len, data } = marker;
 
@@ -292,20 +293,20 @@ impl<T> Reader<T> {
             // eligible deletes as possible in one go.
             self.delete_offset = key.wrapping_add(event_count);
 
-            total_keys += 1;
-            total_items_len += event_count;
-            total_item_bytes += item_bytes;
+            total_records += 1;
+            total_events += event_count;
+            total_bytes += item_bytes;
         }
 
         // If we actually found anything that was ready to be deleted, execute our delete batch
         // and update our buffer usage metrics.
-        if total_keys > 0 {
+        if total_records > 0 {
             debug!(
                 delete_offset = self.delete_offset,
-                "Deleting {} keys from buffer: {} items, {} bytes.",
-                total_keys,
-                total_items_len,
-                total_item_bytes
+                "Deleting {} records from buffer: {} items, {} bytes.",
+                total_records,
+                total_events,
+                total_bytes
             );
             self.db.write(WriteOptions::new(), &delete_batch).unwrap();
 
@@ -315,11 +316,9 @@ impl<T> Reader<T> {
             );
 
             // Update our buffer size and buffer usage metrics.
-            self.decrease_buffer_size(total_item_bytes as u64);
-            self.usage_handle.increment_sent_event_count_and_byte_size(
-                total_items_len as u64,
-                total_item_bytes as u64,
-            );
+            self.decrease_buffer_size(total_bytes as u64);
+            self.usage_handle
+                .increment_sent_event_count_and_byte_size(total_events as u64, total_bytes as u64);
 
             // Now that we've actually deleted some items, notify any blocked writers that progress
             // has been made so they can continue writing.
@@ -369,5 +368,28 @@ impl<T> Reader<T> {
             self.compacted_offset = self.delete_offset;
             self.last_compaction = Instant::now();
         }
+    }
+}
+
+impl<T: Bufferable> fmt::Debug for Reader<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Reader")
+            .field("read_offset", &self.read_offset)
+            .field("compacted_offset", &self.compacted_offset)
+            .field("delete_offset", &self.delete_offset)
+            .field("write_notifier", &self.write_notifier)
+            .field("blocked_write_tasks", &self.blocked_write_tasks)
+            .field("current_size", &self.current_size)
+            .field("ack_counter", &self.ack_counter)
+            .field("uncompacted_size", &self.uncompacted_size)
+            .field("record_acks", &self.record_acks)
+            .field("buffer", &self.buffer)
+            .field("max_uncompacted_size", &self.max_uncompacted_size)
+            .field("last_compaction", &self.last_compaction)
+            .field("last_flush", &self.last_flush)
+            .field("pending_read", &self.pending_read)
+            .field("usage_handle", &self.usage_handle)
+            .field("phantom", &self.phantom)
+            .finish()
     }
 }
