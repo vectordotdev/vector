@@ -2,18 +2,15 @@
 
 #![deny(missing_docs)]
 
-use evmap::ReadHandle;
 use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
+use kube::runtime::reflector::{store::Store, ObjectRef};
 use serde::{Deserialize, Serialize};
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
+use crate::event::{Event, LogEvent, PathComponent, PathIter};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -53,16 +50,13 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with pod metadata.
 pub struct PodMetadataAnnotator {
-    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    pods_state_reader: Store<Pod>,
     fields_spec: FieldsSpec,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub fn new(
-        pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-        fields_spec: FieldsSpec,
-    ) -> Self {
+    pub fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
         Self {
             pods_state_reader,
             fields_spec,
@@ -77,9 +71,9 @@ impl PodMetadataAnnotator {
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
-        let guard = self.pods_state_reader.get(file_info.pod_uid)?;
-        let entry = guard.get_one()?;
-        let pod: &Pod = entry.as_ref();
+        let obj = ObjectRef::<Pod>::new(file_info.pod_name).within(file_info.pod_namespace);
+        let resource = self.pods_state_reader.get(&obj)?;
+        let pod: &Pod = resource.as_ref();
 
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
