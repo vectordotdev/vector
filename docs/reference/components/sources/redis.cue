@@ -117,7 +117,7 @@ components: sources: redis: {
 		}
 		redis_key: {
 			common:      false
-			description: "The log field name to use for the redis key. If unspecified, the key is not added to the log event."
+			description: "The log field name to use for the redis key. If set to an empty string or null, the key is not added to the log event."
 			required:    false
 			warnings: []
 			type: string: {
@@ -134,6 +134,11 @@ components: sources: redis: {
 			host:      fields._local_host
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			redis_key: {
+				description: "The Redis key the event came from"
+				required:    false
+				type: string: {}
+			}
 		}
 	}
 
