@@ -213,7 +213,7 @@ async fn handle_line(
 
 #[cfg(test)]
 mod test {
-    use super::{redis_source, DataTypeConfig, ListOption, Method, RedisSourceConfig};
+    use super::*;
     use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
@@ -221,8 +221,8 @@ mod test {
         crate::test_util::test_generate_config::<RedisSourceConfig>();
     }
 
-    #[test]
-    fn redis_list_source_create_ok() {
+    #[tokio::test]
+    async fn redis_list_source_create_ok() {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
@@ -232,11 +232,18 @@ mod test {
             key: String::from("vector"),
             redis_key: None,
         };
-        assert!(redis_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0).is_ok());
+        assert!(redis_source(
+            &config,
+            codecs::Decoder::default(),
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0
+        )
+        .await
+        .is_ok());
     }
 
-    #[test]
-    fn redis_channel_source_create_ok() {
+    #[tokio::test]
+    async fn redis_channel_source_create_ok() {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
             list: None,
@@ -244,7 +251,14 @@ mod test {
             key: String::from("vector"),
             redis_key: None,
         };
-        assert!(redis_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0).is_ok());
+        assert!(redis_source(
+            &config,
+            codecs::Decoder::default(),
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0
+        )
+        .await
+        .is_ok());
     }
 }
 
@@ -293,6 +307,8 @@ mod integration_test {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
 
         debug!("Sending event.");
@@ -300,7 +316,11 @@ mod integration_test {
 
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
+        tokio::spawn(
+            redis_source(&config, ShutdownSignal::noop(), tx)
+                .await
+                .unwrap(),
+        );
         let events = collect_n(rx, 1).await;
 
         assert_eq!(
@@ -326,6 +346,8 @@ mod integration_test {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
 
         debug!("Sending event.");
@@ -333,7 +355,11 @@ mod integration_test {
 
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
+        tokio::spawn(
+            redis_source(&config, ShutdownSignal::noop(), tx)
+                .await
+                .unwrap(),
+        );
         let events = collect_n(rx, 1).await;
 
         assert_eq!(
@@ -359,11 +385,22 @@ mod integration_test {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
 
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(redis_source(&config, ShutdownSignal::noop(), tx).unwrap());
+        tokio::spawn(
+            redis_source(
+                &config,
+                codecs::Decoder::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap(),
+        );
         let events = collect_n(rx, 10000).await;
 
         assert_eq!(events.len(), 10000);
