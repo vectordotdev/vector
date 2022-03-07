@@ -39,15 +39,12 @@ impl PathsProvider for K8sPathsProvider {
 
     fn paths(&self) -> Vec<PathBuf> {
         let state = self.pod_state.state();
-        dbg!("got pod state");
-        dbg!(state.clone());
 
         state
             .into_iter()
             // filter out pods where we haven't fetched the namespace metadata yet
             // they will be picked up on a later run
             .filter(|pod| {
-                dbg!("made it into filter");
                 trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod);
                 if let Some(namespace) = pod.metadata.namespace.as_ref() {
                     self.namespace_state

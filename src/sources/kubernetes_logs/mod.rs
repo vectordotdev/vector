@@ -22,6 +22,7 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use serde::{Deserialize, Serialize};
+use tokio::pin;
 use vector_common::TimeZone;
 use vector_core::ByteSizeOf;
 
@@ -302,11 +303,24 @@ impl Source {
         } = self;
 
         let pods = Api::<Pod>::all(client.clone());
-        let pod_watcher = watcher(pods, ListParams::default());
+        let pod_watcher = watcher(
+            pods,
+            ListParams {
+                field_selector: Some(field_selector),
+                label_selector: Some(label_selector),
+                ..Default::default()
+            },
+        );
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
         let pod_reflector = reflector(pod_store_w, pod_watcher);
+        tokio::spawn(async move {
+            pin!(pod_reflector);
+            while let Some(_event) = pod_reflector.next().await {
+                ()
+            }
+        });
 
         // -----------------------------------------------------------------
 
@@ -316,6 +330,12 @@ impl Source {
         let ns_state = ns_store_w.as_reader();
 
         let ns_reflector = reflector(ns_store_w, ns_watcher);
+        tokio::spawn(async move {
+            pin!(ns_reflector);
+            while let Some(_event) = ns_reflector.next().await {
+                ()
+            }
+        });
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
