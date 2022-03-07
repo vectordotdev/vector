@@ -184,7 +184,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.33", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.31", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -214,7 +214,7 @@ bollard = { version = "0.11.1", default-features = false, features = ["ssl"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.5", default-features = false }
+cidr-utils = { version = "0.5.6", default-features = false }
 clap = { version = "3.1.5", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
@@ -808,7 +808,7 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
-transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-file"]
