@@ -283,20 +283,27 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
+# nextest doesn't support running doc tests yet so this is split out as
+# `test-docs`
+# https://github.com/nextest-rs/nextest/issues/16
+#
+# criterion doesn't support the flags needed by nextest to run so these are left
+# out for now
+# https://github.com/bheisler/criterion.rs/issues/562
+#
+# `cargo test` lacks support for testing _just_ benches otherwise we'd have
+# a target for that
+# https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
-
-.PHONY: test-benches
-test-benches: ## Run the bench test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --benches --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches codecs-benches language-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE} -- --bench
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-benches test-docs test-behavior test-integration ## Runs all tests: unit, benches, docs, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple

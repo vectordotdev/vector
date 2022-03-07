@@ -117,12 +117,6 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
-      - run: make test-docs
-        env:
-          CARGO_BUILD_JOBS: 5
-      - run: make test-benches
-        env:
-          CARGO_BUILD_JOBS: 5
       - name: Stop sccache
         run: sccache --stop-server
 
@@ -163,6 +157,7 @@ jobs:
       - run: make test-cli
       - run: make test-behavior
       - run: make check-examples
+      - run: make test-docs
       - name: Stop sccache
         run: sccache --stop-server
 
