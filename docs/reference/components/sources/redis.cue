@@ -31,7 +31,7 @@ components: sources: redis: {
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
-		deployment_roles: ["daemon", "sidecar"]
+		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
@@ -101,13 +101,13 @@ components: sources: redis: {
 				options: {
 					method: {
 						common:      false
-						description: "The method (`brpop` or `blpop`) to pop messages when `data_type` is list."
+						description: "The method (`rpop` or `lpop`) to pop messages when `data_type` is list."
 						required:    false
 						type: string: {
 							default: "blpop"
 							enum: {
-								blpop: "Use the `blpop` method to pop messages."
-								brpop: "Use the `brpop` method to pop messages."
+								lpop: "Use the `lpop` method to pop messages."
+								rpop: "Use the `rpop` method to pop messages."
 							}
 							syntax: "literal"
 						}

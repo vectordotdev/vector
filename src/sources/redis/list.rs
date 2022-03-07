@@ -32,11 +32,11 @@ pub async fn watch(
     let fut = async move {
         loop {
             let res = match method {
-                Method::Brpop => tokio::select! {
+                Method::Rpop => tokio::select! {
                     res = brpop(&mut conn, &key) => res,
                     _ = &mut shutdown => break
                 },
-                Method::Blpop => tokio::select! {
+                Method::Lpop => tokio::select! {
                     res = blpop(&mut conn, &key) => res,
                     _ = &mut shutdown => break
                 },

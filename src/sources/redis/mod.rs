@@ -41,8 +41,8 @@ pub struct ListOption {
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     #[derivative(Default)]
-    Blpop,
-    Brpop,
+    Lpop,
+    Rpop,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -63,7 +63,7 @@ impl GenerateConfig for RedisSourceConfig {
             url = "redis://127.0.0.1:6379/0"
             key = "vector"
             data_type = "list"
-            list.method = "brpop"
+            list.method = "lpop"
             redis_key = "redis_key"
             "#,
         )
@@ -165,7 +165,7 @@ mod test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
-                method: Method::Brpop,
+                method: Method::Rpop,
             }),
             url: String::from("redis://127.0.0.1:6379/0"),
             key: String::from("vector"),
@@ -220,14 +220,14 @@ mod integration_test {
     }
 
     #[tokio::test]
-    async fn redis_source_list_brpop() {
+    async fn redis_source_list_rpop() {
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
 
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
-                method: Method::Brpop,
+                method: Method::Rpop,
             }),
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
@@ -235,7 +235,7 @@ mod integration_test {
         };
 
         debug!("Sending event.");
-        send_event_by_list(key.clone(), "test message for list(brpop)").await;
+        send_event_by_list(key.clone(), "test message for list(rpop)").await;
 
         debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
@@ -244,7 +244,7 @@ mod integration_test {
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
-            "test message for list(brpop)".into()
+            "test message for list(rpop)".into()
         );
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
@@ -260,7 +260,7 @@ mod integration_test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
-                method: Method::Blpop,
+                method: Method::Lpop,
             }),
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
