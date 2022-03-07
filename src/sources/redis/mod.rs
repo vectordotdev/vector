@@ -106,15 +106,29 @@ async fn redis_source(
 
     let client = build_client(config).context(ClientSnafu {})?;
 
-    let key = config.key.clone();
-    let redis_key = config.redis_key.clone();
-    let list = config.list.unwrap_or_default();
-
     match config.data_type {
         DataTypeConfig::List => {
-            list::watch(client, key, redis_key, list.method, shutdown, out).await
+            let list = config.list.unwrap_or_default();
+            list::watch(
+                client,
+                config.key.clone(),
+                config.redis_key.clone(),
+                list.method,
+                shutdown,
+                out,
+            )
+            .await
         }
-        DataTypeConfig::Channel => channel::subscribe(client, key, redis_key, shutdown, out).await,
+        DataTypeConfig::Channel => {
+            channel::subscribe(
+                client,
+                config.key.clone(),
+                config.redis_key.clone(),
+                shutdown,
+                out,
+            )
+            .await
+        }
     }
 }
 
@@ -125,12 +139,12 @@ fn build_client(config: &RedisSourceConfig) -> RedisResult<Client> {
     client
 }
 
-fn create_event(line: &str, key: String, redis_key: &Option<String>) -> Event {
+fn create_event(line: &str, key: &str, redis_key: Option<&str>) -> Event {
     let mut event = Event::from(line);
     event
         .as_mut_log()
         .insert(log_schema().source_type_key(), Bytes::from("redis"));
-    if let Some(redis_key) = &redis_key {
+    if let Some(redis_key) = redis_key {
         event.as_mut_log().insert(redis_key.clone(), key);
     }
     event

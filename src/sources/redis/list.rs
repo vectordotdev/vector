@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Failed to create connection : {}", source))]
+    #[snafu(display("Failed to create connection: {}", source))]
     Connection { source: redis::RedisError },
 }
 
@@ -33,11 +33,11 @@ pub async fn watch(
         loop {
             let res = match method {
                 Method::Brpop => tokio::select! {
-                    res = brpop(&mut conn, key.as_str()) => res,
+                    res = brpop(&mut conn, &key) => res,
                     _ = &mut shutdown => break
                 },
                 Method::Blpop => tokio::select! {
-                    res = blpop(&mut conn, key.as_str()) => res,
+                    res = blpop(&mut conn, &key) => res,
                     _ = &mut shutdown => break
                 },
             };
@@ -48,7 +48,7 @@ pub async fn watch(
                     emit!(&RedisEventReceived {
                         byte_size: line.len()
                     });
-                    let event = create_event(line.as_str(), key.clone(), &redis_key);
+                    let event = create_event(&line, &key, redis_key.as_deref());
                     if let Err(error) = out.send(event).await {
                         emit!(&StreamClosedError { error, count: 1 });
                         break;

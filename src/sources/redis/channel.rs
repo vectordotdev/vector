@@ -10,7 +10,7 @@ use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Failed to create connection : {}", source))]
+    #[snafu(display("Failed to create connection: {}", source))]
     Connection { source: redis::RedisError },
     #[snafu(display("Failed to subscribe to channel: {}", source))]
     Subscribe { source: redis::RedisError },
@@ -30,12 +30,12 @@ pub async fn subscribe(
         .context(ConnectionSnafu {})?;
     trace!(message = "Got redis async connection.");
     let mut pubsub_conn = conn.into_pubsub();
-    trace!(message = "Subscribing to channel.", key = key.as_str());
+    trace!(message = "Subscribing to channel.", key = %key);
     pubsub_conn
-        .subscribe(key.as_str())
+        .subscribe(&key)
         .await
         .context(SubscribeSnafu {})?;
-    trace!(message = "Subscribed to channel.", key = key.as_str());
+    trace!(message = "Subscribed to channel.", key = %key);
     let fut = async move {
         let mut pubsub_stream = pubsub_conn.on_message().take_until(shutdown.clone());
         while let Some(msg) = pubsub_stream.next().await {
@@ -45,7 +45,7 @@ pub async fn subscribe(
                     emit!(&RedisEventReceived {
                         byte_size: line.len()
                     });
-                    let event = create_event(line.as_str(), key.clone(), &redis_key);
+                    let event = create_event(&line, &key, redis_key.as_deref());
                     if let Err(error) = out.send(event).await {
                         emit!(&StreamClosedError { error, count: 1 });
                         break;
