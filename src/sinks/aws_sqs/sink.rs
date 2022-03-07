@@ -7,7 +7,8 @@ use vector_core::buffers::Acker;
 use vector_core::sink::StreamSink;
 
 use super::config::SqsSinkConfig;
-use super::service::{SqsRequestBuilder, SqsService};
+use super::request_builder::SqsRequestBuilder;
+use super::service::SqsService;
 use crate::config::SinkContext;
 use crate::event::Event;
 use crate::sinks::util::builder::SinkBuilderExt;
