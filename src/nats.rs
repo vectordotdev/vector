@@ -30,7 +30,7 @@ impl std::fmt::Display for NatsAuthStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use NatsAuthStrategy::*;
         match self {
-            UserPassword => write!(f, "{}", "user_password"),
+            UserPassword => write!(f, "user_password"),
             Token => write!(f, "token"),
             CredentialsFile => write!(f, "credentials_file"),
             NKey => write!(f, "nkey"),
