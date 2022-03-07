@@ -214,55 +214,10 @@ async fn handle_line(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RedisSourceConfig>();
-    }
-
-    #[tokio::test]
-    async fn redis_list_source_create_ok() {
-        let config = RedisSourceConfig {
-            data_type: DataTypeConfig::List,
-            list: Some(ListOption {
-                method: Method::Rpop,
-            }),
-            url: String::from("redis://127.0.0.1:6379/0"),
-            key: String::from("vector"),
-            redis_key: None,
-            framing: default_framing_message_based(),
-            decoding: default_decoding(),
-        };
-        assert!(redis_source(
-            &config,
-            codecs::Decoder::default(),
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0
-        )
-        .await
-        .is_ok());
-    }
-
-    #[tokio::test]
-    async fn redis_channel_source_create_ok() {
-        let config = RedisSourceConfig {
-            data_type: DataTypeConfig::Channel,
-            list: None,
-            url: String::from("redis://127.0.0.1:6379/0"),
-            key: String::from("vector"),
-            redis_key: None,
-            framing: default_framing_message_based(),
-            decoding: default_decoding(),
-        };
-        assert!(redis_source(
-            &config,
-            codecs::Decoder::default(),
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0
-        )
-        .await
-        .is_ok());
     }
 }
 
@@ -278,7 +233,7 @@ mod integration_test {
     };
     use redis::AsyncCommands;
 
-    const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
+    const REDIS_SERVER: &str = "redis://redis:6379/0";
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
@@ -393,6 +348,21 @@ mod integration_test {
             .await
             .unwrap(),
         );
+
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+
+        let mut async_conn = client
+            .get_async_connection()
+            .await
+            .expect("Failed to get redis async connection.");
+
+        // wait for redis_source subscribe the channel.
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        for _i in 0..10000 {
+            let _: i32 = async_conn.publish(key.clone(), text).await.unwrap();
+        }
+
         let events = collect_n(rx, 10000).await;
 
         assert_eq!(events.len(), 10000);
