@@ -89,7 +89,7 @@ async fn run(
         log.insert(pid_key.clone(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
-        if let Err(error) = out.send(Event::from(log)).await {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(&StreamClosedError { error, count: 1 });
             return Err(());
