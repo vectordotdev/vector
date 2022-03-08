@@ -1,8 +1,13 @@
-use bytes::Bytes;
+use bytes::BufMut;
+use codecs::{
+    encoding::{BoxedSerializer, Framer},
+    NewlineDelimitedEncoder,
+};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 use crate::{
+    codecs::Encoder,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -10,7 +15,7 @@ use crate::{
     event::Event,
     internal_events::TemplateRenderingError,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration, Transformer},
         tcp::TcpSinkConfig,
         Encoding, UriSerde,
     },
@@ -72,9 +77,15 @@ impl SinkConfig for PapertrailConfig {
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        sink_config.build(cx, move |event| {
-            Some(encode_event(event, pid, &process, &encoding))
-        })
+        let framer = NewlineDelimitedEncoder::new().into();
+        let serializer = (Box::new(PapertrailSerializer {
+            pid,
+            process,
+            encoding,
+        }) as BoxedSerializer)
+            .into();
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+        sink_config.build(cx, Transformer::default(), encoder)
     }
 
     fn input(&self) -> Input {
@@ -90,64 +101,73 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(
-    mut event: Event,
+#[derive(Debug, Clone)]
+struct PapertrailSerializer {
     pid: u32,
-    process: &Option<Template>,
-    encoding: &EncodingConfig<Encoding>,
-) -> Bytes {
-    let host = event
-        .as_mut_log()
-        .remove(log_schema().host_key())
-        .map(|host| host.to_string_lossy());
+    process: Option<Template>,
+    encoding: EncodingConfig<Encoding>,
+}
 
-    let process = process
-        .as_ref()
-        .and_then(|t| {
-            t.render_string(&event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("process"),
-                        drop_event: false,
+impl tokio_util::codec::Encoder<Event> for PapertrailSerializer {
+    type Error = crate::Error;
+
+    fn encode(
+        &mut self,
+        mut event: Event,
+        buffer: &mut bytes::BytesMut,
+    ) -> Result<(), Self::Error> {
+        let host = event
+            .as_mut_log()
+            .remove(log_schema().host_key())
+            .map(|host| host.to_string_lossy());
+
+        let process = self
+            .process
+            .as_ref()
+            .and_then(|t| {
+                t.render_string(&event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("process"),
+                            drop_event: false,
+                        })
                     })
-                })
-                .ok()
-        })
-        .unwrap_or_else(|| String::from("vector"));
+                    .ok()
+            })
+            .unwrap_or_else(|| String::from("vector"));
 
-    let formatter = Formatter3164 {
-        facility: Facility::LOG_USER,
-        hostname: host,
-        process,
-        pid,
-    };
+        let formatter = Formatter3164 {
+            facility: Facility::LOG_USER,
+            hostname: host,
+            process,
+            pid: self.pid,
+        };
 
-    let mut s: Vec<u8> = Vec::new();
+        self.encoding.apply_rules(&mut event);
+        let log = event.into_log();
 
-    encoding.apply_rules(&mut event);
-    let log = event.into_log();
+        let message = match self.encoding.codec() {
+            Encoding::Json => serde_json::to_string(&log).unwrap(),
+            Encoding::Text => log
+                .get(log_schema().message_key())
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_default(),
+        };
 
-    let message = match encoding.codec() {
-        Encoding::Json => serde_json::to_string(&log).unwrap(),
-        Encoding::Text => log
-            .get(log_schema().message_key())
-            .map(|v| v.to_string_lossy())
-            .unwrap_or_default(),
-    };
+        formatter
+            .format(&mut buffer.writer(), Severity::LOG_INFO, message)
+            .map_err(|error| format!("{}", error))?;
 
-    formatter
-        .format(&mut s, Severity::LOG_INFO, message)
-        .unwrap();
-
-    s.push(b'\n');
-
-    Bytes::from(s)
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use bytes::BytesMut;
     use std::convert::TryFrom;
+    use tokio_util::codec::Encoder;
 
     use super::*;
 
@@ -162,21 +182,22 @@ mod tests {
         evt.as_mut_log().insert("magic", "key");
         evt.as_mut_log().insert("process", "foo");
 
-        let bytes = encode_event(
-            evt,
-            0,
-            &Some(Template::try_from("{{ process }}").unwrap()),
-            &EncodingConfig {
+        let mut bytes = BytesMut::new();
+        let mut serializer = PapertrailSerializer {
+            pid: 0,
+            process: Some(Template::try_from("{{ process }}").unwrap()),
+            encoding: EncodingConfig {
                 codec: Encoding::Json,
                 schema: None,
                 only_fields: None,
                 except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
-        );
+        };
+        serializer.encode(evt, &mut bytes).unwrap();
+        let bytes = bytes.freeze();
 
-        let msg =
-            bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);
+        let msg = bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len());
         let value: serde_json::Value = serde_json::from_slice(&msg).unwrap();
         let value = value.as_object().unwrap();
 

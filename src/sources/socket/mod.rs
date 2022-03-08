@@ -221,14 +221,17 @@ mod test {
         thread,
     };
 
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
 
-    use codecs::NewlineDelimitedDecoderConfig;
+    use codecs::{
+        encoding::{self, Framer, NewlineDelimitedEncoder},
+        NewlineDelimitedDecoderConfig,
+    };
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -246,6 +249,7 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
+        codecs::Encoder,
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -533,12 +537,31 @@ mod test {
         // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
         // it down, exercising the logic we have to ensure timely shutdown even under load:
         let message = random_string(512);
-        let message_bytes = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone());
 
         let sink_cx = SinkContext::new_test();
-        let encoder = move |_event| Some(message_bytes.clone());
+        let framer = NewlineDelimitedEncoder::new().into();
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = crate::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                Ok(())
+            }
+        }
+        let serializer = (Box::new(Serializer {
+            bytes: message_bytes,
+        }) as encoding::BoxedSerializer)
+            .into();
+        let encoder = Encoder::<Framer>::new(framer, serializer);
         let sink_config = TcpSinkConfig::from_address(addr.to_string());
-        let (sink, _healthcheck) = sink_config.build(sink_cx, encoder).unwrap();
+        let (sink, _healthcheck) = sink_config
+            .build(sink_cx, Default::default(), encoder)
+            .unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat(())

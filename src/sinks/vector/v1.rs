@@ -1,12 +1,20 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
+use codecs::{
+    encoding::{Framer, Serializer},
+    BytesEncoder,
+};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use vector_core::event::{proto, Event};
 
 use crate::{
+    codecs::Encoder,
     config::{GenerateConfig, SinkContext},
-    sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
+    sinks::{
+        util::{encoding::Transformer, tcp::TcpSinkConfig},
+        Healthcheck, VectorSink,
+    },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -67,7 +75,10 @@ impl VectorConfig {
             self.send_buffer_bytes,
         );
 
-        sink_config.build(cx, |event| Some(encode_event(event)))
+        let framer = BytesEncoder::new().into();
+        let serializer = Serializer::Boxed(Box::new(VectorSerializer) as _);
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+        sink_config.build(cx, Transformer::default(), encoder)
     }
 }
 
@@ -77,16 +88,23 @@ enum HealthcheckError {
     ConnectError { source: std::io::Error },
 }
 
-fn encode_event(event: Event) -> Bytes {
-    let data = proto::EventWrapper::from(event);
-    let event_len = data.encoded_len();
-    let full_len = event_len + 4;
+#[derive(Debug, Clone)]
+struct VectorSerializer;
 
-    let mut out = BytesMut::with_capacity(full_len);
-    out.put_u32(event_len as u32);
-    data.encode(&mut out).unwrap();
+impl tokio_util::codec::Encoder<Event> for VectorSerializer {
+    type Error = crate::Error;
 
-    out.into()
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        let data = proto::EventWrapper::from(event);
+        let event_len = data.encoded_len();
+        let full_len = event_len + 4;
+
+        buffer.reserve(full_len);
+        buffer.put_u32(event_len as u32);
+        data.encode(buffer)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

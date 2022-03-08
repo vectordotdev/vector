@@ -2,13 +2,13 @@ use std::{
     io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use codecs::encoding::Framer;
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -17,9 +17,11 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
+use tokio_util::codec::Encoder as _;
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     config::SinkContext,
     dns,
     event::Event,
@@ -30,6 +32,7 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
+            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, SinkBuildError, StreamSink,
@@ -87,14 +90,15 @@ impl TcpSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        transformer: Transformer,
+        encoder: Encoder<Framer>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
-        let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
+        let sink = TcpSink::new(connector.clone(), cx.acker(), transformer, encoder);
 
         Ok((
             VectorSink::from_event_streamsink(sink),
@@ -197,19 +201,22 @@ impl TcpConnector {
 struct TcpSink {
     connector: TcpConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    transformer: Transformer,
+    encoder: Encoder<Framer>,
 }
 
 impl TcpSink {
-    fn new(
+    const fn new(
         connector: TcpConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        transformer: Transformer,
+        encoder: Encoder<Framer>,
     ) -> Self {
         Self {
             connector,
             acker,
-            encode_event: Arc::new(encode_event),
+            transformer,
+            encoder,
         }
     }
 
@@ -253,18 +260,23 @@ impl StreamSink<Event> for TcpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
-        let encode_event = Arc::clone(&self.encode_event);
+        let mut encoder = self.encoder.clone();
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
                 let finalizers = event.metadata_mut().take_finalizers();
-                encode_event(event)
-                    .map(|item| EncodedEvent {
+                self.transformer.transform(&mut event);
+                let mut bytes = BytesMut::new();
+                if encoder.encode(event, &mut bytes).is_ok() {
+                    let item = bytes.freeze();
+                    EncodedEvent {
                         item,
                         finalizers,
                         byte_size,
-                    })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
+                    }
+                } else {
+                    EncodedEvent::new(Bytes::new(), 0)
+                }
             })
             .peekable();
 
