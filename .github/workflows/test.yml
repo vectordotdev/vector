@@ -157,6 +157,7 @@ jobs:
       - run: make test-cli
       - run: make test-behavior
       - run: make check-examples
+      - run: make test-docs
       - name: Stop sccache
         run: sccache --stop-server
 
