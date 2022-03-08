@@ -238,43 +238,38 @@ impl EventEncoder {
     }
 }
 
-enum FilteredRecord {
-    Rewritten(LokiRecord),
-    Valid(LokiRecord),
+struct FilteredRecord {
+    pub rewritten: bool,
+    pub inner: LokiRecord,
 }
 
 impl FilteredRecord {
+    pub const fn rewritten(inner: LokiRecord) -> Self {
+        Self {
+            rewritten: true,
+            inner,
+        }
+    }
+
+    pub const fn valid(inner: LokiRecord) -> Self {
+        Self {
+            rewritten: false,
+            inner,
+        }
+    }
+
     pub fn partition(&self) -> PartitionKey {
-        self.inner().partition.clone()
-    }
-
-    const fn is_rewritten(&self) -> bool {
-        matches!(self, Self::Rewritten(_))
-    }
-
-    const fn inner(&self) -> &LokiRecord {
-        match self {
-            Self::Rewritten(value) => value,
-            Self::Valid(value) => value,
-        }
-    }
-
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn into_inner(self) -> LokiRecord {
-        match self {
-            Self::Rewritten(value) => value,
-            Self::Valid(value) => value,
-        }
+        self.inner.partition.clone()
     }
 }
 
 impl ByteSizeOf for FilteredRecord {
     fn allocated_bytes(&self) -> usize {
-        self.inner().allocated_bytes()
+        self.inner.allocated_bytes()
     }
 
     fn size_of(&self) -> usize {
-        self.inner().size_of()
+        self.inner.size_of()
     }
 }
 
@@ -300,17 +295,17 @@ impl RecordFilter {
                     OutOfOrderAction::Drop => None,
                     OutOfOrderAction::RewriteTimestamp => {
                         record.event.timestamp = *latest;
-                        Some(FilteredRecord::Rewritten(record))
+                        Some(FilteredRecord::rewritten(record))
                     }
                 }
             } else {
                 *latest = record.event.timestamp;
-                Some(FilteredRecord::Valid(record))
+                Some(FilteredRecord::valid(record))
             }
         } else {
             self.timestamps
                 .insert(record.partition.clone(), record.event.timestamp);
-            Some(FilteredRecord::Valid(record))
+            Some(FilteredRecord::valid(record))
         }
     }
 }
@@ -368,10 +363,10 @@ impl LokiSink {
                         .into_iter()
                         .flatten()
                         .map(|event| {
-                            if event.is_rewritten() {
+                            if event.rewritten {
                                 count += 1;
                             }
-                            event.into_inner()
+                            event.inner
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
