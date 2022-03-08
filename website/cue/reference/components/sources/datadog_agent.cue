@@ -132,7 +132,7 @@ components: sources: datadog_agent: {
 					logs_no_ssl: true|false # should match source SSL configuration.
 				```
 
-				Sending metrics to Vector requires the Datadog Agent v7.33/6.33 or greater. In order to send metrics the
+				Sending metrics to Vector requires the Datadog Agent v7.35/6.35 or greater. In order to send metrics the
 				[Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the following options:
 
 				```yaml
