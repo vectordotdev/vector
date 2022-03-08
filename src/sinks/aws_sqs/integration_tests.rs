@@ -1,45 +1,13 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
-    SendMessageResult, Sqs, SqsClient,
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use tower::Service;
-use tracing_futures::Instrument;
-use vector_core::ByteSizeOf;
-
-use super::util::SinkBatchSettings;
-use crate::{
-    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, SinkDescription,
-    },
-    event::Event,
-    internal_events::{AwsSqsEventsSent, TemplateRenderingError},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        sink::Response,
-        BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
-    },
-    template::{Template, TemplateParseError},
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
-};
 use std::collections::HashMap;
 
 use rusoto_core::Region;
-use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
+use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest, Sqs, SqsClient};
 use tokio::time::{sleep, Duration};
 
+use super::config::{Encoding, SqsSinkConfig};
+use super::sink::SqsSink;
+use crate::aws::rusoto::RegionOrEndpoint;
+use crate::config::SinkContext;
 use crate::sinks::VectorSink;
 use crate::test_util::{random_lines_with_stream, random_string};
 
@@ -78,7 +46,7 @@ async fn sqs_send_message_batch() {
     config.clone().healthcheck(client.clone()).await.unwrap();
 
     let sink = SqsSink::new(config, cx, client.clone()).unwrap();
-    let sink = VectorSink::from_event_sink(sink);
+    let sink = VectorSink::from_event_streamsink(sink);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
     sink.run(events).await.unwrap();

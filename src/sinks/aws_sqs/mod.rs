@@ -7,8 +7,6 @@ mod sink;
 #[cfg(feature = "aws-sqs-integration-tests")]
 #[cfg(test)]
 mod integration_tests;
-#[cfg(test)]
-mod tests;
 
 use crate::config::SinkDescription;
 

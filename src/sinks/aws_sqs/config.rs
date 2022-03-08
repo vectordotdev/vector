@@ -39,7 +39,7 @@ pub struct SqsSinkConfig {
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub(super) assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -47,7 +47,7 @@ pub struct SqsSinkConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
