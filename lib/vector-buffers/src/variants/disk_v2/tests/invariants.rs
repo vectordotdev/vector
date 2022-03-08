@@ -6,8 +6,12 @@ use super::create_buffer_v2_with_max_data_file_size;
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions, await_timeout, set_data_file_length,
-    test::common::{install_tracing_helpers, with_temp_dir, SizedRecord},
-    variants::disk_v2::{common::MAX_FILE_ID, tests::create_default_buffer_v2},
+    test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    variants::disk_v2::{
+        common::MAX_FILE_ID,
+        tests::{create_buffer_v2_with_write_buffer_size, create_default_buffer_v2},
+    },
+    EventCount,
 };
 
 #[tokio::test]
@@ -519,11 +523,10 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             let deleted_data_file = assertion_registry
                 .build()
                 .with_name("delete_completed_data_file")
-                .with_parent_name("12345")
+                .with_parent_name("reader_deletes_data_file_around_record_id_wraparound")
                 .was_entered()
                 .finalize();
 
-            info!("first read");
             let first_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
             assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
@@ -533,7 +536,6 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             acker.ack(1);
             assert!(!deleted_data_file.try_assert());
 
-            info!("second read");
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
             assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
@@ -543,7 +545,6 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             acker.ack(1);
             assert!(!deleted_data_file.try_assert());
 
-            info!("third read");
             // This read should be where we actually delete the file since we've acknowledged all of
             // the reads from the first data file:
             let third_record_read = reader.next().await.expect("read should not fail");
@@ -572,7 +573,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
         }
     });
 
-    let parent = trace_span!("12345");
+    let parent = trace_span!("reader_deletes_data_file_around_record_id_wraparound");
     fut.instrument(parent).await;
 }
 
@@ -676,13 +677,13 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             let mark_to_skip_called = assertion_registry
                 .build()
                 .with_name("mark_for_skip")
-                .with_parent_name("23456")
+                .with_parent_name("writer_waits_for_reader_after_validate_last_write_fails_and_data_file_skip_triggered")
                 .was_closed()
                 .finalize();
             let waiting_on_reader = assertion_registry
                 .build()
                 .with_name("wait_for_reader")
-                .with_parent_name("23456")
+                .with_parent_name("writer_waits_for_reader_after_validate_last_write_fails_and_data_file_skip_triggered")
                 .was_entered()
                 .finalize();
 
@@ -733,13 +734,78 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
         }
     });
 
-    let parent = trace_span!("23456");
+    let parent = trace_span!(
+        "writer_waits_for_reader_after_validate_last_write_fails_and_data_file_skip_triggered"
+    );
     fut.instrument(parent).await;
 }
 
-// TODO: Write a test that ensures that when the buffered writer tells us it had to preemptively
-// flush, that we correctly integrate its result by updating the ledger.  For example, if we do 10
-// writes without a subsequent flush, and they're all buffered, but an 11th write forces us to flush
-// the buffer before we can actually buffer that 11th write, we should update the ledger to indicate
-// that those 10 initial writes are now "live": updated next record ID, updated buffer size, and so
-// on.
+#[tokio::test]
+async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
+    // This test ensures that when the buffered writer tells us it had to preemptively flush, that
+    // we correctly integrate its result by updating the ledger.  For example, if we do 10 writes
+    // without a subsequent flush, and they're all buffered, but an 11th write forces us to flush
+    // the buffer before we can actually buffer that 11th write, we should update the ledger to
+    // indicate that those 10 initial writes are now "live": updated next record ID, updated buffer
+    // size, and so on.
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let record_size: u32 = 16;
+
+            // Create our buffer with a arbitrarily low write buffer size.  We'll use this to ensure
+            // that the buffered writer has to implicitly flush after we've written a certain number
+            // of records, but before we've manually flushed.
+            let (mut writer, _, _, ledger) =
+                create_buffer_v2_with_write_buffer_size(data_dir.clone(), 128).await;
+
+            assert_buffer_is_empty!(ledger);
+            assert_reader_writer_v2_file_positions!(ledger, 0, 0);
+
+            // We write two records, which should fit within the write buffer without needing to
+            // be implicitly flushed.
+            let mut total_events_written = 0;
+            let mut total_bytes_written = 0;
+
+            for _ in 0..2 {
+                let record = MultiEventRecord(record_size);
+                let record_events = record.event_count();
+                let bytes_written = writer
+                    .write_record(record.clone())
+                    .await
+                    .expect("write should not fail");
+
+                total_events_written += record_events;
+                total_bytes_written += bytes_written;
+            }
+
+            // Now, our buffer should still be "empty" because we don't acknowledge writes, until we
+            // flush, either implicitly or explicitly, and that includes their size being
+            // represented in the total buffer size, and the "next writer record ID":
+            assert_buffer_is_empty!(ledger);
+
+            // Do another write, which should overflow the write buffer and require those first
+            // two writes to be implicitly flushed, which then requires us to update the ledger state:
+            let record = MultiEventRecord(record_size);
+            let record_events = record.event_count();
+            let bytes_written = writer
+                .write_record(record.clone())
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
+
+            // At this point, the entire write buffer should have been flushed, which means whatever
+            // event counts/bytes written they generated should be represented in the ledger state:
+            assert_buffer_size!(ledger, total_events_written, total_bytes_written);
+
+            // Now, do an explicit flush, which should get us our third write:
+            writer.flush().await.expect("flush should not fail");
+
+            total_events_written += record_events;
+            total_bytes_written += bytes_written;
+            assert_buffer_size!(ledger, total_events_written, total_bytes_written);
+        }
+    })
+    .await;
+}

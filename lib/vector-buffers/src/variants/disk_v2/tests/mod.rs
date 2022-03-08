@@ -283,3 +283,27 @@ where
         .await
         .expect("should not fail to create buffer")
 }
+
+pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
+    data_dir: P,
+    write_buffer_size: usize,
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
+where
+    P: AsRef<Path>,
+    R: Bufferable,
+{
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .write_buffer_size(write_buffer_size)
+        .build()
+        .expect("creating buffer should not fail");
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+
+    Buffer::from_config_inner(config, usage_handle)
+        .await
+        .expect("should not fail to create buffer")
+}

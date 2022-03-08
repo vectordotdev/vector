@@ -93,8 +93,6 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             assert_eq!(first_read, Some(SizedRecord(32)));
             assert_buffer_records!(ledger, 1);
 
-            debug!("MARK MARK MARK");
-
             // Now, we haven't acknowledged that read yet, so our next read should see the writer as
             // done but the total buffer size as >= 0, which means it has to wait for something,
             // which in this case is going to be the wakeup after we acknowledge the read.

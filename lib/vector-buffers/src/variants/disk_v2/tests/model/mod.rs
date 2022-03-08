@@ -692,11 +692,6 @@ proptest! {
     fn model_check(config in arb_buffer_config(), actions in arb_actions(0..10)) {
         let _ = install_tracing_helpers();
 
-        info!(message = "starting new model check run",
-            actions = actions.len(), max_buffer_size = config.max_buffer_size,
-            max_data_file_size = config.max_data_file_size,
-            max_record_size = config.max_record_size, flush_interval = ?config.flush_interval);
-
         let rt = Builder::new_current_thread()
             .enable_all()
             .build()
