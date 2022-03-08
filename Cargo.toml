@@ -153,6 +153,7 @@ aws-config = { version = "0.8.0", optional = true }
 aws-types = { version = "0.8.0", optional = true, features = ["hardcoded-credentials"]}
 aws-sdk-sqs = { version = "0.8.0", optional = true }
 aws-sdk-cloudwatch = { version = "0.8.0", optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.8.0", optional = true }
 aws-smithy-client = { version = "0.38.0", optional = true }
 
 # Azure
@@ -629,7 +630,7 @@ sinks-metrics = [
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
-sinks-aws_cloudwatch_metrics = ["rusoto", "aws-sdk-cloudwatch"]
+sinks-aws_cloudwatch_metrics = ["aws-sdk-cloudwatch", "aws-sdk-cloudwatchlogs"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
