@@ -133,7 +133,7 @@ mod tests {
     struct ParenEncoder;
 
     impl ParenEncoder {
-        pub const fn new() -> Self {
+        pub(super) const fn new() -> Self {
             Self
         }
     }
@@ -160,7 +160,7 @@ mod tests {
     where
         T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
     {
-        pub fn new(encoder: T, n: usize) -> Self {
+        pub(super) fn new(encoder: T, n: usize) -> Self {
             Self(encoder, 0, n)
         }
     }
