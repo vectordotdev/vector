@@ -1,22 +1,13 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct LokiEventUnlabeledError;
+pub struct LokiEventUnlabeled;
 
-impl InternalEvent for LokiEventUnlabeledError {
+impl InternalEvent for LokiEventUnlabeled {
     fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "unlabeled",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        counter!(
-            "processing_errors_total", 1,
-            "error_type" => "unlabeled_event",
-        );
+        counter!("processing_errors_total", 1,
+                "error_type" => "unlabeled_event");
     }
 }
 
@@ -41,76 +32,46 @@ impl InternalEvent for LokiUniqueStream {
 }
 
 #[derive(Debug)]
-pub struct LokiOutOfOrderEventDroppedError {
+pub struct LokiOutOfOrderEventDropped {
     pub count: usize,
 }
 
-impl InternalEvent for LokiOutOfOrderEventDroppedError {
+impl InternalEvent for LokiOutOfOrderEventDropped {
     fn emit_logs(&self) {
-        error!(
-            message = "Received out-of-order event; dropping event.",
-            error_code = "out_of_order",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
+        debug!(
+            message = "Received out-of-order events; dropping events.",
             count = %self.count,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", self.count as u64,
-            "error_code" => "out_of_order",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "error_code" => "out_of_order",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!(
-            "events_discarded_total", self.count as u64,
-            "reason" => "out_of_order",
-        );
-        counter!(
-            "processing_errors_total", self.count as u64,
-            "error_type" => "out_of_order",
-        );
+        counter!("events_discarded_total", self.count as u64,
+                "reason" => "out_of_order"); // deprecated
+        counter!("processing_errors_total", 1,
+                "error_type" => "out_of_order"); // deprecated
+        counter!("component_discarded_events_total", self.count as u64,
+                "reason" => "out_of_order");
     }
 }
 
 #[derive(Debug)]
-pub struct LokiOutOfOrderEventRewrittenError {
+pub struct LokiOutOfOrderEventRewritten {
     pub count: usize,
 }
 
-impl InternalEvent for LokiOutOfOrderEventRewrittenError {
+impl InternalEvent for LokiOutOfOrderEventRewritten {
     fn emit_logs(&self) {
-        error!(
-            message = "Received out-of-order event, rewriting timestamp.",
-            error_code = "out_of_order",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
+        debug!(
+            message = "Received out-of-order events, rewriting timestamps.",
             count = %self.count,
-            internal_log_rate_secs = 30
+            internal_log_rate_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", self.count as u64,
-            "error_code" => "out_of_order",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!(
-            "processing_errors_total", self.count as u64,
-            "error_type" => "out_of_order",
-        );
-        counter!("rewritten_timestamp_events_total", self.count as u64,);
+        counter!("processing_errors_total", 1,
+                "error_type" => "out_of_order"); // deprecated
+        counter!("rewritten_timestamp_events_total", self.count as u64);
     }
 }

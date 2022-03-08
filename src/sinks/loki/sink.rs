@@ -22,8 +22,8 @@ use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeledError, LokiEventsProcessed, LokiOutOfOrderEventDroppedError,
-        LokiOutOfOrderEventRewrittenError, TemplateRenderingError,
+        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
+        LokiOutOfOrderEventRewritten, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -223,7 +223,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeledError);
+            emit!(&LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -375,11 +375,11 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(&LokiOutOfOrderEventRewrittenError { count });
+                        emit!(&LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(&LokiOutOfOrderEventDroppedError { count: batch.len() });
+                    emit!(&LokiOutOfOrderEventDropped { count: batch.len() });
                     None
                 }
             })
