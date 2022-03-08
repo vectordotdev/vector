@@ -4,6 +4,28 @@ use vrl::prelude::*;
 
 use crate::util::Base64Charset;
 
+fn decode_base64(
+    charset: Option<Value>,
+    value: Value,
+) -> std::result::Result<Value, ExpressionError> {
+    let charset = charset
+        .map(|v| Value::try_bytes(v))
+        .transpose()?
+        .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
+        .transpose()?
+        .unwrap_or_default();
+    let config = match charset {
+        Base64Charset::Standard => base64::STANDARD,
+        Base64Charset::UrlSafe => base64::URL_SAFE,
+    };
+    let value = value.try_bytes()?;
+
+    match base64::decode_config(value, config) {
+        Ok(s) => Ok(Value::from(Bytes::from(s))),
+        Err(_) => Err("unable to decode value to base64".into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct DecodeBase64;
 
@@ -46,6 +68,13 @@ impl Function for DecodeBase64 {
             result: Ok(r#"some string value"#),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let charset = args.optional("charset");
+
+        decode_base64(charset, value)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -56,29 +85,10 @@ struct DecodeBase64Fn {
 
 impl Expression for DecodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;
 
-        let charset = self
-            .charset
-            .as_ref()
-            .map(|c| {
-                c.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
-            .transpose()?
-            .unwrap_or_default();
-
-        let config = match charset {
-            Base64Charset::Standard => base64::STANDARD,
-            Base64Charset::UrlSafe => base64::URL_SAFE,
-        };
-
-        match base64::decode_config(value, config) {
-            Ok(s) => Ok(Value::from(Bytes::from(s))),
-            Err(_) => Err("unable to decode value to base64".into()),
-        }
+        decode_base64(charset, value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
