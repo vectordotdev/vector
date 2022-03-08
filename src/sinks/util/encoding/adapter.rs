@@ -180,6 +180,8 @@ pub struct ExceptFieldsConfig {
     except_fields: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+/// Transformations to prepare an event for serialization.
 pub struct Transformer {
     only_fields: Option<Vec<Vec<OwnedSegment>>>,
     except_fields: Option<Vec<String>>,
@@ -187,6 +189,7 @@ pub struct Transformer {
 }
 
 impl Transformer {
+    /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
         self.apply_rules(event);
     }
