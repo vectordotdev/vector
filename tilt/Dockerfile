@@ -12,7 +12,8 @@ RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     /usr/local/bin/mold -run cargo build --bin vector \
-    --no-default-features --features api,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sinks-console,sinks-prometheus && \
+    --no-default-features --features \
+    api,sources-datadog_agent,sources-fluent,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sources-logstash,sources-splunk_hec,sources-statsd,sources-syslog,sources-vector,sinks-console,sinks-prometheus,sinks-vector && \
     cp target/debug/vector .
 
 #
