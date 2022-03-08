@@ -107,6 +107,8 @@ async fn run(
     };
 
     // Loop over the returned results, printing out tap events.
+    #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
     loop {
         let message = stream.next().await;
         if let Some(Some(res)) = message {
