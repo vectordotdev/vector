@@ -7,17 +7,15 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use codecs::encoding::Framer;
 use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
-use tokio_util::codec::Encoder as _;
+use tokio_util::codec::Encoder;
 use vector_buffers::Acker;
 
 use super::SinkBuildError;
 use crate::{
-    codecs::Encoder,
     config::SinkContext,
     dns,
     event::Event,
@@ -81,7 +79,7 @@ impl UdpSinkConfig {
         &self,
         cx: SinkContext,
         transformer: Transformer,
-        encoder: Encoder<Framer>,
+        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector(cx.clone())?;
         let sink = UdpSink::new(connector.clone(), cx.acker(), transformer, encoder);
@@ -230,20 +228,21 @@ impl tower::Service<BytesMut> for UdpService {
     }
 }
 
-struct UdpSink {
+struct UdpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     connector: UdpConnector,
     acker: Acker,
     transformer: Transformer,
-    encoder: Encoder<Framer>,
+    encoder: E,
 }
 
-impl UdpSink {
-    const fn new(
-        connector: UdpConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: Encoder<Framer>,
-    ) -> Self {
+impl<E> UdpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
+    fn new(connector: UdpConnector, acker: Acker, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             acker,
@@ -254,7 +253,10 @@ impl UdpSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for UdpSink {
+impl<E> StreamSink<Event> for UdpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 

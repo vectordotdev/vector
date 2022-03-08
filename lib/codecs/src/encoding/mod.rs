@@ -5,9 +5,8 @@ pub mod format;
 pub mod framing;
 
 pub use format::{
-    BoxedSerializer, JsonSerializer, JsonSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
+    NativeSerializer, NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -214,8 +213,6 @@ pub enum Serializer {
     NativeJson(NativeJsonSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
-    /// Uses an opaque `Serializer` implementation for serialization.
-    Boxed(BoxedSerializer),
 }
 
 impl From<JsonSerializer> for Serializer {
@@ -230,12 +227,6 @@ impl From<RawMessageSerializer> for Serializer {
     }
 }
 
-impl From<BoxedSerializer> for Serializer {
-    fn from(serializer: BoxedSerializer) -> Self {
-        Self::Boxed(serializer)
-    }
-}
-
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_core::Error;
 
@@ -245,7 +236,6 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
-            Serializer::Boxed(serializer) => serializer.encode(event, buffer),
         }
     }
 }

@@ -1,13 +1,9 @@
 use bytes::BufMut;
-use codecs::{
-    encoding::{BoxedSerializer, Framer},
-    NewlineDelimitedEncoder,
-};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use tokio_util::codec::Encoder;
 
 use crate::{
-    codecs::Encoder,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -77,15 +73,15 @@ impl SinkConfig for PapertrailConfig {
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        let framer = NewlineDelimitedEncoder::new().into();
-        let serializer = (Box::new(PapertrailSerializer {
-            pid,
-            process,
-            encoding,
-        }) as BoxedSerializer)
-            .into();
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-        sink_config.build(cx, Transformer::default(), encoder)
+        sink_config.build(
+            cx,
+            Transformer::default(),
+            PapertrailEncoder {
+                pid,
+                process,
+                encoding,
+            },
+        )
     }
 
     fn input(&self) -> Input {
@@ -102,14 +98,14 @@ impl SinkConfig for PapertrailConfig {
 }
 
 #[derive(Debug, Clone)]
-struct PapertrailSerializer {
+struct PapertrailEncoder {
     pid: u32,
     process: Option<Template>,
     encoding: EncodingConfig<Encoding>,
 }
 
-impl tokio_util::codec::Encoder<Event> for PapertrailSerializer {
-    type Error = crate::Error;
+impl Encoder<Event> for PapertrailEncoder {
+    type Error = codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -157,7 +153,9 @@ impl tokio_util::codec::Encoder<Event> for PapertrailSerializer {
 
         formatter
             .format(&mut buffer.writer(), Severity::LOG_INFO, message)
-            .map_err(|error| format!("{}", error))?;
+            .map_err(|error| Self::Error::SerializingError(format!("{}", error).into()))?;
+
+        buffer.put_u8(b'\n');
 
         Ok(())
     }
@@ -167,7 +165,6 @@ impl tokio_util::codec::Encoder<Event> for PapertrailSerializer {
 mod tests {
     use bytes::BytesMut;
     use std::convert::TryFrom;
-    use tokio_util::codec::Encoder;
 
     use super::*;
 
@@ -182,8 +179,7 @@ mod tests {
         evt.as_mut_log().insert("magic", "key");
         evt.as_mut_log().insert("process", "foo");
 
-        let mut bytes = BytesMut::new();
-        let mut serializer = PapertrailSerializer {
+        let mut encoder = PapertrailEncoder {
             pid: 0,
             process: Some(Template::try_from("{{ process }}").unwrap()),
             encoding: EncodingConfig {
@@ -194,7 +190,9 @@ mod tests {
                 timestamp_format: None,
             },
         };
-        serializer.encode(evt, &mut bytes).unwrap();
+
+        let mut bytes = BytesMut::new();
+        encoder.encode(evt, &mut bytes).unwrap();
         let bytes = bytes.freeze();
 
         let msg = bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len());

@@ -5,21 +5,16 @@ use std::{
 };
 
 use bytes::{BufMut, BytesMut};
-use codecs::{
-    encoding::{BoxedSerializer, Framer},
-    NewlineDelimitedEncoder,
-};
 use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::Encoder as _;
+use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
 use vector_core::ByteSizeOf;
 
-use super::util::{encoding::Transformer, SinkBatchSettings};
+use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    codecs::Encoder,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
@@ -107,19 +102,10 @@ impl SinkConfig for StatsdSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let default_namespace = self.default_namespace.clone();
+        let mut encoder = StatsdEncoder { default_namespace };
         match &self.mode {
-            Mode::Tcp(config) => {
-                let framer = NewlineDelimitedEncoder::new().into();
-                let serializer =
-                    (Box::new(StatsdSerializer { default_namespace }) as BoxedSerializer).into();
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(cx, Transformer::default(), encoder)
-            }
+            Mode::Tcp(config) => config.build(cx, Default::default(), encoder),
             Mode::Udp(config) => {
-                let framer = NewlineDelimitedEncoder::new().into();
-                let serializer =
-                    (Box::new(StatsdSerializer { default_namespace }) as BoxedSerializer).into();
-                let mut encoder = Encoder::<Framer>::new(framer, serializer);
                 // 1432 bytes is a recommended packet size to fit into MTU
                 // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
                 // However we need to leave some space for +1 extra trailing event in the buffer.
@@ -138,24 +124,17 @@ impl SinkConfig for StatsdSinkConfig {
                 .with_flat_map(move |event: Event| {
                     stream::iter({
                         let byte_size = event.size_of();
-                        let mut encoded = BytesMut::new();
+                        let mut bytes = BytesMut::new();
                         encoder
-                            .encode(event, &mut encoded)
-                            .ok()
-                            .map(|_| Ok(EncodedEvent::new(encoded, byte_size)))
+                            .encode(event, &mut bytes)
+                            .map(|_| Ok(EncodedEvent::new(bytes, byte_size)))
                     })
                 });
 
                 Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => {
-                let framer = NewlineDelimitedEncoder::new().into();
-                let serializer =
-                    (Box::new(StatsdSerializer { default_namespace }) as BoxedSerializer).into();
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(cx, Transformer::default(), encoder)
-            }
+            Mode::Unix(config) => config.build(cx, Default::default(), encoder),
         }
     }
 
@@ -208,14 +187,14 @@ fn push_event<V: Display>(
 }
 
 #[derive(Debug, Clone)]
-struct StatsdSerializer {
+struct StatsdEncoder {
     default_namespace: Option<String>,
 }
 
-impl tokio_util::codec::Encoder<Event> for StatsdSerializer {
-    type Error = crate::Error;
+impl Encoder<Event> for StatsdEncoder {
+    type Error = codecs::encoding::Error;
 
-    fn encode(&mut self, event: Event, buffer: &mut bytes::BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, event: Event, bytes: &mut BytesMut) -> Result<(), Self::Error> {
         let mut buf = Vec::new();
 
         let metric = event.as_metric();
@@ -270,7 +249,8 @@ impl tokio_util::codec::Encoder<Event> for StatsdSerializer {
             buf.join("|"),
         );
 
-        buffer.put_slice(&message.into_bytes());
+        bytes.put_slice(&message.into_bytes());
+        bytes.put_u8(b'\n');
 
         Ok(())
     }
@@ -304,15 +284,6 @@ mod test {
 
     use super::*;
     use crate::{event::Metric, test_util::*};
-
-    fn encode_event(event: Event, default_namespace: Option<String>) -> Option<BytesMut> {
-        let framer = NewlineDelimitedEncoder::new().into();
-        let serializer =
-            (Box::new(StatsdSerializer { default_namespace }) as BoxedSerializer).into();
-        let mut encoder = Encoder::<Framer>::new(framer, serializer);
-        let mut bytes = BytesMut::new();
-        encoder.encode(event, &mut bytes).ok().map(|_| bytes)
-    }
 
     #[test]
     fn generate_config() {
@@ -366,8 +337,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -380,10 +355,14 @@ mod test {
             MetricValue::Counter { value: 1.5 },
         );
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, None).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
-        assert_eq!("counter:1.5|c\n", from_utf8(frame).unwrap());
+        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -396,8 +375,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -411,8 +394,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -440,8 +427,12 @@ mod test {
         .with_tags(Some(tags()));
 
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
@@ -457,8 +448,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 

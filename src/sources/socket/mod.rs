@@ -228,10 +228,7 @@ mod test {
         time::{timeout, Duration, Instant},
     };
 
-    use codecs::{
-        encoding::{self, Framer, NewlineDelimitedEncoder},
-        NewlineDelimitedDecoderConfig,
-    };
+    use codecs::NewlineDelimitedDecoderConfig;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -249,7 +246,6 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        codecs::Encoder,
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -539,29 +535,25 @@ mod test {
         let message = random_string(512);
         let message_bytes = Bytes::from(message.clone());
 
-        let sink_cx = SinkContext::new_test();
-        let framer = NewlineDelimitedEncoder::new().into();
+        let cx = SinkContext::new_test();
         #[derive(Clone, Debug)]
         struct Serializer {
             bytes: Bytes,
         }
         impl tokio_util::codec::Encoder<Event> for Serializer {
-            type Error = crate::Error;
+            type Error = codecs::encoding::Error;
 
             fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
                 buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
                 Ok(())
             }
         }
-        let serializer = (Box::new(Serializer {
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
             bytes: message_bytes,
-        }) as encoding::BoxedSerializer)
-            .into();
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-        let sink_config = TcpSinkConfig::from_address(addr.to_string());
-        let (sink, _healthcheck) = sink_config
-            .build(sink_cx, Default::default(), encoder)
-            .unwrap();
+        };
+        let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat(())

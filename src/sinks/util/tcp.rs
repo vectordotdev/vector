@@ -8,7 +8,6 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::encoding::Framer;
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -17,11 +16,10 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
-use tokio_util::codec::Encoder as _;
+use tokio_util::codec::Encoder;
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
     config::SinkContext,
     dns,
     event::Event,
@@ -91,7 +89,7 @@ impl TcpSinkConfig {
         &self,
         cx: SinkContext,
         transformer: Transformer,
-        encoder: Encoder<Framer>,
+        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -198,20 +196,21 @@ impl TcpConnector {
     }
 }
 
-struct TcpSink {
+struct TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     connector: TcpConnector,
     acker: Acker,
     transformer: Transformer,
-    encoder: Encoder<Framer>,
+    encoder: E,
 }
 
-impl TcpSink {
-    const fn new(
-        connector: TcpConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: Encoder<Framer>,
-    ) -> Self {
+impl<E> TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+{
+    fn new(connector: TcpConnector, acker: Acker, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             acker,
@@ -256,7 +255,10 @@ impl TcpSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for TcpSink {
+impl<E> StreamSink<Event> for TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + Sync + 'static,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.

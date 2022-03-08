@@ -1,20 +1,13 @@
 use bytes::{BufMut, BytesMut};
-use codecs::{
-    encoding::{Framer, Serializer},
-    BytesEncoder,
-};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio_util::codec::Encoder;
 use vector_core::event::{proto, Event};
 
 use crate::{
-    codecs::Encoder,
     config::{GenerateConfig, SinkContext},
-    sinks::{
-        util::{encoding::Transformer, tcp::TcpSinkConfig},
-        Healthcheck, VectorSink,
-    },
+    sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -74,11 +67,29 @@ impl VectorConfig {
             self.tls.clone(),
             self.send_buffer_bytes,
         );
+        sink_config.build(cx, Default::default(), VectorEncoder)
+    }
+}
 
-        let framer = BytesEncoder::new().into();
-        let serializer = Serializer::Boxed(Box::new(VectorSerializer) as _);
-        let encoder = Encoder::<Framer>::new(framer, serializer);
-        sink_config.build(cx, Transformer::default(), encoder)
+#[derive(Debug, Clone)]
+struct VectorEncoder;
+
+impl Encoder<Event> for VectorEncoder {
+    type Error = codecs::encoding::Error;
+
+    fn encode(&mut self, event: Event, out: &mut BytesMut) -> Result<(), Self::Error> {
+        let data = proto::EventWrapper::from(event);
+        let event_len = data.encoded_len();
+        let full_len = event_len + 4;
+
+        let capacity = out.capacity();
+        if capacity < full_len {
+            out.reserve(full_len - capacity);
+        }
+        out.put_u32(event_len as u32);
+        data.encode(out).unwrap();
+
+        Ok(())
     }
 }
 
@@ -86,25 +97,6 @@ impl VectorConfig {
 enum HealthcheckError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: std::io::Error },
-}
-
-#[derive(Debug, Clone)]
-struct VectorSerializer;
-
-impl tokio_util::codec::Encoder<Event> for VectorSerializer {
-    type Error = crate::Error;
-
-    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let data = proto::EventWrapper::from(event);
-        let event_len = data.encoded_len();
-        let full_len = event_len + 4;
-
-        buffer.reserve(full_len);
-        buffer.put_u32(event_len as u32);
-        data.encode(buffer)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]

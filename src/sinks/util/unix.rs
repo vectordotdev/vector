@@ -2,16 +2,14 @@ use std::{path::PathBuf, pin::Pin, time::Duration};
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::encoding::Framer;
 use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
-use tokio_util::codec::Encoder as _;
+use tokio_util::codec::Encoder;
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
     config::SinkContext,
     event::Event,
     internal_events::{
@@ -50,7 +48,7 @@ impl UnixSinkConfig {
         &self,
         cx: SinkContext,
         transformer: Transformer,
-        encoder: Encoder<Framer>,
+        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let sink = UnixSink::new(connector.clone(), cx.acker(), transformer, encoder);
@@ -106,19 +104,25 @@ impl UnixConnector {
     }
 }
 
-struct UnixSink {
+struct UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     connector: UnixConnector,
     acker: Acker,
     transformer: Transformer,
-    encoder: Encoder<Framer>,
+    encoder: E,
 }
 
-impl UnixSink {
-    pub const fn new(
+impl<E> UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
+    pub fn new(
         connector: UnixConnector,
         acker: Acker,
         transformer: Transformer,
-        encoder: Encoder<Framer>,
+        encoder: E,
     ) -> Self {
         Self {
             connector,
@@ -140,7 +144,10 @@ impl UnixSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for UnixSink {
+impl<E> StreamSink<Event> for UnixSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     // Same as TcpSink, more details there.
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut encoder = self.encoder.clone();
@@ -190,10 +197,14 @@ impl StreamSink<Event> for UnixSink {
 
 #[cfg(test)]
 mod tests {
+    use codecs::encoding::Framer;
     use tokio::net::UnixListener;
 
     use super::*;
-    use crate::test_util::{random_lines_with_stream, CountReceiver};
+    use crate::{
+        codecs::Encoder,
+        test_util::{random_lines_with_stream, CountReceiver},
+    };
 
     fn temp_uds_path(name: &str) -> PathBuf {
         tempfile::tempdir().unwrap().into_path().join(name)
@@ -207,7 +218,7 @@ mod tests {
             .build(
                 SinkContext::new_test(),
                 Default::default(),
-                Default::default()
+                Encoder::<Framer>::default()
             )
             .unwrap()
             .1
@@ -219,7 +230,7 @@ mod tests {
             .build(
                 SinkContext::new_test(),
                 Default::default(),
-                Default::default()
+                Encoder::<Framer>::default()
             )
             .unwrap()
             .1
@@ -239,7 +250,7 @@ mod tests {
         let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
         let (sink, _healthcheck) = config
-            .build(cx, Default::default(), Default::default())
+            .build(cx, Default::default(), Encoder::<Framer>::default())
             .unwrap();
 
         // Send the test data
