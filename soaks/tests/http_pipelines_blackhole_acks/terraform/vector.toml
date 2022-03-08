@@ -37,43 +37,6 @@ type = "pipelines"
 inputs = ["preprocessing"]
 
 [transforms.processing.logs]
-order = [
-    "nginx",
-    "redis",
-    "consul",
-    "python",
-    "rabbitmq",
-    "zookeeper",
-    "elasticsearch",
-    "kafka",
-    "couchdb",
-    "docker",
-    "datadog_agent",
-    "ruby",
-    "vault",
-    "nginx_ingress_controller",
-    "mysql",
-    "kubernetes_cluster_autoscaler",
-    "aws_alb_ingress_controller",
-    "proxysql",
-    "azure",
-    "azure_web",
-    "azure_storage",
-    "azure_network",
-    "azure_compute",
-    "etcd",
-    "glog_pipeline",
-    "auth0",
-    "kube_scheduler_glog",
-    "aws_ecs-agent",
-    "nodejs",
-    "postgresql",
-    "cassandra",
-    "apache_httpd",
-    "azure_recovery_services",
-    "c",
-    "web_browser_logs"
-]
 
 [transforms.processing.logs.pipelines.nginx]
 name = "nginx"
