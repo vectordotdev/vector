@@ -108,6 +108,6 @@ jobs:
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
         with:
-          issue-number: ${{ needs.pr-number.outputs.content }}
+          issue-number: ${{ steps.pr-number.outputs.content }}
           edit-mode: replace
           body: ${{ steps.read-analysis.outputs.content }}
