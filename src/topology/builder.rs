@@ -39,8 +39,9 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    source_sender::CHUNK_SIZE,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    SourceSender, source_sender::CHUNK_SIZE,
+    SourceSender,
 };
 
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
