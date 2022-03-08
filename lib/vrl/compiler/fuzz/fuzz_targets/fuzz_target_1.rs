@@ -1,37 +1,21 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use std::collections::BTreeMap;
-use vrl_compiler as vrl;
-
-fn dump(text: &str) {
-    use std::io::prelude::*;
-
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open("nork.txt")
-        .unwrap();
-
-    file.write_all(text.as_bytes()).unwrap();
-    file.write_all(b"\n\n").unwrap();
-}
+use vrl_compiler;
 
 fuzz_target!(|data: Vec<parser::Program>| {
     for expr in data {
         // Compile the VRL.
         let exprstr = format!("{}", expr);
         let exprdebug = format!("{:?}", expr);
-        dump(&format!("Compiling {:?}", exprstr));
 
         match vrl_compiler::compile(expr, &stdlib::all()) {
             Ok(program) => {
-                dump(&format!("Compiled {:?}", exprstr));
                 let timezone = Default::default();
-                let mut runtime = core::Runtime::default();
+                let mut runtime = vrl::Runtime::default();
 
-                let mut target_vm = vrl::Value::Object(BTreeMap::new());
-                let mut target_resolve = vrl::Value::Object(BTreeMap::new());
+                let mut target_vm = vrl_compiler::Value::Object(BTreeMap::new());
+                let mut target_resolve = vrl_compiler::Value::Object(BTreeMap::new());
 
                 // Run the VRL in the VM
                 let vm = runtime.compile(stdlib::all(), &program).unwrap();
