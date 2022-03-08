@@ -17,18 +17,40 @@ jobs:
       ${{ github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: 'Output job parameters'
+        uses: actions/github-script@v3.1.0
+        with:
+          script: |
+            console.log("::group::Context");
+            console.log(context);
+            console.log("::endgroup::");
+
+            console.log("::group::Github");
+            console.log(github);
+            console.log("::endgroup::");
+
       - name: 'Download PR number'
         uses: actions/github-script@v3.1.0
         with:
           script: |
+            console.log("Fetching artifacts for run %s of %s/%s", "${{github.event.workflow_run.id }}", context.repo.owner, context.repo.repo);
+
             var artifacts = await github.paginate(github.actions.listWorkflowRunArtifacts, {
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
+
+            console.log("::group::Fetched %d artifacts", artifacts.length);
+            console.dir(artifacts, {'maxArrayLength': null});
+            console.log("::endgroup::");
+
             var matchArtifact = artifacts.filter((artifact) => {
               return artifact.name == "pr-number"
             })[0];
+
+            console.log("Downloading artifact %s", matchArtifact.id);
+
             var download = await github.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -49,14 +71,24 @@ jobs:
         uses: actions/github-script@v3.1.0
         with:
           script: |
+            console.log("Fetching artifacts for run %s of %s/%s", "${{github.event.workflow_run.id }}", context.repo.owner, context.repo.repo);
+
             var artifacts = await github.paginate(github.actions.listWorkflowRunArtifacts, {
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: ${{github.event.workflow_run.id }},
             });
+
+            console.log("::group::Fetched %d artifacts", artifacts.length);
+            console.dir(artifacts, {'maxArrayLength': null});
+            console.log("::endgroup::");
+
             var matchArtifact = artifacts.filter((artifact) => {
               return artifact.name == "soak-analysis"
             })[0];
+
+            console.log("Downloading artifact %s", matchArtifact.id);
+
             var download = await github.actions.downloadArtifact({
                owner: context.repo.owner,
                repo: context.repo.repo,
