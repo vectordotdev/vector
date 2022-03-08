@@ -59,7 +59,7 @@ pub fn normalize_fields<T: AsRef<str>>(value: T) -> Vec<Field> {
             .collect();
     }
 
-    let field = match value.replace("@", "custom.") {
+    let field = match value.replace('@', "custom.") {
         v if value.starts_with('@') => Field::Facet(v),
         v if DEFAULT_FIELDS.contains(&v.as_ref()) => Field::Default(v),
         v if RESERVED_ATTRIBUTES.contains(&v.as_ref()) => Field::Reserved(v),

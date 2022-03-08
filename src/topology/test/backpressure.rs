@@ -208,7 +208,7 @@ async fn multiple_inputs_backpressure() {
 }
 
 mod test_sink {
-    use crate::config::{Input, SinkConfig, SinkContext};
+    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
     use crate::event::Event;
     use crate::sinks::util::StreamSink;
     use crate::sinks::{Healthcheck, VectorSink};
@@ -256,8 +256,8 @@ mod test_sink {
             "test-backpressure-sink"
         }
 
-        fn can_acknowledge(&self) -> bool {
-            false
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
         }
     }
 }
@@ -286,7 +286,7 @@ mod test_source {
             let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
-                    let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
+                    let _result = cx.out.send_event(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::AcqRel);
                 }
                 Ok(())

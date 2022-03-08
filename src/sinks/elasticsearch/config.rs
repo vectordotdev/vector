@@ -10,7 +10,7 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::rusoto::RegionOrEndpoint,
-    config::{log_schema, DataType, Input, SinkConfig, SinkContext},
+    config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -72,6 +72,13 @@ pub struct ElasticsearchConfig {
     pub bulk: Option<BulkConfig>,
     pub data_stream: Option<DataStreamConfig>,
     pub metrics: Option<MetricToLogConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -349,8 +356,8 @@ impl SinkConfig for ElasticsearchConfig {
         "elasticsearch"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

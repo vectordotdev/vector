@@ -53,7 +53,7 @@ Run Vector with this configuration and watch the configuration for changes.
 vector --config path/to/config.toml -w
 ```
 
-Now run `vector tap`! You should see start seeing a stream of
+Now run `vector tap`! You should start seeing a stream of
 notifications (sent to `stderr`) and events (sent to `stdout`) in your terminal.
 
 ```console
@@ -98,11 +98,11 @@ matching success or failure and improper usage of patterns. If you'd like to
 hide notifications, use the `--quiet` option.
 
 By default, `tap` outputs events encoded in JSON format. YAML and logfmt are
-also supported and can be switched to using the `--format` option.
+also supported and can be enabled by using the `--format` option.
 
 Events in `tap` are actually sampled from their tapped components for
 performance and reliability. You can change the time interval of each sample
-using `--interval` and the maximum number of events to sample per interval with
+with `--interval` and the maximum number of events to sample per interval with
 `--limit`.
 
 Try running `vector tap --quiet --format logfmt`. You'll now see no

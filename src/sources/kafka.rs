@@ -282,7 +282,7 @@ async fn kafka_source(
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                        match out.send_stream(&mut stream).await {
+                        match out.send_event_stream(&mut stream).await {
                             Err(error) => {
                                 emit!(&StreamClosedError { error, count });
                             }
@@ -294,7 +294,7 @@ async fn kafka_source(
                             }
                         }
                     }
-                    None => match out.send_stream(&mut stream).await {
+                    None => match out.send_event_stream(&mut stream).await {
                         Err(error) => {
                             emit!(&StreamClosedError { error, count });
                         }
@@ -381,7 +381,13 @@ fn create_consumer(
 mod test {
     use super::*;
 
-    pub(super) const BOOTSTRAP_SERVER: &str = "localhost:9091";
+    pub fn kafka_host() -> String {
+        std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
+    }
+
+    pub fn kafka_address(port: u16) -> String {
+        format!("{}:{}", kafka_host(), port)
+    }
 
     #[test]
     fn generate_config() {
@@ -390,7 +396,7 @@ mod test {
 
     pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
         KafkaSourceConfig {
-            bootstrap_servers: BOOTSTRAP_SERVER.into(),
+            bootstrap_servers: kafka_address(9091),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
@@ -448,7 +454,7 @@ mod integration_test {
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
-        client.set("bootstrap.servers", BOOTSTRAP_SERVER);
+        client.set("bootstrap.servers", kafka_address(9091));
         client.set("produce.offset.report", "true");
         client.set("message.timeout.ms", "5000");
         client.set("auto.commit.interval.ms", "1");

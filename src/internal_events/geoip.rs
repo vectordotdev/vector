@@ -13,7 +13,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit_logs(&self) {
         error!(
             message = %format!("IP Address not parsed correctly: {:?}", self.error),
-            error = "invalid_ip_address",
+            error_code = "invalid_ip_address",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             address = %self.address,
@@ -24,7 +24,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "invalid_ip_address",
+            "error_code" => "invalid_ip_address",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "address" => self.address.to_string(),

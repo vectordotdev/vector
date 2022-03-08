@@ -13,13 +13,15 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        http::{BatchedHttpSink, HttpEventEncoder, HttpSink, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
     },
@@ -56,6 +58,12 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[cfg(test)]
@@ -70,6 +78,7 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -170,17 +179,17 @@ impl SinkConfig for HttpSinkConfig {
         "http"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpSinkConfig {
-    type Input = BytesMut;
-    type Output = BytesMut;
+pub struct HttpSinkEventEncoder {
+    encoding: EncodingConfig<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<BytesMut> for HttpSinkEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
@@ -192,7 +201,7 @@ impl HttpSink for HttpSinkConfig {
                     body.put_u8(b'\n');
                     body
                 } else {
-                    emit!(&HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessageError);
                     return None;
                 }
             }
@@ -217,6 +226,19 @@ impl HttpSink for HttpSinkConfig {
         });
 
         Some(body)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for HttpSinkConfig {
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = HttpSinkEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        HttpSinkEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -336,10 +358,7 @@ mod tests {
         config::SinkContext,
         sinks::{
             http::HttpSinkConfig,
-            util::{
-                http::HttpSink,
-                test::{build_test_server, build_test_server_generic, build_test_server_status},
-            },
+            util::test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
@@ -356,7 +375,8 @@ mod tests {
 
         let mut config = default_config(Encoding::Text);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let mut encoder = config.build_encoder();
+        let bytes = encoder.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from("hello world\n"));
     }
@@ -368,7 +388,8 @@ mod tests {
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let mut encoder = config.build_encoder();
+        let bytes = encoder.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
