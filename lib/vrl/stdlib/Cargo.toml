@@ -303,5 +303,4 @@ bench = false
 [[bench]]
 name = "benches"
 harness = false
-test = true
 required-features = ["default"]

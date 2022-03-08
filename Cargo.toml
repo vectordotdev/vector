@@ -76,6 +76,7 @@ members = [
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
+  "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/tracing-limit",
@@ -103,6 +104,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
+lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -184,8 +186,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.33", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.31", default-features = false, optional = true }
+async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -214,8 +216,8 @@ bollard = { version = "0.11.1", default-features = false, features = ["ssl"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.5", default-features = false }
-clap = { version = "3.1.5", features = ["derive", "env"] }
+cidr-utils = { version = "0.5.6", default-features = false }
+clap = { version = "3.1.6", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -817,44 +819,37 @@ enrichment-tables-benches = ["enrichment-tables-file"]
 [[bench]]
 name = "default"
 harness = false
-test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "dnstap"
 path = "benches/dnstap/mod.rs"
 harness = false
-test = true
 required-features = ["dnstap-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
-test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "enrichment_tables_file"
 harness = false
-test = true
 required-features = ["enrichment-tables-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
-test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "loki"
 harness = false
-test = true
 required-features = ["loki-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
-test = true
 required-features = ["statistic-benches"]
 
 [[bench]]
@@ -868,5 +863,4 @@ required-features = ["transform-benches"]
 name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
-test = false
 required-features = ["codecs-benches"]

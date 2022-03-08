@@ -70,7 +70,7 @@ components: sinks: loki: {
 
 	configuration: {
 		endpoint: {
-			description: "The base URL of the Loki instance."
+			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]

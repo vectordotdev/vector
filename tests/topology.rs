@@ -41,7 +41,7 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 fn into_message(event: Event) -> String {
     event
         .as_log()
-        .get(&vector::config::log_schema().message_key())
+        .get(vector::config::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
 }
