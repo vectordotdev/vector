@@ -3,9 +3,10 @@
 use super::{EncodingConfiguration, TimestampFormat};
 use crate::{
     codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
-    event::{Event, PathComponent},
+    event::Event,
 };
 use core::fmt::Debug;
+use lookup::lookup_v2::OwnedSegment;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
@@ -107,17 +108,11 @@ where
                 }
             }
             Self::LegacyEncodingConfig(config) => Transformer {
-                only_fields: config.encoding.only_fields().as_ref().map(|fields| {
-                    fields
-                        .iter()
-                        .map(|field| {
-                            field
-                                .iter()
-                                .map(|component| component.clone().into_static())
-                                .collect()
-                        })
-                        .collect()
-                }),
+                only_fields: config
+                    .encoding
+                    .only_fields()
+                    .as_ref()
+                    .map(|fields| fields.iter().map(|field| field.to_vec()).collect()),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
             },
@@ -177,7 +172,7 @@ pub enum OnlyOrExceptFieldsConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnlyFieldsConfig {
-    only_fields: Vec<Vec<PathComponent<'static>>>,
+    only_fields: Vec<Vec<OwnedSegment>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,13 +180,16 @@ pub struct ExceptFieldsConfig {
     except_fields: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+/// Transformations to prepare an event for serialization.
 pub struct Transformer {
-    only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
+    only_fields: Option<Vec<Vec<OwnedSegment>>>,
     except_fields: Option<Vec<String>>,
     timestamp_format: Option<TimestampFormat>,
 }
 
 impl Transformer {
+    /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
         self.apply_rules(event);
     }
@@ -208,7 +206,7 @@ impl EncodingConfiguration for Transformer {
         &None
     }
 
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>> {
         &self.only_fields
     }
 

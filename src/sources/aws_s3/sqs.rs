@@ -474,7 +474,7 @@ impl IngestorProcess {
 
                     if let Some(metadata) = &metadata {
                         for (key, value) in metadata {
-                            log.insert(key, value.clone());
+                            log.insert(key.as_str(), value.clone());
                         }
                     }
 
