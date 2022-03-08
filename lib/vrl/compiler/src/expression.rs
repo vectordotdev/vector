@@ -129,6 +129,27 @@ impl Expr {
             Abort(..) => "abort operation",
         }
     }
+
+    pub fn as_enum(
+        &self,
+        keyword: &'static str,
+        variants: Vec<Value>,
+    ) -> Result<Value, super::function::Error> {
+        match self.as_value() {
+            Some(value) => variants.iter().find(|v| **v == value).cloned().ok_or(
+                super::function::Error::InvalidEnumVariant {
+                    keyword,
+                    value,
+                    variants,
+                },
+            ),
+            None => Err(super::function::Error::InvalidEnumVariant {
+                keyword,
+                value: Value::Null,
+                variants,
+            }),
+        }
+    }
 }
 
 impl Expression for Expr {

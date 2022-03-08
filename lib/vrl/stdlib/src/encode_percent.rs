@@ -137,28 +137,13 @@ impl Function for EncodePercent {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("ascii_set", Some(expr)) => match expr.as_value() {
-                Some(value) => {
-                    let bytes = value.clone().try_bytes().expect("unit not bytes");
-                    match bytes.as_ref() {
-                        b"NON_ALPHANUMERIC"
-                        | b"CONTROLS"
-                        | b"FRAGMENT"
-                        | b"QUERY"
-                        | b"SPECIAL"
-                        | b"PATH"
-                        | b"USERINFO"
-                        | b"COMPONENT"
-                        | b"WWW_FORM_URLENCODED" => Ok(Some(Box::new(bytes) as _)),
-                        _ => Err(Box::new(vrl::function::Error::InvalidEnumVariant {
-                            keyword: "ascii_set",
-                            value,
-                            variants: ascii_sets(),
-                        })),
-                    }
-                }
-                None => Ok(None),
-            },
+            ("ascii_set", Some(expr)) => {
+                let set = expr
+                    .as_enum("ascii_set", ascii_sets())?
+                    .try_bytes()
+                    .expect("ascii set not bytes");
+                Ok(Some(Box::new(set) as _))
+            }
             ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
             _ => Ok(None),
         }
