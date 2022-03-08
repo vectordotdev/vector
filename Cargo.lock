@@ -3779,6 +3779,7 @@ checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 name = "lookup"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "inherent",
  "lalrpop",
  "lalrpop-util",
@@ -8400,6 +8401,7 @@ dependencies = [
  "libc",
  "listenfd",
  "logfmt",
+ "lookup",
  "lru",
  "maxminddb",
  "md-5 0.10.1",

@@ -87,7 +87,3 @@ test = ["vector_common/test"]
 name = "event"
 path = "benches/event/main.rs"
 harness = false
-
-[[bench]]
-name = "path_iter"
-harness = false

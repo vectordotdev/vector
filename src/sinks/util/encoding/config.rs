@@ -3,13 +3,13 @@ use std::{
     marker::PhantomData,
 };
 
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 
 use crate::{
-    event::{PathComponent, PathIter},
     serde::skip_serializing_if_default,
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
@@ -28,7 +28,7 @@ pub struct EncodingConfig<E> {
     pub(crate) schema: Option<String>,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
+    pub(crate) only_fields: Option<Vec<Vec<OwnedSegment>>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -47,7 +47,7 @@ impl<E> EncodingConfiguration for EncodingConfig<E> {
     }
 
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent<'static>>>> {
+    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>> {
         &self.only_fields
     }
 
@@ -164,11 +164,7 @@ where
             only_fields: inner.only_fields.map(|fields| {
                 fields
                     .iter()
-                    .map(|only| {
-                        PathIter::new(only)
-                            .map(|component| component.into_static())
-                            .collect()
-                    })
+                    .map(|only| parse_path(only).segments)
                     .collect()
             }),
             except_fields: inner.except_fields,

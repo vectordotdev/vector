@@ -76,6 +76,7 @@ members = [
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
+  "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/tracing-limit",
@@ -103,6 +104,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
+lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
