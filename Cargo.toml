@@ -818,44 +818,37 @@ enrichment-tables-benches = ["enrichment-tables-file"]
 [[bench]]
 name = "default"
 harness = false
-test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "dnstap"
 path = "benches/dnstap/mod.rs"
 harness = false
-test = true
 required-features = ["dnstap-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
-test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "enrichment_tables_file"
 harness = false
-test = true
 required-features = ["enrichment-tables-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
-test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "loki"
 harness = false
-test = true
 required-features = ["loki-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
-test = true
 required-features = ["statistic-benches"]
 
 [[bench]]
@@ -869,5 +862,4 @@ required-features = ["transform-benches"]
 name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
-test = false
 required-features = ["codecs-benches"]
