@@ -12,13 +12,35 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 
 ## Install Vector
 
-We can install Vector using this installation script:
+We can install Vector using an installation script or Docker:
+
+{{< tabs default="Script" >}}
+{{< tab title="Script" >}}
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
 
-Or you can [choose your preferred installation method][install].
+{{< /tab >}}
+{{< tab title="Docker" >}}
+
+```shell
+docker pull timberio/vector:{{< version >}}-distroless-libc
+```
+
+In addition to `distroless-libc`, `distroless-static`, `alpine` and `debian` distributions are also available.
+
+If you install Vector using Docker, we recommend using an alias to run the commands throughout this tutorial:
+
+```shell
+alias vector='docker run -it --rm timberio/vector:{{< version >}}'
+```
+
+And now something after.
+{{< /tab >}}
+{{< /tabs >}}
+
+Other [installation methods][install] are available.
 
 Once Vector is installed, let's check to make sure that it's working correctly:
 
@@ -100,7 +122,7 @@ encoding.codec = "json"
 The first component uses the [`demo_logs` source][demo_logs], which creates sample log data that enables you to simulate different types of events in various formats.
 
 {{< warning >}}
-Wait, I though you said "real" observability data? We choose generated data here because it's hard for us to know which platform you're trying Vector on. That means it's also hard to document a single way for everyone to get data into Vector.
+Wait, I thought you said "real" observability data? We choose generated data here because it's hard for us to know which platform you're trying Vector on. That means it's also hard to document a single way for everyone to get data into Vector.
 {{< /warning >}}
 
 The second component is a transform called [`remap`][remap]. The `remap` transform is at the heart of what makes Vector so powerful for processing observability data. The transform exposes a simple language called [Vector Remap Language][vrl] that allows you to parse, manipulate, and decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational

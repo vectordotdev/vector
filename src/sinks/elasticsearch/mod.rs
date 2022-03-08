@@ -13,49 +13,46 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
+use std::convert::TryFrom;
+
 pub use common::*;
 pub use config::*;
-pub use encoder::ElasticSearchEncoder;
-
-use crate::{
-    config::SinkDescription,
-    internal_events::TemplateRenderingFailed,
-    template::{Template, TemplateParseError},
-};
+pub use encoder::ElasticsearchEncoder;
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
     Request,
 };
-
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::SignedRequest;
 use serde::{Deserialize, Serialize};
-
 use snafu::{ResultExt, Snafu};
 
-use crate::aws::rusoto::{self, AwsAuthentication};
-use std::convert::TryFrom;
-
-use crate::event::{EventRef, LogEvent};
+use crate::{
+    aws::rusoto::{self, AwsAuthentication},
+    config::SinkDescription,
+    event::{EventRef, LogEvent},
+    internal_events::TemplateRenderingError,
+    template::{Template, TemplateParseError},
+};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub enum ElasticSearchAuth {
+pub enum ElasticsearchAuth {
     Basic { user: String, password: String },
     Aws(AwsAuthentication),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum ElasticSearchMode {
+pub enum ElasticsearchMode {
     #[serde(alias = "normal")]
     Bulk,
     DataStream,
 }
 
-impl Default for ElasticSearchMode {
+impl Default for ElasticsearchMode {
     fn default() -> Self {
         Self::Bulk
     }
@@ -98,13 +95,13 @@ impl TryFrom<&str> for BulkAction {
 }
 
 inventory::submit! {
-    SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
+    SinkDescription::new::<ElasticsearchConfig>("elasticsearch")
 }
 
-impl_generate_config_from_default!(ElasticSearchConfig);
+impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
-pub enum ElasticSearchCommonMode {
+pub enum ElasticsearchCommonMode {
     Bulk {
         index: Template,
         action: Option<Template>,
@@ -112,13 +109,13 @@ pub enum ElasticSearchCommonMode {
     DataStream(DataStreamConfig),
 }
 
-impl ElasticSearchCommonMode {
+impl ElasticsearchCommonMode {
     fn index(&self, log: &LogEvent) -> Option<String> {
         match self {
             Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(&TemplateRenderingError {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -131,14 +128,14 @@ impl ElasticSearchCommonMode {
 
     fn bulk_action<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<BulkAction> {
         match self {
-            ElasticSearchCommonMode::Bulk {
+            ElasticsearchCommonMode::Bulk {
                 action: bulk_action,
                 ..
             } => match bulk_action {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(&TemplateRenderingError {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
@@ -149,7 +146,7 @@ impl ElasticSearchCommonMode {
                 None => Some(BulkAction::Index),
             },
             // avoid the interpolation
-            ElasticSearchCommonMode::DataStream(_) => Some(BulkAction::Create),
+            ElasticsearchCommonMode::DataStream(_) => Some(BulkAction::Create),
         }
     }
 
@@ -184,7 +181,7 @@ async fn finish_signer(
     let credentials = credentials_provider
         .credentials()
         .await
-        .context(AwsCredentialsGenerateFailed)?;
+        .context(AwsCredentialsGenerateFailedSnafu)?;
 
     signer.sign(&credentials);
 

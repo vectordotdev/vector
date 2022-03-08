@@ -1,7 +1,11 @@
-use crate::config::{DataType, TransformConfig, TransformContext};
-use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
+    event::Event,
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Noop;
@@ -13,12 +17,12 @@ impl TransformConfig for Noop {
         Ok(Transform::function(self.clone()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -27,7 +31,7 @@ impl TransformConfig for Noop {
 }
 
 impl FunctionTransform for Noop {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         output.push(event);
     }
 }

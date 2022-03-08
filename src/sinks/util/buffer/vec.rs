@@ -1,5 +1,6 @@
-use super::{err_event_too_large, Batch, BatchSize, PushResult};
 use bytes::Bytes;
+
+use super::{err_event_too_large, Batch, BatchSize, PushResult};
 
 pub trait EncodedLength {
     fn encoded_length(&self) -> usize;
@@ -54,7 +55,7 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     }
 
     fn finish(self) -> Self::Output {
-        self.batch.unwrap_or_else(Vec::new)
+        self.batch.unwrap_or_default()
     }
 
     fn num_items(&self) -> usize {

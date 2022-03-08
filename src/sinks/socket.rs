@@ -1,12 +1,15 @@
+use serde::{Deserialize, Serialize};
+
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     sinks::util::{
         encode_log, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -71,35 +74,42 @@ impl SinkConfig for SocketSinkConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "socket"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        config::SinkContext,
-        event::Event,
-        test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
-    };
-    use futures::stream::{self, StreamExt};
-    use serde_json::Value;
     use std::{
         future::ready,
+        iter,
         net::{SocketAddr, UdpSocket},
     };
+
+    use futures::stream::StreamExt;
+    use serde_json::Value;
     use tokio::{
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        event::Event,
+        test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
+    };
 
     #[test]
     fn generate_config() {
@@ -117,7 +127,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
-        sink.run(stream::once(ready(event))).await.unwrap();
+        sink.run_events(iter::once(event)).await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -188,8 +198,6 @@ mod test {
     #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
-        use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
         use std::{
             pin::Pin,
             sync::{
@@ -198,6 +206,8 @@ mod test {
             },
             task::Poll,
         };
+
+        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
@@ -205,6 +215,9 @@ mod test {
             time::{interval, Duration},
         };
         use tokio_stream::wrappers::IntervalStream;
+
+        use crate::event::EventArray;
+        use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
 
         trace_init();
 
@@ -228,7 +241,7 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(0);
+        let (mut sender, receiver) = mpsc::channel::<Option<EventArray>>(0);
         let jh1 = tokio::spawn(async move {
             let stream = receiver
                 .take_while(|event| ready(event.is_some()))

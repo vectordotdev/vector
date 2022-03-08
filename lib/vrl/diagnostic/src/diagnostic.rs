@@ -1,6 +1,8 @@
-use crate::{DiagnosticError, Label, Note, Severity, Span};
-use codespan_reporting::diagnostic;
 use std::ops::{Deref, DerefMut};
+
+use codespan_reporting::diagnostic;
+
+use crate::{DiagnosticError, Label, Note, Severity, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
@@ -130,7 +132,7 @@ impl From<Diagnostic> for diagnostic::Diagnostic<()> {
             severity: diag.severity.into(),
             code: Some(format!("E{:03}", diag.code)),
             message: diag.message.to_string(),
-            labels: diag.labels.to_vec().into_iter().map(Into::into).collect(),
+            labels: diag.labels.iter().cloned().map(Into::into).collect(),
             notes: notes.iter().map(ToString::to_string).collect(),
         }
     }

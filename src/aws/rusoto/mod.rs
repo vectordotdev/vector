@@ -2,9 +2,13 @@ mod auth;
 pub mod region;
 
 //TODO: replace with direct import
-pub use super::auth::AwsAuthentication;
-use crate::config::ProxyConfig;
-use crate::{http::HttpError, tls::MaybeTlsSettings};
+use std::{
+    fmt, io,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -12,13 +16,15 @@ use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
 };
-use hyper::body::{Body, HttpBody};
-use hyper::client;
+use hyper::{
+    body::{Body, HttpBody},
+    client,
+};
 use once_cell::sync::OnceCell;
 use regex::bytes::RegexSet;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
-use rusoto_core::credential::ProfileProvider;
 use rusoto_core::{
+    credential::ProfileProvider,
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
@@ -31,19 +37,16 @@ use rusoto_credential::{
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient, WebIdentityProvider};
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt, io,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tower::{Service, ServiceExt};
+
+pub use super::auth::AwsAuthentication;
+use crate::{config::ProxyConfig, http::HttpError, tls::MaybeTlsSettings};
 // use crate::http;
 
 pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
 
-pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
-    let settings = MaybeTlsSettings::enable_client()?;
+pub fn client(tls_setting: Option<MaybeTlsSettings>, proxy: &ProxyConfig) -> crate::Result<Client> {
+    let settings = tls_setting.unwrap_or(MaybeTlsSettings::enable_client()?);
     let client = crate::http::HttpClient::new(settings, proxy)?;
     Ok(HttpClient { client })
 }
@@ -155,7 +158,8 @@ impl AwsCredentialsProvider {
                 None,
             );
 
-            let creds = AutoRefreshingProvider::new(provider).context(InvalidAwsCredentials)?;
+            let creds =
+                AutoRefreshingProvider::new(provider).context(InvalidAwsCredentialsSnafu)?;
             Ok(Self::Role(creds))
         } else {
             debug!("Using default credentials provider for AWS.");
@@ -164,7 +168,7 @@ impl AwsCredentialsProvider {
             // is 10 seconds.
             chain.set_timeout(Duration::from_secs(8));
 
-            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentials)?;
+            let creds = AutoRefreshingProvider::new(chain).context(InvalidAwsCredentialsSnafu)?;
 
             Ok(Self::Default(creds))
         }
@@ -182,7 +186,7 @@ impl AwsCredentialsProvider {
             credentials_file,
             profile,
         ))
-        .context(InvalidAwsCredentials)?;
+        .context(InvalidAwsCredentialsSnafu)?;
         Ok(Self::File(creds))
     }
 }

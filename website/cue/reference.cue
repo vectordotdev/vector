@@ -383,6 +383,13 @@ _values: {
 		example:     !=""
 	}
 
+	#ConditionExample: {
+		title:    !=""
+		name:     "vrl" | "datadog_search"
+		example:  !=""
+		vrl_only: bool | *false
+	}
+
 	syntaxes: [#Syntax, ...#Syntax] & [
 			{
 			name:        "vrl"
@@ -426,6 +433,25 @@ _values: {
 			[JSON](\(urls.json)) | `"condition": ".status == 200"`
 			"""
 	}
+
+	condition_examples: [#ConditionExample, ...#ConditionExample] & [
+				{
+			title:   "Standard VRL"
+			name:    "vrl"
+			example: ".status == 500"
+		},
+		{
+			title:   "Datadog Search"
+			name:    "datadog_search"
+			example: "*stack"
+		},
+		{
+			title:    "VRL shorthand"
+			name:     "vrl"
+			example:  ".status == 500"
+			vrl_only: true
+		},
+	]
 }
 
 #TypePrimitive: {
@@ -444,6 +470,7 @@ _values: {
 	{"float": #TypeFloat & {_args: required: Args.required}} |
 	{"object": #TypeObject & {_args: required: Args.required}} |
 	{"string": #TypeString & {_args: required: Args.required}} |
+	{"ascii_char": #TypeAsciiChar & {_args: required: Args.required}} |
 	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
 	{"uint": #TypeUint & {_args: required: Args.required}}
 }
@@ -489,6 +516,10 @@ _values: {
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
 	examples?: [float, ...float]
+
+	// `unit` clarifies the value's unit. While this should be included
+	// as the suffix in the name, this helps to explicitly clarify that.
+	unit: #Unit | *null
 }
 
 #TypeObject: {
@@ -531,6 +562,18 @@ _values: {
 	}
 
 	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+}
+
+#TypeAsciiChar: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: string | null
+	}
+
+	examples?: [string, ...string]
 }
 
 #TypeTimestamp: {

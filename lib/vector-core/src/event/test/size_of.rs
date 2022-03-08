@@ -1,8 +1,9 @@
-use super::*;
-use crate::event::test::common::Name;
-use crate::ByteSizeOf;
-use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::mem;
+
+use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+
+use super::*;
+use crate::{event::test::common::Name, ByteSizeOf};
 
 #[test]
 fn at_least_wrapper_size() {
@@ -67,7 +68,7 @@ fn size_greater_than_allocated_size() {
 
 /// The action that our model interpreter loop will take.
 #[derive(Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     Contains {
         key: String,
     },

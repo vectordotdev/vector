@@ -15,13 +15,12 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::{
-    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
-};
-
 use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
+};
+use crate::{
+    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
 };
 
 /// Partitions metrics based on which Datadog API endpoint that they are sent to.
@@ -48,7 +47,7 @@ impl Partitioner for DatadogMetricsTypePartitioner {
     }
 }
 
-pub struct DatadogMetricsSink<S> {
+pub(crate) struct DatadogMetricsSink<S> {
     service: S,
     acker: Acker,
     request_builder: DatadogMetricsRequestBuilder,
@@ -84,7 +83,7 @@ where
             // Converts "absolute" metrics to "incremental", and converts distributions and
             // aggregated histograms into sketches so that we can send them in a more DD-native
             // format and thus avoid needing to directly specify what quantiles to generate, etc.
-            .normalized::<DatadogMetricsNormalizer>()
+            .normalized_with_default::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint i.e. series (counter, gauge, set) vs sketch
             // (distributions, aggregated histograms, metrics that are already sketches)
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
@@ -100,9 +99,10 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (error, dropped_events) = e.into_parts();
+                        let (message, error_code, dropped_events) = e.into_parts();
                         emit!(&DatadogMetricsEncodingError {
-                            error,
+                            message,
+                            error_code,
                             dropped_events,
                         });
                         None
@@ -120,7 +120,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for DatadogMetricsSink<S>
+impl<S> StreamSink<Event> for DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
     S::Error: fmt::Debug + Send + 'static,

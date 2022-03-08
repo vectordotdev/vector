@@ -1,4 +1,4 @@
-use vrl_core::prelude::*;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SetMetadataField;
@@ -34,10 +34,10 @@ impl Function for SetMetadataField {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let keys = vec![value!("datadog_api_key")];
+        let keys = vec![value!("datadog_api_key"), value!("splunk_hec_token")];
         let key = arguments
             .required_enum("key", &keys)?
             .try_bytes_utf8_lossy()
@@ -63,6 +63,6 @@ impl Expression for SetMetadataFieldFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().null()
+        TypeDef::null().infallible()
     }
 }

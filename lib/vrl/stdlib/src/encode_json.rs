@@ -19,7 +19,7 @@ impl Function for EncodeJson {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -52,16 +52,17 @@ impl Expression for EncodeJsonFn {
         }
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).infallible().bytes()
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         encode_json => EncodeJson;
@@ -69,37 +70,37 @@ mod tests {
         bytes {
             args: func_args![value: r#"hello"#],
             want: Ok(r#""hello""#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         integer {
             args: func_args![value: 42],
             want: Ok("42"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         float {
             args: func_args![value: 42f64],
             want: Ok("42.0"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         boolean {
             args: func_args![value: false],
             want: Ok("false"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         map {
             args: func_args![value: map!["field": "value"]],
             want: Ok(r#"{"field":"value"}"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         array {
             args: func_args![value: vec![1, 2, 3]],
             want: Ok("[1,2,3]"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         timestamp {
@@ -109,20 +110,19 @@ mod tests {
                     .with_timezone(&Utc)
             ],
             want: Ok(r#""1983-04-13T12:09:14.274Z""#),
-            tdef: TypeDef::new().infallible().bytes(),
-
+            tdef: TypeDef::bytes().infallible(),
         }
 
         regex {
             args: func_args![value: Regex::new("^a\\d+$").unwrap()],
             want: Ok(r#""^a\\d+$""#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         null {
             args: func_args![value: Value::Null],
             want: Ok("null"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

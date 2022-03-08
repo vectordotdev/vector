@@ -1,3 +1,4 @@
+use super::prelude::error_stage;
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
@@ -87,6 +88,41 @@ impl InternalEvent for AwsBytesSent {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
             "region" => self.region.name().to_owned(),
+        );
+    }
+}
+
+const STREAM_CLOSED: &str = "stream_closed";
+
+#[derive(Debug)]
+pub struct StreamClosedError {
+    pub error: crate::source_sender::ClosedError,
+    pub count: usize,
+}
+
+impl InternalEvent for StreamClosedError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to forward event(s), downstream is closed.",
+            error = %self.error,
+            error_type = STREAM_CLOSED,
+            stage = error_stage::SENDING,
+            count = %self.count,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => STREAM_CLOSED,
+            "stage" => error_stage::SENDING,
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error" => self.error.to_string(),
+            "error_type" => STREAM_CLOSED,
+            "stage" => error_stage::SENDING,
         );
     }
 }

@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
+use std::{collections::BTreeMap, fs, path::Path};
+
 use vrl::{function::Example, Value};
 
 #[derive(Debug)]
@@ -145,5 +144,5 @@ fn test_name(path: &Path) -> String {
         .unwrap()
         .1
         .trim_end_matches(".vrl")
-        .replace("_", " ")
+        .replace('_', " ")
 }

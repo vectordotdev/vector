@@ -11,7 +11,7 @@ impl Function for GetHostname {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(GetHostnameFn))
@@ -38,6 +38,6 @@ impl Expression for GetHostnameFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+        TypeDef::bytes().fallible()
     }
 }

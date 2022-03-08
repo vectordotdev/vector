@@ -1,28 +1,29 @@
 use std::num::NonZeroU64;
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::config::healthcheck_response;
-use crate::sinks::util::SinkBatchSettings;
-use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::HttpClient,
-    sinks::{
-        util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        },
-        Healthcheck, UriParseError, VectorSink,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
+
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::{
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::HttpClient,
+    sinks::{
+        gcs_common::config::healthcheck_response,
+        util::{
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, UriParseSnafu, VectorSink,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -64,6 +65,13 @@ pub struct PubsubConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_skip_authentication() -> bool {
@@ -110,15 +118,19 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -161,17 +173,17 @@ impl PubsubSink {
             uri = format!("{}?key={}", uri, key);
         }
         uri.parse::<Uri>()
-            .context(UriParseError)
+            .context(UriParseSnafu)
             .map_err(Into::into)
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for PubsubSink {
-    type Input = Value;
-    type Output = Vec<BoxedRawValue>;
+struct PubSubSinkEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<Value> {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
@@ -179,10 +191,23 @@ impl HttpSink for PubsubSink {
         let json = serde_json::to_string(&log).unwrap();
         Some(json!({ "data": base64::encode(&json) }))
     }
+}
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+#[async_trait::async_trait]
+impl HttpSink for PubsubSink {
+    type Input = Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = PubSubSinkEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        PubSubSinkEventEncoder {
+            encoding: self.encoding.clone(),
+        }
+    }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
-        let body = serde_json::to_vec(&body).unwrap();
+        let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");
@@ -212,8 +237,9 @@ async fn healthcheck(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -236,19 +262,25 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::components::{self, HTTP_SINK_TAGS};
-    use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
-    const EMULATOR_HOST: &str = "http://localhost:8681";
+    use super::*;
+    use crate::test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    };
+
+    fn emulator_address() -> String {
+        std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
+    }
+
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
-            endpoint: Some(EMULATOR_HOST.into()),
+            endpoint: Some(emulator_address()),
             skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
@@ -334,7 +366,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
+        let url = format!("{}/v1/projects/{}/{}", emulator_address(), PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)

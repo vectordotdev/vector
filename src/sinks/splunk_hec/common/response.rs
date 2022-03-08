@@ -1,9 +1,6 @@
-use bytes::Bytes;
-use http::Response;
 use vector_core::{event::EventStatus, internal_event::EventsSent, stream::DriverResponse};
 
 pub struct HecResponse {
-    pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub events_count: usize,
     pub events_byte_size: usize,
@@ -24,6 +21,7 @@ impl DriverResponse for HecResponse {
         EventsSent {
             count: self.events_count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }

@@ -1,20 +1,21 @@
+use std::sync::Arc;
+
+use futures::{future, FutureExt};
+use serde::{Deserialize, Serialize};
+use stream_cancel::{Trigger, Tripwire};
+use tokio::sync::Mutex;
+
 use crate::{
-    config::{Config, DataType, SourceConfig, SourceContext},
+    config::{Config, DataType, Output, SourceConfig, SourceContext},
     sinks::blackhole::BlackholeConfig,
-    sources::stdin::StdinConfig,
-    sources::Source,
+    sources::{stdin::StdinConfig, Source},
     test_util::{start_topology, trace_init},
     transforms::json_parser::JsonParserConfig,
     Error,
 };
-use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use stream_cancel::{Trigger, Tripwire};
-use tokio::sync::Mutex;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSourceConfig {
+struct MockSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
 }
@@ -52,12 +53,16 @@ impl SourceConfig for MockSourceConfig {
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "mock"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -80,6 +85,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -88,6 +94,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -108,6 +115,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -143,6 +151,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -151,6 +160,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -170,6 +180,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -208,6 +219,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -216,6 +228,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -235,6 +248,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 

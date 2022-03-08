@@ -1,27 +1,37 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::aws::rusoto::RegionOrEndpoint;
-    use crate::config::SinkContext;
-    use crate::sinks::aws_s3::S3SinkConfig;
-    use crate::sinks::s3_common::config::S3Options;
-    use crate::sinks::util::encoding::StandardEncodings;
-    use crate::sinks::util::BatchConfig;
-    use crate::sinks::util::Compression;
-    use crate::sinks::util::TowerRequestConfig;
-    use crate::test_util::{random_lines_with_stream, random_string};
+    use std::{
+        io::{BufRead, BufReader},
+        time::Duration,
+    };
+
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
     use rusoto_core::{region::Region, RusotoError};
-    use rusoto_s3::S3Client;
-    use rusoto_s3::S3;
-    use std::io::{BufRead, BufReader};
-    use std::time::Duration;
+    use rusoto_s3::{S3Client, S3};
     use tokio_stream::StreamExt;
-    use vector_core::config::proxy::ProxyConfig;
-    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
+    };
+
+    use crate::{
+        aws::rusoto::RegionOrEndpoint,
+        config::SinkContext,
+        sinks::{
+            aws_s3::S3SinkConfig,
+            s3_common::config::S3Options,
+            util::{encoding::StandardEncodings, BatchConfig, Compression, TowerRequestConfig},
+        },
+        test_util::{random_lines_with_stream, random_string},
+    };
+
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     #[tokio::test]
     async fn s3_insert_message_into_with_flat_key_prefix() {
@@ -124,7 +134,7 @@ mod integration_tests {
             Event::from(e)
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -289,7 +299,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
+            endpoint: s3_address(),
         };
 
         use rusoto_core::HttpClient;
@@ -313,26 +323,30 @@ mod integration_tests {
             filename_append_uuid: None,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            region: RegionOrEndpoint::with_endpoint(s3_address()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),
+            tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 
     fn make_events_batch(
         len: usize,
         count: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
-        let (lines, events) = random_lines_with_stream(len, count, None);
-
+    ) -> (
+        Vec<String>,
+        impl Stream<Item = EventArray>,
+        BatchStatusReceiver,
+    ) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+        let (lines, events) = random_lines_with_stream(len, count, Some(batch));
 
-        (lines, events, receiver)
+        (lines, events.map(Into::into), receiver)
     }
 
     async fn create_bucket(bucket: &str, object_lock_enabled: bool) {

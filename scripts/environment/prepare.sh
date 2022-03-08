@@ -10,7 +10,12 @@ cd scripts
 bundle install
 cd ..
 
-sudo npm -g install markdownlint-cli
+# Currently fixing this to version 0.30 since version 0.31 has introduced
+# a change that means it only works with versions of node > 10.
+# https://github.com/igorshubovych/markdownlint-cli/issues/258
+# ubuntu 20.04 gives us version 10.19. We can revert once we update the
+# ci image to install a newer version of node.
+sudo npm -g install markdownlint-cli@0.30
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2

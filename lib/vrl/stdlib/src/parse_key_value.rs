@@ -1,3 +1,5 @@
+use std::{iter::FromIterator, str::FromStr};
+
 use nom::{
     self,
     branch::alt,
@@ -9,7 +11,6 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use std::{iter::FromIterator, str::FromStr};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -80,7 +81,7 @@ impl Function for ParseKeyValue {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -113,10 +114,71 @@ impl Function for ParseKeyValue {
             standalone_key,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("whitespace", Some(expr)) => match expr.as_value() {
+                None => Ok(None),
+                Some(value) => Ok(Some(
+                    Whitespace::from_str(
+                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
+                    )
+                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
+                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
+                        keyword: "whitespace",
+                        value,
+                        variants: Whitespace::all_value().to_vec(),
+                    })?,
+                )),
+            },
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let bytes = value.try_bytes_utf8_lossy()?;
+
+        let key_value_delimiter = args
+            .optional("key_value_delimiter")
+            .unwrap_or_else(|| value!("="));
+        let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+
+        let field_delimiter = args
+            .optional("field_delimiter")
+            .unwrap_or_else(|| value!(" "));
+        let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+
+        let whitespace = match args.optional_any("whitespace") {
+            Some(whitespace) => *whitespace.downcast_ref::<Whitespace>().unwrap(),
+            None => Whitespace::default(),
+        };
+
+        let standalone_key = args
+            .optional("accept_standalone_key")
+            .unwrap_or_else(|| value!(true))
+            .try_boolean()?;
+
+        let values = parse(
+            &bytes,
+            &key_value_delimiter,
+            &field_delimiter,
+            whitespace,
+            standalone_key,
+        )?;
+
+        Ok(Value::from_iter(values))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Whitespace {
+pub(crate) enum Whitespace {
     Strict,
     Lenient,
 }
@@ -195,9 +257,7 @@ impl Expression for ParseKeyValueFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(map! {
-            (): Kind::all()
-        })
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
@@ -658,9 +718,7 @@ mod test {
                              bytes: "13",
                              tls_version: "tls1.1",
                              protocol: "http"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         logfmt {
@@ -672,12 +730,10 @@ mod test {
                              tag: "stopping_fetchers",
                              id: "ConsumerFetcherManager-1382721708341",
                              module: "kafka.consumer.ConsumerFetcherManager"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
-        // From https://github.com/timberio/vector/issues/5347
+        // From https://github.com/vectordotdev/vector/issues/5347
         real_case {
             args: func_args! [
                 value: r#"SerialNum=100018002000001906146520 GenTime="2019-10-24 14:25:03" SrcIP=10.10.254.2 DstIP=10.10.254.7 Protocol=UDP SrcPort=137 DstPort=137 PolicyID=3 Action=PERMIT Content="Session Backout""#
@@ -692,9 +748,7 @@ mod test {
                              PolicyID: "3",
                              Action: "PERMIT",
                              Content: "Session Backout"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         strict {
@@ -705,9 +759,7 @@ mod test {
             want: Ok(value!({foo: "",
                              bar: "",
                              tar: "data"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         spaces {
@@ -717,9 +769,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         delimited {
@@ -730,9 +780,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         delimited_with_spaces {
@@ -743,9 +791,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multiple_chars {
@@ -756,9 +802,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error {
@@ -769,9 +813,7 @@ mod test {
                 accept_standalone_key: false,
             ],
             want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n1: at line 1, in ManyMN:\nI am not a valid line.\n                      ^\n\n"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         // The following case demonstrates a scenario that could potentially be considered an
@@ -786,9 +828,7 @@ mod test {
             ],
             want: Ok(value!({zork: r#"zoog"#,
                              nonk: "nink norgle: noog"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         // If the value field is delimited and we miss the separator,
@@ -801,9 +841,7 @@ mod test {
             ],
             want: Ok(value!({zork: "zoog",
                              nonk: r#""nink" norgle: noog"#})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multi_line_with_quotes {
@@ -814,9 +852,7 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "\"tom\" test"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multi_line_with_quotes_spaces {
@@ -827,9 +863,7 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "tom test"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }

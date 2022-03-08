@@ -1,10 +1,11 @@
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt,
+};
+
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -17,6 +18,7 @@ impl ComponentKey {
         &self.id
     }
 
+    #[must_use]
     pub fn join<D: fmt::Display>(&self, name: D) -> Self {
         Self {
             id: format!("{}.{}", self.id, name),

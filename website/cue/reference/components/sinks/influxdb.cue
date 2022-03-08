@@ -91,19 +91,6 @@ components: sinks: _influxdb: {
 				examples: ["autogen", "one_day_only"]
 			}
 		}
-		tags: {
-			common:      false
-			description: "A set of additional fields that will be attached to each LineProtocol as a tag. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
-			groups: ["v1", "v2"]
-			required: false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["field1", "parent.child_field"]
-					syntax: "field_path"
-				}
-			}
-		}
 		token: {
 			category:    "Auth"
 			description: "[Authentication token](\(urls.influxdb_authentication_token)) for InfluxDB 2."

@@ -1,8 +1,10 @@
-use crate::aws::region::RegionOrEndpoint;
+use std::str::FromStr;
+
 use aws_sdk_sqs::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
-use std::str::FromStr;
+
+use crate::aws::region::RegionOrEndpoint;
 
 impl RegionOrEndpoint {
     pub fn endpoint(&self) -> crate::Result<Option<Endpoint>> {

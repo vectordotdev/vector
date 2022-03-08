@@ -1,23 +1,26 @@
-use crate::sinks::util::http::HttpBatchService;
-
-use crate::event::EventStatus;
-
-use http::Request;
-
-use crate::http::HttpClient;
-use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
-use crate::sinks::util::sink::Response;
-use futures::future;
-use futures::future::BoxFuture;
-use futures::future::Ready;
-use hyper::Body;
 use std::task::{Context, Poll};
+
+use bytes::Bytes;
+use futures::{
+    future,
+    future::{BoxFuture, Ready},
+};
+use http::Request;
+use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+
+use crate::{
+    event::EventStatus,
+    http::HttpClient,
+    sinks::{
+        datadog::events::request_builder::DatadogEventsRequest,
+        util::{http::HttpBatchService, sink::Response},
+    },
+};
 
 pub struct DatadogEventsResponse {
-    pub event_status: EventStatus,
+    pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
     pub event_byte_size: usize,
 }
@@ -31,6 +34,7 @@ impl DriverResponse for DatadogEventsResponse {
         EventsSent {
             count: 1,
             byte_size: self.event_byte_size,
+            output: None,
         }
     }
 }
@@ -38,7 +42,7 @@ impl DriverResponse for DatadogEventsResponse {
 #[derive(Clone)]
 pub struct DatadogEventsService {
     batch_http_service:
-        HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
+        HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {

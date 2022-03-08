@@ -21,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
@@ -62,7 +63,7 @@ components: sources: heroku_logs: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address:          sources.http.configuration.address
 		auth:             sources.http.configuration.auth
 		query_parameters: sources.http.configuration.query_parameters

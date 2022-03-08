@@ -1,18 +1,7 @@
 #![cfg(feature = "aws-kinesis-firehose-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::test_util::components;
-use crate::test_util::components::AWS_SINK_TAGS;
-use crate::{
-    sinks::elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
-    test_util::{random_events_with_stream, random_string, wait_for_duration},
-};
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt};
 use rusoto_core::Region;
 use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
 use rusoto_firehose::{
@@ -22,13 +11,39 @@ use rusoto_firehose::{
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
+use super::*;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{SinkConfig, SinkContext},
+    sinks::{
+        elasticsearch::{ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, Compression, TowerRequestConfig,
+        },
+    },
+    test_util::{
+        components, components::AWS_SINK_TAGS, random_events_with_stream, random_string,
+        wait_for_duration,
+    },
+};
+
+fn kinesis_address() -> String {
+    std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
+
+fn elasticsearch_address() -> String {
+    std::env::var("ELASTICSEARCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+}
+
 #[tokio::test]
 async fn firehose_put_records() {
     let stream = gen_stream();
 
     let region = Region::Custom {
         name: "localstack".into(),
-        endpoint: "http://localhost:4566".into(),
+        endpoint: kinesis_address(),
     };
 
     let elasticseacrh_arn = ensure_elasticsearch_domain(region.clone(), stream.clone()).await;
@@ -40,7 +55,7 @@ async fn firehose_put_records() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+        region: RegionOrEndpoint::with_endpoint(kinesis_address().as_str()),
         encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
@@ -49,8 +64,10 @@ async fn firehose_put_records() {
             retry_attempts: Some(0),
             ..Default::default()
         },
+        tls: None,
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();
@@ -60,18 +77,21 @@ async fn firehose_put_records() {
     let (input, events) = random_events_with_stream(100, 100, None);
 
     components::init_test();
-    sink.0.run(events).await.unwrap();
+    sink.0.run(events.map(Into::into)).await.unwrap();
 
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(5)).await;
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
-    let config = ElasticSearchConfig {
-        auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-        endpoint: "http://localhost:4571".into(),
-        index: Some(stream.clone()),
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+        endpoint: elasticsearch_address(),
+        bulk: Some(BulkConfig {
+            index: Some(stream.clone()),
+            action: None,
+        }),
         ..Default::default()
     };
-    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
 
     let client = reqwest::Client::builder()
         .build()
@@ -128,7 +148,7 @@ async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> Str
     // This takes a long time
     wait_for_duration(
         || async {
-            reqwest::get("http://localhost:4571/_cluster/health")
+            reqwest::get(format!("{}/_cluster/health", elasticsearch_address()))
                 .and_then(reqwest::Response::json::<Value>)
                 .await
                 .map(|v| {
@@ -139,7 +159,7 @@ async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> Str
                 })
                 .unwrap_or(false)
         },
-        Duration::from_secs(30),
+        Duration::from_secs(60),
     )
     .await;
 

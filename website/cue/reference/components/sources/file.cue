@@ -15,6 +15,7 @@ components: sources: file: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -47,7 +48,7 @@ components: sources: file: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		exclude: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"

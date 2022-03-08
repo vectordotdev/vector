@@ -1,8 +1,7 @@
+use std::{fmt, iter::Peekable, str::CharIndices};
+
 use diagnostic::{DiagnosticError, Label, Span};
 use ordered_float::NotNan;
-use std::fmt;
-use std::iter::Peekable;
-use std::str::CharIndices;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
@@ -948,7 +947,7 @@ impl<'input> Lexer<'input> {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
-                match float.replace("_", "").parse() {
+                match float.replace('_', "").parse() {
                     Ok(float) => {
                         let float = NotNan::new(float).unwrap();
                         Ok((start, Token::FloatLiteral(float), end))
@@ -960,7 +959,7 @@ impl<'input> Lexer<'input> {
                     }),
                 }
             }
-            None | Some(_) => match int.replace("_", "").parse() {
+            None | Some(_) => match int.replace('_', "").parse() {
                 Ok(int) => Ok((start, Token::IntegerLiteral(int), end)),
                 Err(err) => Err(Error::NumericLiteral {
                     start,
@@ -1186,8 +1185,7 @@ fn unescape_string_literal(mut s: &str) -> String {
 mod test {
     #![allow(clippy::print_stdout)] // tests
 
-    use super::StringLiteral;
-    use super::*;
+    use super::{StringLiteral, *};
     use crate::lex::Token::*;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {

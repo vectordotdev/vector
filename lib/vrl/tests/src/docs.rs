@@ -1,8 +1,11 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    process::Command,
+};
+
 use serde::Deserialize;
 use serde_json::{Map, Value};
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::process::Command;
 
 use crate::Test;
 
@@ -102,17 +105,12 @@ fn examples_to_tests(
     category: &'static str,
     examples: HashMap<String, Examples>,
 ) -> Box<dyn Iterator<Item = Test>> {
-    Box::new(
-        examples
+    Box::new(examples.into_iter().flat_map(move |(k, v)| {
+        v.examples
             .into_iter()
-            .map(move |(k, v)| {
-                v.examples
-                    .into_iter()
-                    .map(|example| Test::from_cue_example(category, k.clone(), example))
-                    .collect::<Vec<_>>()
-            })
-            .flatten(),
-    )
+            .map(|example| Test::from_cue_example(category, k.clone(), example))
+            .collect::<Vec<_>>()
+    }))
 }
 
 impl Test {

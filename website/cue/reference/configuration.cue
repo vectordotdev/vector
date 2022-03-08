@@ -7,6 +7,21 @@ configuration: {
 
 configuration: {
 	configuration: {
+		acknowledgements: {
+			common:      true
+			description: "Controls how acknowledgements are handled by all sources. These settings may be overridden in individual sources."
+			required:    false
+			type: object: options: {
+				enabled: {
+					common:      true
+					description: "Controls if sources will wait for destination sinks to deliver the events, or persist them to a disk buffer, before acknowledging receipt. If set to `true`, all capable sources will have acknowledgements enabled."
+					warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+					required: false
+					type: bool: default: false
+				}
+			}
+		}
+
 		data_dir: {
 			common: false
 			description: """
@@ -355,6 +370,9 @@ configuration: {
 			body: """
 				The location of your Vector configuration file depends on your installation method. For most Linux
 				based systems, the file can be found at `/etc/vector/vector.toml`.
+
+				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
+				desired Vector configuration.
 				"""
 		}
 		multiple: {

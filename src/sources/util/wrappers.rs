@@ -1,6 +1,10 @@
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use pin_project::pin_project;
-use std::task::{Context, Poll};
-use std::{io, pin::Pin};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait AfterReadExt {
@@ -32,6 +36,11 @@ impl<T, F> AfterRead<T, F> {
     #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     pub const fn get_ref(&self) -> &T {
         &self.inner
+    }
+
+    #[cfg(all(unix, feature = "sources-utils-unix"))]
+    pub fn get_mut_ref(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 

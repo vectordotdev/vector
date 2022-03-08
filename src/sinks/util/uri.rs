@@ -1,12 +1,13 @@
-use crate::http::Auth;
+use std::{fmt, str::FromStr};
+
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::fmt;
-use std::str::FromStr;
+
+use crate::http::Auth;
 
 /// A wrapper for `http::Uri` that implements the serde traits.
 /// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.
@@ -14,7 +15,7 @@ use std::str::FromStr;
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,
-    pub auth: Option<Auth>,
+    pub(crate) auth: Option<Auth>,
 }
 
 impl UriSerde {
@@ -200,12 +201,9 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
 mod tests {
     use super::*;
 
-    fn test_parse(input: &str, expected_uri: &str, expected_auth: Option<(&str, &str)>) {
+    fn test_parse(input: &str, expected_uri: &'static str, expected_auth: Option<(&str, &str)>) {
         let UriSerde { uri, auth } = input.parse().unwrap();
-        assert_eq!(
-            uri,
-            Uri::from_maybe_shared(expected_uri.to_owned()).unwrap()
-        );
+        assert_eq!(uri, Uri::from_static(expected_uri));
         assert_eq!(
             auth,
             expected_auth.map(|(user, password)| {

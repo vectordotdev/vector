@@ -1,10 +1,12 @@
+use std::env;
+
+use serde::{Deserialize, Serialize};
+
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
-use serde::{Deserialize, Serialize};
-use std::env;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
@@ -22,7 +24,7 @@ pub struct Options {
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
-    pub reporting_interval_secs: u64,
+    pub reporting_interval_secs: f64,
 }
 
 impl Default for Options {
@@ -42,8 +44,8 @@ const fn default_enabled() -> bool {
 }
 
 /// By default, report to Datadog every 5 seconds.
-const fn default_reporting_interval_secs() -> u64 {
-    5
+const fn default_reporting_interval_secs() -> f64 {
+    5.0
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and

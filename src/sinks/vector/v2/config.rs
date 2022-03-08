@@ -1,14 +1,3 @@
-use crate::config::{GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions};
-use crate::proto::vector as proto;
-use crate::sinks::util::retries::RetryLogic;
-use crate::sinks::util::{
-    BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
-};
-use crate::sinks::vector::v2::service::{VectorResponse, VectorService};
-use crate::sinks::vector::v2::sink::VectorSink;
-use crate::sinks::vector::v2::VectorSinkError;
-use crate::sinks::{Healthcheck, VectorSink as VectorSinkType};
-use crate::tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig};
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
@@ -16,6 +5,26 @@ use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
+
+use crate::{
+    config::{
+        AcknowledgementsConfig, GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions,
+    },
+    proto::vector as proto,
+    sinks::{
+        util::{
+            retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
+            ServiceBuilderExt, TowerRequestConfig,
+        },
+        vector::v2::{
+            service::{VectorResponse, VectorService},
+            sink::VectorSink,
+            VectorSinkError,
+        },
+        Healthcheck, VectorSink as VectorSinkType,
+    },
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -27,6 +36,12 @@ pub struct VectorConfig {
     pub request: TowerRequestConfig,
     #[serde(default)]
     tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -41,6 +56,7 @@ fn default_config(address: &str) -> VectorConfig {
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
     }
 }
 
@@ -77,7 +93,7 @@ impl VectorConfig {
         };
 
         Ok((
-            VectorSinkType::Stream(Box::new(sink)),
+            VectorSinkType::from_event_streamsink(sink),
             Box::pin(healthcheck),
         ))
     }

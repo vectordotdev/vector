@@ -1,15 +1,22 @@
-use crate::http::{Auth, HttpClient};
-use crate::sinks::util::UriSerde;
+use std::task::{Context, Poll};
+
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
-use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
-use vector_core::buffers::Ackable;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
+};
+
+use crate::{
+    http::{Auth, HttpClient},
+    sinks::util::{Compression, UriSerde},
+};
 
 #[derive(Debug, Snafu)]
 pub enum LokiError {
@@ -34,14 +41,16 @@ impl DriverResponse for LokiResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
 
 pub struct LokiRequest {
+    pub compression: Compression,
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
     pub tenant_id: Option<String>,
     pub events_byte_size: usize,
 }
@@ -87,6 +96,10 @@ impl Service<LokiRequest> for LokiService {
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
+        }
+
+        if let Some(ce) = request.compression.content_encoding() {
+            req = req.header("Content-Encoding", ce);
         }
 
         let body = hyper::Body::from(request.payload);

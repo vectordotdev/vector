@@ -1,15 +1,17 @@
-use crate::{
-    config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
-    transforms::Transform,
-};
 use indexmap::IndexMap;
 use serde::{self, Deserialize, Serialize};
 
+use crate::{
+    config::{
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    schema,
+    transforms::Transform,
+};
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CompoundConfig {
+struct CompoundConfig {
     steps: Vec<TransformStep>,
 }
 
@@ -61,12 +63,12 @@ impl TransformConfig for CompoundConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {

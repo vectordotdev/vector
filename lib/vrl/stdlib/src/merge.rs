@@ -41,7 +41,7 @@ impl Function for Merge {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");
@@ -50,10 +50,25 @@ impl Function for Merge {
 
         Ok(Box::new(MergeFn { to, from, deep }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let to = arguments.required("to");
+        let mut to = to.try_object()?;
+        let from = arguments.required("from");
+        let from = from.try_object()?;
+        let deep = arguments
+            .optional("deep")
+            .map(|val| val.as_boolean().unwrap_or(false))
+            .unwrap_or_else(|| false);
+
+        merge_maps(&mut to, &from, deep);
+
+        Ok(to.into())
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct MergeFn {
+pub(crate) struct MergeFn {
     to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Box<dyn Expression>,
@@ -113,8 +128,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+    use vrl::value::Kind;
+
     use super::*;
-    use value::Kind;
 
     test_function! [
         merge => Merge;
@@ -125,9 +142,9 @@ mod tests {
                 from: value!({ key2: "val2" })
             ],
             want: Ok(value!({ key1: "val1", key2: "val2" })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
             }),
         }
 
@@ -147,11 +164,11 @@ mod tests {
                 key2: "val2",
                 child: { grandchild2: true },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
         }
@@ -176,11 +193,11 @@ mod tests {
                     grandchild2: true,
                 },
             })),
-            tdef: TypeDef::new().object::<String, TypeDef>(map! {
-                "key1": Kind::Bytes,
-                "key2": Kind::Bytes,
-                "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild2": Kind::Boolean,
+            tdef: TypeDef::object(btreemap! {
+                Field::from("key1") => Kind::bytes(),
+                Field::from("key2") => Kind::bytes(),
+                Field::from("child") => TypeDef::object(btreemap! {
+                    Field::from("grandchild2") => Kind::boolean(),
                 }),
             }),
 

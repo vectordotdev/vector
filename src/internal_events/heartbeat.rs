@@ -1,5 +1,6 @@
-use metrics::gauge;
 use std::time::Instant;
+
+use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]

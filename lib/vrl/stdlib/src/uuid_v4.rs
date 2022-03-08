@@ -20,7 +20,7 @@ impl Function for UuidV4 {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
@@ -39,18 +39,19 @@ impl Expression for UuidV4Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::bytes().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_common::TimeZone;
+
     use super::*;
-    use shared::TimeZone;
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },
-        want: TypeDef::new().infallible().bytes(),
+        want: TypeDef::bytes().infallible(),
     }];
 
     #[test]

@@ -1,5 +1,6 @@
-use crate::encode_key_value::EncodeKeyValueFn;
 use vrl::prelude::*;
+
+use crate::encode_key_value::EncodeKeyValueFn;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;
@@ -27,7 +28,7 @@ impl Function for EncodeLogfmt {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         // The encode_logfmt function is just an alias for `encode_key_value` with the following

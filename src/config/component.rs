@@ -1,5 +1,6 @@
-use snafu::Snafu;
 use std::marker::PhantomData;
+
+use snafu::Snafu;
 use toml::Value;
 
 use super::GenerateConfig;

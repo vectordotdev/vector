@@ -39,12 +39,16 @@ impl Function for IsRegex {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(IsRegexFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        Ok(value!(args.required("value").is_regex()))
     }
 }
 
@@ -59,14 +63,15 @@ impl Expression for IsRegexFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         is_regex => IsRegex;
@@ -74,13 +79,13 @@ mod tests {
         bytes {
             args: func_args![value: value!("foobar")],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         regex {
             args: func_args![value: value!(Regex::new(r"\d+").unwrap())],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

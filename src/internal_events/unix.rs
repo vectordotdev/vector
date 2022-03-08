@@ -1,7 +1,8 @@
 // ## skip check-events ##
 
-use metrics::counter;
 use std::{io::Error, path::Path};
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -44,7 +45,7 @@ where
 
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
-    pub error: &'a E,
+    pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 

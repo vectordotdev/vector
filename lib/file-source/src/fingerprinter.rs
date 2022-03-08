@@ -1,12 +1,14 @@
-use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
-use crc::Crc;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs::{self, metadata, File},
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
+
+use crc::Crc;
+use serde::{Deserialize, Serialize};
+
+use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
@@ -159,7 +161,7 @@ impl Fingerprinter {
     }
 
     /// Calculates checksums using strategy pre-0.14.0
-    /// <https://github.com/timberio/vector/issues/8182>
+    /// <https://github.com/vectordotdev/vector/issues/8182>
     pub fn get_legacy_checksum(
         &self,
         path: &Path,
@@ -221,9 +223,11 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
     use std::{collections::HashSet, fs, io::Error, path::Path, time::Duration};
+
     use tempfile::tempdir;
+
+    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
 
     #[test]
     fn test_checksum_fingerprint() {
@@ -451,12 +455,7 @@ mod test {
         let mut buf = Vec::new();
         let mut small_files = HashSet::new();
         assert!(fingerprinter
-            .get_fingerprint_or_log_error(
-                &target_dir.path().to_owned(),
-                &mut buf,
-                &mut small_files,
-                &NoErrors
-            )
+            .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
             .is_none());
     }
 

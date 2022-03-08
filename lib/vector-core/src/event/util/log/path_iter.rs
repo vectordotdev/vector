@@ -1,5 +1,6 @@
+use std::{borrow::Cow, str::Chars};
+
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, mem, str::Chars};
 use substring::Substring;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -44,6 +45,7 @@ impl<'a> PathIter<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum State {
     Start,
     Key(usize),
@@ -74,7 +76,7 @@ impl<'a> Iterator for PathIter<'a> {
             }
 
             let c = self.chars.next();
-            self.state = match mem::take(&mut self.state) {
+            self.state = match self.state {
                 State::Start => match c {
                     Some('.') | Some('[') | Some(']') | None => State::Invalid,
                     Some('\\') => State::Escape,

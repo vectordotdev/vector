@@ -1,4 +1,4 @@
-use shared::tokenize;
+use vector_common::tokenize;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -22,7 +22,7 @@ impl Function for ParseTokens {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -62,9 +62,7 @@ impl Expression for ParseTokensFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().array_mapped::<(), Kind>(map! {
-            (): Kind::Bytes
-        })
+        TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }
 
@@ -87,9 +85,7 @@ mod tests {
                             "11881".into(),
 
                     ]),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! {
-                (): Kind::Bytes
-            }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
     ];
 }

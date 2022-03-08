@@ -1,20 +1,25 @@
-use crate::config::log_schema;
-use crate::event::{Event, LogEvent};
-use crate::internal_events::DatadogEventsFieldInvalid;
-use crate::sinks::datadog::events::request_builder::{
-    DatadogEventsRequest, DatadogEventsRequestBuilder,
-};
-use crate::sinks::datadog::events::service::DatadogEventsResponse;
-use crate::sinks::util::{SinkBuilderExt, StreamSink};
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
 use std::num::NonZeroUsize;
+
+use async_trait::async_trait;
+use futures::{stream::BoxStream, StreamExt};
 use tower::util::BoxService;
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
+
+use crate::{
+    config::log_schema,
+    event::{Event, LogEvent},
+    internal_events::ParserMissingFieldError,
+    sinks::{
+        datadog::events::{
+            request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
+            service::DatadogEventsResponse,
+        },
+        util::{SinkBuilderExt, StreamSink},
+    },
+};
 
 pub struct DatadogEventsSink {
-    pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
+    pub(super) service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
     pub acker: Acker,
 }
 
@@ -45,7 +50,7 @@ impl DatadogEventsSink {
 
 async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
     if !log.contains("title") {
-        emit!(&DatadogEventsFieldInvalid { field: "title" });
+        emit!(&ParserMissingFieldError { field: "title" });
         return None;
     }
 
@@ -55,7 +60,7 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
         if let Some(message) = log.remove(log_schema.message_key()) {
             log.insert("text", message);
         } else {
-            emit!(&DatadogEventsFieldInvalid {
+            emit!(&ParserMissingFieldError {
                 field: log_schema.message_key()
             });
             return None;
@@ -83,7 +88,7 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
 }
 
 #[async_trait]
-impl StreamSink for DatadogEventsSink {
+impl StreamSink<Event> for DatadogEventsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run(input).await
     }

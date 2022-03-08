@@ -1,21 +1,24 @@
-use super::service::HttpRequestBuilder;
-use crate::{
-    http::HttpClient,
-    internal_events::{
-        SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
-        SplunkIndexerAcknowledgementAcksRemoved,
-    },
-};
-use hyper::Body;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     num::{NonZeroU64, NonZeroU8},
     sync::Arc,
     time::Duration,
 };
+
+use hyper::Body;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_core::event::EventStatus;
+
+use super::service::HttpRequestBuilder;
+use crate::{
+    config::AcknowledgementsConfig,
+    http::HttpClient,
+    internal_events::{
+        SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
+        SplunkIndexerAcknowledgementAcksRemoved,
+    },
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
@@ -24,6 +27,13 @@ pub struct HecClientAcknowledgementsConfig {
     pub query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
     pub max_pending_acks: NonZeroU64,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        flatten,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub inner: AcknowledgementsConfig,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
@@ -33,6 +43,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
+            inner: Default::default(),
         }
     }
 }
@@ -185,11 +196,12 @@ impl HecAckClient {
         request_body: &HecAckStatusRequest,
     ) -> Result<HecAckStatusResponse, HecAckApiError> {
         self.decrement_retries();
-        let request_body_bytes =
-            serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let request_body_bytes = crate::serde::json::to_bytes(request_body)
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?
+            .freeze();
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack")
+            .build_request(request_body_bytes, "/services/collector/ack", None)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
@@ -254,6 +266,7 @@ mod tests {
     use tokio::sync::oneshot::{self, Receiver};
     use vector_core::{config::proxy::ProxyConfig, event::EventStatus};
 
+    use super::HecAckClient;
     use crate::{
         http::HttpClient,
         sinks::{
@@ -263,8 +276,6 @@ mod tests {
             util::Compression,
         },
     };
-
-    use super::HecAckClient;
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();

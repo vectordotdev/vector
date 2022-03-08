@@ -1,11 +1,15 @@
 pub mod v1;
 pub mod v2;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        GenerateConfig, Input, Output, TransformConfig, TransformContext, TransformDescription,
+    },
+    schema,
     transforms::Transform,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -66,17 +70,17 @@ impl TransformConfig for LuaConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
+    fn input(&self) -> Input {
         match self {
-            LuaConfig::V1(v1) => v1.config.input_type(),
-            LuaConfig::V2(v2) => v2.config.input_type(),
+            LuaConfig::V1(v1) => v1.config.input(),
+            LuaConfig::V2(v2) => v2.config.input(),
         }
     }
 
-    fn output_type(&self) -> DataType {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         match self {
-            LuaConfig::V1(v1) => v1.config.output_type(),
-            LuaConfig::V2(v2) => v2.config.output_type(),
+            LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
+            LuaConfig::V2(v2) => v2.config.outputs(merged_definition),
         }
     }
 

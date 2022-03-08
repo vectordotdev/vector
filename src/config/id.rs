@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 pub use vector_core::config::ComponentKey;
 
 // Unlike `ComponentKey`, we never deserialize these directly out of user configs, so it's fine to

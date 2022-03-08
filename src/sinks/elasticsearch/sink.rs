@@ -1,22 +1,24 @@
-use crate::event::{Event, LogEvent};
-use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
-use futures::stream::BoxStream;
 use std::num::NonZeroUsize;
-use vector_core::buffers::Acker;
 
-use crate::event::Value;
-use crate::sinks::elasticsearch::encoder::ProcessedEvent;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
-use crate::sinks::elasticsearch::service::{ElasticSearchRequest, ElasticSearchResponse};
-use crate::sinks::elasticsearch::{BulkAction, ElasticSearchCommonMode};
-use crate::transforms::metric_to_log::MetricToLog;
-use crate::Error;
 use async_trait::async_trait;
-use futures::future;
-use futures::StreamExt;
+use futures::{future, stream::BoxStream, StreamExt};
 use tower::util::BoxService;
-use vector_core::stream::BatcherSettings;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, stream::BatcherSettings, ByteSizeOf};
+
+use crate::{
+    event::{Event, LogEvent, Value},
+    sinks::{
+        elasticsearch::{
+            encoder::ProcessedEvent,
+            request_builder::ElasticsearchRequestBuilder,
+            service::{ElasticsearchRequest, ElasticsearchResponse},
+            BulkAction, ElasticsearchCommonMode,
+        },
+        util::{Compression, SinkBuilderExt, StreamSink},
+    },
+    transforms::metric_to_log::MetricToLog,
+    Error,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -35,18 +37,18 @@ impl ByteSizeOf for BatchedEvents {
     }
 }
 
-pub struct ElasticSearchSink {
+pub struct ElasticsearchSink {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
-    pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
+    pub service: BoxService<ElasticsearchRequest, ElasticsearchResponse, Error>,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
-    pub mode: ElasticSearchCommonMode,
+    pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
 }
 
-impl ElasticSearchSink {
+impl ElasticsearchSink {
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -58,6 +60,7 @@ impl ElasticSearchSink {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
+                    _ => None,
                 }))
             })
             .filter_map(|x| async move { x })
@@ -81,7 +84,7 @@ impl ElasticSearchSink {
 
 pub fn process_log(
     mut log: LogEvent,
-    mode: &ElasticSearchCommonMode,
+    mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
@@ -106,7 +109,7 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink for ElasticSearchSink {
+impl StreamSink<Event> for ElasticsearchSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

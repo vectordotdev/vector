@@ -5,10 +5,11 @@ use vector_core::{
 
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
-pub struct DatadogMetricsNormalizer;
+#[derive(Default)]
+pub(crate) struct DatadogMetricsNormalizer;
 
 impl MetricNormalize for DatadogMetricsNormalizer {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         // We primarily care about making sure that counters are incremental, and that gauges are
         // always absolute.  For other metric kinds, we want them to be incremental.
         match &metric.value() {
@@ -47,9 +48,8 @@ mod tests {
         metrics::AgentDDSketch,
     };
 
-    use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
-
     use super::DatadogMetricsNormalizer;
+    use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
     fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u32) {
         // Generate buckets, and general statistics, for an input set of data.  We only use this in
@@ -183,10 +183,18 @@ mod tests {
         )
     }
 
+    fn run_comparisons(inputs: Vec<Metric>, expected_outputs: Vec<Option<Metric>>) {
+        let mut metric_set = MetricSet::default();
+        let mut normalizer = DatadogMetricsNormalizer::default();
+
+        for (input, expected) in inputs.into_iter().zip(expected_outputs) {
+            let result = normalizer.apply_state(&mut metric_set, input);
+            assert_eq!(result, expected);
+        }
+    }
+
     #[test]
     fn absolute_counter() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
 
@@ -203,16 +211,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in counters.into_iter().zip(expected_counters) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(counters, expected_counters);
     }
 
     #[test]
     fn incremental_counter() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
 
@@ -227,16 +230,11 @@ mod tests {
             .map(Option::Some)
             .collect::<Vec<_>>();
 
-        for (input, expected) in counters.into_iter().zip(expected_counters) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(counters, expected_counters);
     }
 
     #[test]
     fn mixed_counter() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
         let third_value = 16.19;
@@ -262,16 +260,11 @@ mod tests {
             Some(get_counter(third_value, MetricKind::Incremental)),
         ];
 
-        for (input, expected) in counters.into_iter().zip(expected_counters) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(counters, expected_counters);
     }
 
     #[test]
     fn absolute_gauge() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
 
@@ -286,16 +279,11 @@ mod tests {
             .map(Option::Some)
             .collect::<Vec<_>>();
 
-        for (input, expected) in gauges.into_iter().zip(expected_gauges) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(gauges, expected_gauges);
     }
 
     #[test]
     fn incremental_gauge() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
 
@@ -309,16 +297,11 @@ mod tests {
             Some(get_gauge(first_value + second_value, MetricKind::Absolute)),
         ];
 
-        for (input, expected) in gauges.into_iter().zip(expected_gauges) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(gauges, expected_gauges);
     }
 
     #[test]
     fn mixed_gauge() {
-        let mut metric_set = MetricSet::default();
-
         let first_value = 3.14;
         let second_value = 8.675309;
         let third_value = 16.19;
@@ -344,16 +327,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in gauges.into_iter().zip(expected_gauges) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(gauges, expected_gauges);
     }
 
     #[test]
     fn absolute_set() {
-        let mut metric_set = MetricSet::default();
-
         let sets = vec![
             get_set(1..=20, MetricKind::Absolute),
             get_set(15..=25, MetricKind::Absolute),
@@ -361,16 +339,11 @@ mod tests {
 
         let expected_sets = vec![None, Some(get_set(21..=25, MetricKind::Incremental))];
 
-        for (input, expected) in sets.into_iter().zip(expected_sets) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(sets, expected_sets);
     }
 
     #[test]
     fn incremental_set() {
-        let mut metric_set = MetricSet::default();
-
         let sets = vec![
             get_set(1..=20, MetricKind::Incremental),
             get_set(15..=25, MetricKind::Incremental),
@@ -381,16 +354,11 @@ mod tests {
             Some(get_set(15..=25, MetricKind::Incremental)),
         ];
 
-        for (input, expected) in sets.into_iter().zip(expected_sets) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(sets, expected_sets);
     }
 
     #[test]
     fn mixed_set() {
-        let mut metric_set = MetricSet::default();
-
         let sets = vec![
             get_set(1..=20, MetricKind::Incremental),
             get_set(10..=16, MetricKind::Absolute),
@@ -407,16 +375,11 @@ mod tests {
             Some(get_set(3..=42, MetricKind::Incremental)),
         ];
 
-        for (input, expected) in sets.into_iter().zip(expected_sets) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(sets, expected_sets);
     }
 
     #[test]
     fn absolute_distribution() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
 
         let mut samples2 = samples1.clone();
@@ -438,16 +401,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in distributions.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(distributions, expected_sketches);
     }
 
     #[test]
     fn incremental_distribution() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(75, 125);
         let sketch1_samples = samples1.clone();
@@ -471,16 +429,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in distributions.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(distributions, expected_sketches);
     }
 
     #[test]
     fn mixed_distribution() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(75, 125);
         let samples3 = generate_f64s(75, 187);
@@ -523,16 +476,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in distributions.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(distributions, expected_sketches);
     }
 
     #[test]
     fn absolute_aggregated_histogram() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(1, 125);
         let sketch_samples = generate_f64s(101, 125);
@@ -549,16 +497,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in agg_histograms.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(agg_histograms, expected_sketches);
     }
 
     #[test]
     fn incremental_aggregated_histogram() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(1, 125);
         let sketch1_samples = samples1.clone();
@@ -578,16 +521,11 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in agg_histograms.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(agg_histograms, expected_sketches);
     }
 
     #[test]
     fn mixed_aggregated_histogram() {
-        let mut metric_set = MetricSet::default();
-
         let samples1 = generate_f64s(1, 100);
         let samples2 = generate_f64s(75, 125);
         let samples3 = generate_f64s(75, 187);
@@ -622,9 +560,6 @@ mod tests {
             )),
         ];
 
-        for (input, expected) in agg_histograms.into_iter().zip(expected_sketches) {
-            let result = DatadogMetricsNormalizer::apply_state(&mut metric_set, input);
-            assert_eq!(result, expected);
-        }
+        run_comparisons(agg_histograms, expected_sketches);
     }
 }

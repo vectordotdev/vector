@@ -13,7 +13,7 @@ components: sinks: influxdb_metrics: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -53,6 +53,15 @@ components: sinks: influxdb_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
+			}
+		}
+		tags: {
+			required:    false
+			common:      false
+			description: "A map of additional key-value pairs that will be attached to each LineProtocol as tags."
+			groups: ["v1", "v2"]
+			type: object: {
+				examples: [{region: "us-west-1"}]
 			}
 		}
 	}

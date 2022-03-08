@@ -1,20 +1,23 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use super::*;
-use crate::aws::rusoto::RegionOrEndpoint;
-use crate::config::SinkConfig;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::{BatchConfig, Compression};
-use crate::test_util::components;
-use crate::{
-    config::SinkContext,
-    test_util::{random_lines_with_stream, random_string},
-};
+use std::sync::Arc;
+
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
-use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+
+use super::*;
+use crate::{
+    aws::rusoto::RegionOrEndpoint,
+    config::{SinkConfig, SinkContext},
+    sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
+    test_util::{components, random_lines_with_stream, random_string},
+};
+
+fn kinesis_address() -> String {
+    std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
 
 #[tokio::test]
 async fn kinesis_put_records() {
@@ -22,7 +25,7 @@ async fn kinesis_put_records() {
 
     let region = Region::Custom {
         name: "localstack".into(),
-        endpoint: "http://localhost:4566".into(),
+        endpoint: kinesis_address(),
     };
 
     ensure_stream(region.clone(), stream.clone()).await;
@@ -33,13 +36,15 @@ async fn kinesis_put_records() {
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
+        region: RegionOrEndpoint::with_endpoint(kinesis_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
+        tls: Default::default(),
         assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();

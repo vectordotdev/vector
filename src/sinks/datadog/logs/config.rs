@@ -1,23 +1,28 @@
-use super::service::LogApiRetry;
-use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
-use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::service::ServiceBuilderExt;
-use crate::sinks::util::SinkBatchSettings;
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+
 use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::num::NonZeroU64;
-use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
+
+use super::{
+    service::LogApiRetry,
+    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
+};
+use crate::{
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
+        util::{
+            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
+            SinkBatchSettings, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
 // threshold the API will toss results. We previously serialized Events as they
@@ -43,7 +48,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogLogsConfig {
+pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
     region: Option<Region>,
@@ -66,6 +71,13 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -129,7 +141,7 @@ impl DatadogLogsConfig {
             .compression(self.compression.unwrap_or_default())
             .build();
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
@@ -157,12 +169,16 @@ impl SinkConfig for DatadogLogsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

@@ -21,7 +21,7 @@ impl Function for OnlyFields {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let mut paths = vec![];
@@ -59,7 +59,7 @@ impl Expression for OnlyFieldsFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
             fallible: true,
-            kind: value::Kind::Null,
+            kind: value::Kind::null(),
             ..Default::default()
         }
     }
@@ -75,7 +75,7 @@ mod tests {
         },
         def: TypeDef {
             fallible: true,
-            kind: value::Kind::Null,
+            kind: value::Kind::null(),
             ..Default::default()
         },
     }];

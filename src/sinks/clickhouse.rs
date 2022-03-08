@@ -1,23 +1,23 @@
-use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::{Auth, HttpClient, HttpError, MaybeAuth},
-    sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
-        retries::{RetryAction, RetryLogic},
-        sink, BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
+use crate::{
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
+    sinks::util::{
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
+        retries::{RetryAction, RetryLogic},
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
+    },
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -42,6 +42,12 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -83,40 +89,56 @@ impl SinkConfig for ClickhouseConfig {
             batch.timeout,
             client.clone(),
             cx.acker(),
-            sink::StdServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
         let healthcheck = healthcheck(client, config).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "clickhouse"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
+}
+
+pub struct ClickhouseEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
+
+impl HttpEventEncoder<BytesMut> for ClickhouseEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
+        self.encoding.apply_rules(&mut event);
+        let log = event.into_log();
+
+        let mut body = crate::serde::json::to_bytes(&log).expect("Events should be valid json!");
+        body.put_u8(b'\n');
+
+        Some(body)
+    }
 }
 
 #[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = ClickhouseEventEncoder;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
-        let log = event.into_log();
-
-        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-        body.push(b'\n');
-
-        Some(body)
+    fn build_encoder(&self) -> Self::Encoder {
+        ClickhouseEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
@@ -137,7 +159,7 @@ impl HttpSink for ClickhouseConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        let mut request = builder.body(events).unwrap();
+        let mut request = builder.body(events.freeze()).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
@@ -171,7 +193,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
             format!(
                 "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
                 database,
-                table.replace("\"", "\\\"")
+                table.replace('\"', "\\\"")
             )
             .as_str(),
         )
@@ -188,7 +210,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
-        .context(super::UriParseError)
+        .context(super::UriParseSnafu)
         .map_err(Into::into)
 }
 
@@ -214,7 +236,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
                 // retry those errors.
                 //
-                // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
+                // Reference: https://github.com/vectordotdev/vector/pull/693#issuecomment-517332654
                 // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
                 //
                 // Fix already merged: https://github.com/ClickHouse/ClickHouse/pull/6271
@@ -276,15 +298,6 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "clickhouse-integration-tests")]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        config::{log_schema, SinkConfig, SinkContext},
-        sinks::util::encoding::TimestampFormat,
-        test_util::components::{self, HTTP_SINK_TAGS},
-        test_util::{random_string, trace_init},
-    };
-    use futures::{future, stream};
-    use serde_json::Value;
     use std::{
         convert::Infallible,
         net::SocketAddr,
@@ -293,16 +306,33 @@ mod integration_tests {
             Arc,
         },
     };
+
+    use futures::future;
+    use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
     use warp::Filter;
+
+    use super::*;
+    use crate::{
+        config::{log_schema, SinkConfig, SinkContext},
+        sinks::util::encoding::TimestampFormat,
+        test_util::{
+            components::{self, HTTP_SINK_TAGS},
+            random_string, trace_init,
+        },
+    };
+
+    fn clickhouse_address() -> String {
+        std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
+    }
 
     #[tokio::test]
     async fn insert_events() {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -350,7 +380,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -395,7 +425,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
         let encoding = EncodingConfigWithDefault {
             timestamp_format: Some(TimestampFormat::Unix),
             ..Default::default()
@@ -457,7 +487,7 @@ mod integration_tests {
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let config: ClickhouseConfig = toml::from_str(&format!(
             r#"
@@ -514,7 +544,7 @@ timestamp_format = "unix""#,
         trace_init();
 
         let table = gen_table();
-        let host = String::from("http://localhost:8123");
+        let host = clickhouse_address();
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -540,13 +570,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
@@ -585,13 +612,10 @@ timestamp_format = "unix""#,
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        timeout(
-            Duration::from_secs(5),
-            sink.run(stream::once(future::ready(input_event))),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout(Duration::from_secs(5), sink.run_events(vec![input_event]))
+            .await
+            .unwrap()
+            .unwrap();
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }

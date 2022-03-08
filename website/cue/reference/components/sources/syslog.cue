@@ -8,6 +8,8 @@ components: sources: syslog: {
 	classes: sources.socket.classes
 
 	features: {
+		acknowledgements: sources.socket.features.acknowledgements
+
 		multiline: sources.socket.features.multiline
 
 		receive: {
@@ -93,6 +95,16 @@ components: sources: syslog: {
 			required:      true
 			type: string: {
 				examples: ["/path/to/socket"]
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 	}

@@ -1,28 +1,30 @@
-use crate::{
-    config::{GenerateConfig, SinkContext},
-    sinks::util::tcp::TcpSinkConfig,
-    sinks::{Healthcheck, VectorSink},
-    tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
-};
 use bytes::{BufMut, Bytes, BytesMut};
-use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use vector_core::event::{proto, Event};
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+use crate::{
+    config::{GenerateConfig, SinkContext},
+    sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
+    tcp::TcpKeepaliveConfig,
+    tls::TlsConfig,
+};
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    #[set = "pub"]
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
 impl VectorConfig {
+    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+        self.tls = config;
+    }
+
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,

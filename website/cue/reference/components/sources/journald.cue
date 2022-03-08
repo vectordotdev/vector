@@ -13,6 +13,7 @@ components: sources: journald: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -43,7 +44,7 @@ components: sources: journald: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		batch_size: {
 			common:      false
 			description: "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."

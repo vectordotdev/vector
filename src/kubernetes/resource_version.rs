@@ -1,7 +1,9 @@
 //! A resource version types to ensure proper usage protocol.
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
-use k8s_openapi::Metadata;
+use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
+    Metadata,
+};
 
 /// Resource version state in the context of a chain of watch requests.
 #[derive(Debug, Clone, Default)]

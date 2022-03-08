@@ -1,19 +1,22 @@
-use super::FuturesUnorderedChunked;
-use crate::event::{EventStatus, Finalizable};
-use crate::internal_event::emit;
-use crate::internal_event::EventsSent;
-use buffers::{Ackable, Acker};
-use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use std::{
     collections::{BinaryHeap, VecDeque},
     fmt,
     num::NonZeroUsize,
     task::Poll,
 };
+
+use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+use vector_buffers::{Ackable, Acker};
+
+use super::FuturesUnorderedChunked;
+use crate::{
+    event::{EventStatus, Finalizable},
+    internal_event::{emit, EventsSent},
+};
 
 /// Newtype wrapper around sequence numbers to enforce misuse resistance.
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -284,7 +287,9 @@ where
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
-                                        emit(&response.events_sent());
+                                        if response.event_status() == EventStatus::Delivered {
+                                            emit(&response.events_sent());
+                                        }
                                     }
                                 };
                                 (seq_num, ack_size)
@@ -317,14 +322,11 @@ mod tests {
         iter::repeat_with,
         num::NonZeroUsize,
         pin::Pin,
-        sync::atomic::Ordering,
-        sync::Arc,
+        sync::{atomic::Ordering, Arc},
         task::{Context, Poll},
         time::Duration,
     };
 
-    use buffers::{Ackable, Acker};
-    use core_common::internal_event::EventsSent;
     use futures_util::{ready, stream};
     use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
@@ -335,13 +337,14 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
+    use vector_buffers::{Ackable, Acker};
+    use vector_common::internal_event::EventsSent;
 
+    use super::{Driver, DriverResponse};
     use crate::{
         event::{EventFinalizers, EventStatus, Finalizable},
         stream::driver::AcknowledgementTracker,
     };
-
-    use super::{Driver, DriverResponse};
 
     struct DelayRequest(usize);
 
@@ -368,6 +371,7 @@ mod tests {
             EventsSent {
                 count: 1,
                 byte_size: 1,
+                output: None,
             }
         }
     }
@@ -393,7 +397,7 @@ mod tests {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_precision_loss)]
     impl DelayService {
-        pub fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
+        pub(crate) fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
             assert!(upper_bound > lower_bound);
             Self {
                 semaphore: PollSemaphore::new(Arc::new(Semaphore::new(permits))),
@@ -408,7 +412,7 @@ mod tests {
             }
         }
 
-        pub fn get_sleep_dur(&mut self) -> Duration {
+        pub(crate) fn get_sleep_dur(&mut self) -> Duration {
             let lower = self.lower_bound_us;
             let upper = self.upper_bound_us;
 
@@ -431,9 +435,10 @@ mod tests {
             Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            if self.permit.is_some() {
-                panic!("should not call poll_ready again after a successful call");
-            }
+            assert!(
+                self.permit.is_none(),
+                "should not call poll_ready again after a successful call"
+            );
 
             match ready!(self.semaphore.poll_acquire(cx)) {
                 None => panic!("semaphore should not be closed!"),
@@ -603,7 +608,7 @@ mod tests {
         let input_total: usize = input_requests.iter().sum();
         let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
         let service = DelayService::new(10, Duration::from_millis(5), Duration::from_millis(150));
-        let (acker, counter) = Acker::new_for_testing();
+        let (acker, counter) = Acker::basic();
         let driver = Driver::new(input_stream, service, acker);
 
         // Now actually run the driver, consuming all of the input.

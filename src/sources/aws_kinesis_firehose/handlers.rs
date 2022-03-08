@@ -1,25 +1,30 @@
-use super::errors::{ParseRecords, RequestError};
-use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use super::Compression;
-use crate::codecs;
-use crate::sources::util::StreamDecodingError;
-use crate::{
-    config::log_schema,
-    event::{BatchStatus, Event},
-    internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
-    },
-    Pipeline,
-};
+use std::{io::Read, sync::Arc};
+
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
-use std::{io::Read, sync::Arc};
 use tokio_util::codec::FramedRead;
-use vector_core::event::BatchNotifier;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
+
+use super::{
+    errors::{ParseRecordsSnafu, RequestError},
+    models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
+    Compression,
+};
+use crate::{
+    codecs,
+    config::log_schema,
+    event::{BatchStatus, Event},
+    internal_events::{
+        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
+        StreamClosedError,
+    },
+    sources::util::StreamDecodingError,
+    SourceSender,
+};
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
 pub async fn firehose(
@@ -29,22 +34,26 @@ pub async fn firehose(
     compression: Compression,
     decoder: codecs::Decoder,
     acknowledgements: bool,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
         let bytes = decode_record(&record, compression)
-            .with_context(|| ParseRecords {
+            .with_context(|_| ParseRecordsSnafu {
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
+        emit!(&BytesReceived {
+            byte_size: bytes.len(),
+            protocol: "http",
+        });
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {
             match stream.next().await {
-                Some(Ok((events, byte_size))) => {
-                    emit!(&AwsKinesisFirehoseEventsReceived {
+                Some(Ok((mut events, _byte_size))) => {
+                    emit!(&EventsReceived {
                         count: events.len(),
-                        byte_size
+                        byte_size: events.size_of(),
                     });
 
                     let (batch, receiver) = acknowledgements
@@ -54,7 +63,7 @@ pub async fn firehose(
                         })
                         .unwrap_or((None, None));
 
-                    for mut event in events {
+                    for event in &mut events {
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(Arc::clone(batch));
                         }
@@ -67,20 +76,19 @@ pub async fn firehose(
                             log.try_insert_flat("request_id", request_id.to_string());
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
+                    }
 
-                        out.send(event)
-                            .map_err(|error| {
-                                let error = RequestError::ShuttingDown {
-                                    request_id: request_id.clone(),
-                                    source: error,
-                                };
-                                // can only fail if receiving end disconnected, so we are shutting
-                                // down, probably not gracefully.
-                                error!(message = "Failed to forward events, downstream is closed.");
-                                error!(message = "Tried to send the following event.", %error);
-                                warp::reject::custom(error)
-                            })
-                            .await?;
+                    let count = events.len();
+                    if let Err(error) = out.send_batch(events).await {
+                        emit!(&StreamClosedError {
+                            error: error.clone(),
+                            count,
+                        });
+                        let error = RequestError::ShuttingDown {
+                            request_id: request_id.clone(),
+                            source: error,
+                        };
+                        warp::reject::custom(error);
                     }
 
                     drop(batch);
@@ -135,7 +143,7 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64 {})?;
+    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());
@@ -143,7 +151,7 @@ fn decode_record(
 
     match compression {
         Compression::None => Ok(Bytes::from(buf)),
-        Compression::Gzip => decode_gzip(&buf[..]).with_context(|| Decompression {
+        Compression::Gzip => decode_gzip(&buf[..]).with_context(|_| DecompressionSnafu {
             compression: compression.to_owned(),
         }),
         Compression::Auto => {

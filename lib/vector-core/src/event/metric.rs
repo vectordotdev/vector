@@ -1,10 +1,3 @@
-use crate::event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
-use crate::metrics::{AgentDDSketch, Handle};
-use crate::ByteSizeOf;
-use chrono::{DateTime, Utc};
-use getset::{Getters, MutGetters};
-use serde::{Deserialize, Serialize};
-use shared::EventDataEq;
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
@@ -14,19 +7,51 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
+use chrono::{DateTime, Utc};
+use float_eq::FloatEq;
+use serde::{Deserialize, Serialize};
+use vector_common::EventDataEq;
+#[cfg(feature = "vrl")]
+use vrl_lib::prelude::VrlValueConvert;
+
+use crate::{
+    event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
+    metrics::{AgentDDSketch, Handle},
+    ByteSizeOf,
+};
+
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Metric {
-    #[getset(get = "pub")]
     #[serde(flatten)]
     pub(super) series: MetricSeries,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub(super) data: MetricData,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip_serializing, default = "EventMetadata::default")]
     metadata: EventMetadata,
+}
+
+impl Metric {
+    pub fn series(&self) -> &MetricSeries {
+        &self.series
+    }
+
+    pub fn data(&self) -> &MetricData {
+        &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut MetricData {
+        &mut self.data
+    }
+
+    pub fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        &mut self.metadata
+    }
 }
 
 impl ByteSizeOf for Metric {
@@ -84,18 +109,29 @@ impl ByteSizeOf for MetricName {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MetricData {
-    #[getset(get = "pub")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
 
-    #[getset(get = "pub")]
     pub kind: MetricKind,
 
-    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub value: MetricValue,
+}
+
+impl MetricData {
+    pub fn timestamp(&self) -> &Option<DateTime<Utc>> {
+        &self.timestamp
+    }
+
+    pub fn value(&self) -> &MetricValue {
+        &self.value
+    }
+
+    pub fn value_mut(&mut self) -> &mut MetricValue {
+        &mut self.value
+    }
 }
 
 impl PartialOrd for MetricData {
@@ -121,10 +157,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<vrl_core::Value> for MetricKind {
+impl TryFrom<vrl_lib::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_lib::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -138,7 +174,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl From<MetricKind> for vrl_core::Value {
+impl From<MetricKind> for vrl_lib::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -147,7 +183,7 @@ impl From<MetricKind> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
@@ -219,6 +255,53 @@ impl MetricValue {
             Self::Sketch { sketch } => sketch.as_name(),
         }
     }
+
+    /// Converts a distribution to an aggregated histogram.
+    ///
+    /// Histogram bucket bounds are based on `buckets`, where the value is the upper bound of the
+    /// bucket.  Samples will be thus be ordered in a "less than" fashion: if the given sample is
+    /// less than or equal to a given bucket's upper bound, it will be counted towards that bucket
+    /// at the given sample rate.
+    ///
+    /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
+    /// `Some(MetricValue::AggregatedHistogram)` is returned.
+    pub fn distribution_to_agg_histogram(&self, buckets: &[f64]) -> Option<MetricValue> {
+        match self {
+            MetricValue::Distribution { samples, .. } => {
+                let (buckets, count, sum) = samples_to_buckets(samples, buckets);
+
+                Some(MetricValue::AggregatedHistogram {
+                    buckets,
+                    count,
+                    sum,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// Converts a distribution to a sketch.
+    ///
+    /// This conversion specifically use the `AgentDDSketch` sketch variant, in the default
+    /// configuration that matches the Datadog Agent, parameter-wise.
+    ///
+    /// If this `MetricValue` is not a distribution, then `None` is returned.  Otherwise,
+    /// `Some(MetricValue::Sketch)` is returned.
+    pub fn distribution_to_sketch(&self) -> Option<MetricValue> {
+        match self {
+            MetricValue::Distribution { samples, .. } => {
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                for sample in samples {
+                    sketch.insert_n(sample.value, sample.rate);
+                }
+
+                Some(MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch),
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 impl ByteSizeOf for MetricValue {
@@ -230,6 +313,58 @@ impl ByteSizeOf for MetricValue {
             Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
             Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
             Self::Sketch { sketch } => sketch.allocated_bytes(),
+        }
+    }
+}
+
+impl PartialEq for MetricValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Counter { value: l_value }, Self::Counter { value: r_value })
+            | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
+                l_value.eq_ulps(r_value, &1)
+            }
+            (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
+                l_values == r_values
+            }
+            (
+                Self::Distribution {
+                    samples: l_samples,
+                    statistic: l_statistic,
+                },
+                Self::Distribution {
+                    samples: r_samples,
+                    statistic: r_statistic,
+                },
+            ) => l_samples == r_samples && l_statistic == r_statistic,
+            (
+                Self::AggregatedHistogram {
+                    buckets: l_buckets,
+                    count: l_count,
+                    sum: l_sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: r_buckets,
+                    count: r_count,
+                    sum: r_sum,
+                },
+            ) => l_buckets == r_buckets && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            (
+                Self::AggregatedSummary {
+                    quantiles: l_quantiles,
+                    count: l_count,
+                    sum: l_sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: r_quantiles,
+                    count: r_count,
+                    sum: r_sum,
+                },
+            ) => l_quantiles == r_quantiles && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
+                l_sketch == r_sketch
+            }
+            _ => false,
         }
     }
 }
@@ -364,7 +499,7 @@ pub fn zip_quantiles(
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for vrl_core::Value {
+impl From<MetricValue> for vrl_lib::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -419,7 +554,7 @@ impl ByteSizeOf for MetricSketch {
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for vrl_core::Value {
+impl From<MetricSketch> for vrl_lib::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }
@@ -454,18 +589,21 @@ impl Metric {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.series.name.name = name.into();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
@@ -475,23 +613,27 @@ impl Metric {
         self.metadata.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
@@ -512,6 +654,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
@@ -521,6 +664,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             series: self.series,
@@ -705,6 +849,7 @@ impl MetricSeries {
 
 impl MetricData {
     /// Rewrite this data to mark it as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -714,12 +859,31 @@ impl MetricData {
     }
 
     /// Rewrite this data to mark it as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,
             kind: MetricKind::Incremental,
             value: self.value,
         }
+    }
+
+    /// Creates a new `MetricData` from individual parts.
+    pub fn from_parts(
+        timestamp: Option<DateTime<Utc>>,
+        kind: MetricKind,
+        value: MetricValue,
+    ) -> Self {
+        Self {
+            timestamp,
+            kind,
+            value,
+        }
+    }
+
+    /// Consumes this `MetricData` and returns its individual parts.
+    pub fn into_parts(self) -> (Option<DateTime<Utc>>, MetricKind, MetricValue) {
+        (self.timestamp, self.kind, self.value)
     }
 
     /// Update this `MetricData` by adding the value from another.
@@ -852,7 +1016,14 @@ impl MetricValue {
                 *sum += sum2;
                 true
             }
-
+            (Self::Sketch { sketch }, Self::Sketch { sketch: sketch2 }) => {
+                match (sketch, sketch2) {
+                    (
+                        MetricSketch::AgentDDSketch(ddsketch),
+                        MetricSketch::AgentDDSketch(ddsketch2),
+                    ) => ddsketch.merge(ddsketch2).is_ok(),
+                }
+            }
             _ => false,
         }
     }
@@ -976,8 +1147,37 @@ impl Display for Metric {
             MetricKind::Absolute => '=',
             MetricKind::Incremental => '+',
         };
-        write!(fmt, "{} {} ", &self.series, kind)?;
-        match &self.data.value {
+        self.series.fmt(fmt)?;
+        write!(fmt, " {} ", kind)?;
+        self.data.value.fmt(fmt)
+    }
+}
+
+impl Display for MetricSeries {
+    /// Display a metric series name using something like Prometheus' text format:
+    ///
+    /// ```text
+    /// NAMESPACE_NAME{TAGS}
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(namespace) = &self.name.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
+        }
+        write_word(fmt, &self.name.name)?;
+        write!(fmt, "{{")?;
+        if let Some(tags) = &self.tags {
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+        }
+        write!(fmt, "}}")
+    }
+}
+
+impl Display for MetricValue {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        match &self {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                 write!(fmt, "{}", value)
             }
@@ -1052,28 +1252,6 @@ impl Display for Metric {
     }
 }
 
-impl Display for MetricSeries {
-    /// Display a metric series name using something like Prometheus' text format:
-    ///
-    /// ```text
-    /// NAMESPACE_NAME{TAGS}
-    /// ```
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        if let Some(namespace) = &self.name.namespace {
-            write_word(fmt, namespace)?;
-            write!(fmt, "_")?;
-        }
-        write_word(fmt, &self.name.name)?;
-        write!(fmt, "{{")?;
-        if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
-            })?;
-        }
-        write!(fmt, "}}")
-    }
-}
-
 fn write_list<I, T, W>(
     fmt: &mut Formatter<'_>,
     sep: &str,
@@ -1101,11 +1279,41 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     }
 }
 
+pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
+    let mut counts = vec![0; buckets.len()];
+    let mut sum = 0.0;
+    let mut count = 0;
+    for sample in samples {
+        if let Some((i, _)) = buckets
+            .iter()
+            .enumerate()
+            .find(|&(_, b)| *b >= sample.value)
+        {
+            counts[i] += sample.rate;
+        }
+
+        sum += sample.value * f64::from(sample.rate);
+        count += sample.rate;
+    }
+
+    let buckets = buckets
+        .iter()
+        .zip(counts.iter())
+        .map(|(b, c)| Bucket {
+            upper_limit: *b,
+            count: *c,
+        })
+        .collect();
+
+    (buckets, count, sum)
+}
+
 #[cfg(test)]
 mod test {
-    use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -1472,5 +1680,48 @@ mod test {
             let result = quantile.as_percentile();
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn value_conversions() {
+        let counter_value = MetricValue::Counter { value: 3.13 };
+        assert_eq!(counter_value.distribution_to_agg_histogram(&[1.0]), None);
+
+        let counter_value = MetricValue::Counter { value: 3.13 };
+        assert_eq!(counter_value.distribution_to_sketch(), None);
+
+        let distrib_value = MetricValue::Distribution {
+            samples: samples!(1.0 => 10, 2.0 => 5, 5.0 => 2),
+            statistic: StatisticKind::Summary,
+        };
+        let converted = distrib_value.distribution_to_agg_histogram(&[1.0, 5.0, 10.0]);
+        assert_eq!(
+            converted,
+            Some(MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 10,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 7,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 0,
+                    },
+                ],
+                sum: 30.0,
+                count: 17,
+            })
+        );
+
+        let distrib_value = MetricValue::Distribution {
+            samples: samples!(1.0 => 1),
+            statistic: StatisticKind::Summary,
+        };
+        let converted = distrib_value.distribution_to_sketch();
+        assert!(matches!(converted, Some(MetricValue::Sketch { .. })));
     }
 }

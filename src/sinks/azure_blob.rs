@@ -1,6 +1,6 @@
 use std::{convert::TryInto, io, sync::Arc};
 
-use azure_storage::blob::prelude::*;
+use azure_storage_blobs::prelude::*;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -9,18 +9,18 @@ use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Finalizable},
     sinks::{
         azure_common::{
             self,
-            config::AzureBlobMetadata,
-            config::{AzureBlobRequest, AzureBlobRetryLogic},
+            config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobRetryLogic},
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
         util::{
-            encoding::EncodingConfig, encoding::StandardEncodings, partitioner::KeyPartitioner,
+            encoding::{EncodingConfig, StandardEncodings},
+            partitioner::KeyPartitioner,
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
             ServiceBuilderExt, TowerRequestConfig,
         },
@@ -33,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     pub connection_string: String,
-    pub container_name: String,
+    pub(super) container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
     pub blob_append_uuid: Option<bool>,
@@ -44,6 +44,12 @@ pub struct AzureBlobSinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
@@ -58,6 +64,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -79,12 +86,16 @@ impl SinkConfig for AzureBlobSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "azure_blob"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -134,7 +145,7 @@ impl AzureBlobSinkConfig {
             batcher_settings,
         );
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
@@ -236,6 +247,7 @@ fn default_config(e: StandardEncodings) -> AzureBlobSinkConfig {
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
+        acknowledgements: Default::default(),
     }
 }
 
@@ -397,22 +409,22 @@ mod tests {
 #[cfg(feature = "azure-blob-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::io::{BufRead, BufReader};
-    use std::num::NonZeroU32;
+    use std::{
+        io::{BufRead, BufReader},
+        num::NonZeroU32,
+    };
 
-    use azure_core::prelude::Range;
-    use azure_core::HttpError;
+    use azure_core::{prelude::Range, HttpError};
     use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use futures::{stream, Stream, StreamExt};
     use http::StatusCode;
 
+    use super::*;
     use crate::{
-        event::LogEvent,
+        event::{EventArray, LogEvent},
         test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn azure_blob_healthcheck_passed() {
@@ -596,8 +608,9 @@ mod integration_tests {
 
     impl AzureBlobSinkConfig {
         pub async fn new_emulator() -> AzureBlobSinkConfig {
+            let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
             let config = AzureBlobSinkConfig {
-                connection_string: String::from("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"),
+                connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address),
                 container_name: "logs".to_string(),
                 blob_prefix: None,
                 blob_time_format: None,
@@ -606,6 +619,7 @@ mod integration_tests {
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             config.ensure_container().await;
@@ -692,11 +706,11 @@ mod integration_tests {
             let response = match request.await {
                 Ok(_) => Ok(()),
                 Err(reason) => match reason.downcast_ref::<HttpError>() {
-                    Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                    Some(HttpError::StatusCode { status, .. }) => match *status {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },
-                    _ => Err(format!("Unexpected error {}", reason.to_string())),
+                    _ => Err(format!("Unexpected error {}", reason)),
                 },
             };
 
@@ -708,7 +722,7 @@ mod integration_tests {
         len: usize,
         count: usize,
         groups: usize,
-    ) -> (Vec<String>, usize, impl Stream<Item = Event>) {
+    ) -> (Vec<String>, usize, impl Stream<Item = EventArray>) {
         let key = count / groups;
         let lines = random_lines(len).take(count).collect::<Vec<_>>();
         let (size, events) = lines
@@ -723,7 +737,7 @@ mod integration_tests {
             })
             .fold((0, Vec::new()), |(mut size, mut events), event| {
                 size += event.size_of();
-                events.push(event);
+                events.push(event.into());
                 (size, events)
             });
 

@@ -1,17 +1,19 @@
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
+
+use serde::{
+    de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+
 use crate::{
     event::{PathComponent, PathIter},
     serde::skip_serializing_if_default,
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },
-};
-use serde::{
-    de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
-use std::{
-    fmt::{self, Debug},
-    marker::PhantomData,
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.
@@ -179,7 +181,7 @@ where
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-pub struct Inner<E> {
+struct Inner<E> {
     codec: E,
     #[serde(default)]
     schema: Option<String>,

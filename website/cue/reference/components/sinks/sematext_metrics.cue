@@ -13,7 +13,7 @@ components: sinks: sematext_metrics: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

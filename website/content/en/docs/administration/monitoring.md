@@ -6,7 +6,7 @@ weight: 2
 tags: ["admin", "logs", "metrics"]
 ---
 
-Although Vector is primarily used to handle observability data from from a wide variety of sources, we also strive to
+Although Vector is primarily used to handle observability data from a wide variety of sources, we also strive to
 make Vector highly observable itself. To that end, Vector provides two [sources], [`internal_logs`][internal_logs] and
 [`internal_metrics`][internal_metrics], that you can use to handle logs and metrics produced by Vector just like you
 would logs and metrics from any other source.
@@ -121,7 +121,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
-[output]: /docs/reference/configuration/sources/internal_metrics/#output
+[output]: /docs/reference/configuration/sources/internal_metrics/#output-data
 [remap]: /docs/reference/configuration/transforms/remap
 [rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks

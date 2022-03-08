@@ -1,14 +1,18 @@
-use super::BuildError;
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
-    internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
-    transforms::{FunctionTransform, Transform},
-};
+use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
-use lazy_static::lazy_static;
+use super::BuildError;
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::{Event, Value},
+    internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -53,12 +57,12 @@ impl TransformConfig for ConcatConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -73,13 +77,12 @@ pub struct Substring {
     end: Option<i32>,
 }
 
+static SUBSTR_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$").unwrap()
+});
+
 impl Substring {
     fn new(input: String) -> Result<Substring, BuildError> {
-        lazy_static! {
-            static ref SUBSTR_REGEX: Regex =
-                Regex::new(r"^(?P<source>.*?)(?:\[(?P<start>-?[0-9]*)\.\.(?P<end>-?[0-9]*)\])?$")
-                    .unwrap();
-        }
         let cap = match SUBSTR_REGEX.captures(input.as_bytes()) {
             None => {
                 return Err(BuildError::InvalidSubstring {
@@ -134,12 +137,12 @@ impl Concat {
 }
 
 impl FunctionTransform for Concat {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 
         for substring in self.items.iter() {
             if let Some(value) = event.as_log().get(&substring.source) {
-                let b = value.as_bytes();
+                let b = value.coerce_to_bytes();
                 let start = match substring.start {
                     None => 0,
                     Some(s) => {

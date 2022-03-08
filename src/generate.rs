@@ -1,26 +1,26 @@
+use std::{
+    fs::{create_dir_all, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
+
+use clap::Parser;
+use colored::*;
+use indexmap::IndexMap;
+use serde::Serialize;
+use toml::{map::Map, Value};
+use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
+
 use crate::config::{
     component::ExampleError, SinkDescription, SinkHealthcheckOptions, SourceDescription,
     TransformDescription,
 };
-use colored::*;
-use indexmap::IndexMap;
-use serde::Serialize;
-use std::path::{Path, PathBuf};
-use std::{
-    fs::{create_dir_all, File},
-    io::Write,
-};
-use structopt::StructOpt;
-use toml::{map::Map, Value};
-use vector_core::buffers::BufferConfig;
-use vector_core::config::GlobalOptions;
-use vector_core::default_data_dir;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Whether to skip the generation of global fields.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     fragment: bool,
 
     /// Generate expression, e.g. 'stdin/json_parser,add_fields/console'
@@ -55,7 +55,7 @@ pub struct Opts {
     expression: String,
 
     /// Generate config as a file
-    #[structopt(long, parse(from_os_str))]
+    #[clap(long, parse(from_os_str))]
     file: Option<PathBuf>,
 }
 
@@ -381,9 +381,10 @@ fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     use indoc::indoc;
+
+    use super::*;
 
     #[test]
     fn generate_all() {
@@ -430,6 +431,7 @@ mod tests {
     #[test]
     fn generate_configfile() {
         use std::fs;
+
         use tempfile::tempdir;
 
         let tempdir = tempdir().expect("Unable to create tempdir for config");
@@ -443,7 +445,13 @@ mod tests {
         assert_eq!(cfg.unwrap(), filecontents)
     }
 
-    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-add_fields",
+        feature = "transforms-json_parser",
+        feature = "transforms-remove_fields",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_basic() {
         assert_eq!(

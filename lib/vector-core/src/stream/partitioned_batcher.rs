@@ -1,22 +1,32 @@
-use crate::partition::Partitioner;
-use crate::stream::batcher::config::BatchConfigParts;
-use crate::stream::batcher::data::BatchReduce;
-use crate::stream::batcher::limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit};
-use crate::time::KeyedTimer;
-use crate::ByteSizeOf;
-use futures::ready;
-use futures::stream::Stream;
+use std::{
+    cmp,
+    collections::HashMap,
+    hash::{BuildHasherDefault, Hash},
+    mem,
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use futures::{
+    ready,
+    stream::{Fuse, Stream, StreamExt},
+};
 use pin_project::pin_project;
-use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hash};
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use std::{cmp, mem};
-use tokio_util::time::delay_queue::Key;
-use tokio_util::time::DelayQueue;
+use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
+
+use crate::{
+    partition::Partitioner,
+    stream::batcher::{
+        config::BatchConfigParts,
+        data::BatchReduce,
+        limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
+    },
+    time::KeyedTimer,
+    ByteSizeOf,
+};
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -314,7 +324,7 @@ where
     partitioner: Prt,
     #[pin]
     /// The stream this `Batcher` wraps
-    stream: St,
+    stream: Fuse<St>,
 }
 
 impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
@@ -332,7 +342,7 @@ where
             closed_batches: Vec::default(),
             timer: ExpirationQueue::new(settings.timeout),
             partitioner,
-            stream,
+            stream: stream.fuse(),
         }
     }
 }
@@ -359,7 +369,7 @@ where
             closed_batches: Vec::default(),
             timer,
             partitioner,
-            stream,
+            stream: stream.fuse(),
         }
     }
 }
@@ -454,19 +464,24 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::partition::Partitioner;
-    use crate::stream::partitioned_batcher::{ExpirationQueue, PartitionedBatcher};
-    use crate::time::KeyedTimer;
+    use std::{
+        collections::{HashMap, HashSet},
+        num::{NonZeroU8, NonZeroUsize},
+        pin::Pin,
+        task::{Context, Poll},
+        time::Duration,
+    };
+
     use futures::{stream, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
-    use std::collections::{HashMap, HashSet};
-    use std::num::{NonZeroU8, NonZeroUsize};
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-    use std::time::Duration;
-    use tokio::pin;
-    use tokio::time::advance;
+    use tokio::{pin, time::advance};
+
+    use crate::{
+        partition::Partitioner,
+        stream::partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
+        time::KeyedTimer,
+    };
 
     #[derive(Debug)]
     /// A test keyed timer

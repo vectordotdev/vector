@@ -15,6 +15,7 @@ components: sources: splunk_hec: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -52,7 +53,7 @@ components: sources: splunk_hec: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements & {
+		acknowledgements: configuration._source_acknowledgements & {
 			type: object: {
 				options: {
 					max_number_of_ack_channels: {
@@ -131,6 +132,12 @@ components: sources: splunk_hec: {
 					examples: ["A94A8FE5CCB19BA61C4C08"]
 				}
 			}
+		}
+		store_hec_token: {
+			common:      false
+			description: "When incoming requests contain a Splunk HEC token, if this setting is set to `true`, the token will kept in the event metadata and will be used if the event is sent to a Splunk HEC sink."
+			required:    false
+			type: bool: default: false
 		}
 	}
 

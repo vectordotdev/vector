@@ -1,10 +1,10 @@
+use std::{convert::TryFrom, str::FromStr};
+
 use http::{uri::InvalidUri, Uri};
 use rusoto_core::{region::ParseRegionError, Region};
+use snafu::{ResultExt, Snafu};
 
 pub use crate::aws::region::RegionOrEndpoint;
-use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
-use std::str::FromStr;
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {
@@ -12,8 +12,6 @@ pub enum ParseError {
     EndpointParseError { source: InvalidUri },
     #[snafu(display("Failed to parse region: {}", source))]
     RegionParseError { source: ParseRegionError },
-    #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
-    BothRegionAndEndpoint,
     #[snafu(display("Must set either 'region' or 'endpoint'"))]
     MissingRegionAndEndpoint,
 }
@@ -23,9 +21,12 @@ impl TryFrom<&RegionOrEndpoint> for Region {
 
     fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
         match (&r.region, &r.endpoint) {
-            (Some(region), None) => region.parse().context(RegionParseError),
+            (Some(region), None) => region.parse().context(RegionParseSnafu),
             (None, Some(endpoint)) => region_from_endpoint(endpoint),
-            (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
+            (Some(region), Some(endpoint)) => Ok(Region::Custom {
+                name: region.to_string(),
+                endpoint: endpoint.to_string(),
+            }),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
     }
@@ -40,7 +41,7 @@ impl TryFrom<RegionOrEndpoint> for Region {
 
 /// Translate an endpoint URL into a Region
 pub fn region_from_endpoint(endpoint: &str) -> Result<Region, ParseError> {
-    let uri = endpoint.parse::<Uri>().context(EndpointParseError)?;
+    let uri = endpoint.parse::<Uri>().context(EndpointParseSnafu)?;
     let name = uri
         .host()
         .and_then(region_name_from_host)
@@ -70,11 +71,13 @@ fn region_name_from_host(host: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::convert::TryInto;
+
     use indoc::indoc;
     use rusoto_core::Region;
     use serde::Deserialize;
-    use std::convert::TryInto;
+
+    use super::*;
 
     #[derive(Deserialize)]
     struct Config {

@@ -3,6 +3,6 @@
     "apache_sample"
   ],
   "type": "elasticsearch",
-  "host": "http://79.12.221.222:9200",
-  "index": "vector-%Y-%m-%d"
+  "endpoint": "http://79.12.221.222:9200",
+  "bulk": {"index": "vector-%Y-%m-%d"}
 }

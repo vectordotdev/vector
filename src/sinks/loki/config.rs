@@ -1,16 +1,22 @@
-use super::healthcheck::healthcheck;
-use super::sink::LokiSink;
-use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
-use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde};
-use crate::sinks::VectorSink;
-use crate::template::Template;
-use crate::tls::{TlsOptions, TlsSettings};
+use std::{collections::HashMap, num::NonZeroU64};
+
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::num::NonZeroU64;
+
+use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::sinks::util::Compression;
+use crate::{
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    http::{Auth, HttpClient, MaybeAuth},
+    sinks::{
+        util::{
+            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
+        },
+        VectorSink,
+    },
+    template::Template,
+    tls::{TlsOptions, TlsSettings},
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -26,6 +32,8 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
     #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
     pub auth: Option<Auth>,
@@ -37,6 +45,13 @@ pub struct LokiConfig {
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -112,15 +127,19 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(config, client).boxed();
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "loki"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -144,8 +163,9 @@ pub fn valid_label_name(label: &Template) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::valid_label_name;
     use std::convert::TryInto;
+
+    use super::valid_label_name;
 
     #[test]
     fn valid_label_names() {

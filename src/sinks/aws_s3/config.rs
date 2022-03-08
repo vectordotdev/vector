@@ -1,31 +1,31 @@
-use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::SinkContext;
-use crate::sinks::s3_common::sink::S3Sink;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
+use std::convert::TryInto;
+
+use rusoto_s3::S3Client;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
+use vector_core::sink::VectorSink;
+
+use super::sink::S3RequestOptions;
 use crate::{
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
+    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
             service::S3Service,
+            sink::S3Sink,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
+            encoding::{EncodingConfig, StandardEncodings},
+            partitioner::KeyPartitioner,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
     },
+    tls::TlsOptions,
 };
-use rusoto_s3::S3Client;
-use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-use tower::ServiceBuilder;
-use vector_core::sink::VectorSink;
-
-use super::sink::S3RequestOptions;
-use crate::sinks::util::partitioner::KeyPartitioner;
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
@@ -50,10 +50,17 @@ pub struct S3SinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for S3SinkConfig {
@@ -70,8 +77,10 @@ impl GenerateConfig for S3SinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            tls: Some(TlsOptions::default()),
             assume_role: None,
             auth: AwsAuthentication::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -87,12 +96,16 @@ impl SinkConfig for S3SinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -143,7 +156,7 @@ impl S3SinkConfig {
 
         let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
