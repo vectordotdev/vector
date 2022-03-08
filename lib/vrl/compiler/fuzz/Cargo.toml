@@ -34,7 +34,7 @@ path = "../../stdlib"
 members = ["."]
 
 [[bin]]
-name = "fuzz_target_1"
-path = "fuzz_targets/fuzz_target_1.rs"
+name = "vm_differential"
+path = "fuzz_targets/vm_differential.rs"
 test = false
 doc = false
