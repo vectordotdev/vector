@@ -15,7 +15,7 @@ mod errors;
 
 pub use errors::{ClosedError, StreamSendError};
 
-const CHUNK_SIZE: usize = 1000;
+pub(crate) const CHUNK_SIZE: usize = 1000;
 
 #[derive(Debug)]
 pub struct Builder {
