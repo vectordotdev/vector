@@ -188,13 +188,13 @@ components: sources: datadog_agent: {
 					logs.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
-				In order to send metrics the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with
-				the following options:
+				In order to send metrics the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				following options:
 
 				```yaml
 				vector:
 					metrics.enabled: true
-  					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
 				"""
