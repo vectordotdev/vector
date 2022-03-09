@@ -136,7 +136,7 @@ impl FunctionTransform for Geoip {
         let target_field = self.target.clone();
         let ipaddress = event
             .as_log()
-            .get(&self.source)
+            .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             match FromStr::from_str(ipaddress) {
@@ -209,7 +209,7 @@ impl FunctionTransform for Geoip {
             serde_json::to_value(city)
         };
         if let Ok(json_value) = json_value {
-            event.as_mut_log().insert(target_field, json_value);
+            event.as_mut_log().insert(target_field.as_str(), json_value);
         }
 
         output.push(event);
@@ -253,7 +253,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -276,7 +280,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -299,7 +307,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
     }
@@ -322,7 +334,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -342,7 +358,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -362,7 +382,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
     }

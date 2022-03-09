@@ -12,6 +12,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -21,7 +22,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, LogEvent, PathComponent, PathIter, Value},
+    event::{self, merge_state::LogEventMergeState, LogEvent, Value},
     internal_events::{
         BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -900,11 +901,11 @@ impl ContainerLogInfo {
 
             // Labels.
             if !self.metadata.labels.is_empty() {
-                let prefix_path = PathIter::new("label").collect::<Vec<_>>();
+                let prefix_path = parse_path("label");
                 for (key, value) in self.metadata.labels.iter() {
-                    let mut path = prefix_path.clone();
-                    path.push(PathComponent::Key(key.clone().into()));
-                    log_event.insert_path(path, value.clone());
+                    let mut path = prefix_path.clone().segments;
+                    path.push(OwnedSegment::Field(key.clone()));
+                    log_event.insert(&path, value.clone());
                 }
             }
 
@@ -957,7 +958,7 @@ impl ContainerLogInfo {
             if is_partial {
                 // Only add partial event marker field if it's requested.
                 if let Some(partial_event_marker_field) = partial_event_marker_field {
-                    log_event.insert(partial_event_marker_field, true);
+                    log_event.insert(partial_event_marker_field.as_str(), true);
                 }
             }
             // Return the log event as is, partial or not. No merging here.
@@ -1353,7 +1354,7 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
+        assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
@@ -1496,7 +1497,7 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
+        assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],

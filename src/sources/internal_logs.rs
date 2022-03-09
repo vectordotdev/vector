@@ -84,9 +84,9 @@ async fn run(
             byte_size,
         });
         if let Ok(hostname) = &hostname {
-            log.insert(host_key.clone(), hostname.to_owned());
+            log.insert(host_key.as_str(), hostname.to_owned());
         }
-        log.insert(pid_key.clone(), pid);
+        log.insert(pid_key.as_str(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
         if let Err(error) = out.send_event(Event::from(log)).await {
