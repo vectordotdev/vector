@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use futures::Stream;
+use futures::{stream, Stream, StreamExt};
 use itertools::Itertools;
 use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -80,7 +80,9 @@ pub(crate) fn create_events_stream(
 ) -> impl Stream<Item = Vec<OutputEventsPayload>> {
     // Channel for receiving individual tap payloads. Since we can process at most `limit` per
     // interval, this is capped to the same value.
-    let (tap_tx, mut tap_rx) = mpsc::channel(limit);
+    let (tap_tx, tap_rx) = mpsc::channel(limit);
+    let mut tap_rx = ReceiverStream::new(tap_rx)
+        .flat_map(|payload| stream::iter(<Vec<OutputEventsPayload>>::from(payload)));
 
     // The resulting vector of `Event` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
@@ -118,9 +120,7 @@ pub(crate) fn create_events_stream(
                 // Process `TapPayload`s. A tap payload could contain log/metric events or a
                 // notification. Notifications are emitted immediately; events buffer until
                 // the next `interval`.
-                Some(payload) = tap_rx.recv() => {
-                    let payload = payload.into();
-
+                Some(payload) = tap_rx.next() => {
                     // Emit notifications immediately; these don't count as a 'batch'.
                     if let OutputEventsPayload::Notification(_) = payload {
                         // If an error occurs when sending, the subscription has likely gone
