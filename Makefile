@@ -298,7 +298,9 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 ifeq ($(CI), true)
-	@scripts/upload-test-results.sh
+	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+		--service vector \
+		target/nextest/default/junit.xml
 endif
 
 .PHONY: test-docs
@@ -350,7 +352,9 @@ ifeq ($(AUTOSPAWN), true)
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(CI), true)
-	@scripts/upload-test-results.sh
+	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+		--service vector \
+		target/nextest/default/junit.xml
 endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
@@ -392,7 +396,9 @@ test-shutdown-cleanup:
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
 ifeq ($(CI), true)
-	@scripts/upload-test-results.sh
+	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+		--service vector \
+		target/nextest/default/junit.xml
 endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
