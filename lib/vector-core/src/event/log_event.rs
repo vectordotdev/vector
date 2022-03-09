@@ -122,6 +122,14 @@ impl LogEvent {
             .and_then(|path| self.fields.get_by_path(path))
     }
 
+    // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
+    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<String> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .map(std::string::ToString::to_string)
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }
