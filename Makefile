@@ -59,9 +59,6 @@ export VERSION ?= $(shell scripts/version.sh)
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
-# Overritten in CI for Datadog CI reporting
-export DD_ENV ?= local
-
 export RUST_VERSION ?= $(shell grep channel rust-toolchain.toml | cut -d '"' -f 2)
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
@@ -300,10 +297,8 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 .PHONY: test
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
-ifeq ($(CI), true)
-	datadog-ci junit upload \
-		--service vector \
-		target/nextest/default/junit.xml
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
 endif
 
 .PHONY: test-docs
@@ -354,10 +349,8 @@ ifeq ($(AUTOSPAWN), true)
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
-ifeq ($(CI), true)
-	datadog-ci junit upload \
-		--service vector \
-		target/nextest/default/junit.xml
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
 endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
@@ -398,10 +391,8 @@ test-shutdown-cleanup:
 .PHONY: test-cli
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
-ifeq ($(CI), true)
-	datadog-ci junit upload \
-		--service vector \
-		target/nextest/default/junit.xml
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
 endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)

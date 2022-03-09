@@ -1,4 +1,4 @@
-#!/bin/bash; C:\Program\ Files\Git\bin\bash.exe
+#!/usr/bin/env bash
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -11,6 +11,12 @@ IFS=$'\n\t'
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+_os_platform="$(uname -s)"
+_os_architecture="$(uname -m)"
+
+export DD_TAGS="os.platform:$_os_platform,os.architecture:$_os_architecture"
+export DD_ENV="${DD_ENV:-"local"}"
+
+datadog-ci junit upload \
   --service vector \
   target/nextest/default/junit.xml
