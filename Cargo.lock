@@ -609,28 +609,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aws-sdk-cloudwatchlogs"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9cefdd4806407b31b7a06672ddc02eb37d97a7ea0ce41dc71ffe6787b6a9369"
-dependencies = [
- "aws-endpoint",
- "aws-http",
- "aws-sig-auth",
- "aws-smithy-async",
- "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-http-tower",
- "aws-smithy-json",
- "aws-smithy-types",
- "aws-types",
- "bytes 1.1.0",
- "http",
- "tokio-stream",
- "tower",
-]
-
-[[package]]
 name = "aws-sdk-sqs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8375,7 +8353,6 @@ dependencies = [
  "avro-rs",
  "aws-config",
  "aws-sdk-cloudwatch",
- "aws-sdk-cloudwatchlogs",
  "aws-sdk-sqs",
  "aws-smithy-client",
  "aws-types",
