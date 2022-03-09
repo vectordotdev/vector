@@ -106,7 +106,7 @@ file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value", optional = true }
+value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
@@ -407,7 +407,7 @@ enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
 # Codecs
-codecs = ["value", "smallvec", "memchr"]
+codecs = ["smallvec", "memchr"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -454,7 +454,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "async-compression"]
 sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs", "aws-smithy-client"]
-sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "codecs", "value"]
+sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "codecs"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
@@ -567,7 +567,7 @@ transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter"]
 transforms-reduce = []
 transforms-regex_parser = []
-transforms-remap = ["value"]
+transforms-remap = []
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []
