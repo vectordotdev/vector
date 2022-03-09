@@ -125,7 +125,7 @@ pub struct DatadogLogsJsonEncoding {
 }
 
 impl DatadogLogsJsonEncoding {
-    pub(super) fn with_schema_support(mut self, enabled: bool) -> Self {
+    pub(super) const fn with_schema_support(mut self, enabled: bool) -> Self {
         self.schema_enabled = enabled;
         self
     }

@@ -356,7 +356,7 @@ pub async fn build_pieces(
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
-            schema: config.schema.clone(),
+            schema: config.schema,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
