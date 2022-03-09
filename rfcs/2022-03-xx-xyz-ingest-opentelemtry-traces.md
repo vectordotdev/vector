@@ -8,9 +8,9 @@ adjustement required for future extension to other trace types.
 - `datadog_agent` source supports receiving traces from the Datadog `trace-agent`
 - `datadog_traces` sink supports emitting traces to Datadog
 - OpenTelemetry traces are already supported by Datadog:
-  - Either with the Datadog exporter using the opentelemetry collector (without the `trace-agent`)
-  - Or with the `trace-agent` configured to receive OpenTelemtry traces (both grpc and http transport layer are
-    supported)
+  - Either with the [Datadog exporter][otlp-dd-exporter] using the Opentelemetry collector (without the `trace-agent`)
+  - Or with the `trace-agent` [configured to receive OpenTelemtry traces][otlp-traces-with-dd-agent] (both grpc and http
+    transport layer are supported)
 
 ## Cross cutting concerns
 
@@ -48,6 +48,7 @@ sources:
   otlp_traces:
     type: opentelemetry_traces
     address: "[::]:8081"
+    mode: grpc
 
 sinks:
   dd_trace:
@@ -61,15 +62,22 @@ And it should just work.
 
 ### Implementation
 
-- `opentelemetry_source`:
-  - grpc details TBD
-  - http details TBD
-- Internal traces representation/normalization: TBD
-- APM stats computation: likely to mimic what's done in the Datadog OTLP exporter
+- `opentelemetry_traces` or simply `opentelemetry` sources:
+  - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
+    use the [offical gRPC service definitions][otlp-grpc-def].
+  - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
+    payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
+    All the expected behaviours regarding the kind of requests/responses code and sequence are clearly defined as well
+    as the default URL path (`/v1/traces` for traces).
+- Internal traces representation/normalization, two options are opened see [outstanding questions](#outstanding-questions)
+- APM stats computation:
+  - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on the [Agent codebase][-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
+  - Where the APM stats computations is still under discusion, see [outstanding questions](#outstanding-questions)
 
 ## Rationale
 
-- Opentelemtry is the de-facto standard for traces, so supporting it at some point is mandatory.
+- Opentelemetry is the de-facto standard for traces, so supporting it at some point is mandatory. Note that this
+  consideration is wider than just traces as metrics (and logs) are addressed by the Opentelemetry project
 
 ## Drawbacks
 
@@ -83,24 +91,163 @@ N/A
 
 - We could keep the Datadog trace-agent as an OTLP->Datadog traces converter and ingest datadog traces from there
 - We could keep the Datadog exporter as an OTLP->Datadog traces converter and ingest datadog traces from there
-- We could write a Vector exporter for the Opentelemetry collector, note that this would likely leverage the Vector protocol and this logic could be applied to metrics as well
+- We could write a Vector exporter for the Opentelemetry collector, note that this would likely leverage the Vector
+  protocol and this logic could be applied to metrics as well
 
 ## Outstanding Questions
 
-- How do we do traces normalization/format enforcement
-- Do we want to have a single `opentelemtry` source with names output or multiple sources ?
-- APM stats computation:
-  - Either in source (to be done for each source, except for the `datadog_agent` sources where APM stats may be decoded from received payloads) - likely to be the preferred solution
+- Do we want to have a single `opentelemtry` source with names output or multiple sources for Opentelemetry metrics and
+  Opentelemetry logs ?
+- APM stats computation
+  - Either in all traces sources (to be done for each source, except for the `datadog_agent` sources where APM stats may be decoded from received payloads) - likely to be the preferred solution
   - Either in a transform like `traces_to_metrics`
+  - Or in the `datadog_traces` sources
+
+### Traces normalization/format enforcement
+
+For cross format operation like `opentelemetry_traces` source to `datadog_traces` sinks or the opposite (Datadog to OpenTelemetry) trace standardization is require so between sinks/sources traces will follow one single universal representation, there is two major possible approach
+  1. Stick to a `LogEvent` based representation and leverage [Vector event schema][schema-work]
+  2. Move traces away from their current representation (as LogEvent) and build a new container based on a set of dedicated structs representing traces and spans with common properties and generic key/value store(s) to allow a certain degree of flexibility.
+
+The second option would have to provide a way to store, at least, all fields from both Opentelemetry and Datadog Traces:
+Datadog [newer trace format][dd-traces-proto] (condensed):
+
+```protobuf
+message Span {
+    string service = 1;
+    string name = 2;
+    string resource = 3;
+    uint64 traceID = 4;
+    uint64 spanID = 5;
+    uint64 parentID = 6;
+    int64 start = 7;
+    int64 duration = 8;
+    int32 error = 9;
+    map<string, string> meta = 10;
+    map<string, double> metrics = 11;
+    string type = 12;
+    map<string, bytes> meta_struct = 13;
+}
+
+message TraceChunk {
+	// priority specifies sampling priority of the trace.
+	int32 priority = 1;
+	// origin specifies origin product ("lambda", "rum", etc.) of the trace.
+	string origin = 2;
+	// spans specifies list of containing spans.
+	repeated Span spans = 3;
+	// tags specifies tags common in all `spans`.
+	map<string, string> tags = 4;
+	// droppedTrace specifies whether the trace was dropped by samplers or not.
+	bool droppedTrace = 5;
+}
+
+// TracerPayload represents a payload the trace agent receives from tracers.
+message TracerPayload {
+	// containerID specifies the ID of the container where the tracer is running on.
+	string containerID;
+	// languageName specifies language of the tracer.
+	string languageName;
+	// languageVersion specifies language version of the tracer.
+	string languageVersion = 3 ;
+	// tracerVersion specifies version of the tracer.
+	string tracerVersion = 4;
+	// runtimeID specifies V4 UUID representation of a tracer session.
+	string runtimeID = 5;
+	// chunks specifies list of containing trace chunks.
+	repeated TraceChunk chunks = 6;
+	// tags specifies tags common in all `chunks`.
+	map<string, string> tags = 7;
+	// env specifies `env` tag that set with the tracer.
+	string env = 8;
+	// hostname specifies hostname of where the tracer is running.
+	string hostname = 9;
+	// version specifies `version` tag that set with the tracer.
+	string appVersion = 10;
+}
+
+```
+
+
+Opentelemetry [trace format][otlp-proto-def] (condensed):
+```protobuf
+message InstrumentationLibrarySpans {
+  opentelemetry.proto.common.v1.InstrumentationLibrary instrumentation_library = 1;
+  repeated Span spans = 2;
+  string schema_url = 3;
+}
+
+message Span {
+  bytes trace_id = 1;
+  bytes span_id = 2;
+  string trace_state = 3;
+  bytes parent_span_id = 4;
+  string name = 5;
+
+  enum SpanKind {
+    SPAN_KIND_UNSPECIFIED = 0;
+    SPAN_KIND_INTERNAL = 1;
+    SPAN_KIND_SERVER = 2;
+    SPAN_KIND_CLIENT = 3;
+    SPAN_KIND_PRODUCER = 4;
+    SPAN_KIND_CONSUMER = 5;
+  }
+
+  SpanKind kind = 6;
+  fixed64 start_time_unix_nano = 7;
+  fixed64 end_time_unix_nano = 8;
+  repeated opentelemetry.proto.common.v1.KeyValue attributes = 9;
+  uint32 dropped_attributes_count = 10;
+
+  message Event {
+    fixed64 time_unix_nano = 1;
+    string name = 2;
+    repeated opentelemetry.proto.common.v1.KeyValue attributes = 3;
+    uint32 dropped_attributes_count = 4;
+  }
+
+  repeated Event events = 11;
+  uint32 dropped_events_count = 12;
+
+  message Link {
+    bytes trace_id = 1;
+    bytes span_id = 2;
+    string trace_state = 3;
+    repeated opentelemetry.proto.common.v1.KeyValue attributes = 4;
+    uint32 dropped_attributes_count = 5;
+  }
+
+  repeated Link links = 13;
+  uint32 dropped_links_count = 14;
+  Status status = 15;
+}
+```
+
+Conversion from Opentelemetry to Datadog is happening [here][span-conversion] in the trace agent, overall it put a lot of structured information into the `meta` map, including nested events that end up json encoded in that map. This makes the opposite conversion a bit complicated if we want it to be completely symetrical.
+
 
 ## Plan Of Attack
 
 - [ ] Implement traces normalisation/schema
-- [ ] `opentelemetry_traces`, http mode
 - [ ] `opentelemetry_traces`, grpc mode
-- [ ] APM stats computation : either in `opentelemtry_traces` or in a dedicated transform
+- [ ] `opentelemetry_traces`, http mode
+- [ ] APM stats computation
 
 ## Future Improvements
 
 - Transforms / VRL helpers to manipulate traces or isolate outliers
 - OpenTelemtry sinks
+
+[otlp-dd-exporter]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/64a87c1/exporter/datadogexporter
+[otlp-traces-with-dd-agent]: https://docs.datadoghq.com/tracing/setup_overview/open_standards/#otlp-ingest-in-datadog-agent
+[otlp-protocols]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md
+[otlp-proto-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto
+[otlp-proto-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto
+[otlp-grpc-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto/collector
+[otlp-http]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp
+[apm-stats-computation]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/datadogexporter/stats.go#L30
+[agent-code-for-otlp-exporter]: https://pkg.go.dev/github.com/DataDog/datadog-agent/pkg/trace/exportable@v0.0.0-20201016145401-4646cf596b02
+[agent-handle-span]: https://github.com/DataDog/datadog-agent/blob/4646cf596b0242a7741328bd518a807b01db28c6/pkg/trace/exportable/stats/statsraw.go#L192
+[dd-traces-proto]: https://github.com/DataDog/datadog-agent/tree/main/pkg/trace/pb
+[span-conversion]: https://github.com/DataDog/datadog-agent/blob/882588c/pkg/trace/api/otlp.go#L320-L322
+[schema-work]: https://github.com/vectordotdev/vector/issues/11300
