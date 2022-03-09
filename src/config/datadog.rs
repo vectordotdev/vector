@@ -2,8 +2,10 @@ use std::env;
 
 use serde::{Deserialize, Serialize};
 
-use super::{ComponentKey, Config, ConfigPath, OutputId, SinkOuter, SourceOuter};
-use crate::config::{load_source_from_paths, process_paths};
+use super::{
+    load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
+    SourceOuter,
+};
 use crate::{
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
@@ -19,6 +21,9 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    #[serde(default = "default_exit_on_fatal_error")]
+    pub exit_on_fatal_error: bool,
+
     #[serde(default)]
     pub api_key: Option<String>,
 
@@ -27,6 +32,12 @@ pub struct Options {
 
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: f64,
+
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    #[serde(default = "default_retry_interval_secs")]
+    pub retry_interval_secs: u32,
 }
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
@@ -47,10 +58,13 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
+            exit_on_fatal_error: default_exit_on_fatal_error(),
             api_key: None,
             app_key: "".to_owned(),
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
+            max_retries: default_max_retries(),
+            retry_interval_secs: default_retry_interval_secs(),
         }
     }
 }
@@ -60,9 +74,24 @@ const fn default_enabled() -> bool {
     true
 }
 
+/// By default, Vector should exit when a fatal reporting error is encountered.
+const fn default_exit_on_fatal_error() -> bool {
+    true
+}
+
 /// By default, report to Datadog every 5 seconds.
 const fn default_reporting_interval_secs() -> f64 {
     5.0
+}
+
+/// By default, keep retrying (recoverable) failed reporting (infinitely, for practical purposes.)
+const fn default_max_retries() -> u32 {
+    u32::MAX
+}
+
+/// By default, retry (recoverable) failed reporting every 5 seconds.
+const fn default_retry_interval_secs() -> u32 {
+    5
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
