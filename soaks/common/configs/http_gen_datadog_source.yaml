@@ -4,6 +4,7 @@ prometheus_addr: "0.0.0.0:9090"
 targets:
   vector:
     seed: [2, 3, 5, 7, 11, 13, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137]
+    batch_sizes: ["1Mb", "500Kb", "250Kb", "100Kb", "50Kb", "25Kb", "10Kb", "1Kb"]
     headers:
       dd-api-key: "DEADBEEF"
     target_uri: "http://vector:8282/v1/input"
