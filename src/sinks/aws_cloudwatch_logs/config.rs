@@ -1,7 +1,6 @@
 use std::num::NonZeroU64;
 
 use futures::FutureExt;
-use rusoto_logs::CloudWatchLogsClient;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
@@ -22,6 +21,7 @@ use crate::{
     template::Template,
     tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -61,7 +61,7 @@ impl CloudwatchLogsSinkConfig {
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(CloudWatchLogsClient::new_with_client(client, region))
+        Ok(CloudwatchLogsClient::new_with_client(client, region))
     }
 }
 

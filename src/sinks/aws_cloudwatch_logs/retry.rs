@@ -1,8 +1,5 @@
 use std::marker::PhantomData;
 
-use rusoto_core::{request::BufferedHttpResponse, RusotoError};
-use rusoto_logs::{CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError};
-
 use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
 
 #[derive(Debug)]

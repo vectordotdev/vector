@@ -5,13 +5,6 @@ use std::{
 };
 
 use futures::{future::BoxFuture, ready, FutureExt};
-use rusoto_core::{RusotoError, RusotoResult};
-use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
-    CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
-    DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
-    PutLogEventsRequest, PutLogEventsResponse,
-};
 use tokio::sync::oneshot;
 
 use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;

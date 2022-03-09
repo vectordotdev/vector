@@ -7,11 +7,6 @@ use std::{
 use chrono::Duration;
 use futures::{future::BoxFuture, ready, FutureExt};
 use futures_util::TryFutureExt;
-use rusoto_core::RusotoError;
-use rusoto_logs::{
-    CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError,
-    InputLogEvent, PutLogEventsError,
-};
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,

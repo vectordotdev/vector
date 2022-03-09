@@ -6,10 +6,6 @@ use std::convert::TryFrom;
 use chrono::Duration;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
-use rusoto_core::Region;
-use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, GetLogEventsRequest,
-};
 
 use super::*;
 use crate::{
