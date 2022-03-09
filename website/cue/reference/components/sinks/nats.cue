@@ -25,7 +25,13 @@ components: sinks: nats: {
 				}
 			}
 			request: enabled: false
-			tls: enabled:     false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.nats
 
