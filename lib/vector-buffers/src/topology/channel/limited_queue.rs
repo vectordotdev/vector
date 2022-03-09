@@ -146,15 +146,19 @@ impl<T: Bufferable> LimitedSender<T> {
                 let permits_n = self.get_required_permits_for_item(&item);
                 match self.inner.limiter.poll_acquire_many(permits_n, cx) {
                     Poll::Ready(Some(permit)) => {
+                        debug!("Acquired {} permits", permits_n);
                         // We acquired enough permits to allow this send to proceed, so we bundle the
                         // permit with the item so that when we pull it out of the queue, the capacity
                         // is correctly adjusted.
                         self.inner.data.push((permit, item)).expect(
                             "queue should always have capacity when permits can be acquired",
                         );
+                        debug!("Pushed data into queue");
 
+                        debug!("Waking read_waker to notify that there's data");
                         // Don't forget to wake the reader since there's data to consume now. :)
                         self.inner.read_waker.wake();
+                        debug!("Finished waking read_waker to notify that there's data");
 
                         Poll::Ready(Ok(()))
                     }
@@ -162,6 +166,7 @@ impl<T: Bufferable> LimitedSender<T> {
                     // be calling us, so this is an error.
                     Poll::Ready(None) => Poll::Ready(Err(SendError(item))),
                     Poll::Pending => {
+                        debug!("No permits available, storing item in slot and pending");
                         // We couldn't get all the permits yet, so we have to store the item back in the
                         // holding slot before returning.
                         self.slot = Some(item);
@@ -222,19 +227,24 @@ impl<T: Bufferable> LimitedReceiver<T> {
     pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         match self.inner.data.pop() {
             Some((permit, item)) => {
+                debug!("Received data from queue");
                 // We got an item, woohoo! Now, drop the permit which will properly free up permits
                 // in the semaphore, and then also try to notify a pending writer.
                 drop(permit);
                 self.inner.write_waker.as_ref().notify_one();
+                debug!("Notified write_waker that permits were freed");
                 Poll::Ready(Some(item))
             }
             // Figure out if we're actually closed or not, to determine if more items might be
             // coming or if it's time to also close up shop.
             None => {
+                debug!("No data available in queue");
                 if self.inner.limiter.is_closed() {
+                    debug!("Semaphore is closed");
                     Poll::Ready(None)
                 } else {
                     self.inner.read_waker.register(cx.waker());
+                    debug!("Waiting for read_waker to awaken me");
                     Poll::Pending
                 }
             }
