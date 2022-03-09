@@ -6,7 +6,7 @@ mod tests;
 use std::{collections::BTreeMap, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use chrono::{TimeZone, Utc};
+use chrono::{serde::ts_milliseconds, DateTime, TimeZone, Utc};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{future, FutureExt};
 use http::StatusCode;
@@ -183,11 +183,11 @@ impl SourceConfig for DatadogAgentConfig {
             DeserializerConfig::Bytes => schema::Definition::empty()
                 .required_field("message", Kind::bytes(), Some("message"))
                 .required_field("status", Kind::bytes(), Some("severity"))
-                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                 .required_field("hostname", Kind::bytes(), Some("host"))
-                .required_field("service", Kind::bytes(), None)
-                .required_field("ddsource", Kind::bytes(), None)
-                .required_field("ddtags", Kind::bytes(), None)
+                .required_field("service", Kind::bytes(), Some("service"))
+                .required_field("ddsource", Kind::bytes(), Some("source"))
+                .required_field("ddtags", Kind::bytes(), Some("tags"))
                 .merge(self.decoding.schema_definition()),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
@@ -550,21 +550,30 @@ impl DatadogAgentSource {
         let now = Utc::now();
         let mut decoded = Vec::new();
 
-        for message in messages {
+        for LogMsg {
+            message,
+            status,
+            timestamp,
+            hostname,
+            service,
+            ddsource,
+            ddtags,
+        } in messages
+        {
             let mut decoder = self.decoder.clone();
             let mut buffer = BytesMut::new();
-            buffer.put(message.message);
+            buffer.put(message);
             loop {
                 match decoder.decode_eof(&mut buffer) {
                     Ok(Some((events, _byte_size))) => {
                         for mut event in events {
                             if let Event::Log(ref mut log) = event {
-                                log.try_insert_flat("status", message.status.clone());
-                                log.try_insert_flat("timestamp", message.timestamp);
-                                log.try_insert_flat("hostname", message.hostname.clone());
-                                log.try_insert_flat("service", message.service.clone());
-                                log.try_insert_flat("ddsource", message.ddsource.clone());
-                                log.try_insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat("status", status.clone());
+                                log.try_insert_flat("timestamp", timestamp);
+                                log.try_insert_flat("hostname", hostname.clone());
+                                log.try_insert_flat("service", service.clone());
+                                log.try_insert_flat("ddsource", ddsource.clone());
+                                log.try_insert_flat("ddtags", ddtags.clone());
                                 log.try_insert_flat(
                                     self.log_schema_source_type_key,
                                     Bytes::from("datadog_agent"),
@@ -737,7 +746,8 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    pub timestamp: i64,
+    #[serde(deserialize_with = "ts_milliseconds::deserialize")]
+    pub timestamp: DateTime<Utc>,
     pub hostname: Bytes,
     pub service: Bytes,
     pub ddsource: Bytes,

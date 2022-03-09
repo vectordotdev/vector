@@ -57,7 +57,7 @@ impl Arbitrary for LogMsg {
         LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
-            timestamp: i64::arbitrary(g),
+            timestamp: Utc.timestamp_millis(i64::arbitrary(g)),
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
@@ -187,7 +187,7 @@ async fn full_payload_v1() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -238,7 +238,7 @@ async fn full_payload_v2() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -289,7 +289,7 @@ async fn no_api_key() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -340,7 +340,7 @@ async fn api_key_in_url() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("bar"),
-                        timestamp: 456,
+                        timestamp: Utc.timestamp(456, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -394,7 +394,7 @@ async fn api_key_in_query_params() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("bar"),
-                        timestamp: 456,
+                        timestamp: Utc.timestamp(456, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -454,7 +454,7 @@ async fn api_key_in_header() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("baz"),
-                        timestamp: 789,
+                        timestamp: Utc.timestamp(789, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -508,7 +508,7 @@ async fn delivery_failure() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -541,7 +541,7 @@ async fn ignores_disabled_acknowledgements() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -582,7 +582,7 @@ async fn ignores_api_key() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("baz"),
-                        timestamp: 789,
+                        timestamp: Utc.timestamp(789, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -886,7 +886,7 @@ async fn split_outputs() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("baz"),
-                        timestamp: 789,
+                        timestamp: Utc.timestamp(789, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
