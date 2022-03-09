@@ -11,6 +11,8 @@ IFS=$'\n\t'
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
+ls target/nextest/default/
+
 DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
   --service vector \
   target/nextest/default/junit.xml
