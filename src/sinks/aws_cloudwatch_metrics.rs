@@ -4,16 +4,12 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-// use rusoto_cloudwatch::{
-//     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
-// };
-// use rusoto_core::{Region, RusotoError};
 use aws_sdk_cloudwatch::error::{PutMetricDataError, PutMetricDataErrorKind};
 use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 use vector_core::ByteSizeOf;
