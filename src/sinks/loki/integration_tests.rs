@@ -275,12 +275,10 @@ async fn many_tenants() {
         .map(Event::from)
         .collect::<Vec<_>>();
 
-    for i in 0..10 {
-        let event = events.get_mut(i).unwrap();
+    for (i, event) in events.iter_mut().enumerate() {
+        let log = event.as_mut_log();
 
-        event
-            .as_mut_log()
-            .insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
+        log.insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
     }
 
     let _ = sink.run_events(events).await.unwrap();
@@ -353,9 +351,14 @@ async fn out_of_order_accept() {
     // first event of the second batch is out-of-order.
     events[batch_size]
         .as_mut_log()
-        .insert(log_schema().timestamp_key(), base);
+        .insert(log_schema().timestamp_key(), base - Duration::seconds(1));
 
-    test_out_of_order_events(OutOfOrderAction::Accept, batch_size, events, events).await;
+    // move out-of-order event to where it will appear in results
+    let mut expected = events.clone();
+    let reordered_event = expected.remove(batch_size);
+    let expected = vec![reordered_event].into_iter().chain(expected).collect();
+
+    test_out_of_order_events(OutOfOrderAction::Accept, batch_size, events, expected).await;
 }
 
 #[tokio::test]
