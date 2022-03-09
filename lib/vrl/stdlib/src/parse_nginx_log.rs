@@ -5,6 +5,24 @@ use vrl::prelude::*;
 
 use crate::log_util;
 
+fn parse_nginx_log(
+    bytes: Value,
+    timestamp_format: Option<Value>,
+    format: &Bytes,
+    ctx: &Context,
+) -> std::result::Result<Value, ExpressionError> {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => time_format_for_format(format.as_ref()),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let regex = regex_for_format(format.as_ref());
+    let captures = regex.captures(&message).ok_or("failed parsing log line")?;
+    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
+        .map(rename_referrer)
+        .map_err(Into::into)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseNginxLog;
 
@@ -74,6 +92,34 @@ impl Function for ParseNginxLog {
             },
         ]
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("format", Some(expr)) => {
+                let variants = vec![value!("combined"), value!("error")];
+                let format = expr
+                    .as_enum("format", variants)?
+                    .try_bytes()
+                    .expect("format not bytes");
+                Ok(Some(Box::new(format) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
+        let timestamp_format = args.optional("timestamp_format");
+
+        parse_nginx_log(value, timestamp_format, format, ctx)
+    }
 }
 
 fn regex_for_format(format: &[u8]) -> &Regex {
@@ -111,22 +157,14 @@ struct ParseNginxLogFn {
 impl Expression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => time_format_for_format(self.format.as_ref()),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let format = &self.format;
 
-        let regex = regex_for_format(self.format.as_ref());
-
-        let captures = regex.captures(&message).ok_or("failed parsing log line")?;
-
-        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
-            .map(rename_referrer)
-            .map_err(Into::into)
+        parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

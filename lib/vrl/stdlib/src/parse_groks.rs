@@ -119,10 +119,18 @@ impl Function for ParseGroks {
                     }
                 });
 
-                let patterns = expr.as_value().unwrap();
+                let patterns = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    }
+                })?;
                 let patterns = patterns
                     .try_array()
-                    .unwrap()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    })?
                     .into_iter()
                     .map(|value| {
                         let pattern = value
