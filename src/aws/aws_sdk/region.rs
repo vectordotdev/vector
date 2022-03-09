@@ -1,8 +1,7 @@
-use std::str::FromStr;
-
-use aws_sdk_sqs::Endpoint;
+use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
+use std::str::FromStr;
 
 use crate::aws::region::RegionOrEndpoint;
 

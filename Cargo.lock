@@ -8355,6 +8355,7 @@ dependencies = [
  "aws-sdk-cloudwatch",
  "aws-sdk-sqs",
  "aws-smithy-client",
+ "aws-smithy-http",
  "aws-types",
  "azure_core",
  "azure_storage",

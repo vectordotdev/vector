@@ -15,9 +15,10 @@ use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
+use crate::aws::RegionOrEndpoint;
 use crate::http::build_proxy_connector;
 use crate::{
-    aws::{auth::AwsAuthentication, rusoto::RegionOrEndpoint},
+    aws::auth::AwsAuthentication,
     config::{
         AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
