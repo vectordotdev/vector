@@ -179,6 +179,13 @@ impl Definition {
         self
     }
 
+    /// Returns a `Lookup` into an event, based on the provided `meaning`, if the meaning exists.
+    ///
+    /// TODO(Jean): return `Lookup` here, but it requires some changes to `Value`s API first.
+    pub fn meaning_path(&self, meaning: &str) -> Option<&LookupBuf> {
+        self.meaning.get(meaning)
+    }
+
     /// Returns `true` if the provided field is marked as optional.
     fn is_optional_field(&self, path: &LookupBuf) -> bool {
         self.optional.contains(path)

@@ -263,7 +263,7 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

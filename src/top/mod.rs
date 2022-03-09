@@ -22,4 +22,8 @@ pub struct Opts {
     /// Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k, 1,000,000 = 1.00 M
     #[clap(short = 'H', long)]
     human_metrics: bool,
+
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops.
+    #[clap(short, long)]
+    no_reconnect: bool,
 }

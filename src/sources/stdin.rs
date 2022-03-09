@@ -145,7 +145,7 @@ where
                             log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.try_insert(&host_key, hostname.clone());
+                                log.try_insert(host_key.as_str(), hostname.clone());
                             }
 
                             yield event;
@@ -163,7 +163,7 @@ where
         }
         .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

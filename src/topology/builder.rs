@@ -27,7 +27,6 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
-    ready_events::ReadyEventsExt,
     schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -591,8 +590,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(INLINE_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -606,16 +604,11 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
-        // try to balance out the increased overhead of spawning tasks
-        const CONCURRENT_BATCH_SIZE: usize = 1024;
-
         let mut input_rx = self
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(CONCURRENT_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;

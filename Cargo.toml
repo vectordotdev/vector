@@ -76,6 +76,7 @@ members = [
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
+  "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/tracing-limit",
@@ -103,6 +104,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
+lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -184,8 +186,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.31", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.31", default-features = false, optional = true }
+async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -214,8 +216,8 @@ bollard = { version = "0.11.1", default-features = false, features = ["ssl"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.5", default-features = false }
-clap = { version = "3.1.3", features = ["derive", "env"] }
+cidr-utils = { version = "0.5.6", default-features = false }
+clap = { version = "3.1.6", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -249,10 +251,11 @@ md-5 = { version = "0.10", optional = true }
 memchr = { version = "2.4", default-features = false, optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
+nkeys = { version = "0.2.0", optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
-once_cell = { version = "1.9", default-features = false }
+once_cell = { version = "1.10", default-features = false }
 openssl = { version = "0.10.38", default-features = false }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
@@ -264,8 +267,8 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.8.1", default-features = false, optional = true }
+regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
+roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.6", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", optional = true, features = ["union"] }
@@ -274,8 +277,8 @@ snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-strum = { version = "0.24", default-features = false, optional = true }
-strum_macros = { version = "0.24", default-features = false, optional = true }
+strum = { version = "0.24", default-features = false }
+strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
@@ -293,7 +296,7 @@ warp = { version = "0.3.1", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -385,8 +388,6 @@ api = [
   "base64",
   "itertools",
   "vector_core/api",
-  "strum",
-  "strum_macros",
 ]
 
 # API client
@@ -469,7 +470,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
-sources-nats = ["nats", "codecs"]
+sources-nats = ["nats", "nkeys", "codecs"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
@@ -655,7 +656,7 @@ sinks-influxdb = []
 sinks-kafka = ["rdkafka"]
 sinks-logdna = []
 sinks-loki = []
-sinks-nats = ["nats"]
+sinks-nats = ["nats", "nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["syslog"]
@@ -810,7 +811,7 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
-transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = ["codecs"]
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-file"]
@@ -818,44 +819,37 @@ enrichment-tables-benches = ["enrichment-tables-file"]
 [[bench]]
 name = "default"
 harness = false
-test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "dnstap"
 path = "benches/dnstap/mod.rs"
 harness = false
-test = true
 required-features = ["dnstap-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
-test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "enrichment_tables_file"
 harness = false
-test = true
 required-features = ["enrichment-tables-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
-test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "loki"
 harness = false
-test = true
 required-features = ["loki-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
-test = true
 required-features = ["statistic-benches"]
 
 [[bench]]
@@ -869,5 +863,4 @@ required-features = ["transform-benches"]
 name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
-test = false
 required-features = ["codecs-benches"]

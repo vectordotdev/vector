@@ -9,13 +9,14 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
+use lookup::lookup_v2::Path;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Value,
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
@@ -111,42 +112,41 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.as_map(), key.as_ref())
+    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
+        self.fields.get_by_path_v2(key)
+    }
+
+    pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.fields.get_by_path(path))
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }
 
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.as_map_mut(), key.as_ref())
+    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(path)
     }
 
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.as_map(), key.as_ref())
+    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+        util::log::contains(self.as_map(), path)
     }
 
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), path, value.into())
     }
 
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+        if !self.contains(path.clone()) {
+            self.insert(path, value);
         }
-    }
-
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value> + Debug,
-    {
-        util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
     /// Rename a key in place without reference to pathing
@@ -194,12 +194,12 @@ impl LogEvent {
         }
     }
 
-    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), false)
+    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+        self.remove_prune(path, false)
     }
 
-    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
+    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+        util::log::remove(Arc::make_mut(&mut self.fields), path, prune)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
@@ -234,13 +234,13 @@ impl LogEvent {
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field) {
+            let incoming_val = match incoming.remove(field.as_ref()) {
                 None => continue,
                 Some(val) => val,
             };
-            match self.get_mut(&field) {
+            match self.get_mut(field.as_ref()) {
                 None => {
-                    self.insert(field, incoming_val);
+                    self.insert(field.as_ref(), incoming_val);
                 }
                 Some(current_val) => current_val.merge(incoming_val),
             }

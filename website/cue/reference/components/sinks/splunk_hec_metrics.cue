@@ -13,6 +13,7 @@ components: sinks: splunk_hec_metrics: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
