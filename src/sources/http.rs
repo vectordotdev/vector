@@ -704,8 +704,8 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_eq!(log["User-Agent"], "test_client".into());
-            assert_eq!(log["Upgrade-Insecure-Requests"], "false".into());
+            assert_eq!(log["\"User-Agent\""], "test_client".into());
+            assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
             assert_eq!(log["http_path"], "/".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
