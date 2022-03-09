@@ -1,13 +1,15 @@
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::collections::BTreeMap;
 
-use super::{PathComponent, PathIter, Value};
+use super::Value;
 
 /// Checks whether a field specified by a given path is present.
-pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
-    let mut path_iter = PathIter::new(path);
+#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
+pub fn contains<'a>(fields: &BTreeMap<String, Value>, path: impl Path<'a>) -> bool {
+    let mut path_iter = path.segment_iter();
 
     match path_iter.next() {
-        Some(PathComponent::Key(key)) => match fields.get(key.as_ref()) {
+        Some(BorrowedSegment::Field(key)) => match fields.get(key.as_ref()) {
             None => false,
             Some(value) => value_contains(value, path_iter),
         },
@@ -15,18 +17,20 @@ pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     }
 }
 
-fn value_contains<'a, I>(mut value: &Value, mut path_iter: I) -> bool
-where
-    I: Iterator<Item = PathComponent<'a>>,
-{
+fn value_contains<'a>(
+    mut value: &Value,
+    mut path_iter: impl Iterator<Item = BorrowedSegment<'a>>,
+) -> bool {
     loop {
         value = match (path_iter.next(), value) {
             (None, _) => return true,
-            (Some(PathComponent::Key(key)), Value::Object(map)) => match map.get(key.as_ref()) {
-                None => return false,
-                Some(nested_value) => nested_value,
-            },
-            (Some(PathComponent::Index(index)), Value::Array(array)) => match array.get(index) {
+            (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                match map.get(key.as_ref()) {
+                    None => return false,
+                    Some(nested_value) => nested_value,
+                }
+            }
+            (Some(BorrowedSegment::Index(index)), Value::Array(array)) => match array.get(index) {
                 None => return false,
                 Some(nested_value) => nested_value,
             },
@@ -77,7 +81,7 @@ mod test {
         ];
 
         for (query, expected) in &queries {
-            assert_eq!(contains(&fields, query), *expected, "{}", query);
+            assert_eq!(contains(&fields, *query), *expected, "{}", query);
         }
     }
 }

@@ -210,7 +210,7 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert(k, v.clone());
+                    log.insert(k.as_ref(), v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {

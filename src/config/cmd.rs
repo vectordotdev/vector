@@ -79,7 +79,10 @@ pub fn cmd(opts: &Opts, config_paths: &[ConfigPath]) -> exitcode::ExitCode {
         serde_json::to_string(&source)
     };
 
-    println!("{}", json.expect("config should be serializable"));
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", json.expect("config should be serializable"));
+    }
 
     exitcode::OK
 }

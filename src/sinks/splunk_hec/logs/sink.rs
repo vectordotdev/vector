@@ -162,7 +162,7 @@ pub fn process_log(
 
     let fields = indexed_fields
         .iter()
-        .filter_map(|field| log.get(field).map(|value| (field, value.clone())))
+        .filter_map(|field| log.get(field.as_str()).map(|value| (field, value.clone())))
         .collect::<LogEvent>();
 
     let metadata = HecLogsProcessedEventMetadata {

@@ -1,54 +1,61 @@
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 
-use super::{PathComponent, PathIter, Value};
+use super::Value;
 
 /// Removes field value specified by the given path and return its value.
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
-pub fn remove(fields: &mut BTreeMap<String, Value>, path: &str, prune: bool) -> Option<Value> {
-    remove_map(fields, PathIter::new(path).peekable(), prune).map(|(value, _)| value)
+#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
+pub fn remove<'a>(value: &mut Value, path: impl Path<'a>, prune: bool) -> Option<Value> {
+    let path_iter = path.segment_iter().peekable();
+    remove_rec(value, path_iter, prune).map(|(value, _)| value)
 }
 
 /// Recursively iterate through the path, and remove the last path
 /// element. This is the top-level function which can remove from any
 /// type of `Value`.
-fn remove_rec(value: &mut Value, path: Peekable<PathIter>, prune: bool) -> Option<(Value, bool)> {
+fn remove_rec<'a>(
+    value: &mut Value,
+    path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
+    prune: bool,
+) -> Option<(Value, bool)> {
     match value {
-        Value::Object(map) => remove_map(map, path, prune),
-        Value::Array(map) => remove_array(map, path, prune),
+        Value::Object(map) => remove_map(map, path_iter, prune),
+        Value::Array(map) => remove_array(map, path_iter, prune),
         _ => None,
     }
 }
 
-fn remove_array(
+fn remove_array<'a>(
     array: &mut Vec<Value>,
-    mut path: Peekable<PathIter>,
+    mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     prune: bool,
 ) -> Option<(Value, bool)> {
-    match path.next()? {
-        PathComponent::Index(index) => match path.peek() {
-            None => array_remove(array, index).map(|v| (v, array.is_empty())),
+    match path_iter.next()? {
+        BorrowedSegment::Index(index) => match path_iter.peek() {
+            None => array_remove(array, index as usize).map(|v| (v, array.is_empty())),
             Some(_) => array
-                .get_mut(index)
-                .and_then(|value| remove_rec(value, path, prune)),
+                .get_mut(index as usize)
+                .and_then(|value| remove_rec(value, path_iter, prune)),
         },
         _ => None,
     }
 }
 
-fn remove_map(
+fn remove_map<'a>(
     fields: &mut BTreeMap<String, Value>,
-    mut path: Peekable<PathIter>,
+    mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     prune: bool,
 ) -> Option<(Value, bool)> {
-    match path.next()? {
-        PathComponent::Key(key) => match path.peek() {
+    match path_iter.next()? {
+        BorrowedSegment::Field(key) => match path_iter.peek() {
             None => fields.remove(key.as_ref()).map(|v| (v, fields.is_empty())),
             Some(_) => {
                 let (result, empty) = fields
                     .get_mut(key.as_ref())
-                    .and_then(|value| remove_rec(value, path, prune))?;
+                    .and_then(|value| remove_rec(value, path_iter, prune))?;
                 if prune && empty {
                     fields.remove(key.as_ref());
                 }
@@ -71,7 +78,7 @@ fn array_remove(values: &mut Vec<Value>, index: usize) -> Option<Value> {
 mod test {
     use serde_json::json;
 
-    use super::{super::test::fields_from_json, *};
+    use super::*;
 
     #[test]
     fn array_remove_from_middle() {
@@ -88,7 +95,7 @@ mod test {
 
     #[test]
     fn remove_simple() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "field": 123
         }));
         assert_eq!(
@@ -100,7 +107,7 @@ mod test {
 
     #[test]
     fn remove_nested() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "a": {
                 "b": {
                     "c": 5
@@ -126,13 +133,13 @@ mod test {
 
         for (query, expected_first, expected_second) in &queries {
             assert_eq!(
-                remove(&mut fields, query, false),
+                remove(&mut fields, *query, false),
                 *expected_first,
                 "{}",
                 query
             );
             assert_eq!(
-                remove(&mut fields, query, false),
+                remove(&mut fields, *query, false),
                 *expected_second,
                 "{}",
                 query
@@ -140,7 +147,7 @@ mod test {
         }
         assert_eq!(
             fields,
-            fields_from_json(json!({
+            Value::from(json!({
                 "a": {
                     "b": {},
                     "array": [
@@ -156,7 +163,7 @@ mod test {
 
     #[test]
     fn remove_prune() {
-        let mut fields = fields_from_json(json!({
+        let mut fields = Value::from(json!({
             "a": {
                 "b": {
                     "c": vec![5]
@@ -168,7 +175,7 @@ mod test {
         assert_eq!(remove(&mut fields, "a.d", true), Some(Value::Integer(4)));
         assert_eq!(
             fields,
-            fields_from_json(json!({
+            Value::from(json!({
                 "a": {
                     "b": {
                         "c": vec![5]
@@ -181,6 +188,6 @@ mod test {
             remove(&mut fields, "a.b.c[0]", true),
             Some(Value::Integer(5))
         );
-        assert_eq!(fields, fields_from_json(json!({})));
+        assert_eq!(fields, Value::from(json!({})));
     }
 }
