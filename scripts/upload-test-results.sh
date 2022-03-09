@@ -1,4 +1,4 @@
-#!/usr/bin/env bash; C:/Program\ Files/Git/user/bin/bash.exe
+#!/bin/bash; C:\Program\ Files\Git\bin\bash.exe
 set -euo pipefail
 IFS=$'\n\t'
 
