@@ -297,6 +297,7 @@ impl RecordFilter {
                         record.event.timestamp = *latest;
                         Some(FilteredRecord::rewritten(record))
                     }
+                    OutOfOrderAction::Accept => Some(FilteredRecord::valid(record)),
                 }
             } else {
                 *latest = record.event.timestamp;
