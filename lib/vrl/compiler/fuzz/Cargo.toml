@@ -15,11 +15,11 @@ arbitrary = { version = "1", features = ["derive"] }
 [dependencies.parser]
 package = "vrl-parser"
 path = "../../parser"
-features = ["fuzz"] 
+features = ["fuzz"]
 
 [dependencies.vrl]
 package = "vrl"
-path = "../../vrl" 
+path = "../../vrl"
 
 [dependencies.vrl-compiler]
 path = ".."
