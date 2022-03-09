@@ -84,12 +84,12 @@ async fn run(
             byte_size,
         });
         if let Ok(hostname) = &hostname {
-            log.insert(host_key.clone(), hostname.to_owned());
+            log.insert(host_key.as_str(), hostname.to_owned());
         }
-        log.insert(pid_key.clone(), pid);
+        log.insert(pid_key.as_str(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
-        if let Err(error) = out.send(Event::from(log)).await {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(&StreamClosedError { error, count: 1 });
             return Err(());
@@ -101,11 +101,12 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use futures::Stream;
     use tokio::time::{sleep, Duration};
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, source_sender::ReceiverStream, test_util::collect_ready, trace};
+    use crate::{event::Event, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {
@@ -154,7 +155,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> ReceiverStream<Event> {
+    async fn start_source() -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

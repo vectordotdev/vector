@@ -1,7 +1,8 @@
 use crossbeam_queue::ArrayQueue;
-use futures::{ready, task::AtomicWaker};
+use futures::{ready, task::AtomicWaker, Sink, Stream};
 use std::{
     cmp, fmt,
+    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -26,6 +27,7 @@ impl<T> fmt::Display for SendError<T> {
 
 impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 
+#[derive(Debug)]
 struct Inner<T> {
     data: Arc<ArrayQueue<(OwnedSemaphorePermit, T)>>,
     limit: usize,
@@ -46,14 +48,11 @@ impl<T> Clone for Inner<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct LimitedSender<T> {
     inner: Inner<T>,
     sender_count: Arc<AtomicUsize>,
     slot: Option<T>,
-}
-
-pub struct LimitedReceiver<T> {
-    inner: Inner<T>,
 }
 
 impl<T: Bufferable> LimitedSender<T> {
@@ -189,6 +188,31 @@ impl<T: Bufferable> LimitedSender<T> {
     }
 }
 
+impl<T: Bufferable> Sink<T> for LimitedSender<T> {
+    type Error = SendError<T>;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), SendError<T>> {
+        Pin::into_inner(self).start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_close(cx)
+    }
+}
+
+#[derive(Debug)]
+pub struct LimitedReceiver<T> {
+    inner: Inner<T>,
+}
+
 impl<T: Bufferable> LimitedReceiver<T> {
     /// Gets the number of items that this channel could accept.
     pub fn available_capacity(&self) -> usize {
@@ -215,6 +239,18 @@ impl<T: Bufferable> LimitedReceiver<T> {
                 }
             }
         }
+    }
+
+    pub fn close(&mut self) {
+        self.inner.limiter.close();
+    }
+}
+
+impl<T: Bufferable> Stream for LimitedReceiver<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        Pin::into_inner(self).poll_next(cx)
     }
 }
 

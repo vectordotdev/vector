@@ -349,7 +349,7 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         );
 
-                        let res = out.send(event).await;
+                        let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
@@ -571,7 +571,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     }
 
                     for (key, value) in object {
-                        log.insert(key, value);
+                        log.insert(key.as_str(), value);
                     }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -589,7 +589,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             for (key, value) in object {
-                log.insert(key, value);
+                log.insert(key.as_str(), value);
             }
         }
 

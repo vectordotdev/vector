@@ -5,6 +5,7 @@ rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 rustup run stable cargo install cargo-deb --version 1.29.2
 rustup run stable cargo install cross --version 0.2.1
+rustup run stable cargo install cargo-nextest --version 0.9.8
 
 cd scripts
 bundle install

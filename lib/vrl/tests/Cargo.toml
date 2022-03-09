@@ -15,7 +15,7 @@ vrl = { path = "../vrl" }
 ansi_term = "0.12"
 chrono = "0.4"
 chrono-tz = "0.6"
-clap = { version = "3.1.3", features = ["derive"] }
+clap = { version = "3.1.6", features = ["derive"] }
 glob = "0.3"
 prettydiff = "0.6"
 regex = "1"
