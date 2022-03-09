@@ -11,7 +11,7 @@ use vector_common::EventDataEq;
 
 use crate::ByteSizeOf;
 pub use ::value::Value;
-pub use array::{EventArray, EventContainer, LogArray, MetricArray};
+pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -19,8 +19,8 @@ pub use finalization::{
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use r#ref::{EventMutRef, EventRef};
 pub use trace::TraceEvent;
-pub use util::log::{PathComponent, PathIter};
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
@@ -35,6 +35,7 @@ pub mod merge_state;
 mod metadata;
 pub mod metric;
 pub mod proto;
+mod r#ref;
 mod ser;
 #[cfg(test)]
 mod test;
@@ -436,104 +437,6 @@ impl MaybeAsLogMut for Event {
         match self {
             Event::Log(log) => Some(log),
             _ => None,
-        }
-    }
-}
-
-/// A wrapper for references to inner event types, where reconstituting
-/// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EventRef<'a> {
-    Log(&'a LogEvent),
-    Metric(&'a Metric),
-    Trace(&'a TraceEvent),
-}
-
-impl<'a> EventRef<'a> {
-    /// Extract the `LogEvent` reference in this.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if this is not a `LogEvent` reference.
-    pub fn as_log(self) -> &'a LogEvent {
-        match self {
-            Self::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
-        }
-    }
-
-    /// Convert this reference into a new `LogEvent` by cloning.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if this is not a `LogEvent` reference.
-    pub fn into_log(self) -> LogEvent {
-        match self {
-            Self::Log(log) => log.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
-        }
-    }
-
-    /// Extract the `Metric` reference in this.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if this is not a `Metric` reference.
-    pub fn as_metric(self) -> &'a Metric {
-        match self {
-            Self::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
-        }
-    }
-
-    /// Convert this reference into a new `Metric` by cloning.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if this is not a `Metric` reference.
-    pub fn into_metric(self) -> Metric {
-        match self {
-            Self::Metric(metric) => metric.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
-        }
-    }
-}
-
-impl<'a> From<&'a Event> for EventRef<'a> {
-    fn from(event: &'a Event) -> Self {
-        match event {
-            Event::Log(log) => EventRef::Log(log),
-            Event::Metric(metric) => EventRef::Metric(metric),
-            Event::Trace(trace) => EventRef::Trace(trace),
-        }
-    }
-}
-
-impl<'a> From<&'a LogEvent> for EventRef<'a> {
-    fn from(log: &'a LogEvent) -> Self {
-        Self::Log(log)
-    }
-}
-
-impl<'a> From<&'a Metric> for EventRef<'a> {
-    fn from(metric: &'a Metric) -> Self {
-        Self::Metric(metric)
-    }
-}
-
-impl<'a> From<&'a TraceEvent> for EventRef<'a> {
-    fn from(trace: &'a TraceEvent) -> Self {
-        Self::Trace(trace)
-    }
-}
-
-impl<'a> EventDataEq<Event> for EventRef<'a> {
-    fn event_data_eq(&self, that: &Event) -> bool {
-        match (self, that) {
-            (Self::Log(a), Event::Log(b)) => a.event_data_eq(b),
-            (Self::Metric(a), Event::Metric(b)) => a.event_data_eq(b),
-            (Self::Trace(a), Event::Trace(b)) => a.event_data_eq(b),
-            _ => false,
         }
     }
 }

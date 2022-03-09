@@ -1,12 +1,12 @@
-use std::sync::atomic::Ordering;
+use std::{sync::atomic::Ordering, time::Duration};
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 
 use super::{create_default_buffer_v1, create_default_buffer_v1_with_usage};
 use crate::{
-    assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, MultiEventRecord, SizedRecord},
-    variants::disk_v1::tests::drive_reader_to_flush,
+    assert_buffer_usage_metrics, assert_reader_writer_v1_positions,
+    test::common::{with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
+    variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
     EventCount,
 };
 
@@ -204,6 +204,150 @@ async fn initial_size_correct_with_multievents() {
             let snapshot = usage.snapshot();
             assert_eq!(expected_events as u64, snapshot.received_event_count);
             assert_eq!(expected_bytes as u64, snapshot.received_byte_size);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
+    // This ensures that our buffer metrics are accurate not only after writing, but also correct
+    // when reloading a buffer. If there is an undecodable event as the last record, we should only
+    // have an event count as the delta between the last key and the first key, since that's all the
+    // data we have... but we should also not decrement the buffer size below zero when we've read
+    // all the records, as the last record obviously isn't accounted for.
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a regular buffer, no customizations required, and ensure everything is zeroed out:
+            let (mut writer, reader, _, usage) =
+                create_default_buffer_v1_with_usage(data_dir.clone());
+            assert_reader_writer_v1_positions!(reader, writer, 0, 0);
+            assert_buffer_usage_metrics!(usage, empty);
+
+            // Now write four valid records, and ensure our buffer metrics and reader/writer
+            // positions correctly reflect that:
+            let counts = [32, 17, 16, 14];
+            let mut total_write_offset = 0;
+            let mut last_write_offset;
+            for count in counts {
+                last_write_offset = total_write_offset;
+                total_write_offset += count as usize;
+                assert_reader_writer_v1_positions!(reader, writer, 0, last_write_offset);
+
+                let record = PoisonPillMultiEventRecord(count);
+
+                writer.send(record).await.expect("write should not fail");
+                assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset);
+            }
+
+            let usage_snapshot = usage.snapshot();
+            let total_bytes_after_four_valid_writes = usage_snapshot.received_byte_size;
+            let expected_event_count_after_four_valid_writes = counts.iter().sum::<u32>() as usize;
+
+            assert_buffer_usage_metrics!(
+                usage,
+                none_sent,
+                recv_events => expected_event_count_after_four_valid_writes as u64,
+            );
+
+            // Now write a poisoned record which will be the last record in the buffer before we
+            // reload it, but make sure it's being accounted for in the buffer metrics, since we
+            // should be able to _write_ it without issue:
+            let poisoned_record = PoisonPillMultiEventRecord::poisoned();
+            let poisoned_event_count = poisoned_record.event_count();
+            let expected_event_count_after_poisoned_write =
+                expected_event_count_after_four_valid_writes + poisoned_event_count;
+
+            last_write_offset = total_write_offset;
+            total_write_offset += poisoned_event_count;
+
+            writer
+                .send(poisoned_record)
+                .await
+                .expect("write should not fail");
+            assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset);
+
+            let usage_snapshot = usage.snapshot();
+            let total_bytes_after_poisoned_write = usage_snapshot.received_byte_size;
+            assert!(total_bytes_after_poisoned_write > total_bytes_after_four_valid_writes);
+
+            assert_buffer_usage_metrics!(
+                usage,
+                none_sent,
+                recv_events => expected_event_count_after_poisoned_write as u64,
+            );
+
+            // Now close the buffer and reload it, and make sure we have the expected initial state,
+            // and that reading all of the records we wrote does not generate an invalid buffer
+            // metric state i.e. negative numbers, etc.
+            //
+            // Specifically, when the last record in the buffer is undecodable, the initialization
+            // code will delete it and set the write offset to the key of the record, since we know
+            // that is a safe spot to leave off on.  We would end up deleting the record anyways,
+            // but deleting it early on avoids having to bake in logic to the reader on how to
+            // handle deleting it without messing up the buffer metrics:
+            drop(writer);
+            drop(reader);
+            drop(usage);
+
+            let (writer, mut reader, acker, usage) =
+                create_default_buffer_v1_with_usage::<_, PoisonPillMultiEventRecord>(data_dir);
+
+            let expected_write_offset = last_write_offset;
+            assert_reader_writer_v1_positions!(reader, writer, 0, expected_write_offset);
+
+            assert_buffer_usage_metrics!(
+                usage,
+                none_sent,
+                recv_events => expected_event_count_after_four_valid_writes as u64,
+                recv_bytes => total_bytes_after_four_valid_writes,
+            );
+
+            // Now that we've verified that our initial buffer state is what we expect, we'll
+            // actually read all four valid records, and attempt to do a fifth read which should
+            // skip over the fifth record, which is invalid:
+            let mut count_idx = 0;
+            while count_idx < counts.len() {
+                let expected_event_count = counts[count_idx] as usize;
+                count_idx += 1;
+
+                let record = reader.next().await.expect("record should be present");
+                let actual_event_count = record.event_count();
+                assert_eq!(expected_event_count, actual_event_count);
+
+                acker.ack(actual_event_count);
+            }
+            info!("Read four valid records.");
+
+            // We need to do one more call to the reader to drive acknowledgement so that we make
+            // sure we've accounted for all reads.  We also have to pause/advance time to ensure the
+            // flush call is eligible and can actually run.
+            tokio::time::pause();
+            tokio::time::advance(FLUSH_INTERVAL.saturating_add(Duration::from_millis(1))).await;
+
+            let final_read = reader.next().now_or_never();
+            assert_eq!(None, final_read);
+
+            // At this point, we've read all four valid records, and since the undecodable record
+            // was deleted when the buffer was initialized on the second load, our buffer metrics
+            // should be back in lockstep.
+            assert_buffer_usage_metrics!(
+                usage,
+                recv_events => expected_event_count_after_four_valid_writes as u64,
+                recv_bytes => total_bytes_after_four_valid_writes,
+                sent_events => expected_event_count_after_four_valid_writes as u64,
+                sent_bytes => total_bytes_after_four_valid_writes,
+            );
+
+            let expected_read_offset = last_write_offset;
+            assert_reader_writer_v1_positions!(
+                reader,
+                writer,
+                expected_read_offset,
+                expected_write_offset
+            );
         }
     })
     .await;

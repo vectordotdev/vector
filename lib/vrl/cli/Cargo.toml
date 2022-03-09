@@ -12,10 +12,10 @@ path = "src/main.rs"
 
 [dependencies]
 bytes = "1.1.0"
-clap = { version = "3.1.3", features = ["derive"] }
+clap = { version = "3.1.6", features = ["derive"] }
 exitcode = "1"
 indoc = "1.0.4"
-once_cell = { version = "1.9", optional = true }
+once_cell = { version = "1.10", optional = true }
 prettytable-rs = { version = "0.8", default-features = false, optional = true }
 regex = { version = "1", default-features = false, optional = true, features = ["perf"] }
 rustyline = { version = "9", default-features = false, optional = true }

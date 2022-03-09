@@ -256,11 +256,11 @@ async fn kafka_source(
                                     if let Event::Log(ref mut log) = event {
                                         log.insert(schema.source_type_key(), Bytes::from("kafka"));
                                         log.insert(schema.timestamp_key(), timestamp);
-                                        log.insert(key_field, msg_key.clone());
-                                        log.insert(topic_key, Value::from(msg_topic.clone()));
-                                        log.insert(partition_key, Value::from(msg_partition));
-                                        log.insert(offset_key, Value::from(msg_offset));
-                                        log.insert(headers_key, Value::from(headers_map.clone()));
+                                        log.insert(key_field.as_str(), msg_key.clone());
+                                        log.insert(topic_key.as_str(), Value::from(msg_topic.clone()));
+                                        log.insert(partition_key.as_str(), Value::from(msg_partition));
+                                        log.insert(offset_key.as_str(), Value::from(msg_offset));
+                                        log.insert(headers_key.as_str(), Value::from(headers_map.clone()));
                                     }
 
                                     yield event;
@@ -282,7 +282,7 @@ async fn kafka_source(
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                        match out.send_stream(&mut stream).await {
+                        match out.send_event_stream(&mut stream).await {
                             Err(error) => {
                                 emit!(&StreamClosedError { error, count });
                             }
@@ -294,7 +294,7 @@ async fn kafka_source(
                             }
                         }
                     }
-                    None => match out.send_stream(&mut stream).await {
+                    None => match out.send_event_stream(&mut stream).await {
                         Err(error) => {
                             emit!(&StreamClosedError { error, count });
                         }

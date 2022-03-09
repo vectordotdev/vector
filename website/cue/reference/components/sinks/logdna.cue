@@ -13,6 +13,7 @@ components: sinks: logdna: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

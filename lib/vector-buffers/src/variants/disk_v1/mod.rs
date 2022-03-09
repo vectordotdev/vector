@@ -22,10 +22,10 @@ use std::{
 use async_trait::async_trait;
 use futures::task::AtomicWaker;
 use leveldb::{
-    batch::Writebatch,
+    batch::{Batch, Writebatch},
     database::Database,
-    iterator::{Iterable, LevelDBIterator},
-    options::{Options, ReadOptions},
+    iterator::Iterable,
+    options::{Options, ReadOptions, WriteOptions},
 };
 use parking_lot::Mutex;
 use snafu::{ResultExt, Snafu};
@@ -174,13 +174,14 @@ where
             //
             // If there's no data in the old style path, though, we just delete the directory and move
             // on: no need to emit anything because nothing is being lost.
-            let (old_buffer_size, old_buffer_record_count) = db_initial_size::<T>(&old_path)?;
-            if old_buffer_size != 0 || old_buffer_record_count != 0 {
+            let old_buffer_state = db_initial_state::<T>(&old_path)?;
+            if old_buffer_state.total_bytes != 0 || old_buffer_state.total_records != 0 {
                 // The old style path still has some data, so all we're going to do is warn the user
                 // that this is the case, since we don't want to risk reading older records that
                 // they've moved on from after switching to the new style path.
                 warn!(
-                    old_buffer_record_count, old_buffer_size,
+                    old_buffer_record_count = old_buffer_state.total_records,
+                    old_buffer_size = old_buffer_state.total_bytes,
                     "Found both old and new buffers with data for '{}' sink. This may indicate that you upgraded to 0.19.x prior to a regression being fixed which deals with disk buffer directory names. Using new buffers and ignoring old. See https://github.com/vectordotdev/vector/issues/10430 for more information.\n\nYou can suppress this message by renaming the old buffer data directory to something else.  Current path for old buffer data directory: {}, suggested path for renaming: {}",
                     name, old_path.to_string_lossy(), sidelined_path.to_string_lossy()
                 );
@@ -214,23 +215,30 @@ where
     build(&path, max_size, usage_handle)
 }
 
-/// Read the byte size and item size of the database
+#[derive(Default)]
+struct BufferState {
+    total_records: u64,
+    total_events: u64,
+    total_bytes: u64,
+    read_offset: Option<usize>,
+    write_offset: Option<usize>,
+}
+
+impl BufferState {
+    fn read_offset(&self) -> usize {
+        self.read_offset.unwrap_or(0)
+    }
+
+    fn write_offset(&self) -> usize {
+        self.write_offset.unwrap_or(0)
+    }
+}
+
+/// Calculates the initial state of the buffer.
 ///
-/// There is a mismatch between leveldb's mechanism and vector's. While vector
-/// would prefer to keep as little in-memory as possible leveldb, being a
-/// database, has the opposite consideration. As such it may mmap 1000 of its
-/// LDB files into vector's address space at a time with no ability for us to
-/// change this number. See [leveldb issue
-/// 866](https://github.com/google/leveldb/issues/866). Because we do need to
-/// know the byte size of our store we are forced to iterate through all the LDB
-/// files on disk, meaning we impose a huge memory burden on our end users right
-/// at the jump in conditions where the disk buffer has filled up. This'll OOM
-/// vector, meaning we're trapped in a catch 22.
-///
-/// This function does not solve the problem -- leveldb will still map 1000
-/// files if it wants -- but we at least avoid forcing this to happen at the
-/// start of vector.
-pub(super) fn db_initial_size<T>(path: &Path) -> Result<(u64, u64), DataDirError>
+/// The state includes the necessary information to adjust buffer metrics (event count and bytes
+/// consumed) as well as information required for the writer to know the next key to write to.
+fn db_initial_state<T>(path: &Path) -> Result<BufferState, DataDirError>
 where
     T: Bufferable,
 {
@@ -241,47 +249,86 @@ where
         data_dir: path.parent().expect("always a parent"),
     })?;
 
-    let mut byte_size = 0;
-    let mut key_count = 0;
-    let mut first_key = None;
-    let mut last_key = None;
-    for (k, v) in db.iter(ReadOptions::new()) {
-        byte_size += v.len() as u64;
-        key_count += 1;
-
-        if first_key.is_none() {
-            first_key = Some(k.0);
-        }
-        last_key = Some(k.0);
-    }
+    let (mut total_records, mut total_bytes, first_key, last_key, last_value) =
+        db.iter(ReadOptions::new()).fold(
+            (0, 0, None, None, None),
+            |(records, bytes, first, _, _), (k, v)| {
+                (
+                    records + 1,
+                    bytes + v.len() as u64,
+                    first.or(Some(k.0)),
+                    Some(k.0),
+                    Some(v),
+                )
+            },
+        );
 
     // Keys are assigned such that if we write an item that compromises 10 events, and that item has
     // key K, then the next key we generate will be K+10.  This lets us take the difference between
     // the last key and the first key to get the number of actual events in the buffer, minus the
     // events contained in the last key/value pair.  We decode it below to get that, too.
-    let mut item_size = last_key.unwrap_or(0) as u64 - first_key.unwrap_or(0) as u64;
+    let mut total_events = last_key.unwrap_or(0) as u64 - first_key.unwrap_or(0) as u64;
 
-    if last_key.is_some() {
-        let iter = db.iter(ReadOptions::new());
-        iter.seek_to_last();
-        if iter.valid() {
-            let val = iter.value();
-            if let Ok(item) = T::decode(T::get_metadata(), &val[..]) {
-                item_size += item.event_count() as u64;
+    let read_offset = first_key;
+    let write_offset = last_key.map(|key| {
+        let value = last_value.expect("can't have a last key without a last value");
+        match T::decode(T::get_metadata(), &value[..]) {
+            Ok(record) => {
+                let event_count = record.event_count();
+                total_events += event_count as u64;
+                key.wrapping_add(event_count)
+            }
+            Err(e) => {
+                // If the last record couldn't be decoded, we know the reader is never going to
+                // do anything with this read to begin with, so we make the conscious decision
+                // to delete it here and now.
+                //
+                // If we don't delete it now, we have to compensate in the reader code when we
+                // hit and make sure we don't count it as a true event for the purposes of
+                // metrics, but do properly delete it, and so on.  We know we have to delete it,
+                // so if we just do that now, then our reader logic can stay a bit cleaner.
+                //
+                // We also have to delete it now, rather than just setting the write offset to
+                // overwrite it, because otherwise, the reader might get to it before a write
+                // comes in that overwrites it.
+                error!(
+                    decode_error = %e,
+                    "Detected undecodable record when querying initial state of buffer. Dropping record and continuing."
+                );
+
+                // Since we're deleting it, we'll reuse the key for the writer by setting the
+                // write offset to overwrite it.  Adjust our statistics, as well.
+                total_records -= 1;
+                total_bytes -= value.len() as u64;
+
+                // Now go ahead and actually delete it so the reader can't pick it up.
+                let mut delete_batch = Writebatch::new();
+                delete_batch.delete(Key(key));
+
+                db.write(WriteOptions::new(), &delete_batch)
+                    .expect("Failed to delete invalid/undecodable record from buffer.");
+
+                key
             }
         }
-    }
+    });
 
     debug!(
         ?first_key,
         ?last_key,
-        "Read {} key(s) from database, with {} bytes total, comprising {} events total.",
-        key_count,
-        byte_size,
-        item_size
+        "Read {} records from database, with {} bytes total, comprising {} events total.",
+        total_records,
+        total_bytes,
+        total_events
     );
 
-    Ok((byte_size, item_size))
+    Ok(BufferState {
+        total_records,
+        total_events,
+        total_bytes,
+        read_offset,
+        write_offset,
+    })
 }
 
 /// Build a new `DiskBuffer` rooted at `path`
@@ -301,8 +348,11 @@ pub fn build<T: Bufferable>(
     let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
     let max_size = max_size - max_uncompacted_size;
 
-    let (initial_byte_size, initial_item_size) = db_initial_size::<T>(path)?;
-    usage_handle.increment_received_event_count_and_byte_size(initial_item_size, initial_byte_size);
+    let initial_state = db_initial_state::<T>(path)?;
+    usage_handle.increment_received_event_count_and_byte_size(
+        initial_state.total_events,
+        initial_state.total_bytes,
+    );
 
     let mut options = Options::new();
     options.create_if_missing = true;
@@ -312,21 +362,13 @@ pub fn build<T: Bufferable>(
     })?;
     let db = Arc::new(db);
 
-    let head;
-    let tail;
-    {
-        let mut iter = db.keys_iter(ReadOptions::new());
-        head = iter.next().map_or(0, |k| k.0);
-        iter.seek_to_last();
-        tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
-    }
+    let read_offset = initial_state.read_offset();
+    let delete_offset = initial_state.read_offset();
+    let write_offset = initial_state.write_offset();
 
-    let current_size = Arc::new(AtomicU64::new(initial_byte_size));
-
+    let current_size = Arc::new(AtomicU64::new(initial_state.total_bytes));
     let write_notifier = Arc::new(AtomicWaker::new());
-
     let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
-
     let ack_counter = Arc::new(AtomicUsize::new(0));
     let acker = create_disk_v1_acker(&ack_counter, &write_notifier);
 
@@ -334,7 +376,7 @@ pub fn build<T: Bufferable>(
         db: Some(Arc::clone(&db)),
         write_notifier: Arc::clone(&write_notifier),
         blocked_write_tasks: Arc::clone(&blocked_write_tasks),
-        offset: Arc::new(AtomicUsize::new(tail)),
+        offset: Arc::new(AtomicUsize::new(write_offset)),
         writebatch: Writebatch::new(),
         batch_size: 0,
         max_size,
@@ -344,17 +386,17 @@ pub fn build<T: Bufferable>(
     };
 
     let reader = Reader {
-        db: Arc::clone(&db),
-        write_notifier: Arc::clone(&write_notifier),
+        db,
+        write_notifier,
         blocked_write_tasks,
-        read_offset: head,
+        read_offset,
         compacted_offset: 0,
-        delete_offset: head,
+        delete_offset,
         current_size,
         ack_counter,
         max_uncompacted_size,
         uncompacted_size: 0,
-        record_acks: OrderedAcknowledgements::from_acked(head),
+        record_acks: OrderedAcknowledgements::from_acked(read_offset),
         buffer: VecDeque::new(),
         last_compaction: Instant::now(),
         last_flush: Instant::now(),

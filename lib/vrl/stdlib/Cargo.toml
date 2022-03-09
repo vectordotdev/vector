@@ -27,7 +27,7 @@ indexmap = { version = "~1.8.0", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
-once_cell = { version = "1.9", optional = true }
+once_cell = { version = "1.10", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -303,5 +303,4 @@ bench = false
 [[bench]]
 name = "benches"
 harness = false
-test = true
 required-features = ["default"]

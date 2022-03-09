@@ -113,3 +113,58 @@ macro_rules! assert_reader_v1_delete_position {
         );
     }};
 }
+
+#[macro_export]
+macro_rules! assert_buffer_usage_metrics {
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*) $(,)?) => {{
+        let usage_snapshot = $usage.snapshot();
+        $(
+            assert_eq!($expected, usage_snapshot.$field);
+        )*
+    }};
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), recv_events => $recv_events:expr, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!(
+            $usage,
+            @asserts ($($field => $expected,)* received_event_count => $recv_events),
+            $($tail)*
+        );
+    }};
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), recv_bytes => $recv_bytes:expr, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!(
+            $usage,
+            @asserts ($($field => $expected,)* received_byte_size => $recv_bytes),
+            $($tail)*
+        );
+    }};
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_events => $sent_events:expr, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!(
+            $usage,
+            @asserts ($($field => $expected,)* sent_event_count => $sent_events),
+            $($tail)*
+        );
+    }};
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), sent_bytes => $sent_bytes:expr, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!(
+            $usage,
+            @asserts ($($field => $expected,)* sent_byte_size => $sent_bytes),
+            $($tail)*
+        );
+    }};
+    ($usage:expr, @asserts ($($field:ident => $expected:expr),*), none_sent, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!(
+            $usage,
+            @asserts ($($field => $expected,)* sent_event_count => 0, sent_byte_size => 0),
+            $($tail)*
+        );
+    }};
+    ($usage:expr, empty) => {{
+        let usage_snapshot = $usage.snapshot();
+        assert_eq!(0, usage_snapshot.received_event_count);
+        assert_eq!(0, usage_snapshot.received_byte_size);
+        assert_eq!(0, usage_snapshot.sent_event_count);
+        assert_eq!(0, usage_snapshot.sent_byte_size);
+    }};
+    ($usage:expr, $($tail:tt)*) => {{
+        assert_buffer_usage_metrics!($usage, @asserts (), $($tail)*);
+    }};
+}

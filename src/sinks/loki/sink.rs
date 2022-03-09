@@ -178,7 +178,7 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(&field);
+                        event.as_mut_log().remove(field.as_str());
                     }
                 }
             }
