@@ -346,17 +346,8 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let concurrency_limit = match self.out_of_order_action {
-            OutOfOrderAction::Drop => Some(1),
-            OutOfOrderAction::RewriteTimestamp => Some(1),
-            OutOfOrderAction::Accept => None,
-        };
-
         let service = tower::ServiceBuilder::new()
-            .option_layer(
-                concurrency_limit
-                    .map(|limit| tower::limit::concurrency::ConcurrencyLimitLayer::new(limit)),
-            )
+            .concurrency_limit(1)
             .service(self.service);
 
         let encoder = self.encoder.clone();
@@ -388,7 +379,7 @@ impl LokiSink {
                     None
                 }
             })
-            .request_builder(NonZeroUsize::new(50), self.request_builder)
+            .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
