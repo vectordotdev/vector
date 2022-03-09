@@ -144,8 +144,6 @@ jobs:
     runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
-      - uses: colpal/actions-clean@v1
-
       - uses: actions/checkout@v3
 
       - uses: actions/checkout@v3
@@ -189,8 +187,6 @@ jobs:
     runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
-      - uses: colpal/actions-clean@v1
-
       - uses: actions/checkout@v3
 
       - uses: actions/checkout@v3
@@ -236,8 +232,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
-      - uses: colpal/actions-clean@v1
-
       - name: Check out the repo
         uses: actions/checkout@v3
 
@@ -322,8 +316,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
-      - uses: colpal/actions-clean@v1
-
       - name: Check out the repo
         uses: actions/checkout@v3
 
