@@ -1,2 +1,5 @@
 [profile.default]
 retries = 3
+
+[profile.default.junit]  # this can be some other profile, too
+path = "junit.xml"
