@@ -1,17 +1,11 @@
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    error, fmt,
-    future::ready,
-    pin::Pin,
-    sync::Arc,
-};
+use std::{collections::HashSet, error, fmt, future::ready, pin::Pin, sync::Arc};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
@@ -95,23 +89,29 @@ pub struct Ec2Metadata {
 
 #[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
-    state: Arc<ArcSwap<HashMap<Cow<'static, str>, Bytes>>>,
+    state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
 }
 
 #[derive(Debug, Clone)]
+struct MetadataKey {
+    log_path: OwnedPath,
+    metric_tag: String,
+}
+
+#[derive(Debug)]
 struct Keys {
-    ami_id_key: Cow<'static, str>,
-    availability_zone_key: Cow<'static, str>,
-    instance_id_key: Cow<'static, str>,
-    instance_type_key: Cow<'static, str>,
-    local_hostname_key: Cow<'static, str>,
-    local_ipv4_key: Cow<'static, str>,
-    public_hostname_key: Cow<'static, str>,
-    public_ipv4_key: Cow<'static, str>,
-    region_key: Cow<'static, str>,
-    subnet_id_key: Cow<'static, str>,
-    vpc_id_key: Cow<'static, str>,
-    role_name_key: Cow<'static, str>,
+    ami_id_key: MetadataKey,
+    availability_zone_key: MetadataKey,
+    instance_id_key: MetadataKey,
+    instance_type_key: MetadataKey,
+    local_hostname_key: MetadataKey,
+    local_ipv4_key: MetadataKey,
+    public_hostname_key: MetadataKey,
+    public_ipv4_key: MetadataKey,
+    region_key: MetadataKey,
+    subnet_id_key: MetadataKey,
+    vpc_id_key: MetadataKey,
+    role_name_key: MetadataKey,
 }
 
 inventory::submit! {
@@ -124,7 +124,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let state = Arc::new(ArcSwap::new(Arc::new(HashMap::new())));
+        let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
@@ -210,12 +210,12 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert(k, v.clone());
+                    log.insert(&k.log_path, v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {
                 state.iter().for_each(|(k, v)| {
-                    metric.insert_tag(k.to_string(), String::from_utf8_lossy(v).to_string());
+                    metric.insert_tag(k.metric_tag.clone(), String::from_utf8_lossy(v).to_string());
                 });
             }
             Event::Trace(_) => panic!("Traces are not supported."),
@@ -229,7 +229,7 @@ struct MetadataClient {
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
-    state: Arc<ArcSwap<HashMap<Cow<'static, str>, Bytes>>>,
+    state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
     refresh_interval: Duration,
     fields: HashSet<String>,
 }
@@ -253,7 +253,7 @@ impl MetadataClient {
         client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
-        state: Arc<ArcSwap<HashMap<Cow<'static, str>, Bytes>>>,
+        state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
         refresh_interval: Duration,
         fields: Vec<String>,
     ) -> Self {
@@ -334,59 +334,59 @@ impl MetadataClient {
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        let mut new_state = HashMap::new();
+        let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
         if let Some(document) = self.get_document().await? {
             if self.fields.contains(AMI_ID_KEY) {
-                new_state.insert(self.keys.ami_id_key.clone(), document.image_id.into());
+                new_state.push((self.keys.ami_id_key.clone(), document.image_id.into()));
             }
 
             if self.fields.contains(INSTANCE_ID_KEY) {
-                new_state.insert(
+                new_state.push((
                     self.keys.instance_id_key.clone(),
                     document.instance_id.into(),
-                );
+                ));
             }
 
             if self.fields.contains(INSTANCE_TYPE_KEY) {
-                new_state.insert(
+                new_state.push((
                     self.keys.instance_type_key.clone(),
                     document.instance_type.into(),
-                );
+                ));
             }
 
             if self.fields.contains(REGION_KEY) {
-                new_state.insert(self.keys.region_key.clone(), document.region.into());
+                new_state.push((self.keys.region_key.clone(), document.region.into()));
             }
 
             if self.fields.contains(AVAILABILITY_ZONE_KEY) {
                 if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
-                    new_state.insert(self.keys.availability_zone_key.clone(), availability_zone);
+                    new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
                 }
             }
 
             if self.fields.contains(LOCAL_HOSTNAME_KEY) {
                 if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
-                    new_state.insert(self.keys.local_hostname_key.clone(), local_hostname);
+                    new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
                 }
             }
 
             if self.fields.contains(LOCAL_IPV4_KEY) {
                 if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
-                    new_state.insert(self.keys.local_ipv4_key.clone(), local_ipv4);
+                    new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
                 }
             }
 
             if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
                 if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
-                    new_state.insert(self.keys.public_hostname_key.clone(), public_hostname);
+                    new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
                 }
             }
 
             if self.fields.contains(PUBLIC_IPV4_KEY) {
                 if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
-                    new_state.insert(self.keys.public_ipv4_key.clone(), public_ipv4);
+                    new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
                 }
             }
 
@@ -405,7 +405,7 @@ impl MetadataClient {
                         })?;
 
                         if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                            new_state.insert(self.keys.subnet_id_key.clone(), subnet_id);
+                            new_state.push((self.keys.subnet_id_key.clone(), subnet_id));
                         }
                     }
 
@@ -418,7 +418,7 @@ impl MetadataClient {
                         })?;
 
                         if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                            new_state.insert(self.keys.vpc_id_key.clone(), vpc_id);
+                            new_state.push((self.keys.vpc_id_key.clone(), vpc_id));
                         }
                     }
                 }
@@ -429,17 +429,21 @@ impl MetadataClient {
                     let role_names = String::from_utf8_lossy(&role_names[..]);
 
                     for (i, role_name) in role_names.lines().enumerate() {
-                        new_state.insert(
-                            Cow::from(format!("{}[{}]", self.keys.role_name_key, i)),
+                        new_state.push((
+                            MetadataKey {
+                                log_path: self.keys.role_name_key.log_path.with_index_appended(i),
+                                metric_tag: format!(
+                                    "{}[{}]",
+                                    self.keys.role_name_key.metric_tag, i
+                                ),
+                            },
                             role_name.to_string().into(),
-                        );
+                        ));
                     }
                 }
             }
 
-            let mut existing_state = self.state.load().as_ref().clone();
-            existing_state.extend(new_state);
-            self.state.store(Arc::new(existing_state));
+            self.state.store(Arc::new(new_state));
         }
 
         Ok(())
@@ -485,41 +489,35 @@ impl MetadataClient {
     }
 }
 
+fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
+    if let Some(namespace) = namespace {
+        MetadataKey {
+            log_path: parse_path(namespace).with_field_appended(key),
+            metric_tag: format!("{}.{}", namespace, key),
+        }
+    } else {
+        MetadataKey {
+            log_path: OwnedPath::single_field(key),
+            metric_tag: key.to_owned(),
+        }
+    }
+}
+
 impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
-        if let Some(namespace) = &namespace {
-            Keys {
-                ami_id_key: Cow::from(format!("{}.{}", namespace, AMI_ID_KEY)),
-                availability_zone_key: Cow::from(format!(
-                    "{}.{}",
-                    namespace, AVAILABILITY_ZONE_KEY
-                )),
-                instance_id_key: Cow::from(format!("{}.{}", namespace, INSTANCE_ID_KEY)),
-                instance_type_key: Cow::from(format!("{}.{}", namespace, INSTANCE_TYPE_KEY)),
-                local_hostname_key: Cow::from(format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY)),
-                local_ipv4_key: Cow::from(format!("{}.{}", namespace, LOCAL_IPV4_KEY)),
-                public_hostname_key: Cow::from(format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY)),
-                public_ipv4_key: Cow::from(format!("{}.{}", namespace, PUBLIC_IPV4_KEY)),
-                region_key: Cow::from(format!("{}.{}", namespace, REGION_KEY)),
-                subnet_id_key: Cow::from(format!("{}.{}", namespace, SUBNET_ID_KEY)),
-                vpc_id_key: Cow::from(format!("{}.{}", namespace, VPC_ID_KEY)),
-                role_name_key: Cow::from(format!("{}.{}", namespace, VPC_ID_KEY)),
-            }
-        } else {
-            Keys {
-                ami_id_key: AMI_ID_KEY.into(),
-                availability_zone_key: AVAILABILITY_ZONE_KEY.into(),
-                instance_id_key: INSTANCE_ID_KEY.into(),
-                instance_type_key: INSTANCE_TYPE_KEY.into(),
-                local_hostname_key: LOCAL_HOSTNAME_KEY.into(),
-                local_ipv4_key: LOCAL_IPV4_KEY.into(),
-                public_hostname_key: PUBLIC_HOSTNAME_KEY.into(),
-                public_ipv4_key: PUBLIC_IPV4_KEY.into(),
-                region_key: REGION_KEY.into(),
-                subnet_id_key: SUBNET_ID_KEY.into(),
-                vpc_id_key: VPC_ID_KEY.into(),
-                role_name_key: ROLE_NAME_KEY.into(),
-            }
+        Keys {
+            ami_id_key: create_key(namespace, AMI_ID_KEY),
+            availability_zone_key: create_key(namespace, AVAILABILITY_ZONE_KEY),
+            instance_id_key: create_key(namespace, INSTANCE_ID_KEY),
+            instance_type_key: create_key(namespace, INSTANCE_TYPE_KEY),
+            local_hostname_key: create_key(namespace, LOCAL_HOSTNAME_KEY),
+            local_ipv4_key: create_key(namespace, LOCAL_IPV4_KEY),
+            public_hostname_key: create_key(namespace, PUBLIC_HOSTNAME_KEY),
+            public_ipv4_key: create_key(namespace, PUBLIC_IPV4_KEY),
+            region_key: create_key(namespace, REGION_KEY),
+            subnet_id_key: create_key(namespace, SUBNET_ID_KEY),
+            vpc_id_key: create_key(namespace, VPC_ID_KEY),
+            role_name_key: create_key(namespace, ROLE_NAME_KEY),
         }
     }
 }
@@ -554,6 +552,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use futures::{SinkExt, StreamExt};
+    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedPath, OwnedSegment};
 
     use super::*;
     use crate::{
@@ -565,20 +564,66 @@ mod integration_tests {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
     }
 
-    const TEST_METADATA: [(&str, &str); 12] = [
-        (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
-        (PUBLIC_IPV4_KEY, "192.1.1.1"),
-        (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
-        (LOCAL_IPV4_KEY, "192.1.1.2"),
-        (LOCAL_HOSTNAME_KEY, "mock-hostname"),
-        (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
-        (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
-        (INSTANCE_TYPE_KEY, "t2.micro"),
-        (REGION_KEY, "us-east-1"),
-        (VPC_ID_KEY, "mock-vpc-id"),
-        (SUBNET_ID_KEY, "mock-subnet-id"),
-        ("role-name[0]", "mock-user"),
-    ];
+    fn expected_log_fields() -> Vec<(OwnedPath, &'static str)> {
+        vec![
+            (
+                vec![OwnedSegment::field(AVAILABILITY_ZONE_KEY)].into(),
+                "ww-region-1a",
+            ),
+            (
+                vec![OwnedSegment::field(PUBLIC_IPV4_KEY)].into(),
+                "192.1.1.1",
+            ),
+            (
+                vec![OwnedSegment::field(PUBLIC_HOSTNAME_KEY)].into(),
+                "mock-public-hostname",
+            ),
+            (
+                vec![OwnedSegment::field(LOCAL_IPV4_KEY)].into(),
+                "192.1.1.2",
+            ),
+            (
+                vec![OwnedSegment::field(LOCAL_HOSTNAME_KEY)].into(),
+                "mock-hostname",
+            ),
+            (
+                vec![OwnedSegment::field(INSTANCE_ID_KEY)].into(),
+                "i-096fba6d03d36d262",
+            ),
+            (
+                vec![OwnedSegment::field(AMI_ID_KEY)].into(),
+                "ami-05f27d4d6770a43d2",
+            ),
+            (
+                vec![OwnedSegment::field(INSTANCE_TYPE_KEY)].into(),
+                "t2.micro",
+            ),
+            (vec![OwnedSegment::field(REGION_KEY)].into(), "us-east-1"),
+            (vec![OwnedSegment::field(VPC_ID_KEY)].into(), "mock-vpc-id"),
+            (
+                vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
+                "mock-subnet-id",
+            ),
+            (parse_path("\"role-name\"[0]"), "mock-user"),
+        ]
+    }
+
+    fn expected_metric_fields() -> Vec<(&'static str, &'static str)> {
+        vec![
+            (AVAILABILITY_ZONE_KEY, "ww-region-1a"),
+            (PUBLIC_IPV4_KEY, "192.1.1.1"),
+            (PUBLIC_HOSTNAME_KEY, "mock-public-hostname"),
+            (LOCAL_IPV4_KEY, "192.1.1.2"),
+            (LOCAL_HOSTNAME_KEY, "mock-hostname"),
+            (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+            (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
+            (INSTANCE_TYPE_KEY, "t2.micro"),
+            (REGION_KEY, "us-east-1"),
+            (VPC_ID_KEY, "mock-vpc-id"),
+            (SUBNET_ID_KEY, "mock-subnet-id"),
+            ("role-name[0]", "mock-user"),
+        ]
+    }
 
     fn make_metric() -> Metric {
         Metric::new(
@@ -619,8 +664,8 @@ mod integration_tests {
 
         let log = LogEvent::default();
         let mut expected_log = log.clone();
-        for (k, v) in TEST_METADATA.iter().cloned() {
-            expected_log.insert(k, v);
+        for (k, v) in expected_log_fields().iter().cloned() {
+            expected_log.insert(&k, v);
         }
 
         tx.send(log.into()).await.unwrap();
@@ -647,7 +692,7 @@ mod integration_tests {
 
         let metric = make_metric();
         let mut expected_metric = metric.clone();
-        for (k, v) in TEST_METADATA.iter() {
+        for (k, v) in expected_metric_fields().iter() {
             expected_metric.insert_tag(k.to_string(), v.to_string());
         }
 
@@ -674,8 +719,8 @@ mod integration_tests {
 
         let log = LogEvent::default();
         let mut expected_log = log.clone();
-        expected_log.insert(PUBLIC_IPV4_KEY, "192.1.1.1");
-        expected_log.insert(REGION_KEY, "us-east-1");
+        expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.1.1.1");
+        expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
 
         tx.send(log.into()).await.unwrap();
 
@@ -730,8 +775,9 @@ mod integration_tests {
             tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
+
             assert_eq!(
-                event.as_log().get("ec2.metadata.availability-zone"),
+                event.as_log().get("ec2.metadata.\"availability-zone\""),
                 Some(&"ww-region-1a".into())
             );
         }
@@ -757,7 +803,9 @@ mod integration_tests {
 
             let event = stream.next().await.unwrap();
             assert_eq!(
-                event.as_log().get(AVAILABILITY_ZONE_KEY),
+                event
+                    .as_log()
+                    .get(&[BorrowedSegment::field(AVAILABILITY_ZONE_KEY)]),
                 Some(&"ww-region-1a".into())
             );
         }
