@@ -18,8 +18,8 @@ use crate::{
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings, TowerRequestConfig,
+            encoding::EncodingConfigWithDefault, service::ServiceBuilderExt, BatchConfig,
+            Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -58,11 +58,6 @@ pub(crate) struct DatadogLogsConfig {
     // Deprecated name
     #[serde(alias = "api_key")]
     default_api_key: String,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -138,8 +133,17 @@ impl DatadogLogsConfig {
                 self.get_uri(),
                 cx.globals.enterprise,
             ));
+
+        let encoding = EncodingConfigWithDefault {
+            codec: DatadogLogsJsonEncoding::default().with_schema_support(cx.schema.enabled),
+            schema: Default::default(),
+            only_fields: Default::default(),
+            except_fields: Default::default(),
+            timestamp_format: Default::default(),
+        };
+
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
+            .encoding(encoding)
             .compression(self.compression.unwrap_or_default())
             .build();
 

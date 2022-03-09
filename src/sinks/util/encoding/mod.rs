@@ -21,11 +21,11 @@
 //!
 //! ### [`EncodingConfigWithDefault<E>`]
 //!
-//! This configuration type is practically identical to [`EncodingConfigWithDefault<E>`], except it
-//! will use the `Default` implementation of `E` to create the codec if a value isn't specified in
-//! the configuration when deserialized.  Similarly, it won't write the codec during serialization
-//! if it's already the default value.  This is good when there's an obvious default codec to use,
-//! but you still want to provide the ability to change it.
+//! This configuration type is practically identical to [`EncodingConfig<E>`], except it will use
+//! the `Default` implementation of `E` to create the codec if a value isn't specified in the
+//! configuration when deserialized.  Similarly, it won't write the codec during serialization if
+//! it's already the default value.  This is good when there's an obvious default codec to use, but
+//! you still want to provide the ability to change it.
 //!
 //! ### [`EncodingConfigFixed<E>`]
 //!
