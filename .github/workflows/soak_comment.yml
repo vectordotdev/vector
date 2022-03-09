@@ -21,12 +21,12 @@ jobs:
         uses: actions/github-script@v3.1.0
         with:
           script: |
-            console.log("::group::Context");
-            console.log(context);
+            console.log("::group::github.event");
+            console.log(${{ toJSON(github.event) }}, {'depth': null, 'maxArrayLength': null});
             console.log("::endgroup::");
 
-            console.log("::group::Github");
-            console.log(github);
+            console.log("::group::context");
+            console.dir(context, {'depth': null, 'maxArrayLength': null});
             console.log("::endgroup::");
 
       - name: 'Download PR number'
