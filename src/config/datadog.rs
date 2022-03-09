@@ -2,7 +2,8 @@ use std::env;
 
 use serde::{Deserialize, Serialize};
 
-use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
+use super::{ComponentKey, Config, ConfigPath, OutputId, SinkOuter, SourceOuter};
+use crate::config::{load_source_from_paths, process_paths};
 use crate::{
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
@@ -21,10 +22,25 @@ pub struct Options {
     #[serde(default)]
     pub api_key: Option<String>,
 
+    pub app_key: String,
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: f64,
+}
+
+/// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
+struct PipelinesFields<'a> {
+    config: &'a str,
+    api_key: &'a str,
+    app_key: &'a str,
+    configuration_key: &'a str,
+}
+
+/// Error conditions that indicate how reporting a configuration to Datadog Observability Pipelines
+/// failed. Callers can then determine whether reattempt(s) are relevant.
+enum PipelinesError {
+    Unauthorized,
 }
 
 impl Default for Options {
@@ -32,6 +48,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             api_key: None,
+            app_key: "".to_owned(),
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
         }
@@ -50,7 +67,7 @@ const fn default_reporting_interval_secs() -> f64 {
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config) -> bool {
+pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
     // Only valid if a [datadog] section is present in config.
     let datadog = match config.datadog.as_ref() {
         Some(datadog) => datadog,
@@ -69,9 +86,32 @@ pub fn try_attach(config: &mut Config) -> bool {
         _ => return false,
     };
 
-    info!("Datadog API key provided. Host and internal metrics will be sent to Datadog.");
+    info!("Datadog API key provided. Integration with Datadog Observability Pipelines is enabled.");
 
     let version = config.version.as_ref().expect("Config should be versioned");
+
+    // Report the internal configuration to Datadog Observability Pipelines.
+    // First, we need to create a JSON representation of config, based on the original files
+    // that Vector was spawned with.
+    let (table, _) = process_paths(config_paths)
+        .map(|paths| load_source_from_paths(&paths).ok())
+        .flatten()
+        .expect("Couldn't load source from config paths. Please report.");
+
+    // Serializing a TOML table as JSON should always succeed.
+    let config_json =
+        serde_json::to_string(&table).expect("Couldn't serialise config as JSON. Please report.");
+
+    // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
+    // exploding as func arguments to avoid confusion with multiple &str fields.
+    let fields = PipelinesFields {
+        config: &config_json,
+        api_key: &api_key,
+        app_key: &datadog.app_key,
+        configuration_key: &datadog.configuration_key,
+    };
+
+    report_serialized_config_to_datadog(fields);
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
@@ -108,6 +148,11 @@ pub fn try_attach(config: &mut Config) -> bool {
     );
 
     true
+}
+
+/// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
+fn report_serialized_config_to_datadog(fields: PipelinesFields) -> Result<(), PipelinesError> {
+    Ok(())
 }
 
 #[cfg(test)]
