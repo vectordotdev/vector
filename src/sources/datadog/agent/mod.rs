@@ -7,8 +7,8 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use chrono::{serde::ts_milliseconds, DateTime, TimeZone, Utc};
+use bytes::{Buf, Bytes};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
