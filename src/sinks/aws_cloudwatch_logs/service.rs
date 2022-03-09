@@ -1,3 +1,8 @@
+use aws_sdk_cloudwatchlogs::error::{
+    CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError,
+};
+use aws_sdk_cloudwatchlogs::model::InputLogEvent;
+use aws_sdk_cloudwatchlogs::types::SdkError;
 use std::{
     collections::HashMap,
     fmt,
@@ -45,10 +50,10 @@ type Svc = Buffer<
 
 #[derive(Debug)]
 pub enum CloudwatchError {
-    Put(RusotoError<PutLogEventsError>),
-    Describe(RusotoError<DescribeLogStreamsError>),
-    CreateStream(RusotoError<CreateLogStreamError>),
-    CreateGroup(RusotoError<CreateLogGroupError>),
+    Put(SdkError<PutLogEventsError>),
+    Describe(SdkError<DescribeLogStreamsError>),
+    CreateStream(SdkError<CreateLogStreamError>),
+    CreateGroup(SdkError<CreateLogGroupError>),
     NoStreamsFound,
 }
 
@@ -70,14 +75,14 @@ impl fmt::Display for CloudwatchError {
 
 impl std::error::Error for CloudwatchError {}
 
-impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
-    fn from(error: RusotoError<PutLogEventsError>) -> Self {
+impl From<SdkError<PutLogEventsError>> for CloudwatchError {
+    fn from(error: SdkError<PutLogEventsError>) -> Self {
         CloudwatchError::Put(error)
     }
 }
 
-impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
-    fn from(error: RusotoError<DescribeLogStreamsError>) -> Self {
+impl From<SdkError<DescribeLogStreamsError>> for CloudwatchError {
+    fn from(error: SdkError<DescribeLogStreamsError>) -> Self {
         CloudwatchError::Describe(error)
     }
 }

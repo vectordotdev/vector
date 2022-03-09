@@ -4,6 +4,7 @@ use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
+use crate::http::build_proxy_connector;
 use crate::{
     aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -53,15 +54,42 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
-        let region = (&self.region).try_into()?;
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
+        // TODO: make more generic
 
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
+        let mut config_builder = aws_sdk_cloudwatchlogs::config::Builder::new()
+            .credentials_provider(self.auth.credentials_provider().await?);
 
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(CloudwatchLogsClient::new_with_client(client, region))
+        if let Some(endpont_override) = self.region.endpoint()? {
+            config_builder = config_builder.endpoint_resolver(endpont_override);
+        }
+
+        if let Some(region) = self.region.region() {
+            config_builder = config_builder.region(region);
+        }
+
+        if proxy.enabled {
+            let tls_settings = MaybeTlsSettings::enable_client()?;
+            let proxy = build_proxy_connector(tls_settings, proxy)?;
+            let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+            let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
+            let client =
+                aws_sdk_cloudwatchlogs::Client::from_conf_conn(config_builder.build(), connector);
+            Ok(client)
+        } else {
+            Ok(aws_sdk_cloudwatchlogs::Client::from_conf(
+                config_builder.build(),
+            ))
+        }
+
+        // let region = (&self.region).try_into()?;
+        //
+        // let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        // let client = rusoto::client(Some(tls_settings), proxy)?;
+        // let creds = self.auth.build(&region, self.assume_role.clone())?;
+        //
+        // let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        // Ok(CloudwatchLogsClient::new_with_client(client, region))
     }
 }
 
