@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash; C:/Program\ Files/Git/user/bin/bash.exe
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -10,8 +10,6 @@ IFS=$'\n\t'
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
-
-ls target/nextest/default/
 
 DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
   --service vector \

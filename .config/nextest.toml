@@ -1,5 +1,8 @@
 [profile.default]
 retries = 3
+status-level = "all"
+failure-output = "immediate-final"
+fail-fast = false
 
 [profile.default.junit]  # this can be some other profile, too
 path = "junit.xml"
