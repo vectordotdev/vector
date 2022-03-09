@@ -59,6 +59,9 @@ export VERSION ?= $(shell scripts/version.sh)
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
+# Overritten in CI for Datadog CI reporting
+export DD_ENV ?= local
+
 export RUST_VERSION ?= $(shell grep channel rust-toolchain.toml | cut -d '"' -f 2)
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
@@ -298,7 +301,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 ifeq ($(CI), true)
-	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+	datadog-ci junit upload \
 		--service vector \
 		target/nextest/default/junit.xml
 endif
@@ -352,7 +355,7 @@ ifeq ($(AUTOSPAWN), true)
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(CI), true)
-	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+	datadog-ci junit upload \
 		--service vector \
 		target/nextest/default/junit.xml
 endif
@@ -396,7 +399,7 @@ test-shutdown-cleanup:
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
 ifeq ($(CI), true)
-	DD_ENV="${DD_ENV:-"local"}" datadog-ci junit upload \
+	datadog-ci junit upload \
 		--service vector \
 		target/nextest/default/junit.xml
 endif
