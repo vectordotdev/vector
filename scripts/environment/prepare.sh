@@ -17,6 +17,7 @@ cd ..
 # ubuntu 20.04 gives us version 10.19. We can revert once we update the
 # ci image to install a newer version of node.
 sudo npm -g install markdownlint-cli@0.30
+sudo npm -g install @datadog/datadog-ci
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2
