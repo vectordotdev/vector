@@ -4,7 +4,7 @@ use azure_storage_blobs::prelude::*;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
-use super::service::AzureBlobRequestOptions;
+use super::request_builder::AzureBlobRequestOptions;
 
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},

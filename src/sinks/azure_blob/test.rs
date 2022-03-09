@@ -3,7 +3,7 @@ use chrono::Utc;
 use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
-use super::service::AzureBlobRequestOptions;
+use super::request_builder::AzureBlobRequestOptions;
 
 use crate::event::Event;
 use crate::sinks::util::{

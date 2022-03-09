@@ -1,5 +1,5 @@
 mod config;
-mod service;
+mod request_builder;
 
 #[cfg(feature = "azure-blob-integration-tests")]
 #[cfg(test)]
