@@ -170,9 +170,10 @@ components: sinks: [Name=string]: {
 					description: "Configures the encoding specific sink behavior."
 					required:    features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
-					type: object: options: {
+					type: object: {
 						if features.send.encoding.codec.enabled {
-							codec: {
+							examples: [{codec: "json"}]
+							options: codec: {
 								description: "The encoding codec used to serialize the events before outputting."
 								required:    true
 								type: string: {
@@ -212,42 +213,43 @@ components: sinks: [Name=string]: {
 								}
 							}
 						}
-
-						except_fields: {
-							common:      false
-							description: "Prevent the sink from encoding the specified fields."
-							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+						options: {
+							except_fields: {
+								common:      false
+								description: "Prevent the sink from encoding the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
 								}
 							}
-						}
 
-						only_fields: {
-							common:      false
-							description: "Makes the sink encode only the specified fields."
-							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+							only_fields: {
+								common:      false
+								description: "Makes the sink encode only the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
 								}
 							}
-						}
 
-						timestamp_format: {
-							common:      false
-							description: "How to format event timestamps."
-							required:    false
-							type: string: {
-								default: "rfc3339"
-								enum: {
-									rfc3339: "Formats as a RFC3339 string"
-									unix:    "Formats as a unix timestamp"
+							timestamp_format: {
+								common:      false
+								description: "How to format event timestamps."
+								required:    false
+								type: string: {
+									default: "rfc3339"
+									enum: {
+										rfc3339: "Formats as a RFC3339 string"
+										unix:    "Formats as a unix timestamp"
+									}
 								}
 							}
 						}
