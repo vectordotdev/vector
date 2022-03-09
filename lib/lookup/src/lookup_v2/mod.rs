@@ -6,9 +6,45 @@ use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
+}
+
+impl OwnedPath {
+    pub fn root() -> Self {
+        vec![].into()
+    }
+
+    pub fn push_field(&mut self, field: &str) {
+        self.segments.push(OwnedSegment::field(field));
+    }
+
+    pub fn with_field_appended(&self, field: &str) -> Self {
+        let mut new_path = self.clone();
+        new_path.push_field(field);
+        new_path
+    }
+
+    pub fn push_index(&mut self, index: usize) {
+        self.segments.push(OwnedSegment::index(index));
+    }
+
+    pub fn with_index_appended(&self, index: usize) -> Self {
+        let mut new_path = self.clone();
+        new_path.push_index(index);
+        new_path
+    }
+
+    pub fn single_field(field: &str) -> Self {
+        vec![OwnedSegment::field(field)].into()
+    }
+}
+
+impl From<Vec<OwnedSegment>> for OwnedPath {
+    fn from(segments: Vec<OwnedSegment>) -> Self {
+        Self { segments }
+    }
 }
 
 /// Use if you want to pre-parse paths so it can be used multiple times
@@ -103,6 +139,12 @@ pub enum OwnedSegment {
 }
 
 impl OwnedSegment {
+    pub fn field(value: &str) -> OwnedSegment {
+        OwnedSegment::Field(value.into())
+    }
+    pub fn index(value: usize) -> OwnedSegment {
+        OwnedSegment::Index(value)
+    }
     pub fn is_field(&self) -> bool {
         matches!(self, OwnedSegment::Field(_))
     }
@@ -134,6 +176,9 @@ pub enum BorrowedSegment<'a> {
 impl BorrowedSegment<'_> {
     pub fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
+    }
+    pub fn index(value: usize) -> BorrowedSegment<'static> {
+        BorrowedSegment::Index(value)
     }
     pub fn is_field(&self) -> bool {
         matches!(self, BorrowedSegment::Field(_))

@@ -777,7 +777,9 @@ impl Value {
         let mut path_iter = path.segment_iter();
         loop {
             match (path_iter.next(), value) {
-                (None, _) => return Some(value),
+                (None, _) => {
+                    return Some(value);
+                }
                 (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
                     match map.get(key.as_ref()) {
                         None => return None,
