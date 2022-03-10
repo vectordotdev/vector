@@ -56,7 +56,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
                         Some(HttpError::StatusCode { status, .. }) => {
-                            emit!(&AzureBlobResponseError { code: *status })
+                            emit!(&AzureBlobResponseError::from(*status))
                         }
                         _ => emit!(&AzureBlobHttpError {
                             error: reason.to_string()

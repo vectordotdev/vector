@@ -5,14 +5,22 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AzureBlobResponseError {
-    pub code: hyper::StatusCode,
+    error_code: String,
+}
+
+impl From<hyper::StatusCode> for AzureBlobResponseError {
+    fn from(code: hyper::StatusCode) -> Self {
+        Self {
+            error_code: http_error_code(code.as_u16()),
+        }
+    }
 }
 
 impl InternalEvent for AzureBlobResponseError {
     fn emit_logs(&self) {
         error!(
             message = "HTTP error response.",
-            error_code = %http_error_code(self.code.as_u16()),
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
         );
@@ -21,7 +29,7 @@ impl InternalEvent for AzureBlobResponseError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => http_error_code(self.code.as_u16()),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
