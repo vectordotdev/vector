@@ -68,13 +68,18 @@ impl InternalEvent for HttpEventsReceived<'_> {
 
 #[derive(Debug)]
 pub struct HttpBadRequest<'a> {
-    pub code: u16,
-    pub message: &'a str,
+    code: u16,
+    error_code: String,
+    message: &'a str,
 }
 
 impl<'a> HttpBadRequest<'a> {
-    fn error_code(&self) -> String {
-        http_error_code(self.code)
+    pub fn new(code: u16, message: &'a str) -> Self {
+        Self {
+            code,
+            error_code: http_error_code(code),
+            message,
+        }
     }
 }
 
@@ -83,7 +88,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         warn!(
             message = "Received bad request.",
             error = %self.message,
-            error_code = %self.error_code(),
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
@@ -94,7 +99,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code(),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
