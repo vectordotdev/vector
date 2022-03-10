@@ -1,4 +1,4 @@
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::aws::AwsAuthentication;
 use crate::config::ProxyConfig;
 use crate::http::build_proxy_connector;
 use crate::tls::MaybeTlsSettings;
@@ -78,16 +78,17 @@ pub trait ClientBuilder {
 
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
-    region_or_endpoint: &RegionOrEndpoint,
+    region: Option<Region>,
+    endpoint: Option<Endpoint>,
     proxy: &ProxyConfig,
 ) -> crate::Result<T::Client> {
     let mut config_builder = T::create_config_builder(auth.credentials_provider().await?);
 
-    if let Some(endpoint_override) = region_or_endpoint.endpoint()? {
+    if let Some(endpoint_override) = endpoint {
         config_builder = T::with_endpoint_resolver(config_builder, endpoint_override);
     }
 
-    if let Some(region) = region_or_endpoint.region() {
+    if let Some(region) = region {
         config_builder = T::with_region(config_builder, region);
     }
 

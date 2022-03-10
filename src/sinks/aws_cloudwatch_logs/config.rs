@@ -93,7 +93,13 @@ pub struct CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsSinkConfig {
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
-        create_client::<CloudwatchLogsClientBuilder>(&self.auth, &self.region, proxy).await
+        create_client::<CloudwatchLogsClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+        )
+        .await
     }
 }
 
