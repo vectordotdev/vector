@@ -13,6 +13,7 @@ components: sinks: loki: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -69,7 +70,7 @@ components: sinks: loki: {
 
 	configuration: {
 		endpoint: {
-			description: "The base URL of the Loki instance."
+			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
@@ -114,9 +115,10 @@ components: sinks: loki: {
 			common: false
 			description: """
 				Some sources may generate events with timestamps that aren't in strictly chronological order. The Loki
-				service can't accept a stream of such events. Vector sorts events before sending them to Loki, however
-				some late events might arrive after a batch has been sent. This option specifies what Vector should do
-				with those events.
+				service can't accept a stream of such events prior version 2.4.0. Vector sorts events before sending
+				them to Loki, however some late events might arrive after a batch has been sent. This option specifies
+				what Vector should do with those events. If you are using Loki 2.4.0 and newer, you should set this
+				option to "accept"
 				"""
 			required: false
 			type: string: {
@@ -124,6 +126,7 @@ components: sinks: loki: {
 				enum: {
 					"drop":              "Drop the event."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
+					"accept":            "Don't do anything, send events into Loki normally (needs Loki 2.4.0 and newer)"
 				}
 			}
 		}

@@ -43,7 +43,7 @@ mod machine;
 mod state;
 mod variable;
 
-pub use argument_list::VmArgumentList;
+pub use argument_list::{compile_arguments, function_compile_arguments, VmArgumentList};
 pub use machine::OpCode;
 pub use machine::Vm;
 pub use variable::Variable;

@@ -1,5 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
@@ -11,10 +15,8 @@ use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
 /// Components that have been added
 async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
-    let res = client.component_added();
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_added();
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -42,10 +44,8 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
 
 /// Components that have been removed
 async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
-    let res = client.component_removed();
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_removed();
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -62,10 +62,8 @@ async fn received_events_totals(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_received_events_totals_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_received_events_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -92,10 +90,8 @@ async fn received_events_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_received_events_throughputs_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_received_events_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -114,10 +110,8 @@ async fn received_events_throughputs(
 }
 
 async fn sent_events_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
-    let res = client.component_sent_events_totals_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_sent_events_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -143,10 +137,8 @@ async fn sent_events_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_sent_events_throughputs_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_sent_events_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -173,10 +165,8 @@ async fn processed_bytes_totals(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_processed_bytes_totals_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_processed_bytes_totals_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -203,10 +193,8 @@ async fn processed_bytes_throughputs(
     tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.component_processed_bytes_throughputs_subscription(interval);
-
     tokio::pin! {
-        let stream = res.stream();
+        let stream = client.component_processed_bytes_throughputs_subscription(interval);
     };
 
     while let Some(Some(res)) = stream.next().await {
@@ -226,41 +214,47 @@ async fn processed_bytes_throughputs(
 
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
-pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
+pub fn subscribe(
+    client: SubscriptionClient,
+    tx: state::EventTx,
+    interval: i64,
+) -> Vec<JoinHandle<()>> {
     let client = Arc::new(client);
 
-    tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
-    tokio::spawn(component_removed(Arc::clone(&client), tx.clone()));
-    tokio::spawn(received_events_totals(
-        Arc::clone(&client),
-        tx.clone(),
-        interval,
-    ));
-    tokio::spawn(received_events_throughputs(
-        Arc::clone(&client),
-        tx.clone(),
-        interval,
-    ));
-    tokio::spawn(sent_events_totals(
-        Arc::clone(&client),
-        tx.clone(),
-        interval,
-    ));
-    tokio::spawn(sent_events_throughputs(
-        Arc::clone(&client),
-        tx.clone(),
-        interval,
-    ));
-    tokio::spawn(processed_bytes_totals(
-        Arc::clone(&client),
-        tx.clone(),
-        interval,
-    ));
-    tokio::spawn(processed_bytes_throughputs(
-        Arc::clone(&client),
-        tx,
-        interval,
-    ));
+    vec![
+        tokio::spawn(component_added(Arc::clone(&client), tx.clone())),
+        tokio::spawn(component_removed(Arc::clone(&client), tx.clone())),
+        tokio::spawn(received_events_totals(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(received_events_throughputs(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(sent_events_totals(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(sent_events_throughputs(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(processed_bytes_totals(
+            Arc::clone(&client),
+            tx.clone(),
+            interval,
+        )),
+        tokio::spawn(processed_bytes_throughputs(
+            Arc::clone(&client),
+            tx,
+            interval,
+        )),
+    ]
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
@@ -308,7 +302,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                 ))
             })
         })
-        .collect::<state::State>();
+        .collect::<BTreeMap<_, _>>();
 
-    Ok(rows)
+    Ok(state::State::new(rows))
 }

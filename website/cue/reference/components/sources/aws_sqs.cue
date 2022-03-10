@@ -4,6 +4,7 @@ components: sources: aws_sqs: components._aws_new_sdk & {
 	title: "AWS SQS"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false

@@ -6,7 +6,7 @@ use vrl::{
 };
 
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(grok::Error),
 }
 
@@ -87,7 +87,7 @@ impl Function for ParseGrok {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");

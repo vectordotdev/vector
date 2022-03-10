@@ -18,15 +18,15 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Route {
-    conditions: IndexMap<String, Condition>,
+    conditions: Vec<(String, Condition)>,
 }
 
 impl Route {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
-        let mut conditions = IndexMap::new();
+        let mut conditions = Vec::with_capacity(config.route.len());
         for (output_name, condition) in config.route.iter() {
             let condition = condition.build(&context.enrichment_tables)?;
-            conditions.insert(output_name.clone(), condition);
+            conditions.push((output_name.clone(), condition));
         }
         Ok(Self { conditions })
     }
@@ -38,13 +38,13 @@ impl SyncTransform for Route {
         event: Event,
         output: &mut vector_core::transform::TransformOutputsBuf,
     ) {
-        for (output_name, condition) in self.conditions.iter() {
+        for (output_name, condition) in &self.conditions {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
                 emit!(&RouteEventDiscarded {
                     output: output_name.as_ref()
-                });
+                })
             }
         }
     }
@@ -223,7 +223,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
@@ -258,7 +258,7 @@ mod test {
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);

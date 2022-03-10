@@ -442,19 +442,9 @@ async fn bad_s3_region() {
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
-        region = "us-east-1"
-        endpoint = "https://localhost"
-
-        [sinks.out4]
-        type = "aws_s3"
-        inputs = ["in"]
-        compression = "gzip"
-        encoding = "text"
-        bucket = "asdf"
-        key_prefix = "logs/"
         endpoint = "this shouldnt work"
 
-        [sinks.out4.batch]
+        [sinks.out3.batch]
         max_bytes = 100000
         "#,
         Format::Toml,
@@ -467,8 +457,7 @@ async fn bad_s3_region() {
         vec![
             "Sink \"out1\": Must set either 'region' or 'endpoint'",
             "Sink \"out2\": Failed to parse region: Not a valid AWS region: moonbase-alpha",
-            "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
-            "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
+            "Sink \"out3\": Failed to parse custom endpoint as URI: invalid uri character"
         ]
     )
 }

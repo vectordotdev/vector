@@ -9,7 +9,7 @@ use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use vector_core::{
     buffers::{topology::channel::BufferReceiver, Acker},
-    event::Event,
+    event::EventArray,
 };
 
 use crate::{config::ComponentKey, utilization::Utilization};
@@ -19,7 +19,7 @@ pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Utilization<BufferReceiver<Event>>, Acker),
+    Sink(Utilization<BufferReceiver<EventArray>>, Acker),
     Healthcheck,
 }
 

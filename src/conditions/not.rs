@@ -4,7 +4,7 @@ use super::{AnyCondition, Condition, ConditionConfig, Conditional};
 use crate::event::Event;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NotConfig(AnyCondition);
+pub(crate) struct NotConfig(AnyCondition);
 
 impl From<AnyCondition> for NotConfig {
     fn from(value: AnyCondition) -> Self {

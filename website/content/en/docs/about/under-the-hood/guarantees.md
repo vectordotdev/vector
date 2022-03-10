@@ -11,6 +11,40 @@ Here you can find an overview of delivery guarantee types and their meaning as w
 the stability of our components. Next, you can head over to the [components] page and use filters to
 see which components support specific guarantees.
 
+## Acknowledgement guarantees
+
+Vector supports end-to-end acknowledgement for the majority of its
+sources and sinks. This is a system which tracks the delivery status of
+an event through the lifetime of that event as it travels from the
+originating source to any number of destination sinks. Support for this
+feature is indicated by the "acknowledgements" badge at the top of the
+relevant sink or source configuration reference page.
+
+For a source that supports end-to-end acknowledgements and is
+connected to a sink that has the `acknowledgements` option enabled,
+this will cause it to wait for _all_ connected sinks to either mark
+the event as delivered, or to persist the events to a disk buffer, if
+configured on the sink, before acknowledging receipt of the event. If
+a sink signals the event was rejected and the source can provide an
+error response (i.e. through an HTTP error code), then the source will
+provide an appropriate error to the sending agent.
+
+Sinks support end-to-end acknowledgements by providing an indicator of
+the final status of each event after delivery has completed. This
+includes waiting until all internal buffering and the retry process is
+complete. Sinks which have a durable buffer configured will mark events
+as delivered once they are persisted to that buffer, as an indicator
+that Vector will continue to retry the event even after restarts. If the
+sink does not support acknowledgements, events will be marked as having
+been delivered when they are handed off to the sink component, before
+any deliveries are attempted.
+
+Some transforms will drop events as part of their normal
+operation. For example, the `dedupe` transform will drop events that
+duplicate another recent event in order to reduce data volume. When
+this happens, the event will be considered as having been delivered
+with no error.
+
 ## Delivery guarantees
 
 ### At-least-once
@@ -19,9 +53,13 @@ The **at-least-once** delivery guarantee ensures that an [event] received by a V
 ultimately delivered at least once. While rare, it is possible for an event to be delivered more
 than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
 
+While rare, it is possible for an event to be delivered more than
+once. See the [Does Vector support exactly-once
+delivery?](#faq-at-least-once) FAQ below).
+
 {{< warning >}}
-In order to achieve at-least-once delivery between restarts your source must be configured to use
-disk-based buffers:
+In order to achieve at-least-once delivery between restarts,
+your sink must be configured to use disk-based buffers:
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
@@ -36,7 +74,7 @@ Refer to each [sink's][sinks] documentation for further guidance on its buffer o
 [sinks]: /docs/reference/configuration/sinks
 {{< /warning >}}
 
-### Best effort
+### Best-effort
 
 A **best-effort** delivery guarantee means that a Vector component makes a best effort to deliver
 each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying

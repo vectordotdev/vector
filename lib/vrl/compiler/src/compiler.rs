@@ -7,9 +7,9 @@ use parser::ast::{self, AssignmentOp, Node};
 
 use crate::{expression::*, Function, Program, State, Value};
 
-pub type Errors = Vec<Box<dyn DiagnosticError>>;
+pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
 
-pub struct Compiler<'a> {
+pub(crate) struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,

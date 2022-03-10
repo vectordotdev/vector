@@ -24,8 +24,8 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
-        TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -183,7 +183,7 @@ impl TcpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(&TcpSocketConnectionFailed { error });
+                    emit!(&TcpSocketConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }

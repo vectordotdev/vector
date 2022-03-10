@@ -13,6 +13,7 @@ components: sinks: socket: {
 	}
 
 	features: {
+		acknowledgements: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

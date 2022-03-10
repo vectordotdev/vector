@@ -9,7 +9,10 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
@@ -91,6 +94,7 @@ mod nats;
 mod nginx_metrics;
 mod open;
 #[cfg(any(
+    feature = "sinks-datadog_events",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",
@@ -108,7 +112,7 @@ mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 mod pulsar;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -166,7 +170,10 @@ pub(crate) use self::ansi_stripper::*;
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub(crate) use self::api::*;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+#[cfg(any(
+    feature = "sinks-aws_cloudwatch_logs",
+    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
+))]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
@@ -254,6 +261,7 @@ pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
+    feature = "sinks-datadog_events",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
     feature = "transforms-grok_parser",
@@ -271,7 +279,7 @@ pub(crate) use self::postgresql_metrics::*;
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;

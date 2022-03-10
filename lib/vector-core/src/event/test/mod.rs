@@ -12,7 +12,7 @@ fn event_iteration() {
 
     event
         .as_mut_log()
-        .insert("Ke$ha", "It's going down, I'm yelling timber");
+        .insert("\"Ke$ha\"", "It's going down, I'm yelling timber");
     event
         .as_mut_log()
         .insert("Pitbull", "The bigger they are, the harder they fall");

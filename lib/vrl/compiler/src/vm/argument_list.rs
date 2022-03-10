@@ -1,5 +1,12 @@
-use crate::{value::Kind, ExpressionError, Parameter, Value};
-use std::any::Any;
+use diagnostic::DiagnosticError;
+
+use crate::{
+    expression::{Expr, FunctionArgument},
+    function::FunctionCompileContext,
+    value::Kind,
+    ExpressionError, Function, Parameter, Value,
+};
+use std::{any::Any, collections::BTreeMap};
 
 pub enum VmArgument<'a> {
     Value(Value),
@@ -99,11 +106,84 @@ impl<'a> VmArgumentList<'a> {
             match args.as_ref() {
                 None if param.required => return Err("parameter is required".into()),
                 Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(&kind)) => {
-                    return Err("parameter type mismatch".into())
+                    return Err(format!(
+                        "expected {}, got {}",
+                        param.kind(),
+                        arg.kind().expect("argument has valid kind"),
+                    )
+                    .into());
                 }
                 _ => (),
             }
         }
         Ok(())
+    }
+}
+
+/// Keeps clippy happy.
+type CompiledArguments =
+    Result<BTreeMap<&'static str, Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticError>>;
+
+/// Compiles the function arguments with the given argument list.
+/// This is used by the stdlib unit tests.
+pub fn function_compile_arguments<F>(
+    function: &F,
+    args: &crate::function::ArgumentList,
+) -> CompiledArguments
+where
+    F: Function,
+{
+    // Clone to give us a mutable object.
+    // Calling optional_value mutates the args object, which breaks things further on
+    // in the tests if we don't work on our own copy.
+    let mut args = args.clone();
+    let mut result = BTreeMap::new();
+    let context = FunctionCompileContext::new(Default::default());
+    let params = function.parameters();
+    let function_arguments: Vec<(&'static str, Option<FunctionArgument>)> = args.clone().into();
+
+    for param in params {
+        let arg = args
+            .optional_value(param.keyword)
+            .unwrap_or(None)
+            .map(Expr::from);
+
+        if let Some(arg) =
+            function.compile_argument(&function_arguments, &context, param.keyword, arg.as_ref())?
+        {
+            result.insert(param.keyword, arg);
+        }
+    }
+
+    Ok(result)
+}
+
+/// Compiles the arguments provided for the given function.
+/// This needs to be a separate function to `compile_function_arguments` because the caller
+/// needs to own the list of anys which has the same lifetime as the return.
+/// This is used by the stdlib unit tests.
+pub fn compile_arguments<'a, F>(
+    function: &F,
+    args: &mut crate::function::ArgumentList,
+    anys: &'a BTreeMap<&'static str, Box<dyn Any + Send + Sync>>,
+) -> VmArgumentList<'a>
+where
+    F: Function,
+{
+    let params = function.parameters();
+    let values = params
+        .iter()
+        .map(|param| {
+            anys.get(param.keyword).map(VmArgument::Any).or_else(|| {
+                args.optional_value(param.keyword)
+                    .expect("argument should be a literal")
+                    .map(VmArgument::Value)
+            })
+        })
+        .collect();
+
+    VmArgumentList {
+        args: params,
+        values,
     }
 }

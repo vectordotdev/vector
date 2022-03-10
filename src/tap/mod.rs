@@ -1,7 +1,7 @@
 mod cmd;
 
 use clap::Parser;
-pub use cmd::cmd;
+pub(crate) use cmd::cmd;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
 
@@ -39,4 +39,12 @@ pub struct Opts {
     /// Quiet output includes only events
     #[clap(short, long)]
     quiet: bool,
+
+    /// Include metadata such as the event's associated component ID
+    #[clap(short, long)]
+    meta: bool,
+
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops.
+    #[clap(short, long)]
+    no_reconnect: bool,
 }

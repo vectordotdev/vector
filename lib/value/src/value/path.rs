@@ -7,6 +7,7 @@ impl Value {
     ///
     /// For example, given the path `.foo.bar` and value `true`, the return
     /// value would be an object representing `{ "foo": { "bar": true } }`.
+    #[must_use]
     pub fn at_path(mut self, path: &LookupBuf) -> Self {
         for segment in path.as_segments().iter().rev() {
             match segment {

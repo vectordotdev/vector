@@ -271,6 +271,14 @@ cli: {
 					_short:      "q"
 					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
 				}
+				"meta": {
+					_short:      "m"
+					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
+				}
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
+				}
 			}
 
 			options: {
@@ -335,11 +343,15 @@ cli: {
 
 			flags: _default_flags & {
 				"human-metrics": {
-					_short: "h"
+					_short: "H"
 					description: """
 						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
 						1,000,000 = 1.00 M
 						"""
+				}
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops."
 				}
 			}
 

@@ -20,6 +20,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: true
 			from: {

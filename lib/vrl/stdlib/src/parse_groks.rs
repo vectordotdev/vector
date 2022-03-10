@@ -10,7 +10,7 @@ use vrl::{
 };
 
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(datadog_grok::parse_grok_rules::Error),
 }
 
@@ -105,7 +105,7 @@ impl Function for ParseGroks {
     fn compile_argument(
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -191,7 +191,7 @@ impl Function for ParseGroks {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");

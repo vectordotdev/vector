@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -15,7 +15,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
             message = "Invalid packet from statsd, discarding.",
             error = %self.error,
             error_code = "invalid_packet",
-            error_type = "parse_error",
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
             rate_limit_secs = 10,
@@ -26,7 +26,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => "invalid_packet",
-            "error_type" => "parse_error",
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -82,7 +82,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             message = %message,
             error = %error,
             error_code = %self.error_code(),
-            error_type = "connection_failed",
+            error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             rate_limit_secs = 10,
         );
@@ -92,7 +92,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
         counter!(
             "component_errors_total", 1,
             "error_code" => self.error_code(),
-            "error_type" => "connection_failed",
+            "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated

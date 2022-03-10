@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
 
 use vector_core::{internal_event::InternalEvent, update_counter};
@@ -30,8 +30,6 @@ impl InternalEvent for KafkaEventsReceived {
     }
 }
 
-const KAFKA_OFFSET_UPDATE: &str = "kafka_offset_update";
-
 #[derive(Debug)]
 pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
@@ -42,7 +40,8 @@ impl InternalEvent for KafkaOffsetUpdateError {
         error!(
             message = "Unable to update consumer offset.",
             error = %self.error,
-            error_type = KAFKA_OFFSET_UPDATE,
+            error_code = "kafka_offset_update",
+            error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
         );
     }
@@ -50,16 +49,14 @@ impl InternalEvent for KafkaOffsetUpdateError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => KAFKA_OFFSET_UPDATE,
+            "error_code" => "kafka_offset_update",
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("consumer_offset_updates_failed_total", 1);
     }
 }
-
-const KAFKA_READ: &str = "kafka_read";
 
 #[derive(Debug)]
 pub struct KafkaReadError {
@@ -71,7 +68,8 @@ impl InternalEvent for KafkaReadError {
         error!(
             message = "Failed to read message.",
             error = %self.error,
-            error_type = KAFKA_READ,
+            error_code = "reading_message",
+            error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
         );
     }
@@ -79,23 +77,12 @@ impl InternalEvent for KafkaReadError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => KAFKA_READ,
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("events_failed_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct KafkaKeyExtractionFailed<'a> {
-    pub key_field: &'a str,
-}
-
-impl InternalEvent for KafkaKeyExtractionFailed<'_> {
-    fn emit_logs(&self) {
-        error!(message = "Failed to extract key.", key_field = %self.key_field);
     }
 }
 
@@ -140,19 +127,29 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
     }
 }
 
-pub struct KafkaHeaderExtractionFailed<'a> {
+pub struct KafkaHeaderExtractionError<'a> {
     pub header_field: &'a str,
 }
 
-impl InternalEvent for KafkaHeaderExtractionFailed<'_> {
+impl InternalEvent for KafkaHeaderExtractionError<'_> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
-            header_field = self.header_field
+            error_code = "extracing_header",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+            header_field = self.header_field,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "extracing_field",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("kafka_header_extraction_failures_total", 1);
     }
 }

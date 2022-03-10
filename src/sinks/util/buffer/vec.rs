@@ -55,7 +55,7 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     }
 
     fn finish(self) -> Self::Output {
-        self.batch.unwrap_or_else(Vec::new)
+        self.batch.unwrap_or_default()
     }
 
     fn num_items(&self) -> usize {

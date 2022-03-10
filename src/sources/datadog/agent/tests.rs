@@ -1,4 +1,21 @@
-use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg};
+use std::{
+    array::IntoIter,
+    collections::{BTreeMap, HashMap},
+    iter::FromIterator,
+    net::SocketAddr,
+    str,
+};
+
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use futures::{Stream, StreamExt};
+use http::HeaderMap;
+use indoc::indoc;
+use pretty_assertions::assert_eq;
+use prost::Message;
+use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+use value::Kind;
+
 use crate::{
     codecs::{
         self,
@@ -8,37 +25,47 @@ use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
+        into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
-        Event, EventStatus,
+        Event, EventStatus, Value,
     },
     schema,
     serde::{default_decoding, default_framing_message_based},
-    sources::datadog::agent::{LOGS, METRICS},
+    sources::datadog::agent::{
+        logs::{decode_log_body, LogMsg},
+        metrics::DatadogSeriesRequest,
+        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+    },
     test_util::{
         components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
         next_addr, spawn_collect_n, trace_init, wait_for_tcp,
     },
     SourceSender,
 };
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use futures::Stream;
-use http::HeaderMap;
-use pretty_assertions::assert_eq;
-use prost::Message;
-use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::num::NonZeroU16;
-use std::str;
-use value::Kind;
 
-mod dd_proto {
+mod dd_metrics_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-const TEST_LOGS_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
-const TEST_METRICS_SCHEMA_ID: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(2) };
+mod dd_traces_proto {
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+}
+
+fn test_logs_schema_definition() -> schema::Definition {
+    schema::Definition::empty().required_field(
+        "a log field",
+        Kind::integer().or_bytes(),
+        Some("log field"),
+    )
+}
+
+fn test_metrics_schema_definition() -> schema::Definition {
+    schema::Definition::empty().required_field(
+        "a schema tag",
+        Kind::boolean().or_null(),
+        Some("tag"),
+    )
+}
 
 impl Arbitrary for LogMsg {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -63,7 +90,6 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-
         let decoder = codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
             Deserializer::Bytes(BytesDeserializer::new()),
@@ -73,11 +99,11 @@ fn test_decode_log_body() {
             true,
             decoder,
             "http",
-            TEST_LOGS_SCHEMA_ID.into(),
-            TEST_METRICS_SCHEMA_ID.into(),
+            test_logs_schema_definition(),
+            test_metrics_schema_definition(),
         );
 
-        let events = source.decode_log_body(body, api_key).unwrap();
+        let events = decode_log_body(body, api_key, &source).unwrap();
         assert_eq!(events.len(), msgs.len());
         for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
             let log = event.as_log();
@@ -89,7 +115,10 @@ fn test_decode_log_body() {
             assert_eq!(log["ddsource"], msg.ddsource.into());
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
-            assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_logs_schema_definition()
+            );
         }
 
         TestResult::passed()
@@ -118,30 +147,36 @@ async fn source(
     let mut logs_output = None;
     let mut metrics_output = None;
     if multiple_outputs {
-        logs_output = Some(sender.add_outputs(status, "logs".to_string()));
-        metrics_output = Some(sender.add_outputs(status, "metrics".to_string()));
+        logs_output = Some(
+            sender
+                .add_outputs(status, "logs".to_string())
+                .flat_map(into_event_stream),
+        );
+        metrics_output = Some(
+            sender
+                .add_outputs(status, "metrics".to_string())
+                .flat_map(into_event_stream),
+        );
     }
     let address = next_addr();
-    let schema_ids = HashMap::from([
-        (Some(LOGS.to_owned()), TEST_LOGS_SCHEMA_ID.into()),
-        (Some(METRICS.to_owned()), TEST_METRICS_SCHEMA_ID.into()),
+    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address = "{}"
+            compression = "none"
+            store_api_key = {}
+            acknowledgements = {}
+            multiple_outputs = {}
+        "#},
+        address, store_api_key, acknowledgements, multiple_outputs
+    ))
+    .unwrap();
+    let schema_definitions = HashMap::from([
+        (Some(LOGS.to_owned()), test_logs_schema_definition()),
+        (Some(METRICS.to_owned()), test_metrics_schema_definition()),
     ]);
-    let context = SourceContext::new_test(sender, Some(schema_ids));
+    let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        DatadogAgentConfig {
-            address,
-            tls: None,
-            store_api_key,
-            framing: default_framing_message_based(),
-            decoding: default_decoding(),
-            acknowledgements: acknowledgements.into(),
-            multiple_outputs,
-        }
-        .build(context)
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+        config.build(context).await.unwrap().await.unwrap();
     });
     wait_for_tcp(address).await;
     (recv, logs_output, metrics_output, address)
@@ -203,7 +238,10 @@ async fn full_payload_v1() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -251,7 +289,10 @@ async fn full_payload_v2() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -299,7 +340,10 @@ async fn no_api_key() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert!(event.metadata().datadog_api_key().is_none());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -350,7 +394,10 @@ async fn api_key_in_url() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -401,7 +448,10 @@ async fn api_key_in_query_params() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -458,7 +508,10 @@ async fn api_key_in_header() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -580,7 +633,10 @@ async fn ignores_api_key() {
         assert_eq!(log["ddtags"], "one,two,three".into());
         assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
         assert!(event.metadata().datadog_api_key().is_none());
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 }
 
@@ -729,7 +785,10 @@ async fn decode_series_endpoints() {
         );
 
         for event in events {
-            assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_metrics_schema_definition()
+            );
         }
     }
 }
@@ -746,12 +805,12 @@ async fn decode_sketches() {
     );
 
     let mut buf = Vec::new();
-    let sketch = dd_proto::sketch_payload::Sketch {
+    let sketch = dd_metrics_proto::sketch_payload::Sketch {
         metric: "dd_sketch".to_string(),
         tags: vec!["foo:bar".to_string(), "foobar".to_string()],
         host: "a_host".to_string(),
         distributions: Vec::new(),
-        dogsketches: vec![dd_proto::sketch_payload::sketch::Dogsketch {
+        dogsketches: vec![dd_metrics_proto::sketch_payload::sketch::Dogsketch {
             ts: 1542182950,
             cnt: 2,
             min: 16.0,
@@ -763,7 +822,7 @@ async fn decode_sketches() {
         }],
     };
 
-    let sketch_payload = dd_proto::SketchPayload {
+    let sketch_payload = dd_metrics_proto::SketchPayload {
         metadata: None,
         sketches: vec![sketch],
     };
@@ -820,8 +879,127 @@ async fn decode_sketches() {
         );
 
         for event in events {
-            assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+            assert_eq!(
+                event.metadata().schema_definition(),
+                &test_metrics_schema_definition()
+            );
         }
+    }
+}
+
+#[tokio::test]
+async fn decode_traces() {
+    trace_init();
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "dd-api-key",
+        "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+    );
+    headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
+
+    let mut buf = Vec::new();
+
+    let span = dd_traces_proto::Span {
+        service: "a_service".to_string(),
+        name: "a_name".to_string(),
+        resource: "a_resource".to_string(),
+        trace_id: 123u64,
+        span_id: 456u64,
+        parent_id: 789u64,
+        start: 1_431_648_000_000_001i64,
+        duration: 1_000_000_000i64,
+        error: 404i32,
+        meta: BTreeMap::from_iter(IntoIter::new([("foo".to_string(), "bar".to_string())])),
+        metrics: BTreeMap::from_iter(IntoIter::new([("a_metrics".to_string(), 0.577f64)])),
+        r#type: "a_type".to_string(),
+    };
+
+    let trace = dd_traces_proto::ApiTrace {
+        trace_id: 123u64,
+        spans: vec![span.clone()],
+        start_time: 1_431_648_000_000_001i64,
+        end_time: 1_431_649_000_000_001i64,
+    };
+
+    let payload = dd_traces_proto::TracePayload {
+        host_name: "a_hostname".to_string(),
+        env: "an_environment".to_string(),
+        traces: vec![trace],
+        transactions: vec![span],
+    };
+
+    payload.encode(&mut buf).unwrap();
+
+    let events = spawn_collect_n(
+        async move {
+            assert_eq!(
+                200,
+                send_with_path(
+                    addr,
+                    unsafe { str::from_utf8_unchecked(&buf) },
+                    headers,
+                    "/api/v0.2/traces"
+                )
+                .await
+            );
+        },
+        rx,
+        2,
+    )
+    .await;
+
+    {
+        let trace = events[0].as_trace();
+        assert_eq!(trace.as_map()["host"], "a_hostname".into());
+        assert_eq!(trace.as_map()["env"], "an_environment".into());
+        assert_eq!(trace.as_map()["language"], "ada".into());
+        assert!(trace.contains("spans"));
+        assert_eq!(trace.as_map()["spans"].as_array().unwrap().len(), 1);
+        let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0]
+            .as_object()
+            .unwrap();
+        assert_eq!(span_from_trace["service"], "a_service".into());
+        assert_eq!(span_from_trace["name"], "a_name".into());
+        assert_eq!(span_from_trace["resource"], "a_resource".into());
+        assert_eq!(span_from_trace["trace_id"], Value::Integer(123));
+        assert_eq!(span_from_trace["span_id"], Value::Integer(456));
+        assert_eq!(span_from_trace["parent_id"], Value::Integer(789));
+        assert_eq!(
+            span_from_trace["start"],
+            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
+        );
+        assert_eq!(span_from_trace["duration"], Value::Integer(1_000_000_000));
+        assert_eq!(span_from_trace["error"], Value::Integer(404));
+        assert_eq!(span_from_trace["meta"].as_object().unwrap().len(), 1);
+        assert_eq!(
+            span_from_trace["meta"].as_object().unwrap()["foo"],
+            "bar".into()
+        );
+        assert_eq!(span_from_trace["metrics"].as_object().unwrap().len(), 1);
+        assert_eq!(
+            span_from_trace["metrics"].as_object().unwrap()["a_metrics"],
+            0.577.into()
+        );
+        assert_eq!(
+            &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+            "12345678abcdefgh12345678abcdefgh"
+        );
+
+        let apm_event = events[1].as_trace();
+        assert!(!apm_event.contains("spans"));
+        assert_eq!(apm_event.as_map()["env"], "an_environment".into());
+        assert_eq!(apm_event.as_map()["language"], "ada".into());
+        assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
+        assert_eq!(apm_event.as_map()["service"], "a_service".into());
+        assert_eq!(apm_event.as_map()["name"], "a_name".into());
+        assert_eq!(apm_event.as_map()["resource"], "a_resource".into());
+
+        assert_eq!(
+            &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+            "12345678abcdefgh12345678abcdefgh"
+        );
     }
 }
 
@@ -917,7 +1095,10 @@ async fn split_outputs() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "abcdefgh12345678abcdefgh12345678"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_METRICS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_metrics_schema_definition()
+        );
     }
 
     {
@@ -935,7 +1116,10 @@ async fn split_outputs() {
             &event.metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
-        assert_eq!(event.metadata().schema_id(), TEST_LOGS_SCHEMA_ID.into());
+        assert_eq!(
+            event.metadata().schema_definition(),
+            &test_logs_schema_definition()
+        );
     }
 
     COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
@@ -1018,6 +1202,7 @@ fn test_config_outputs() {
                         ),
                     ),
                     (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),
@@ -1059,6 +1244,7 @@ fn test_config_outputs() {
                         ),
                     ),
                     (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),
@@ -1110,6 +1296,7 @@ fn test_config_outputs() {
                         ),
                     ),
                     (Some(METRICS), None),
+                    (Some(TRACES), None),
                 ]),
             },
         ),
@@ -1122,6 +1309,9 @@ fn test_config_outputs() {
             decoding,
             acknowledgements: Default::default(),
             multiple_outputs,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
         };
 
         let mut outputs = config

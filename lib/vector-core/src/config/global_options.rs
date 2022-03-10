@@ -8,7 +8,7 @@ use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
-pub enum DataDirError {
+pub(crate) enum DataDirError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
     MissingDataDir,
     #[snafu(display("data_dir {:?} does not exist", data_dir))]

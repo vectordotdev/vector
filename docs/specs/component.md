@@ -220,12 +220,17 @@ implement since errors are specific to the component.
 
 * Properties
   * `message` - A human readable error message.
-  * `error` - An error code. The values for `error` for a given error event MUST
-    be a bounded set with relatively low cardinality because it will be used as
-    a metric tag. Examples would be syscall error code. Examples of values that
-    should not be used are raw error messages from `serde` as these are highly
-    variable depending on the input. Instead, these errors should be converted
-    to an error code like `invalid_json`.
+  * `error_code` - An error code for the failure, if applicable.
+
+    `error_code` SHOULD only be specified if it adds additional information
+    beyond `error_type`.
+
+    The values for `error_code` for a given error event MUST be a bounded set
+    with relatively low cardinality because it will be used as a metric tag.
+    Examples would be syscall error code. Examples of values that should not be
+    used are raw error messages from `serde` as these are highly variable
+    depending on the input. Instead, these errors should be converted to an
+    error code like `invalid_json`.
   * `error_type` - The type of error condition. This MUST be one of the types
     listed in the `error_type` enum list in the cue docs.
   * `stage` - The stage at which the error occurred. This MUST be one of

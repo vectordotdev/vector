@@ -1,11 +1,13 @@
-use bytes::BytesMut;
+use bytes::{Buf, BufMut, BytesMut};
 use pretty_assertions::assert_eq;
+use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
+use vector_buffers::encoding::Encodable;
 use vector_common::btreemap;
 
 use super::*;
-use crate::config::log_schema;
+use crate::{config::log_schema, event::ser::EventEncodableMetadataFlags};
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
     value.encode(buffer).expect("encoding should not fail");
@@ -16,23 +18,22 @@ fn decode_value<T: Encodable, B: Buf + Clone>(buffer: B) -> T {
 }
 
 #[test]
-fn event_encodable_metadata_stable_while_leveldb_disk_buffer_still_present() {
+fn encodable_must_decode_single_eventarray_while_leveldb_disk_buffer_still_present() {
     // REVIEWERS: Be aware, if this is being removed or changed, the only acceptable context is
     // LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be
     // explained.
-    let allowed = allowed_event_encodable_metadata();
-    let actual = <Event as Encodable>::get_metadata();
-    assert_eq!(
-        allowed, actual,
-        "metadata for `Encodable` impl for `Event` must not change \
-prior to the LevelDB-based disk buffer implementation being removed"
+    let metadata = <EventArray as Encodable>::get_metadata();
+    assert!(
+        <EventArray as Encodable>::can_decode(metadata),
+        "metadata for `Encodable` impl for `EventArray` must support decoding individual \
+events prior to the LevelDB-based disk buffer implementation being removed"
     );
 }
 
 #[test]
-fn event_can_go_from_raw_prost_to_encodable_and_vice_versa() {
+fn eventarray_can_go_from_raw_prost_to_encodable_and_vice_versa() {
     // This is another test that ensures that we can encode via a raw Prost encode call and decode
-    // via `Event`'s `Encodable` implementation, and vice versa, as an additional layer of assurance
+    // via `EventArray`'s `Encodable` implementation, and vice versa, as an additional layer of assurance
     // that we haven't changed the `Encodable` implementation prior to removing the LevelDB-based
     // disk buffers.
     //
@@ -46,44 +47,80 @@ fn event_can_go_from_raw_prost_to_encodable_and_vice_versa() {
         "key3" => "value3",
     };
     let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+    let events = EventArray::from(event);
 
     // First test: raw Prost encode -> `Encodable::decode`.
-    let first_event = event.clone();
-
     let mut first_encode_buf = BytesMut::with_capacity(4096);
-    proto::EventWrapper::from(first_event)
+    proto::EventArray::from(events.clone())
         .encode(&mut first_encode_buf)
-        .expect("event should not fail to encode");
+        .expect("events should not fail to encode");
 
     let first_decode_buf = first_encode_buf.freeze();
-    let first_decoded_event = decode_value::<Event, _>(first_decode_buf);
+    let first_decoded = EventArray::decode(EventArray::get_metadata(), first_decode_buf)
+        .expect("events should not fail to decode");
 
-    assert_eq!(event, first_decoded_event);
+    assert_eq!(events, first_decoded);
 
     // Second test: `Encodable::encode` -> raw Prost decode.
-    let second_event = event.clone();
-
     let mut second_encode_buf = BytesMut::with_capacity(4096);
-    encode_value(second_event, &mut second_encode_buf);
+    events
+        .clone()
+        .encode(&mut second_encode_buf)
+        .expect("events should not fail to encode");
 
     let second_decode_buf = second_encode_buf.freeze();
-    let second_decoded_event: Event = proto::EventWrapper::decode(second_decode_buf)
+    let second_decoded: EventArray = proto::EventArray::decode(second_decode_buf)
         .map(Into::into)
-        .expect("event should not fail to decode");
+        .expect("events should not fail to decode");
 
-    assert_eq!(event, second_decoded_event);
+    assert_eq!(events, second_decoded);
 }
 
-// Ser/De the Event never loses bytes
 #[test]
-fn serde_no_size_loss() {
-    fn inner(event: Event) -> TestResult {
-        let expected = event.clone();
+fn event_can_go_from_raw_prost_to_eventarray_encodable() {
+    // This is another test that ensures that we can encode via a raw Prost encode call and decode
+    // via `EventArray`'s `Encodable` implementation, specifically for a single `Event`.  This is
+    // the invariant we must provide to ensure that older disk buffer v1 files are still readable
+    // when `EventArray` is introduced.
+    //
+    // REVIEWERS: Be aware, if this is being removed or changed, the only acceptable context is
+    // LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be
+    // explained.
+
+    let event_fields = btreemap! {
+        "key1" => "value1",
+        "key2" => "value2",
+        "key3" => "value3",
+    };
+    let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+
+    let mut encode_buf = BytesMut::with_capacity(4096);
+    proto::EventWrapper::from(event.clone())
+        .encode(&mut encode_buf)
+        .expect("event should not fail to encode");
+
+    let decode_buf = encode_buf.freeze();
+    let decoded_events = EventArray::decode(
+        EventEncodableMetadataFlags::DiskBufferV1CompatibilityMode.into(),
+        decode_buf,
+    )
+    .expect("event should not fail to decode");
+
+    let mut events = decoded_events.into_events().collect::<Vec<_>>();
+    assert_eq!(events.len(), 1);
+    assert_eq!(event, events.remove(0));
+}
+
+// Ser/De the EventArray never loses bytes
+#[test]
+fn serde_eventarray_no_size_loss() {
+    fn inner(events: EventArray) -> TestResult {
+        let expected = events.clone();
 
         let mut buffer = BytesMut::with_capacity(64);
-        encode_value(event, &mut buffer);
+        encode_value(events, &mut buffer);
 
-        let actual = decode_value::<Event, _>(buffer);
+        let actual = decode_value::<EventArray, _>(buffer);
         assert_eq!(actual.size_of(), expected.size_of());
 
         TestResult::passed()
@@ -92,21 +129,21 @@ fn serde_no_size_loss() {
     QuickCheck::new()
         .tests(1_000)
         .max_tests(10_000)
-        .quickcheck(inner as fn(Event) -> TestResult);
+        .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
-// Ser/De the Event type through EncodeBytes -> DecodeBytes
+// Ser/De the EventArray type through EncodeBytes -> DecodeBytes
 #[test]
 #[allow(clippy::neg_cmp_op_on_partial_ord)] // satisfying clippy leads to less
                                             // clear expression
 fn back_and_forth_through_bytes() {
-    fn inner(event: Event) -> TestResult {
-        let expected = event.clone();
+    fn inner(events: EventArray) -> TestResult {
+        let expected = events.clone();
 
         let mut buffer = BytesMut::with_capacity(64);
-        encode_value(event, &mut buffer);
+        encode_value(events, &mut buffer);
 
-        let actual = decode_value::<Event, _>(buffer);
+        let actual = decode_value::<EventArray, _>(buffer);
 
         // While Event does implement PartialEq we prefer to use PartialOrd
         // instead. This is done because Event is populated with a number
@@ -122,7 +159,7 @@ fn back_and_forth_through_bytes() {
     QuickCheck::new()
         .tests(1_000)
         .max_tests(10_000)
-        .quickcheck(inner as fn(Event) -> TestResult);
+        .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
 #[test]

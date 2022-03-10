@@ -4,13 +4,14 @@ use std::{
     task::{Context, Poll},
 };
 
+use crate::event::{Event, EventArray, EventContainer};
 use futures::{task::noop_waker_ref, Stream, StreamExt};
 
-pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
+pub(crate) fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     serde_json::from_reader(File::open(path)?).map_err(Into::into)
 }
 
-pub fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
+pub(crate) fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
 where
     S: Stream + Unpin,
 {
@@ -22,4 +23,14 @@ where
         vec.push(item);
     }
     vec
+}
+
+pub(crate) fn collect_ready_events<S>(rx: S) -> Vec<Event>
+where
+    S: Stream<Item = EventArray> + Unpin,
+{
+    collect_ready(rx)
+        .into_iter()
+        .flat_map(EventArray::into_events)
+        .collect()
 }

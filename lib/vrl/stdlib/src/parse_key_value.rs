@@ -81,7 +81,7 @@ impl Function for ParseKeyValue {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -118,7 +118,7 @@ impl Function for ParseKeyValue {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -178,7 +178,7 @@ impl Function for ParseKeyValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Whitespace {
+pub(crate) enum Whitespace {
     Strict,
     Lenient,
 }
@@ -280,7 +280,7 @@ fn parse<'a>(
             // Create a descriptive error message if possible.
             nom::error::convert_error(input, e)
         }
-        _ => format!("{}", e),
+        _ => e.to_string(),
     })?;
 
     if rest.trim().is_empty() {

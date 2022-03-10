@@ -7,14 +7,16 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::util::SinkBatchSettings;
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },
 };
 
@@ -33,6 +35,13 @@ pub(super) struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -94,14 +103,16 @@ impl SinkConfig for HoneycombConfig {
     fn sink_type(&self) -> &'static str {
         "honeycomb"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HoneycombConfig {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+pub struct HoneycombEventEncoder;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
         let mut log = event.into_log();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
@@ -117,6 +128,17 @@ impl HttpSink for HoneycombConfig {
         });
 
         Some(data)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for HoneycombConfig {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = HoneycombEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        HoneycombEventEncoder
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {

@@ -14,6 +14,7 @@ components: sinks: file: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: {
@@ -73,6 +74,18 @@ components: sinks: file: {
 				and the file when emitting events to the file sink. This
 				requires that the Vector agent have the correct permissions
 				to create and write to files in the specified directories.
+				"""
+		}
+
+		durability: {
+			title: "Durability of Created Files"
+			body: """
+				Vector makes no attempt to ensure the files output by
+				this sink are durably written to disk by using any of
+				the "sync" write modes. As such, this sink only
+				ensures that the operating system does not generate an
+				error, it does not wait until the data is written to
+				disk before acknowledging the events.
 				"""
 		}
 	}

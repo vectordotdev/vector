@@ -1,6 +1,6 @@
 use crate::Value;
 use chrono::SecondsFormat;
-use std::fmt;
+use std::{fmt, string::ToString};
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -9,9 +9,9 @@ impl fmt::Display for Value {
                 f,
                 r#""{}""#,
                 String::from_utf8_lossy(val)
-                    .replace(r#"\"#, r#"\\"#)
-                    .replace(r#"""#, r#"\""#)
-                    .replace("\n", r#"\n"#)
+                    .replace('\\', r#"\\"#)
+                    .replace('"', r#"\""#)
+                    .replace('\n', r#"\n"#)
             ),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
@@ -27,7 +27,7 @@ impl fmt::Display for Value {
             Value::Array(array) => {
                 let joined = array
                     .iter()
-                    .map(|val| format!("{}", val))
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "[{}]", joined)

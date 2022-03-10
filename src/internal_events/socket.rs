@@ -1,5 +1,5 @@
 #[cfg(feature = "codecs")]
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -77,7 +77,8 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
         error!(
             message = "Error receiving data.",
             error = %self.error,
-            error_type = "connection_failed",
+            error_code = "receiving_data",
+            error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             mode = %self.mode.as_str(),
         );
@@ -86,10 +87,10 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "mode" => self.mode.as_str(),
-            "error" => self.error.to_string(),
-            "error_type" => "connection_failed",
+            "error_code" => "receiving_data",
+            "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
+            "mode" => self.mode.as_str(),
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => self.mode.as_str());

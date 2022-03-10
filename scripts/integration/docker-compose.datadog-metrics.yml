@@ -20,7 +20,7 @@ services:
     environment:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - CI_TEST_DATADOG_API_KEY
+      - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code
 

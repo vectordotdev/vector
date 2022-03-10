@@ -16,6 +16,7 @@ pub use framing::{
 use crate::{
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
+    schema,
 };
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
@@ -152,6 +153,14 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
+        }
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        match self {
+            SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
         }
     }
 }

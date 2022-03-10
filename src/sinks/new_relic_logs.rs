@@ -7,7 +7,9 @@ use snafu::Snafu;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -65,6 +67,12 @@ pub struct NewRelicLogsConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -111,6 +119,10 @@ impl SinkConfig for NewRelicLogsConfig {
     fn sink_type(&self) -> &'static str {
         "new_relic_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 impl NewRelicLogsConfig {
@@ -123,6 +135,7 @@ impl NewRelicLogsConfig {
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -157,6 +170,7 @@ impl NewRelicLogsConfig {
             batch: batch_settings.into(),
             request,
             tls: None,
+            acknowledgements: self.acknowledgements,
         })
     }
 }
@@ -207,7 +221,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -238,7 +252,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -276,7 +290,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));

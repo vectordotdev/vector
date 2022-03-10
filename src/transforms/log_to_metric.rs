@@ -732,10 +732,11 @@ mod tests {
         let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
+        let mut output = output.into_events();
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "exception_total",
+                "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata.clone(),
@@ -743,9 +744,9 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "status",
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata,
@@ -786,28 +787,29 @@ mod tests {
 
         let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
+        let output: Vec<_> = output.into_events().collect();
         assert_eq!(2, output.len());
         assert_eq!(
-            output.pop().unwrap().into_metric(),
-            Metric::new_with_metadata(
-                "xyz_exception_total",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 1.0 },
-                metadata.clone(),
-            )
-            .with_namespace(Some("local"))
-            .with_timestamp(Some(ts()))
-        );
-        assert_eq!(
-            output.pop().unwrap().into_metric(),
-            Metric::new_with_metadata(
+            output[0].as_metric(),
+            &Metric::new_with_metadata(
                 "local_abc_status_set",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["42".into()].into_iter().collect()
                 },
+                metadata.clone(),
+            )
+            .with_timestamp(Some(ts()))
+        );
+        assert_eq!(
+            output[1].as_metric(),
+            &Metric::new_with_metadata(
+                "xyz_exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
                 metadata,
             )
+            .with_namespace(Some("local"))
             .with_timestamp(Some(ts()))
         );
     }

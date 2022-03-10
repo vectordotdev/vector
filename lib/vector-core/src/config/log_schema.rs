@@ -1,4 +1,3 @@
-use getset::{Getters, Setters};
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +34,7 @@ pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(default)]
 pub struct LogSchema {
     #[serde(default = "LogSchema::default_message_key")]

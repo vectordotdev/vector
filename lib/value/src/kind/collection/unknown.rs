@@ -10,10 +10,10 @@ use crate::{kind::merge, Kind};
 /// (e.g. the array collection has an integer value at index 0, and is 3 values in size. We don't
 /// know the exact values for indices 1 and 2, but we do know that it has to be the type defined by
 /// `Unknown`).
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Unknown(pub(super) Inner);
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub(super) enum Inner {
     Exact(Box<Kind>),
 
@@ -152,7 +152,7 @@ impl From<&Kind> for Unknown {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub(super) struct Infinite {
     bytes: Option<()>,
     integer: Option<()>,

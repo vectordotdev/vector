@@ -36,8 +36,7 @@ impl<E: FileSourceInternalEvents> Glob<E> {
 
         let exclude_patterns = exclude_patterns
             .iter()
-            .map(|path| path.to_str().map(|path| Pattern::new(path).ok()))
-            .flatten()
+            .filter_map(|path| path.to_str().map(|path| Pattern::new(path).ok()))
             .collect::<Option<Vec<_>>>()?;
 
         Some(Self {

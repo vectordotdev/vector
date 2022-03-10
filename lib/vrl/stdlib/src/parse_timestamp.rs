@@ -20,7 +20,7 @@ impl Function for ParseTimestamp {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -60,7 +60,7 @@ impl Expression for ParseTimestampFn {
                 let bytes = self.format.resolve(ctx)?;
                 let format = bytes.try_bytes_utf8_lossy()?;
                 Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
-                    .map_err(|e| format!("{}", e))?
+                    .map_err(|e| e.to_string())?
                     .convert(v)
                     .map_err(|e| e.to_string().into())
             }

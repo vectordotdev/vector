@@ -621,8 +621,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             // The writer correctly reset/marked itself as needing to skip the current data file,
             // but we need to actually attempt a write to drive the logic where it tries to open up
             // the next data file, so we do that here, expecting it to end up blocked on the reader.
-            let mut blocked_write =
-                spawn(async move { writer.write_record(SizedRecord(record_size)).await });
+            let mut blocked_write = spawn(writer.write_record(SizedRecord(record_size)));
 
             while !waiting_on_reader.try_assert() {
                 assert_pending!(blocked_write.poll());

@@ -309,6 +309,7 @@ impl EventStatus {
     /// Passing a new status of `Dropped` is a programming error and
     /// will panic in debug/test builds.
     #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
+    #[must_use]
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
             // `Recorded` always overwrites existing status and is never updated

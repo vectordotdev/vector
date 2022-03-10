@@ -18,6 +18,7 @@ impl ComponentKey {
         &self.id
     }
 
+    #[must_use]
     pub fn join<D: fmt::Display>(&self, name: D) -> Self {
         Self {
             id: format!("{}.{}", self.id, name),

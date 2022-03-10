@@ -947,7 +947,7 @@ impl<'input> Lexer<'input> {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
-                match float.replace("_", "").parse() {
+                match float.replace('_', "").parse() {
                     Ok(float) => {
                         let float = NotNan::new(float).unwrap();
                         Ok((start, Token::FloatLiteral(float), end))
@@ -959,7 +959,7 @@ impl<'input> Lexer<'input> {
                     }),
                 }
             }
-            None | Some(_) => match int.replace("_", "").parse() {
+            None | Some(_) => match int.replace('_', "").parse() {
                 Ok(int) => Ok((start, Token::IntegerLiteral(int), end)),
                 Err(err) => Err(Error::NumericLiteral {
                     start,

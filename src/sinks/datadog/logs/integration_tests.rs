@@ -12,7 +12,7 @@ async fn to_real_v2_endpoint() {
         default_api_key = "atoken"
         compression = "none"
     "#};
-    let api_key = std::env::var("CI_TEST_DATADOG_API_KEY")
+    let api_key = std::env::var("TEST_DATADOG_API_KEY")
         .expect("couldn't find the Datatog api key in environment variables");
     let config = config.replace("atoken", &api_key);
     let (config, cx) = load_sink::<DatadogLogsConfig>(config.as_str()).unwrap();

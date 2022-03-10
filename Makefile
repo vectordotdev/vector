@@ -283,12 +283,31 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
+# nextest doesn't support running doc tests yet so this is split out as
+# `test-docs`
+# https://github.com/nextest-rs/nextest/issues/16
+#
+# criterion doesn't support the flags needed by nextest to run so these are left
+# out for now
+# https://github.com/bheisler/criterion.rs/issues/562
+#
+# `cargo test` lacks support for testing _just_ benches otherwise we'd have
+# a target for that
+# https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches codecs-benches language-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
+
+.PHONY: test-docs
+test-docs: ## Run the docs test suite
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -320,20 +339,8 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
-	test $(shell printenv | grep CI_TEST_DATADOG_API_KEY | wc -l) -gt 0 || exit 1 # make sure the environment is available
+	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
-
-.PHONY: test-integration-kafka
-test-integration-kafka: ## Runs Kafka integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
 
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
@@ -342,7 +349,11 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nats start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
@@ -373,19 +384,19 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 30 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
+	make test-integration-shutdown
+	make test-shutdown-cleanup
+
+test-shutdown-cleanup:
+	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -655,10 +666,6 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
-
-.PHONY: slim-builds
-slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
 
 ifeq (${CI}, true)
 .PHONY: ci-sweep

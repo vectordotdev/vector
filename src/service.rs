@@ -52,7 +52,7 @@ struct InstallOpts {
         env = "VECTOR_CONFIG_DIR",
         use_value_delimiter(true)
     )]
-    pub config_dirs: Vec<PathBuf>,
+    config_dirs: Vec<PathBuf>,
 }
 
 impl InstallOpts {
@@ -74,7 +74,7 @@ impl InstallOpts {
         }
     }
 
-    pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
+    fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
             (&self.config_paths_toml, Some(config::Format::Toml)),
@@ -147,12 +147,12 @@ enum SubCommand {
 }
 
 struct ServiceInfo {
-    pub name: OsString,
-    pub display_name: OsString,
-    pub description: OsString,
+    name: OsString,
+    display_name: OsString,
+    description: OsString,
 
-    pub executable_path: std::path::PathBuf,
-    pub launch_arguments: Vec<OsString>,
+    executable_path: std::path::PathBuf,
+    launch_arguments: Vec<OsString>,
 }
 
 impl Default for ServiceInfo {

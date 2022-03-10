@@ -173,8 +173,8 @@ async fn handle_request(
         }
         Err(error) => {
             emit!(&HttpBadRequest {
-                error_code: error.code(),
-                error_message: error.message(),
+                code: error.code(),
+                message: error.message(),
             });
             Err(warp::reject::custom(error))
         }

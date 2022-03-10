@@ -345,7 +345,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Variant<T, U> {
+pub(crate) enum Variant<T, U> {
     Single {
         target: T,
         expr: Box<U>,
@@ -464,8 +464,8 @@ where
 
 #[derive(Debug, Clone)]
 pub(crate) struct Details {
-    pub type_def: TypeDef,
-    pub value: Option<Value>,
+    pub(crate) type_def: TypeDef,
+    pub(crate) value: Option<Value>,
 }
 
 // -----------------------------------------------------------------------------
@@ -478,7 +478,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
 

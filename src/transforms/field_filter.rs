@@ -74,7 +74,7 @@ impl FunctionTransform for FieldFilter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if event
             .as_log()
-            .get(&self.field_name)
+            .get(self.field_name.as_str())
             .map(|f| f.coerce_to_bytes())
             .map_or(false, |b| b == self.value.as_bytes())
         {

@@ -13,6 +13,7 @@ components: sinks: elasticsearch: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

@@ -75,7 +75,7 @@ impl<'a> FieldsIter<'a> {
                 None => return res,
                 Some(PathComponent::Key(key)) => {
                     if key.contains('.') {
-                        res.push_str(&key.replace(".", "\\."));
+                        res.push_str(&key.replace('.', "\\."));
                     } else {
                         res.push_str(key);
                     }

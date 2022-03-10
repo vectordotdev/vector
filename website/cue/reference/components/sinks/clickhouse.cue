@@ -13,6 +13,7 @@ components: sinks: clickhouse: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

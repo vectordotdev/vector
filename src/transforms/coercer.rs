@@ -77,10 +77,10 @@ impl FunctionTransform for Coercer {
             // conversion.
             let mut new_log = LogEvent::new_with_metadata(log.metadata().clone());
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
+                if let Some(value) = log.remove(field.as_str()) {
                     match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            new_log.insert(field, converted);
+                            new_log.insert(field.as_str(), converted);
                         }
                         Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
@@ -90,10 +90,10 @@ impl FunctionTransform for Coercer {
             return;
         } else {
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
+                if let Some(value) = log.remove(field.as_str()) {
                     match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            log.insert(field, converted);
+                            log.insert(field.as_str(), converted);
                         }
                         Err(error) => emit!(&CoercerConversionError { field, error }),
                     }
@@ -148,7 +148,7 @@ mod tests {
         let coercer = coercer.as_function();
         let mut buf = OutputBuffer::with_capacity(1);
         coercer.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(&metadata, result.metadata());
         result
     }

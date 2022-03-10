@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_metrics: components._aws & {
+components: sinks: aws_cloudwatch_metrics: components._aws_new_sdk & {
 	title: "AWS Cloudwatch Metrics"
 
 	classes: {
@@ -13,6 +13,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

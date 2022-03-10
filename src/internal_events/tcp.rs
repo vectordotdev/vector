@@ -1,7 +1,6 @@
-// ## skip check-events ##
-
 use std::net::IpAddr;
 
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -27,19 +26,33 @@ impl InternalEvent for TcpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionFailed<E> {
+pub struct TcpSocketConnectionError<E> {
     pub error: E,
 }
 
-impl<E> InternalEvent for TcpSocketConnectionFailed<E>
+impl<E> InternalEvent for TcpSocketConnectionError<E>
 where
     E: std::error::Error,
 {
     fn emit_logs(&self) {
-        error!(message = "Unable to connect.", error = %self.error);
+        error!(
+            message = "Unable to connect.",
+            error = %self.error,
+            error_code = "failed_connecting",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
     }
 
     fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_connecting",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
         counter!("connection_failed_total", 1, "mode" => "tcp");
     }
 }
@@ -58,11 +71,11 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionError {
+pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
 }
 
-impl InternalEvent for TcpSocketConnectionError {
+impl InternalEvent for TcpSocketTlsConnectionError {
     fn emit_logs(&self) {
         match self.error {
             // Specific error that occurs when the other side is only
@@ -72,16 +85,33 @@ impl InternalEvent for TcpSocketConnectionError {
                 if source.code() == openssl::ssl::ErrorCode::SYSCALL
                     && source.io_error().is_none() =>
             {
-                debug!(message = "Connection error, probably a healthcheck.", error = %self.error, internal_log_rate_secs = 10);
+                debug!(
+                    message = "Connection error, probably a healthcheck.",
+                    error = %self.error,
+                    internal_log_rate_secs = 10,
+                );
             }
             _ => {
-                warn!(message = "Connection error.", error = %self.error, internal_log_rate_secs = 10)
+                error!(
+                    message = "Connection error.",
+                    error = %self.error,
+                    error_code = "connection_failed",
+                    error_type = error_type::WRITER_FAILED,
+                    stage = error_stage::SENDING,
+                    internal_log_rate_secs = 10,
+                );
             }
         }
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1, "mode" => "tcp");
+        counter!(
+            "connection_errors_total", 1,
+            "error_code" => "connection_failed",
+            "error_type" => "writer_failed",
+            "stage" => error_stage::SENDING,
+            "mode" => "tcp",
+        );
     }
 }
 
@@ -92,11 +122,24 @@ pub struct TcpSocketError {
 
 impl InternalEvent for TcpSocketError {
     fn emit_logs(&self) {
-        warn!(message = "TCP socket error.", error = %self.error);
+        error!(
+            message = "TCP socket error.",
+            error = %self.error,
+            error_code = "socket_failed",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1, "mode" => "tcp");
+        counter!(
+            "connection_errors_total", 1,
+            "error_code" => "socket_failed",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+            "mode" => "tcp",
+        );
     }
 }
 
@@ -107,11 +150,29 @@ pub struct TcpSendAckError {
 
 impl InternalEvent for TcpSendAckError {
     fn emit_logs(&self) {
-        warn!(message = "Error writing acknowledgement, dropping connection.", error = %self.error);
+        error!(
+            message = "Error writing acknowledgement, dropping connection.",
+            error = %self.error,
+            error_code = "ack_failed",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_send_ack_errors_total", 1, "mode" => "tcp");
+        counter!(
+            "connection_errors_total", 1,
+            "error_code" => "ack_failed",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+            "mode" => "tcp",
+        );
+        // deprecated
+        counter!(
+            "connection_send_ack_errors_total", 1,
+            "mode" => "tcp",
+        );
     }
 }
 

@@ -355,20 +355,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-#[cfg(feature = "sources-aws_s3")]
-pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!(message = "Reading zst file.", path = %path.as_ref().display());
-    let mut file = File::open(path).unwrap();
-    let mut zst_bytes = Vec::new();
-    file.read_to_end(&mut zst_bytes).unwrap();
-    let mut output = String::new();
-    zstd::stream::Decoder::new(&zst_bytes[..])
-        .unwrap()
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
-}
-
 pub fn runtime() -> runtime::Runtime {
     runtime::Builder::new_multi_thread()
         .enable_all()

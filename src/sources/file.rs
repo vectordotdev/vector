@@ -396,7 +396,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_stream(&mut messages).instrument(span).await });
+        tokio::spawn(async move { out.send_event_stream(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
@@ -474,7 +474,7 @@ fn create_event(
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
-        event.insert(file_key.clone(), file);
+        event.insert(file_key.as_str(), file);
     }
 
     if let Some(hostname) = &hostname {

@@ -17,6 +17,7 @@ components: sinks: _humio: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
