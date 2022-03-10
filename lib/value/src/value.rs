@@ -27,6 +27,7 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use error::ValueError;
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
 use std::result::Result as StdResult;
@@ -769,6 +770,35 @@ impl Value {
         }
     }
 
+    /// Returns a reference to a field value specified by a path iter.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get_by_path_v2<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
+        let mut value = self;
+        let mut path_iter = path.segment_iter();
+        loop {
+            match (path_iter.next(), value) {
+                (None, _) => return Some(value),
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                    match map.get(key.as_ref()) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
+                    match array.get(index as usize) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                _ => return None,
+            }
+        }
+    }
+
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
@@ -860,6 +890,35 @@ impl Value {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
+            }
+        }
+    }
+
+    /// Get a mutable borrow of the value by path
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get_mut_by_path_v2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
+        let mut value = self;
+        let mut path_iter = path.segment_iter();
+        loop {
+            match (path_iter.next(), value) {
+                (None, value) => return Some(value),
+                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
+                    match map.get_mut(key.as_ref()) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
+                    match array.get_mut(index as usize) {
+                        None => return None,
+                        Some(nested_value) => {
+                            value = nested_value;
+                        }
+                    }
+                }
+                _ => return None,
             }
         }
     }

@@ -140,7 +140,7 @@ pub fn udp(
                                     if let Event::Log(ref mut log) = event {
                                         log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
                                         log.try_insert(log_schema().timestamp_key(), now);
-                                        log.try_insert(host_key.clone(), address.to_string());
+                                        log.try_insert(host_key.as_str(), address.to_string());
                                     }
                                 }
 

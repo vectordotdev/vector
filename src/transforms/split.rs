@@ -103,7 +103,10 @@ impl Split {
 
 impl FunctionTransform for Split {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             for ((name, conversion), value) in self
@@ -113,7 +116,7 @@ impl FunctionTransform for Split {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert(name.clone(), value);
+                        event.as_mut_log().insert(name.as_str(), value);
                     }
                     Err(error) => {
                         emit!(&ParserConversionError { name, error });
@@ -121,7 +124,7 @@ impl FunctionTransform for Split {
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError { field: &self.field });

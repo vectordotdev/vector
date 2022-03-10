@@ -141,7 +141,7 @@ impl KeyValue {
 impl FunctionTransform for KeyValue {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.to_string_lossy());
+        let value = log.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             let pairs = value
@@ -149,9 +149,9 @@ impl FunctionTransform for KeyValue {
                 .filter_map(|pair| self.parse_pair(pair));
 
             if let Some(target_field) = &self.target_field {
-                if log.contains(target_field) {
+                if log.contains(target_field.as_str()) {
                     if self.overwrite_target {
-                        log.remove(target_field);
+                        log.remove(target_field.as_str());
                     } else {
                         emit!(&ParserTargetExistsError { target_field });
                         return output.push(event);
@@ -160,6 +160,11 @@ impl FunctionTransform for KeyValue {
             }
 
             for (mut key, val) in pairs {
+                let path_key = if let Some(target_field) = self.target_field.to_owned() {
+                    format!("{}.\"{}\"", target_field, key)
+                } else {
+                    format!("\"{}\"", key)
+                };
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
@@ -167,19 +172,19 @@ impl FunctionTransform for KeyValue {
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
-                            log.insert(key, value);
+                            log.insert(path_key.as_str(), value);
                         }
                         Err(error) => {
                             emit!(&KeyValueParserError { key, error });
                         }
                     }
                 } else {
-                    log.insert(key, val);
+                    log.insert(path_key.as_str(), val);
                 }
             }
 
             if self.drop_field {
-                log.remove(&self.field);
+                log.remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError {
@@ -383,7 +388,7 @@ mod tests {
         .await;
         assert!(log.contains("foo"));
         assert!(log.contains("bop"));
-        assert!(log.contains("({score})"));
+        assert!(log.contains("\"({score})\""));
     }
 
     #[tokio::test]

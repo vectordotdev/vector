@@ -334,7 +334,7 @@ mod tests {
 
         let timestamp_key = log_schema().timestamp_key().to_string();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(&timestamp_key, now);
+        log.insert(timestamp_key.as_str(), now);
 
         (timestamp_key, timestamp_value)
     }

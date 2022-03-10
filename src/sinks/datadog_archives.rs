@@ -454,7 +454,7 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                 .map(|v| v.to_owned())
                 .collect();
             for path in custom_attributes {
-                if let Some(value) = log_event.remove(&path) {
+                if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);
                 }
             }

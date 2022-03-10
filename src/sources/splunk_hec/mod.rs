@@ -571,7 +571,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     }
 
                     for (key, value) in object {
-                        log.insert(key, value);
+                        log.insert(key.as_str(), value);
                     }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -589,7 +589,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             for (key, value) in object {
-                log.insert(key, value);
+                log.insert(key.as_str(), value);
             }
         }
 

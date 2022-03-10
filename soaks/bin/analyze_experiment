@@ -37,6 +37,9 @@ for exp in bytes_written.experiment.unique():
     baseline = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'baseline')]
     comparison = bytes_written.loc[(bytes_written.experiment == exp) & (bytes_written.variant == 'comparison')]
 
+    assert len(baseline) != 0, "[{}] Baseline has zero samples, unrecoverable failure.".format(exp)
+    assert len(comparison) != 0, "[{}] Comparison has zero samples, unrecoverable failure.".format(exp)
+
     baseline_mean = baseline.throughput.mean()
     baseline_stdev = baseline.throughput.std()
     baseline_stderr = scipy.stats.sem(baseline.throughput)
