@@ -3,6 +3,7 @@ use aws_sdk_cloudwatchlogs::error::{
 };
 use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use std::{
     collections::HashMap,
     fmt,
@@ -118,7 +119,7 @@ impl DriverResponse for CloudwatchResponse {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {
+    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudwatchLogsClient) -> Self {
         let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
 
         Self {

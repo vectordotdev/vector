@@ -10,6 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::{future::BoxFuture, ready, FutureExt};
 use tokio::sync::oneshot;
@@ -31,13 +32,13 @@ struct Client {
     group_name: String,
 }
 
-type ClientResult<T, E> = BoxFuture<'static, SdkError<T, E>>;
+type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E>>>;
 
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
     CreateStream(ClientResult<(), CreateLogStreamError>),
-    DescribeStream(ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError>),
-    Put(ClientResult<PutLogEventsResponse, PutLogEventsError>),
+    DescribeStream(ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError>),
+    Put(ClientResult<PutLogEventsOutput, PutLogEventsError>),
 }
 
 impl CloudwatchFuture {
@@ -192,49 +193,57 @@ impl Client {
         &self,
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
-    ) -> ClientResult<PutLogEventsResponse, PutLogEventsError> {
-        let request = PutLogEventsRequest {
-            log_events,
-            sequence_token,
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
-
+    ) -> ClientResult<PutLogEventsOutput, PutLogEventsError> {
         let client = self.client.clone();
-        Box::pin(async move { client.put_log_events(request).await })
+        Box::pin(async move {
+            client
+                .put_log_events()
+                .set_log_events(Some(log_events))
+                .sequence_token(sequence_token)
+                .log_group_name(&self.group_name)
+                .log_stream_name(&self.stream_name)
+                .send()
+                .await
+        })
     }
 
     pub fn describe_stream(
         &self,
-    ) -> ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError> {
-        let request = DescribeLogStreamsRequest {
-            limit: Some(1),
-            log_group_name: self.group_name.clone(),
-            log_stream_name_prefix: Some(self.stream_name.clone()),
-            ..Default::default()
-        };
-
+    ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
         let client = self.client.clone();
-        Box::pin(async move { client.describe_log_streams(request).await })
+        Box::pin(async move {
+            client
+                .describe_log_streams()
+                .limit(1)
+                .log_group_name(&self.group_name)
+                .log_stream_name_prefix(&self.stream_name)
+                .send()
+                .await
+        })
     }
 
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
-        let request = CreateLogGroupRequest {
-            log_group_name: self.group_name.clone(),
-            ..Default::default()
-        };
-
         let client = self.client.clone();
-        Box::pin(async move { client.create_log_group(request).await })
+        Box::pin(async move {
+            client
+                .create_log_group()
+                .log_group_name(&self.group_name)
+                .send()
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
-        let request = CreateLogStreamRequest {
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
-
         let client = self.client.clone();
-        Box::pin(async move { client.create_log_stream(request).await })
+        Box::pin(async move {
+            client
+                .create_log_stream()
+                .log_group_name(&self.group_name)
+                .log_stream_name(&self.stream_name)
+                .send()
+                .await?;
+            Ok(())
+        })
     }
 }
