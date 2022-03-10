@@ -214,13 +214,15 @@ impl Client {
         log_events: Vec<InputLogEvent>,
     ) -> ClientResult<PutLogEventsOutput, PutLogEventsError> {
         let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
         Box::pin(async move {
             client
                 .put_log_events()
                 .set_log_events(Some(log_events))
                 .set_sequence_token(sequence_token)
-                .log_group_name(&self.group_name)
-                .log_stream_name(&self.stream_name)
+                .log_group_name(group_name)
+                .log_stream_name(stream_name)
                 .send()
                 .await
         })
@@ -230,12 +232,14 @@ impl Client {
         &self,
     ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
         let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
         Box::pin(async move {
             client
                 .describe_log_streams()
                 .limit(1)
-                .log_group_name(self.group_name.clone())
-                .log_stream_name_prefix(self.stream_name.clone())
+                .log_group_name(group_name)
+                .log_stream_name_prefix(stream_name)
                 .send()
                 .await
         })
@@ -243,10 +247,11 @@ impl Client {
 
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
+        let group_name = self.group_name.clone();
         Box::pin(async move {
             client
                 .create_log_group()
-                .log_group_name(&self.group_name)
+                .log_group_name(group_name)
                 .send()
                 .await?;
             Ok(())
@@ -255,11 +260,13 @@ impl Client {
 
     pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
         let client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
         Box::pin(async move {
             client
                 .create_log_stream()
-                .log_group_name(&self.group_name)
-                .log_stream_name(&self.stream_name)
+                .log_group_name(group_name)
+                .log_stream_name(stream_name)
                 .send()
                 .await?;
             Ok(())

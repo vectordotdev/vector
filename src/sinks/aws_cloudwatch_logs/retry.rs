@@ -1,6 +1,7 @@
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatchlogs::error::{
-    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError, PutLogEventsErrorKind,
+    CreateLogStreamErrorKind, DescribeLogStreamsError, DescribeLogStreamsErrorKind,
+    PutLogEventsError, PutLogEventsErrorKind,
 };
 use std::marker::PhantomData;
 
@@ -50,9 +51,11 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = &body[..body.len().min(50)];
+                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
                         error!(message = "Put logs HTTP error.", status = %status, body = %truncated_body);
                         true
+                    } else {
+                        false
                     }
                 }
                 SdkError::ConstructionFailure(_) => false,
@@ -75,15 +78,18 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = &body[..body.len().min(50)];
+                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
                         error!(message = "Describe streams HTTP error.", status = %status, body = %truncated_body);
                         true
+                    } else {
+                        false
                     }
                 }
+                SdkError::ConstructionFailure(_) => false,
             },
             CloudwatchError::CreateStream(err) => match err {
                 SdkError::ServiceError { err, raw } => match err.kind {
-                    DescribeLogStreamsErrorKind::ServiceUnavailableException(_) => {
+                    CreateLogStreamErrorKind::ServiceUnavailableException(_) => {
                         error!(message = "Create stream service unavailable.", %error);
                         true
                     }
@@ -98,11 +104,14 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = &body[..body.len().min(50)];
+                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
                         error!(message = "Create stream HTTP error.", status = %status, body = %truncated_body);
                         true
+                    } else {
+                        false
                     }
                 }
+                SdkError::ConstructionFailure(_) => false,
             },
             _ => false,
         }
