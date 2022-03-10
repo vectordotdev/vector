@@ -65,6 +65,8 @@ const getExampleValue = (param, deepFilter) => {
             }
           }
         });
+      } else {
+        value = getValue(p);
       }
     } else {
       value = getValue(p);

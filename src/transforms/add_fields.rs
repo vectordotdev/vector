@@ -127,13 +127,17 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key_string, value).is_some() {
+                if event
+                    .as_mut_log()
+                    .insert(key_string.as_str(), value)
+                    .is_some()
+                {
                     emit!(&AddFieldsFieldOverwritten { field: &key });
                 }
-            } else if event.as_mut_log().contains(&key_string) {
+            } else if event.as_mut_log().contains(key_string.as_str()) {
                 emit!(&AddFieldsFieldNotOverwritten { field: &key });
             } else {
-                event.as_mut_log().insert(&key_string, value);
+                event.as_mut_log().insert(key_string.as_str(), value);
             }
         }
 

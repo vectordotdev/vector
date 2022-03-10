@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_sdk_cloudwatch::error::{PutMetricDataError, PutMetricDataErrorKind};
+use aws_sdk_cloudwatch::error::PutMetricDataError;
 use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
@@ -15,9 +15,11 @@ use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
+use crate::aws::aws_sdk::is_retriable_error;
+use crate::aws::RegionOrEndpoint;
 use crate::http::build_proxy_connector;
 use crate::{
-    aws::{auth::AwsAuthentication, rusoto::RegionOrEndpoint},
+    aws::auth::AwsAuthentication,
     config::{
         AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
@@ -306,12 +308,7 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            SdkError::ServiceError { err, raw: _ } => {
-                matches!(err.kind, PutMetricDataErrorKind::InternalServiceFault(_))
-            }
-            _ => false,
-        }
+        is_retriable_error(error)
     }
 }
 
