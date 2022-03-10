@@ -218,7 +218,7 @@ impl Client {
             client
                 .put_log_events()
                 .set_log_events(Some(log_events))
-                .sequence_token(sequence_token)
+                .set_sequence_token(sequence_token)
                 .log_group_name(&self.group_name)
                 .log_stream_name(&self.stream_name)
                 .send()
@@ -234,8 +234,8 @@ impl Client {
             client
                 .describe_log_streams()
                 .limit(1)
-                .log_group_name(&self.group_name)
-                .log_stream_name_prefix(&self.stream_name)
+                .log_group_name(self.group_name.clone())
+                .log_stream_name_prefix(self.stream_name.clone())
                 .send()
                 .await
         })
