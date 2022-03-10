@@ -221,7 +221,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -252,7 +252,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -290,7 +290,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
