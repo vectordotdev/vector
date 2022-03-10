@@ -1,7 +1,7 @@
-use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatchlogs::error::{
     CreateLogStreamErrorKind, DescribeLogStreamsErrorKind, PutLogEventsErrorKind,
 };
+use aws_sdk_cloudwatchlogs::types::SdkError;
 use std::marker::PhantomData;
 
 use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
