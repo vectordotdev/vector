@@ -27,9 +27,9 @@ impl RetryLogic for LokiRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            LokiError::ServerError { code } => match code {
-                &StatusCode::TOO_MANY_REQUESTS => true,
-                &StatusCode::NOT_IMPLEMENTED => false,
+            LokiError::ServerError { code } => match *code {
+                StatusCode::TOO_MANY_REQUESTS => true,
+                StatusCode::NOT_IMPLEMENTED => false,
                 _ if code.is_server_error() => true,
                 _ => false,
             },
