@@ -50,12 +50,25 @@ impl Expression for Block {
     fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let mut jumps = Vec::new();
 
-        for expr in &self.inner {
+        // An empty block should resolve to Null.
+        if self.inner.is_empty() {
+            let null = vm.add_constant(Value::Null);
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(null);
+        }
+
+        let mut expressions = self.inner.iter().peekable();
+
+        while let Some(expr) = expressions.next() {
             // Write each of the inner expressions
             expr.compile_to_vm(vm)?;
 
-            // If there is an error, we need to jump to the end of the block.
-            jumps.push(vm.emit_jump(OpCode::JumpIfErr));
+            if expressions.peek().is_some() {
+                // At the end of each statement (apart from the last one) we need to clean up
+                // This involves popping the value remaining on the stack, and jumping to the end
+                // of the block if we are in error.
+                jumps.push(vm.emit_jump(OpCode::EndStatement));
+            }
         }
 
         // Update all the jumps to jump to the end of the block.

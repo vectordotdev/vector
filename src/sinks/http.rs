@@ -642,7 +642,7 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
+        .replace("$IN_ADDR", &in_addr.to_string());
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();

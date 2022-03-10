@@ -1175,7 +1175,7 @@ mod tests {
 
     impl Partition<Bytes> for (usize, usize) {
         fn partition(&self) -> Bytes {
-            format!("{}", self.0).into()
+            self.0.to_string().into()
         }
     }
 
