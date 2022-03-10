@@ -595,6 +595,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-cloudwatch"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8196fee59818e0097765fce8ed5fb824be526a4b5e33ae3c4d173059828cb1"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-query",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-sqs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6114,20 +6137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusoto_cloudwatch"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b42eaedbdf15b452446aa00aee94230c41443673985807f1c12fb1fb1cc5799"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde_urlencoded 0.7.0",
- "xml-rs",
-]
-
-[[package]]
 name = "rusoto_core"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8442,8 +8451,10 @@ dependencies = [
  "atty",
  "avro-rs",
  "aws-config",
+ "aws-sdk-cloudwatch",
  "aws-sdk-sqs",
  "aws-smithy-client",
+ "aws-smithy-http",
  "aws-types",
  "azure_core",
  "azure_storage",
@@ -8540,7 +8551,6 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "roaring",
- "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
  "rusoto_es",
