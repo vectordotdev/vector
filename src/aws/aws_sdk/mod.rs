@@ -1,7 +1,6 @@
 use aws_smithy_client::SdkError;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
-// use std::str::FromStr;
 
 mod auth;
 mod region;
