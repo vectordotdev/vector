@@ -140,7 +140,6 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Rusoto
-rusoto_cloudwatch = { version = "0.47.0", optional = true }
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
 rusoto_es = { version = "0.47.0", optional = true }
@@ -156,7 +155,9 @@ rusoto_sts = { version = "0.47.0", optional = true }
 aws-config = { version = "0.8.0", optional = true }
 aws-types = { version = "0.8.0", optional = true, features = ["hardcoded-credentials"]}
 aws-sdk-sqs = { version = "0.8.0", optional = true }
+aws-sdk-cloudwatch = { version = "0.8.0", optional = true }
 aws-smithy-client = { version = "0.38.0", optional = true }
+aws-smithy-http = { version = "0.38.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -401,6 +402,13 @@ api-client = [
   "vector-api-client",
 ]
 
+aws-core = [
+  "aws-config",
+  "aws-types",
+  "aws-smithy-client",
+  "aws-smithy-http"
+]
+
 # Anything that requires Protocol Buffers.
 protobuf-build = ["tonic-build", "prost-build"]
 
@@ -456,7 +464,7 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "async-compression"]
-sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs", "aws-smithy-client"]
+sources-aws_sqs = ["aws-core", "aws-sdk-sqs", "codecs"]
 sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "codecs", "value"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
@@ -635,7 +643,7 @@ sinks-metrics = [
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
-sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
+sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]

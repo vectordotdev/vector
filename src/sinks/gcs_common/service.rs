@@ -117,7 +117,7 @@ impl Service<GcsRequest> for GcsService {
         headers.insert("content-type", settings.content_type);
         headers.insert(
             "content-length",
-            HeaderValue::from_str(&format!("{}", request.body.len())).unwrap(),
+            HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
         settings
             .content_encoding
