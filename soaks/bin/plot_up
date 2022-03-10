@@ -18,7 +18,7 @@ args = parser.parse_args()
 
 up = pd.concat(common.open_captures(args.capture_dir,
                                     'up',
-                                    unwanted_labels=['metric_name', 'metric_kind', 'target', 'time']))
+                                    unwanted_labels=['metric_name', 'metric_kind', 'time']))
 
 for exp in up.experiment.unique():
     print(exp)
@@ -26,7 +26,7 @@ for exp in up.experiment.unique():
 
     pathlib.Path(os.path.join(args.output_dir, "{}".format(exp))).mkdir(parents=True, exist_ok=True)
 
-    data = up[up.experiment == exp].sort_values(by=['variant']).reset_index()
+    data = up[(up.experiment == exp) & (up.target == "vector")].sort_values(by=['variant']).reset_index()
     print(data)
 
     sns.scatterplot(data=data,
