@@ -23,7 +23,7 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     controller.reset();
 
     for idx in 0..cardinality {
-        metrics::counter!("test", 1, "idx" => format!("{}", idx));
+        metrics::counter!("test", 1, "idx" => idx.to_string());
     }
 
     controller

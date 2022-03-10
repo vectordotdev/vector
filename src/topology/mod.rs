@@ -9,7 +9,6 @@
 pub(super) use vector_core::fanout;
 
 pub mod builder;
-pub(self) mod ready_events;
 mod running;
 mod schema;
 mod task;

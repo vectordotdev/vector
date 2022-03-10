@@ -5,3 +5,5 @@ if ($env:CI -ne $null) {
 } else {
     $env:Path += ";$HOME\.cargo\bin"
 }
+
+rustup run stable cargo install cargo-nextest --version 0.9.8

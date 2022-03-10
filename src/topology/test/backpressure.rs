@@ -15,10 +15,6 @@ use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
 pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
-// The implementation of `LimitedSender` uses a holding slot in order to accept an item before
-// trying to drive the send of the item, so we have to account for that here.
-pub const EXTRA_LIMITED_QUEUE_SEND_SLOT: usize = 1;
-
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
 #[tokio::test]
@@ -29,7 +25,6 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -51,7 +46,7 @@ async fn serial_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Acquire);
 
@@ -68,7 +63,6 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -98,7 +92,7 @@ async fn default_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -116,7 +110,6 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -152,7 +145,7 @@ async fn buffer_drop_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -169,22 +162,20 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + EXTRA_LIMITED_QUEUE_SEND_SLOT
         + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
-    let source_counter_1 = Arc::new(AtomicUsize::new(0));
-    let source_counter_2 = Arc::new(AtomicUsize::new(0));
+    let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source(
         "in1",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_1),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_source(
         "in2",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_2),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -198,13 +189,18 @@ async fn multiple_inputs_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
-    let sourced_events_1 = source_counter_1.load(Ordering::Relaxed);
-    let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
-    let sourced_events_sum = sourced_events_1 + sourced_events_2;
+    let sourced_events_sum = source_counter.load(Ordering::Relaxed);
 
     assert_eq!(sourced_events_sum, expected_sourced_events);
+}
+
+// Wait until the source has sent at least the expected number of events, plus a small additional
+// margin to ensure we allow it to run over the expected amount if it's going to.
+async fn wait_until_expected(source_counter: impl AsRef<AtomicUsize>, expected: usize) {
+    crate::test_util::wait_for_atomic_usize(source_counter, |count| count >= expected).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 }
 
 mod test_sink {
@@ -286,8 +282,15 @@ mod test_source {
             let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
-                    let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
+                    let _result = cx.out.send_event(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::AcqRel);
+                    // Place ourselves at the back of tokio's task queue, giving downstream
+                    // components a chance to process the event we just sent before sending more.
+                    // This helps the backpressure tests behave more deterministically when we use
+                    // opportunistic batching at the topology level. Yielding here makes it very
+                    // unlikely that a `ready_chunks` or similar will have a chance to see more
+                    // than one event available at a time.
+                    tokio::task::yield_now().await;
                 }
                 Ok(())
             }

@@ -70,6 +70,6 @@ impl Log {
 
     /// Get JSON field data on the log event, by field name
     async fn json(&self, field: String) -> Option<&Value> {
-        self.event.get(field)
+        self.event.get(field.as_str())
     }
 }

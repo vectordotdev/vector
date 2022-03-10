@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt};
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
@@ -27,7 +27,6 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
-    ready_events::ReadyEventsExt,
     schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -156,11 +155,13 @@ pub async fn build_pieces(
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
         for output in source_outputs {
-            let rx = builder.add_output(output.clone());
+            let mut rx = builder.add_output(output.clone());
 
-            let (fanout, control) = Fanout::new();
+            let (mut fanout, control) = Fanout::new();
             let pump = async move {
-                rx.map(EventArray::from).map(Ok).forward(fanout).await?;
+                while let Some(array) = rx.next().await {
+                    fanout.send(array).await;
+                }
                 Ok(TaskOutput::Source)
             };
 
@@ -591,8 +592,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(INLINE_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -606,16 +606,11 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
-        // try to balance out the increased overhead of spawning tasks
-        const CONCURRENT_BATCH_SIZE: usize = 1024;
-
         let mut input_rx = self
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(CONCURRENT_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -675,7 +670,7 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (fanout, control) = Fanout::new();
+    let (mut fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
@@ -687,7 +682,7 @@ fn build_task_transform(
                 byte_size: events.size_of(),
             })
         });
-    let transform = t
+    let stream = t
         .transform(Box::pin(filtered))
         .inspect(|events: &EventArray| {
             emit!(&EventsSent {
@@ -695,14 +690,13 @@ fn build_task_transform(
                 byte_size: events.size_of(),
                 output: None,
             });
-        })
-        .map(Ok)
-        .forward(fanout)
-        .boxed()
-        .map_ok(|_| {
-            debug!("Finished.");
-            TaskOutput::Transform
         });
+    let transform = async move {
+        fanout.send_stream(stream).await;
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
+    }
+    .boxed();
 
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);

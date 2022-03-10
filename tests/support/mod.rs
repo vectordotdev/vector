@@ -31,19 +31,20 @@ use vector::{
         SourceContext, TransformConfig, TransformContext,
     },
     event::{
+        into_event_stream,
         metric::{self, MetricData, MetricValue},
-        Event, Value,
+        Event, EventArray, EventContainer, Value,
     },
     schema,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
-    source_sender::{ReceiverStream, SourceSender},
+    source_sender::SourceSender,
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::Acker;
+use vector_buffers::{topology::channel::LimitedReceiver, Acker};
 
-pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) {
+pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
@@ -52,7 +53,7 @@ pub fn sink(channel_size: usize) -> (impl Stream<Item = Event>, MockSinkConfig) 
 pub fn sink_with_data(
     channel_size: usize,
     data: &str,
-) -> (impl Stream<Item = Event>, MockSinkConfig) {
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new_with_data(tx, true, data);
     (rx, sink)
@@ -60,7 +61,7 @@ pub fn sink_with_data(
 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
-) -> (impl Stream<Item = Event>, MockSinkConfig) {
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
@@ -123,7 +124,7 @@ pub fn create_directory() -> PathBuf {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
     #[serde(skip)]
-    receiver: Arc<Mutex<Option<ReceiverStream<Event>>>>,
+    receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
@@ -133,7 +134,7 @@ pub struct MockSourceConfig {
 }
 
 impl MockSourceConfig {
-    pub fn new(receiver: ReceiverStream<Event>) -> Self {
+    pub fn new(receiver: LimitedReceiver<EventArray>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -142,7 +143,7 @@ impl MockSourceConfig {
         }
     }
 
-    pub fn new_with_data(receiver: ReceiverStream<Event>, data: &str) -> Self {
+    pub fn new_with_data(receiver: LimitedReceiver<EventArray>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
@@ -152,7 +153,7 @@ impl MockSourceConfig {
     }
 
     pub fn new_with_event_counter(
-        receiver: ReceiverStream<Event>,
+        receiver: LimitedReceiver<EventArray>,
         event_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {
@@ -193,13 +194,14 @@ impl SourceConfig for MockSourceConfig {
 
                 recv.poll_next_unpin(cx)
             })
-            .inspect(move |_| {
+            .inspect(move |array| {
                 if let Some(counter) = &event_counter {
-                    counter.fetch_add(1, Ordering::Relaxed);
+                    counter.fetch_add(array.len(), Ordering::Relaxed);
                 }
-            });
+            })
+            .flat_map(into_event_stream);
 
-            match out.send_stream(&mut stream).await {
+            match out.send_event_stream(&mut stream).await {
                 Ok(()) => {
                     info!("Finished sending.");
                     Ok(())
@@ -425,7 +427,7 @@ impl StreamSink<Event> for MockSink {
             Mode::Normal(mut sink) => {
                 // We have an inner sink, so forward the input normally
                 while let Some(event) = input.next().await {
-                    if let Err(error) = sink.send(event).await {
+                    if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
 

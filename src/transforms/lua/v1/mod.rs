@@ -196,23 +196,27 @@ impl mlua::UserData for LuaEvent {
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key,
+                            key.as_str(),
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
                     Some(mlua::Value::Integer(integer)) => {
-                        this.inner.as_mut_log().insert(key, Value::Integer(integer));
+                        this.inner
+                            .as_mut_log()
+                            .insert(key.as_str(), Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) if !number.is_nan() => {
                         this.inner
                             .as_mut_log()
-                            .insert(key, Value::Float(NotNan::new(number).unwrap()));
+                            .insert(key.as_str(), Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
-                        this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
+                        this.inner
+                            .as_mut_log()
+                            .insert(key.as_str(), Value::Boolean(boolean));
                     }
                     Some(mlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(key);
+                        this.inner.as_mut_log().remove(key.as_str());
                     }
                     _ => {
                         info!(
@@ -221,7 +225,7 @@ impl mlua::UserData for LuaEvent {
                             field = key.as_str(),
                             internal_log_rate_secs = 30
                         );
-                        this.inner.as_mut_log().remove(key);
+                        this.inner.as_mut_log().remove(key.as_str());
                     }
                 }
 
@@ -230,7 +234,7 @@ impl mlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
-            if let Some(value) = this.inner.as_log().get(key) {
+            if let Some(value) = this.inner.as_log().get(key.as_str()) {
                 let string = lua.create_string(&value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {
@@ -251,7 +255,10 @@ impl mlua::UserData for LuaEvent {
                     let keys: mlua::Table = state.raw_get("keys")?;
                     let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key.clone().and_then(|k| event.inner.as_log().get(k)) {
+                    match key
+                        .clone()
+                        .and_then(|k| event.inner.as_log().get(k.as_str()))
+                    {
                         Some(value) => {
                             Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
                         }
@@ -527,7 +534,7 @@ mod tests {
               local M = {{}}
 
               local function modify(event2)
-                event2["new field"] = "new value"
+                event2["\"new field\""] = "new value"
               end
               M.modify = modify
 
@@ -546,8 +553,7 @@ mod tests {
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
         let event = Event::new_empty_log();
         let event = transform.transform_one(event).unwrap();
-
-        assert_eq!(event.as_log()["new field"], "new value".into());
+        assert_eq!(event.as_log()["\"new field\""], "new value".into());
     }
 
     #[test]

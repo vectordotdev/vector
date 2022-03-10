@@ -5,16 +5,16 @@ use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -110,12 +110,12 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for ClickhouseConfig {
-    type Input = BytesMut;
-    type Output = BytesMut;
+pub struct ClickhouseEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<BytesMut> for ClickhouseEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
@@ -123,6 +123,19 @@ impl HttpSink for ClickhouseConfig {
         body.put_u8(b'\n');
 
         Some(body)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for ClickhouseConfig {
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = ClickhouseEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        ClickhouseEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {

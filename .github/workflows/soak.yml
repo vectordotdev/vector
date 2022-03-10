@@ -141,7 +141,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -186,7 +186,7 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -287,12 +287,12 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10.1"
+          python-version: "3.10.2"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -373,12 +373,12 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10.1"
+          python-version: "3.10.2"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -413,12 +413,12 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10.1"
+          python-version: "3.10.2"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -455,20 +455,6 @@ jobs:
           name: pr-number
           path: /tmp/pr.txt
 
-      - name: Read analysis file
-        id: read-analysis
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
-
-      - name: Post Results To PR
-        uses: peter-evans/create-or-update-comment@v1
-        continue-on-error: true
-        with:
-          issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
-          edit-mode: replace
-          body: ${{ steps.read-analysis.outputs.content }}
-
   detect-regressions:
     name: Regression analysis
     runs-on: ubuntu-20.04
@@ -481,12 +467,12 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10.1"
+          python-version: "3.10.2"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install scipy==1.7.* pandas==1.3.* tabulate==0.8.*
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -519,12 +505,12 @@ jobs:
       - name: Set up Python3
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10.1"
+          python-version: "3.10.2"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install scipy==1.7.* pandas==1.3.* seaborn==0.11.* tabulate==0.8.*
+          pip install scipy==1.8.* pandas==1.4.* seaborn==0.11.* tabulate==0.8.*
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -544,6 +530,12 @@ jobs:
           ./soaks/bin/plot_analysis --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                     --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
+
+      - name: Plot up analysis
+        run: |
+          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
+          ./soaks/bin/plot_up --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+                              --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
 
       - name: Upload plots
         uses: actions/upload-artifact@v1

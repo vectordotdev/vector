@@ -1,26 +1,25 @@
 use std::{
     collections::BTreeMap,
-    convert::TryInto,
     num::NonZeroU64,
     task::{Context, Poll},
 };
 
-use chrono::{DateTime, SecondsFormat, Utc};
+use aws_sdk_cloudwatch::error::PutMetricDataError;
+use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
+use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
+use aws_sdk_cloudwatch::types::SdkError;
+use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use rusoto_cloudwatch::{
-    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
-};
-use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
+use crate::aws::aws_sdk::is_retriable_error;
+use crate::aws::RegionOrEndpoint;
+use crate::http::build_proxy_connector;
 use crate::{
-    aws::{
-        auth::AwsAuthentication,
-        rusoto::{self, RegionOrEndpoint},
-    },
+    aws::auth::AwsAuthentication,
     config::{
         AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
@@ -35,12 +34,12 @@ use crate::{
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::{MaybeTlsSettings, TlsOptions},
 };
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
-    client: CloudWatchClient,
+    client: CloudwatchClient,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -91,7 +90,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, healthcheck))
@@ -111,48 +110,61 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
 }
 
 impl CloudWatchMetricsSinkConfig {
-    async fn healthcheck(self, client: CloudWatchClient) -> crate::Result<()> {
-        let datum = MetricDatum {
-            metric_name: "healthcheck".into(),
-            value: Some(1.0),
-            ..Default::default()
-        };
-        let request = PutMetricDataInput {
-            namespace: self.default_namespace.clone(),
-            metric_data: vec![datum],
-        };
+    async fn healthcheck(self, client: CloudwatchClient) -> crate::Result<()> {
+        let _result = client
+            .put_metric_data()
+            .metric_data(
+                MetricDatum::builder()
+                    .metric_name("healthcheck")
+                    .value(1.0)
+                    .build(),
+            )
+            .namespace(&self.default_namespace)
+            .send()
+            .await?;
 
-        client.put_metric_data(request).await.map_err(Into::into)
+        Ok(())
     }
 
-    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchClient> {
-        let region = (&self.region).try_into()?;
+    async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchClient> {
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            match region {
-                Region::Custom { endpoint, .. } => Region::Custom {
-                    name: "us-east-1".into(),
-                    endpoint,
-                },
-                _ => panic!("Only Custom regions are supported for CloudWatchClient testing"),
-            }
+            Some(Region::new("us-east-1"))
         } else {
-            region
+            self.region.region()
         };
 
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
+        let mut config_builder = aws_sdk_cloudwatch::config::Builder::new()
+            .credentials_provider(self.auth.credentials_provider().await?);
 
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(CloudWatchClient::new_with_client(client, region))
+        if let Some(endpont_override) = self.region.endpoint()? {
+            config_builder = config_builder.endpoint_resolver(endpont_override);
+        }
+
+        if let Some(region) = region {
+            config_builder = config_builder.region(region);
+        }
+
+        if proxy.enabled {
+            let tls_settings = MaybeTlsSettings::enable_client()?;
+            let proxy = build_proxy_connector(tls_settings, proxy)?;
+            let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+            let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
+            let client =
+                aws_sdk_cloudwatch::Client::from_conf_conn(config_builder.build(), connector);
+            Ok(client)
+        } else {
+            Ok(aws_sdk_cloudwatch::Client::from_conf(
+                config_builder.build(),
+            ))
+        }
     }
 }
 
 impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
-        client: CloudWatchClient,
+        client: CloudwatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
@@ -196,42 +208,49 @@ impl CloudWatchMetricsSvc {
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
-                let timestamp = event.timestamp().map(timestamp_to_string);
+                // let timestamp = event.timestamp().map(timestamp_to_string);
+                let timestamp = event
+                    .timestamp()
+                    .map(|x| AwsDateTime::from_millis(x.timestamp_millis()));
                 let dimensions = event.tags().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.value() {
-                    MetricValue::Counter { value } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(*value),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
+                    MetricValue::Counter { value } => Some(
+                        MetricDatum::builder()
+                            .metric_name(metric_name)
+                            .value(*value)
+                            .set_timestamp(timestamp)
+                            .set_dimensions(dimensions)
+                            .build(),
+                    ),
                     MetricValue::Distribution {
                         samples,
                         statistic: _,
-                    } => Some(MetricDatum {
-                        metric_name,
-                        values: Some(samples.iter().map(|s| s.value).collect()),
-                        counts: Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::Set { values } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(values.len() as f64),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::Gauge { value } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(*value),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
+                    } => Some(
+                        MetricDatum::builder()
+                            .metric_name(metric_name)
+                            .set_values(Some(samples.iter().map(|s| s.value).collect()))
+                            .set_counts(Some(samples.iter().map(|s| s.rate as f64).collect()))
+                            .set_timestamp(timestamp)
+                            .set_dimensions(dimensions)
+                            .build(),
+                    ),
+                    MetricValue::Set { values } => Some(
+                        MetricDatum::builder()
+                            .metric_name(metric_name)
+                            .value(values.len() as f64)
+                            .set_timestamp(timestamp)
+                            .set_dimensions(dimensions)
+                            .build(),
+                    ),
+                    MetricValue::Gauge { value } => Some(
+                        MetricDatum::builder()
+                            .metric_name(metric_name)
+                            .value(*value)
+                            .set_timestamp(timestamp)
+                            .set_dimensions(dimensions)
+                            .build(),
+                    ),
                     _ => None,
                 }
             })
@@ -253,7 +272,7 @@ impl MetricNormalize for AwsCloudwatchMetricNormalize {
 
 impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc {
     type Response = ();
-    type Error = RusotoError<PutMetricDataError>;
+    type Error = SdkError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -267,14 +286,17 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
             return future::ok(()).boxed();
         }
 
-        let input = PutMetricDataInput {
-            metric_data,
-            namespace,
-        };
-
-        debug!(message = "Sending data.", input = ?input);
         let client = self.client.clone();
-        Box::pin(async move { client.put_metric_data(input).await })
+
+        Box::pin(async move {
+            client
+                .put_metric_data()
+                .namespace(namespace)
+                .set_metric_data(Some(metric_data))
+                .send()
+                .await?;
+            Ok(())
+        })
     }
 }
 
@@ -282,39 +304,39 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
 struct CloudWatchMetricsRetryLogic;
 
 impl RetryLogic for CloudWatchMetricsRetryLogic {
-    type Error = RusotoError<PutMetricDataError>;
+    type Error = SdkError<PutMetricDataError>;
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
-            error => rusoto::is_retriable_error(error),
-        }
+        is_retriable_error(error)
     }
-}
-
-fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
 fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)
-        .map(|(k, v)| Dimension {
-            name: k.to_string(),
-            value: v.to_string(),
-        })
+        .map(|(k, v)| Dimension::builder().name(k).value(v).build())
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use aws_sdk_cloudwatch::types::DateTime;
     use chrono::offset::TimeZone;
+    use chrono::Utc;
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+
+    fn timestamp(time: &str) -> DateTime {
+        DateTime::from_millis(
+            chrono::DateTime::parse_from_rfc3339(time)
+                .unwrap()
+                .timestamp_millis(),
+        )
+    }
 
     #[test]
     fn generate_config() {
@@ -329,14 +351,17 @@ mod tests {
         }
     }
 
-    fn svc() -> CloudWatchMetricsSvc {
+    async fn svc() -> CloudWatchMetricsSvc {
         let config = config();
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
+        let client = config
+            .create_client(&ProxyConfig::from_env())
+            .await
+            .unwrap();
         CloudWatchMetricsSvc { client }
     }
 
-    #[test]
-    fn encode_events_basic_counter() {
+    #[tokio::test]
+    async fn encode_events_basic_counter() {
         let events = vec![
             Metric::new(
                 "exception_total",
@@ -367,35 +392,29 @@ mod tests {
         ];
 
         assert_eq!(
-            svc().encode_events(events),
+            svc().await.encode_events(events),
             vec![
-                MetricDatum {
-                    metric_name: "exception_total".into(),
-                    value: Some(1.0),
-                    ..Default::default()
-                },
-                MetricDatum {
-                    metric_name: "bytes_out".into(),
-                    value: Some(2.5),
-                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                    ..Default::default()
-                },
-                MetricDatum {
-                    metric_name: "healthcheck".into(),
-                    value: Some(1.0),
-                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                    dimensions: Some(vec![Dimension {
-                        name: "region".into(),
-                        value: "local".into()
-                    }]),
-                    ..Default::default()
-                },
+                MetricDatum::builder()
+                    .metric_name("exception_total")
+                    .value(1.0)
+                    .build(),
+                MetricDatum::builder()
+                    .metric_name("bytes_out")
+                    .value(2.5)
+                    .timestamp(timestamp("2018-11-14T08:09:10.123Z"))
+                    .build(),
+                MetricDatum::builder()
+                    .metric_name("healthcheck")
+                    .value(1.0)
+                    .timestamp(timestamp("2018-11-14T08:09:10.123Z"))
+                    .dimensions(Dimension::builder().name("region").value("local").build())
+                    .build()
             ]
         );
     }
 
-    #[test]
-    fn encode_events_absolute_gauge() {
+    #[tokio::test]
+    async fn encode_events_absolute_gauge() {
         let events = vec![Metric::new(
             "temperature",
             MetricKind::Absolute,
@@ -403,17 +422,16 @@ mod tests {
         )];
 
         assert_eq!(
-            svc().encode_events(events),
-            vec![MetricDatum {
-                metric_name: "temperature".into(),
-                value: Some(10.0),
-                ..Default::default()
-            }]
+            svc().await.encode_events(events),
+            vec![MetricDatum::builder()
+                .metric_name("temperature")
+                .value(10.0)
+                .build()]
         );
     }
 
-    #[test]
-    fn encode_events_distribution() {
+    #[tokio::test]
+    async fn encode_events_distribution() {
         let events = vec![Metric::new(
             "latency",
             MetricKind::Incremental,
@@ -424,18 +442,17 @@ mod tests {
         )];
 
         assert_eq!(
-            svc().encode_events(events),
-            vec![MetricDatum {
-                metric_name: "latency".into(),
-                values: Some(vec![11.0, 12.0]),
-                counts: Some(vec![100.0, 50.0]),
-                ..Default::default()
-            }]
+            svc().await.encode_events(events),
+            vec![MetricDatum::builder()
+                .metric_name("latency")
+                .set_values(Some(vec![11.0, 12.0]))
+                .set_counts(Some(vec![100.0, 50.0]))
+                .build()]
         );
     }
 
-    #[test]
-    fn encode_events_set() {
+    #[tokio::test]
+    async fn encode_events_set() {
         let events = vec![Metric::new(
             "users",
             MetricKind::Incremental,
@@ -445,12 +462,11 @@ mod tests {
         )];
 
         assert_eq!(
-            svc().encode_events(events),
-            vec![MetricDatum {
-                metric_name: "users".into(),
-                value: Some(2.0),
-                ..Default::default()
-            }]
+            svc().await.encode_events(events),
+            vec![MetricDatum::builder()
+                .metric_name("users")
+                .value(2.0)
+                .build()]
         );
     }
 }
@@ -459,6 +475,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::offset::TimeZone;
+    use chrono::Utc;
     use futures::StreamExt;
     use rand::seq::SliceRandom;
 
@@ -483,7 +500,10 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_metrics_healthchecks() {
         let config = config();
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
+        let client = config
+            .create_client(&ProxyConfig::from_env())
+            .await
+            .unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
@@ -491,7 +511,7 @@ mod integration_tests {
     async fn cloudwatch_metrics_put_data() {
         let cx = SinkContext::new_test();
         let config = config();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
+        let client = config.create_client(&cx.globals.proxy).await.unwrap();
         let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();
@@ -552,7 +572,7 @@ mod integration_tests {
     async fn cloudwatch_metrics_namespace_partitioning() {
         let cx = SinkContext::new_test();
         let config = config();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
+        let client = config.create_client(&cx.globals.proxy).await.unwrap();
         let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();

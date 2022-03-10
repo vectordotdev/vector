@@ -5,6 +5,7 @@ rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 rustup run stable cargo install cargo-deb --version 1.29.2
 rustup run stable cargo install cross --version 0.2.1
+rustup run stable cargo install cargo-nextest --version 0.9.8
 
 cd scripts
 bundle install
@@ -16,6 +17,7 @@ cd ..
 # ubuntu 20.04 gives us version 10.19. We can revert once we update the
 # ci image to install a newer version of node.
 sudo npm -g install markdownlint-cli@0.30
+sudo npm -g install @datadog/datadog-ci
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2

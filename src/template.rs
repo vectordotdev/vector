@@ -154,7 +154,7 @@ fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateR
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
                 EventRef::Metric(metric) => render_metric_field(key, metric),
                 EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
@@ -415,10 +415,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("%F", "foo");
+        event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
-        let template = Template::try_from("nested {{ %F }} %T").unwrap();
+        let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),
