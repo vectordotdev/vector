@@ -1,6 +1,6 @@
-use crate::{config::log_schema, event::Event, schema};
+use crate::{config::log_schema, event::Event, internal_events::RawMessageEmpty, schema};
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use value::Kind;
@@ -51,6 +51,10 @@ impl Encoder<Event> for RawMessageSerializer {
             Event::Metric(_) => None,
             Event::Trace(_) => None,
         };
+
+        if bytes.as_ref().map(Bytes::is_empty).unwrap_or(true) {
+            emit!(&RawMessageEmpty);
+        }
 
         if let Some(bytes) = bytes {
             buffer.put(bytes);

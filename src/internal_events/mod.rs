@@ -41,7 +41,7 @@ mod datadog_events;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
-mod decoder;
+mod decoding;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
@@ -51,6 +51,8 @@ mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+#[cfg(any(feature = "codecs"))]
+mod encoding;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
@@ -198,7 +200,7 @@ pub(crate) use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
-pub(crate) use self::decoder::*;
+pub(crate) use self::decoding::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
@@ -209,6 +211,8 @@ pub(crate) use self::dnstap::*;
 pub(crate) use self::docker_logs::*;
 #[cfg(feature = "sinks-elasticsearch")]
 pub(crate) use self::elasticsearch::*;
+#[cfg(any(feature = "codecs"))]
+pub(crate) use self::encoding::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
