@@ -18,6 +18,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			inputs = ["datadog_agent"]
 			source = '''
 			  redact(., filters: ["us_social_security_number"])
+			  redact(., filters: ["email_address"])
 			'''
 
 			[sinks.datadog_backend]

@@ -79,5 +79,15 @@ remap: functions: redact: {
 				ssn:  "[REDACTED]"
 			}
 		},
+		{
+			title: "Replace email address in any field"
+			source: #"""
+				redact({ "name": "John Doe", "email": "john.doe@hello.com"}, filters: ["email_address"])
+				"""#
+			return: {
+				name: "John Doe"
+				email:  "[REDACTED]"
+			}
+		},
 	]
 }
