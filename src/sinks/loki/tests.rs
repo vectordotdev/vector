@@ -15,8 +15,8 @@ fn generate_config() {
     crate::test_util::test_generate_config::<LokiConfig>();
 }
 
-#[test]
-fn interpolate_labels() {
+#[tokio::test]
+async fn interpolate_labels() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
@@ -56,8 +56,8 @@ fn interpolate_labels() {
     assert_eq!(record.labels[3], ("label3".to_string(), "bar".to_string()));
 }
 
-#[test]
-fn use_label_from_dropped_fields() {
+#[tokio::test]
+async fn use_label_from_dropped_fields() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://localhost:3100"
