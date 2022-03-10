@@ -11,7 +11,7 @@ import pathlib
 
 np.seterr(all='raise')
 
-parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser = argparse.ArgumentParser(description='Plot up results from soak run')
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--output-dir', type=str, help='the directory to search for capture files')
 args = parser.parse_args()
@@ -33,6 +33,4 @@ for exp in up.experiment.unique():
                     x="fetch_index", y="value",
                     hue="run_id")
     plt.savefig(os.path.join(args.output_dir, "{}/up.png".format(exp)), dpi=200)
-    plt.close()
-
     plt.close()
