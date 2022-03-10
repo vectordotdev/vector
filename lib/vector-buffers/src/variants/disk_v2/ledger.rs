@@ -555,7 +555,7 @@ where
         //
         // TODO: It'd be nice to incorporate this within `Filesystem` to fully encapsulate _all_
         // file I/O, but the code is so specific, including the drop guard for the lock file, that I
-        // don't know if it's worth it
+        // don't know if it's worth it.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
         let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
         if !ledger_lock.try_lock().context(IoSnafu)? {

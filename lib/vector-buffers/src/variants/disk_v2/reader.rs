@@ -420,18 +420,6 @@ where
     }
 
     fn track_read(&mut self, record_id: u64, record_bytes: u64, event_count: NonZeroU64) {
-        // TODO: We explain this ID design in multiple places now, which probably means we should
-        // encapsulate it in a new method/function/single doc comment somewhere.
-
-        // We need to track our reader progress, both in the form of how much data we've read in
-        // this data file, as well as the record ID. This is required not only for ensuring our
-        // general buffer accounting (event count, buffer size, etc) is accurate, but also to be
-        // able to handle corrupted records.
-        //
-        // We make sure to track enough information such that when we encounter a corrupted record,
-        // or if we skip records due to missing data, we can figure out how many events we've
-        // dropped or lost, and handle the necessary adjustments to the buffer accounting.
-
         // We explicitly reduce the event count by one here in order to correctly calculate the
         // "last" record ID, which you can visualize as follows...
         //

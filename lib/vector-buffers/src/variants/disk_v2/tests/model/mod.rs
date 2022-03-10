@@ -15,7 +15,9 @@ use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::disk_v2::{writer::RecordWriter, Buffer, DiskBufferConfig, WriterError, common::MAX_FILE_ID},
+    variants::disk_v2::{
+        common::MAX_FILE_ID, writer::RecordWriter, Buffer, DiskBufferConfig, WriterError,
+    },
     EventCount, WhenFull,
 };
 
@@ -117,7 +119,7 @@ impl FileModel {
         self.finalized.load(Ordering::SeqCst)
     }
 
-    fn write(&self, record: Record, record_len: u64) -> (Option<Record>, usize, usize) {
+    fn write(&self, record: Record, record_len: u64) -> (Option<Record>, usize, u64) {
         assert!(
             !self.is_finalized(),
             "invariant violation: tried to write to file after finalization"
@@ -145,7 +147,7 @@ impl FileModel {
         if record_len >= self.write_buffer_size {
             // The record is bigger the write buffer itself, so just write it immediately:
             flushed_events += record.event_count();
-            flushed_bytes += record_len as usize;
+            flushed_bytes += record_len;
 
             self.flushed_bytes.fetch_add(record_len, Ordering::SeqCst);
             self.flushed_records.push((record, record_len));
@@ -157,7 +159,7 @@ impl FileModel {
         (None, flushed_events, flushed_bytes)
     }
 
-    fn flush(&self) -> (usize, usize) {
+    fn flush(&self) -> (usize, u64) {
         let mut flushed_events = 0;
         let mut flushed_bytes = 0;
         while let Some((record, record_len)) = self.unflushed_records.pop() {
@@ -169,7 +171,7 @@ impl FileModel {
             self.flushed_records.push((record, record_len));
         }
 
-        (flushed_events, flushed_bytes as usize)
+        (flushed_events, flushed_bytes)
     }
 
     fn read(&self) -> Option<(Record, u64)> {
@@ -584,7 +586,7 @@ impl WriterModel {
             (0, 0)
         };
 
-        self.track_flushed_events(flushed_events as u64, flushed_bytes as u64);
+        self.track_flushed_events(flushed_events as u64, flushed_bytes);
     }
 
     fn track_flushed_events(&mut self, flushed_events: u64, flushed_bytes: u64) {
@@ -696,7 +698,7 @@ impl WriterModel {
 
                     // We buffered the write but had to do some flushing to make it possible, so
                     // track the events that have now hit the data file.
-                    self.track_flushed_events(flushed_events as u64, flushed_bytes as u64);
+                    self.track_flushed_events(flushed_events as u64, flushed_bytes);
                 }
                 _ => {
                     panic!("invariant violation: write can't flush if it has denied write overall")
