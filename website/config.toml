@@ -45,9 +45,9 @@ site_generation = 2
 
 # Search
 [params.search]
-algolia_app_id = "EOIG7V0A2O"
+algolia_app_id = "7036MFLVFJ"
 # Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
-algolia_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
+algolia_public_api_key = "348b4bf7b69613ffc01b455ffd280886"
 
 algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
