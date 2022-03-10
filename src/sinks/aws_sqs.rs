@@ -1,3 +1,6 @@
+use aws_sdk_sqs::error::GetQueueAttributesError;
+use aws_sdk_sqs::types::SdkError;
+use aws_sdk_sqs::Client as SqsClient;
 use std::{
     convert::{TryFrom, TryInto},
     num::NonZeroU64,
@@ -5,11 +8,11 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
-    SendMessageResult, Sqs, SqsClient,
-};
+// use rusoto_core::RusotoError;
+// use rusoto_sqs::{
+//     GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
+//     SendMessageResult, Sqs, SqsClient,
+// };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
@@ -51,7 +54,7 @@ enum BuildError {
 enum HealthcheckError {
     #[snafu(display("GetQueueAttributes failed: {}", source))]
     GetQueueAttributes {
-        source: RusotoError<GetQueueAttributesError>,
+        source: SdkError<GetQueueAttributesError>,
     },
 }
 
