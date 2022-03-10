@@ -4,7 +4,7 @@ short: End-to-end acknowledgement
 description: Learn how to use end-to-end acknowledgement
 author_github: https://github.com/barieom
 domain: delivery
-weight: 5
+weight: 7
 tags: ["delivery", "logs", "level up", "guides", "guide"]
 ---
 
@@ -42,60 +42,77 @@ multiple sinks, by enabling this global config, all supported sources will wait 
 acknowledgement from all the sinks. A source that does acknowledgements will wait
 forever for an ack before responding
 
-But you can enable acknowledgements at each source level if you want more granular
+But you can enable acknowledgements at each sink level if you want more granular
 control over how acknowledgements for specific cases (e.g. you're buffering your
-data). You can set acknowledgements at the source and sink level by:
+data). You can set acknowledgements at the sink level by doing the following:
 
 ```toml
-[sources.cool_source_id]
+[sinks.very_cool_id]
    # Enable or disable waiting for acknowledgements for this sink.
    # Defaults to the global value of `acknowledgements`
    acknowledgement = true
-
-...
-
-[sinks.cool_source_id]
-   acknowledgement = true
 ```
 
-## Edge cases 
+## Edge cases
 
 Unsurprisingly, there are a few exceptions and edge cases for the end-to-end
 acknowledgement feature. First, as alluded to earlier, not all sources and sinks
 are supported because some sources and sinks are unable to provide acknowledgements
-at the protocol level. A list of sources and sinks that are not supported are:
+at the protocol level. A list of sources and sinks that _are_ supported are:
 
 #### Sources:
-- `apache_metrics.cue`
-- `aws_ecs_metrics.cue`
-- `demo_logs.cue`
-- `dnstap.cue`          
-- `docker_logs.cue`
-- `eventstoredb_metrics.cue`
-- `exec.cue`
-- `host_metrics.cue`
-- `internal_logs.cue`
-- `internal_metrics.cue`
-- `kubernetes_logs.cue`
-- `mongodb_metrics.cue`
-- `nats.cue`
-- `nginx_metrics.cue`
-- `postgresql_metrics`  
-- `prometheus_scrape.cue`
-- `socket.cue`
-- `statsd.cue`
-- `stdin.cue`
-- `syslog.cue`
+- `aws_kinesis_firehose`
+- `aws_s3.cue`
+- `aws_sqs.cue`
+- `datadog_agent.cue`
+- `file.cue`
+- `fluent.cue`
+- `heroku_logs.cue`
+- `http.cue`
+- `journald.cue`
+- `kafka.cue`
+- `logstash.cue`
+- `prometheus_remote_write.cue`
+- `splunk_hec.cue`
+- `vector.cue`
 
 #### Sinks:
-- `console.cue`
-- `nats.cue`
-- `papertrail.cue`
-- `prometheus_exporter.cue`
-- `prometheus_remote_write.cue`
-- `pulsar.cue`
-- `socket.cue`
-- `statsd.cue`
+- `aws_cloudwatch_logs.cue`
+- `aws_cloudwatch_metrics.cue`
+- `aws_kinesis_firehose.cue`
+- `aws_kinesis_streams.cue`
+- `aws_s3.cue`
+- `aws_sqs.cue`
+- `azure_blob.cue`
+- `azure_monitor_logs.cue`
+- `blackhole.cue`
+- `clickhouse.cue`
+- `datadog_archives.cue`
+- `datadog_events.cue`
+- `datadog_logs.cue`
+- `datadog_metrics.cue`
+- `elasticsearch.cue`
+- `file.cue`
+- `gcp_cloud_storage.cue`
+- `gcp_pubsub.cue`
+- `gcp_stackdriver_logs.cue`
+- `gcp_stackdriver_metrics.cue`
+- `honeycomb.cue`
+- `http.cue`
+- `humio.cue`
+- `influxdb_logs.cue`
+- `influxdb_metrics.cue`
+- `kafka.cue`
+- `logdna.cue`
+- `loki.cue`
+- `new_relic.cue`
+- `new_relic_logs.cue`
+- `redis.cue`
+- `sematext_logs.cue`
+- `sematext_metrics.cue`
+- `splunk_hec_logs.cue`
+- `splunk_hec_metrics.cue`
+- `vector.cue`
 
 Second, when buffering your observability data, the behavior of end-to-end
 acknowledgement is a little different. When an event is persisted in a buffer, the
@@ -107,7 +124,7 @@ that may have no relation to the source event, tracking whether an event has bee
 successfully delivered gets extremely complex. As such, end-to-end acknowledgement
 behavior will be put in the hands of script writers.
 
-## Parting thoughs
+## Parting thoughts
 
 This guide intended to serve as a basic guide on how you can start
 leveraging `acknowledgement`. If you have any feedback regarding this feature,
