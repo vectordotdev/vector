@@ -27,9 +27,19 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
-    pub request_id: Option<&'a str>,
-    pub code: hyper::StatusCode,
-    pub error: &'a str,
+    request_id: Option<&'a str>,
+    error_code: String,
+    error: &'a str,
+}
+
+impl<'a> AwsKinesisFirehoseRequestError<'a> {
+    pub fn new(code: hyper::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
+        Self {
+            error_code: http_error_code(code.as_u16()),
+            error,
+            request_id,
+        }
+    }
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
@@ -37,7 +47,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         error!(
             message = "Error occurred while handling request.",
             error = ?self.error,
-            error_code = %http_error_code(self.code.as_u16()),
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             internal_log_rate_secs = 10,
@@ -49,7 +59,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error_code" => http_error_code(self.code.as_u16()),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
         );
         // deprecated

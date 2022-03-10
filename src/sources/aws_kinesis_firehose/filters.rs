@@ -150,11 +150,11 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     }
 
-    emit!(&AwsKinesisFirehoseRequestError {
-        request_id,
-        error: message.as_str(),
+    emit!(&AwsKinesisFirehoseRequestError::new(
         code,
-    });
+        message.as_str(),
+        request_id
+    ));
 
     let json = warp::reply::json(&FirehoseResponse {
         request_id: request_id.unwrap_or_default().to_string(),
