@@ -116,7 +116,7 @@ fn encoder() -> EncodingConfigFixed<StandardJsonEncoding> {
                 "title",
             ]
             .iter()
-            .map(|field| vec![OwnedSegment::Field((*field).into())])
+            .map(|field| vec![OwnedSegment::Field((*field).into())].into())
             .collect(),
         ),
         // DataDog Event API requires unix timestamp.

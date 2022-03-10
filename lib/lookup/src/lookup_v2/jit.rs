@@ -206,6 +206,14 @@ mod test {
             (".[", vec![BorrowedSegment::Invalid]),
             ("f.", vec![BorrowedSegment::Field(Cow::from("f"))]),
             ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
+            (
+                "ec2.metadata.\"availability-zone\"",
+                vec![
+                    BorrowedSegment::Field(Cow::from("ec2")),
+                    BorrowedSegment::Field(Cow::from("metadata")),
+                    BorrowedSegment::Field(Cow::from("availability-zone")),
+                ],
+            ),
             (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
             (
                 ".@timestamp",

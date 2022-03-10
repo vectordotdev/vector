@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::OwnedPath;
 use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -26,9 +26,8 @@ pub struct EncodingConfig<E> {
     pub(crate) codec: E,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    pub(crate) only_fields: Option<Vec<Vec<OwnedSegment>>>,
+    pub(crate) only_fields: Option<Vec<OwnedPath>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -46,8 +45,7 @@ impl<E> EncodingConfiguration for EncodingConfig<E> {
         &self.schema
     }
 
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>> {
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
         &self.only_fields
     }
 
@@ -160,13 +158,7 @@ where
         let concrete = Self {
             codec: inner.codec,
             schema: inner.schema,
-            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-            only_fields: inner.only_fields.map(|fields| {
-                fields
-                    .iter()
-                    .map(|only| parse_path(only).segments)
-                    .collect()
-            }),
+            only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -182,7 +174,7 @@ struct Inner<E> {
     #[serde(default)]
     schema: Option<String>,
     #[serde(default)]
-    only_fields: Option<Vec<String>>,
+    only_fields: Option<Vec<OwnedPath>>,
     #[serde(default)]
     except_fields: Option<Vec<String>>,
     #[serde(default)]
