@@ -258,7 +258,7 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
             Some(path)
         }
         Err(error) => {
-            fmt.error(format!("{}", error));
+            fmt.error(error.to_string());
             None
         }
     }
@@ -288,17 +288,17 @@ impl Formatter {
             max_line_width: 0,
             print_space: false,
             error_intro: if color {
-                format!("{}", "x".red())
+                "x".red().to_string()
             } else {
                 "x".to_owned()
             },
             warning_intro: if color {
-                format!("{}", "~".yellow())
+                "~".yellow().to_string()
             } else {
                 "~".to_owned()
             },
             success_intro: if color {
-                format!("{}", "√".green())
+                "√".green().to_string()
             } else {
                 "√".to_owned()
             },

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use vector_common::EventDataEq;
 
@@ -446,10 +446,9 @@ impl OutputBuffer {
     }
 
     async fn send(&mut self, output: &mut Fanout) {
-        for array in self.0.drain(..) {
-            output.feed(array).await.expect("unit error");
+        for array in std::mem::take(&mut self.0) {
+            output.send(array).await;
         }
-        output.flush().await.expect("unit error");
     }
 
     fn iter_events(&self) -> impl Iterator<Item = EventRef> {

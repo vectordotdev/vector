@@ -245,7 +245,7 @@ impl RegexParser {
 impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.coerce_to_bytes());
+        let value = log.get(self.field.as_str()).map(|s| s.coerce_to_bytes());
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(value).into_iter().next();
@@ -270,9 +270,9 @@ impl FunctionTransform for RegexParser {
             if let Some(captures) = pattern.captures(value) {
                 // Handle optional overwriting of the target field
                 if let Some(target_field) = target_field {
-                    if log.contains(target_field) {
+                    if log.contains(target_field.as_str()) {
                         if self.overwrite_target {
-                            log.remove(target_field);
+                            log.remove(target_field.as_str());
                         } else {
                             emit!(&ParserTargetExistsError { target_field });
                             output.push(event);
@@ -288,7 +288,7 @@ impl FunctionTransform for RegexParser {
                     (name, value)
                 }));
                 if self.drop_field {
-                    log.remove(&self.field);
+                    log.remove(self.field.as_str());
                 }
                 output.push(event);
                 return;
@@ -411,7 +411,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(&"message").is_some());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]

@@ -283,11 +283,11 @@ mod integration_test {
             let headers_key = headers_key.clone();
             let mut header_values = BTreeMap::new();
             header_values.insert(
-                header_1_key.to_string(),
+                header_1_key.to_owned(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.for_each_log(move |log| {
-                log.insert(headers_key.clone(), header_values.clone());
+                log.insert(headers_key.as_str(), header_values.clone());
             });
             events
         });

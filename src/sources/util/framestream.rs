@@ -668,7 +668,7 @@ mod test {
                 .as_mut_log()
                 .insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.as_mut_log().insert(self.host_key(), host);
+                event.as_mut_log().insert(self.host_key().as_str(), host);
             }
 
             (self.extra_task_handling_routine.clone())();

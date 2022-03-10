@@ -82,7 +82,7 @@ impl From<JsonParserConfig> for JsonParser {
 impl FunctionTransform for JsonParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field);
+        let value = log.get(self.field.as_str());
 
         let parsed = value
             .and_then(|value| {
@@ -109,21 +109,21 @@ impl FunctionTransform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    let contains_target = log.contains(&target_field);
+                    let contains_target = log.contains(target_field.as_str());
 
                     if contains_target && !self.overwrite_target {
                         emit!(&ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
-                            log.remove(&self.field);
+                            log.remove(self.field.as_str());
                         }
 
-                        log.insert(&target_field, Value::Object(object));
+                        log.insert(target_field.as_str(), Value::Object(object));
                     }
                 }
                 None => {
                     if self.drop_field {
-                        log.remove(&self.field);
+                        log.remove(self.field.as_str());
                     }
 
                     for (key, value) in object {
@@ -447,8 +447,8 @@ mod test {
         assert_eq!(event.as_log()["null"], crate::event::Value::Null);
         assert_eq!(event.as_log()["float"], 12.34.into());
         assert_eq!(event.as_log()["int"], 56.into());
-        assert_eq!(event.as_log()["bool true"], true.into());
-        assert_eq!(event.as_log()["bool false"], false.into());
+        assert_eq!(event.as_log()["\"bool true\""], true.into());
+        assert_eq!(event.as_log()["\"bool false\""], false.into());
         assert_eq!(event.as_log()["array[0]"], "z".into());
         assert_eq!(event.as_log()["array[1]"], 7.into());
         assert_eq!(event.as_log()["object.nested"], "data".into());

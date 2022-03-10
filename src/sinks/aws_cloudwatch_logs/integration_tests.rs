@@ -358,7 +358,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .enumerate()
         .map(|(i, e)| {
             let mut event = Event::from(e);
-            let stream = format!("{}", (i % 2));
+            let stream = (i % 2).to_string();
             event.as_mut_log().insert("key", stream);
             event
         })

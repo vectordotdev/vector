@@ -10,7 +10,7 @@ fn parse_timestamp(
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
             Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
-                .map_err(|e| format!("{}", e))?
+                .map_err(|e| e.to_string())?
                 .convert(v)
                 .map_err(|e| e.to_string().into())
         }

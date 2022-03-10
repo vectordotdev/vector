@@ -141,7 +141,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -186,7 +186,7 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -454,20 +454,6 @@ jobs:
         with:
           name: pr-number
           path: /tmp/pr.txt
-
-      - name: Read analysis file
-        id: read-analysis
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
-
-      - name: Post Results To PR
-        uses: peter-evans/create-or-update-comment@v1
-        continue-on-error: true
-        with:
-          issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
-          edit-mode: replace
-          body: ${{ steps.read-analysis.outputs.content }}
 
   detect-regressions:
     name: Regression analysis

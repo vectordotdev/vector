@@ -170,8 +170,11 @@ impl TcpSource for RawTcpSource {
                 log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
                 log.try_insert(log_schema().timestamp_key(), now);
 
-                let host_key = (self.config.host_key.clone())
-                    .unwrap_or_else(|| log_schema().host_key().to_string());
+                let host_key = self
+                    .config
+                    .host_key
+                    .as_deref()
+                    .unwrap_or_else(|| log_schema().host_key());
 
                 log.try_insert(host_key, host.clone());
             }

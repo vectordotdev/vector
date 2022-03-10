@@ -118,7 +118,7 @@ fn parse_offset(tz: &str) -> Result<FixedOffset, String> {
     let date_str = format!("2020-04-12 22:10:57 {}", tz);
     let datetime =
         DateTime::parse_from_str(&date_str, &format!("%Y-%m-%d %H:%M:%S {}", offset_format))
-            .map_err(|e| format!("{}", e))?;
+            .map_err(|e| e.to_string())?;
     Ok(datetime.timezone())
 }
 
