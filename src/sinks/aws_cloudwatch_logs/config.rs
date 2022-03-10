@@ -27,7 +27,7 @@ use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 
-struct CloudwatchLogsClientBuilder;
+pub struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
     type ConfigBuilder = aws_sdk_cloudwatchlogs::config::Builder;
