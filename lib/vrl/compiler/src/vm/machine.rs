@@ -140,13 +140,25 @@ pub enum Instruction {
     Primitive(usize),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Vm {
     fns: Vec<Box<dyn Function>>,
     instructions: Vec<Instruction>,
     values: Vec<Value>,
     targets: Vec<Variable>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
+}
+
+impl Default for Vm {
+    fn default() -> Self {
+        Self {
+            fns: Default::default(),
+            instructions: Default::default(),
+            values: Default::default(),
+            targets: Default::default(),
+            static_params: Default::default(),
+        }
+    }
 }
 
 impl Vm {

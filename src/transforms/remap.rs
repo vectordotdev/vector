@@ -176,7 +176,7 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, _) = config.compile_vrl_program(
+        let (program, functions, state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
@@ -184,7 +184,7 @@ impl Remap {
         let runtime = Runtime::default();
 
         let vm = match config.runtime {
-            VrlRuntime::Vm => Some(Arc::new(runtime.compile(functions, &program)?)),
+            VrlRuntime::Vm => Some(Arc::new(runtime.compile(functions, &program, state)?)),
             VrlRuntime::Ast => None,
         };
 

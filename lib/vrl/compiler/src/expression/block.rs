@@ -47,12 +47,16 @@ impl Expression for Block {
         type_def.with_fallibility(fallible)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         let mut jumps = Vec::new();
 
         for expr in &self.inner {
             // Write each of the inner expressions
-            expr.compile_to_vm(vm)?;
+            expr.compile_to_vm(vm, state)?;
 
             // If there is an error, we need to jump to the end of the block.
             jumps.push(vm.emit_jump(OpCode::JumpIfErr));

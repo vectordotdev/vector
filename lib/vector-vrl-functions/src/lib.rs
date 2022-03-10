@@ -3,6 +3,8 @@ pub mod remove_metadata_field;
 pub mod set_metadata_field;
 pub mod set_semantic_meaning;
 
+use vrl::prelude::*;
+
 pub(crate) fn keys() -> Vec<Value> {
     vec![value!("datadog_api_key"), value!("splunk_hec_token")]
 }
