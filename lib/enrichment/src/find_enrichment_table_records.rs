@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
 
 use vrl::prelude::*;
 
