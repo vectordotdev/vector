@@ -223,7 +223,7 @@ impl FilesystemInner {
         let file = self
             .files
             .entry(path.to_owned())
-            .or_insert_with(|| TestFile::new());
+            .or_insert_with(TestFile::new);
         let mut new_file = file.clone();
         new_file.set_writable();
 
@@ -251,11 +251,11 @@ impl FilesystemInner {
     }
 
     fn open_mmap_readable(&mut self, path: &Path) -> Option<TestMmap> {
-        self.files.get(path).map(|f| f.as_mmap())
+        self.files.get(path).map(TestFile::as_mmap)
     }
 
     fn open_mmap_writable(&mut self, path: &Path) -> Option<TestMmap> {
-        self.files.get(path).map(|f| f.as_mmap())
+        self.files.get(path).map(TestFile::as_mmap)
     }
 
     fn delete_file(&mut self, path: &Path) -> bool {

@@ -14,7 +14,6 @@ use crate::{
 
 #[tokio::test]
 async fn basic_read_write_loop() {
-    let _ = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 

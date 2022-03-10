@@ -79,7 +79,7 @@ pub trait Filesystem: Send + Sync {
     /// # Errors
     ///
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
-    /// returned describing the underlying error.     
+    /// returned describing the underlying error.
     async fn delete_file(&self, path: &Path) -> io::Result<()>;
 }
 

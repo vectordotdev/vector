@@ -447,23 +447,13 @@ where
         let wrapped_record =
             Record::with_checksum(id, metadata, &self.encode_buf, &self.checksummer);
 
-        // TODO: This could be a good spot to potentially calculate the on-disk size of the archived
-        // record, but to do that correctly, it involves needing a few things:
-        // - correctly size the archived record (can already do)
-        // - getting the length of DST fields like slices (can do by hand, not resilient to `Record`
-        //   changing, though)
-        // - getting the serializer alignment (doable by hand, but also subject to impl details
-        //   hidden under-the-hood)
-        //
-        // Since that stuff is tricky, it's easiest to just rely on the fully serialized archive,
-        // although it means we go through the serialization step needlessly when the record
-        // inevitably won't fit.  All things considered, though, this will occur very infrequently,
-        // though: something like once every ~32k writes if every write is ~4KB.
-
         // Push 8 dummy bytes where our length delimiter will sit.  We'll fix this up after
         // serialization.  Notably, `AlignedSerializer` will report the serializer position as
         // the length of its backing store, which now includes our 8 bytes, so we _subtract_
         // those from the position when figuring out the actual value to write back after.
+        //
+        // We write it this way -- in the serializer buffer, and not as a separate write -- so that
+        // we can do a single write but also so that we always have an aligned buffer.
         self.ser_buf
             .extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
@@ -498,10 +488,6 @@ where
 
         // With the record archived and serialized, do our final check to ensure we can fit this
         // write.  We always allow at least one write into an empty data file.
-        //
-        // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
-        // better/super low overhead way to capture "the bytes we wrote" rather than piecing
-        // together what we _believe_ we should have written.
         if !self.can_write(serializer_pos) {
             debug!(
                 current_data_file_size = self.current_data_file_size,
@@ -873,7 +859,7 @@ where
             // wait for the reader to signal that they've made some progress.
             let total_buffer_size = self.ledger.get_total_buffer_size();
             let max_buffer_size = self.config.max_buffer_size;
-            if total_buffer_size <= max_buffer_size {
+            if total_buffer_size < max_buffer_size {
                 break;
             }
 
@@ -1081,9 +1067,11 @@ where
         self.track_write(record_events.get(), bytes_written as u64);
 
         // If we did flush some buffered writes during this write, however, we now compensate for
-        // that after updating our internal state.
+        // that after updating our internal state.  We'll also notify the reader, too, since the
+        // data should be available to read:
         if let Some(flush_result) = flush_result {
             self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
+            self.ledger.notify_writer_waiters();
         }
 
         trace!(

@@ -31,20 +31,20 @@ impl error::Error for DecodeError {}
 pub struct Record {
     id: u32,
     size: u32,
-    event_count: usize,
+    event_count: u32,
 }
 
 impl Record {
-    pub(crate) const fn new(id: u32, size: u32) -> Self {
+    pub(crate) const fn new(id: u32, size: u32, event_count: u32) -> Self {
         Record {
             id,
             size,
-            event_count: 1,
+            event_count,
         }
     }
 
     const fn header_len() -> usize {
-        mem::size_of::<u32>() + mem::size_of::<u32>()
+        mem::size_of::<u32>() * 3
     }
 
     pub const fn len(&self) -> usize {
@@ -54,7 +54,7 @@ impl Record {
 
 impl EventCount for Record {
     fn event_count(&self) -> usize {
-        self.event_count
+        self.event_count as usize
     }
 }
 
@@ -79,6 +79,7 @@ impl FixedEncodable for Record {
 
         buffer.put_u32(self.id);
         buffer.put_u32(self.size);
+        buffer.put_u32(self.event_count);
         buffer.put_bytes(0x42, self.size as usize);
         Ok(())
     }
@@ -98,6 +99,7 @@ impl FixedEncodable for Record {
 
         let id = buffer.get_u32();
         let size = buffer.get_u32();
+        let event_count = buffer.get_u32();
 
         if buffer.remaining() < size as usize {
             return Err(DecodeError);
@@ -109,6 +111,6 @@ impl FixedEncodable for Record {
             return Err(DecodeError);
         }
 
-        Ok(Record::new(id, size))
+        Ok(Record::new(id, size, event_count))
     }
 }
