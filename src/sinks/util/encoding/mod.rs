@@ -78,7 +78,7 @@ pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator, Transformer};
 pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedPath};
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
@@ -117,8 +117,7 @@ pub trait EncodingConfiguration {
 
     fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>>;
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>>;
     fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -128,10 +127,9 @@ pub trait EncodingConfiguration {
                 .keys()
                 .filter(|field| {
                     let field_path = parse_path(field);
-                    !only_fields.iter().any(|only| {
-                        // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                        field_path.segments.starts_with(&only[..])
-                    })
+                    !only_fields
+                        .iter()
+                        .any(|only| field_path.segments.starts_with(&only.segments[..]))
                 })
                 .collect::<Vec<_>>();
 
@@ -178,19 +176,10 @@ pub trait EncodingConfiguration {
     ///
     /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
     fn validate(&self) -> Result<()> {
-        if let (Some(only_fields), Some(except_fields)) =
-            (&self.only_fields(), &self.except_fields())
-        {
-            if except_fields.iter().any(|f| {
-                let path_iter = parse_path(f);
-                only_fields.iter().any(|v| v == &path_iter.segments)
-            }) {
-                return Err(
-                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
-                );
-            }
-        }
-        Ok(())
+        validate_fields(
+            self.only_fields().as_deref(),
+            self.except_fields().as_deref(),
+        )
     }
 
     /// Apply the EncodingConfig rules to the provided event.
@@ -208,6 +197,24 @@ pub trait EncodingConfiguration {
             self.apply_timestamp_format(log);
         }
     }
+}
+
+/// Check if `except_fields` and `only_fields` items are mutually exclusive.
+///
+/// If an error is returned, the entire encoding configuration should be considered inoperable.
+pub fn validate_fields(
+    only_fields: Option<&[OwnedPath]>,
+    except_fields: Option<&[String]>,
+) -> Result<()> {
+    if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
+        if except_fields.iter().any(|f| {
+            let path_iter = parse_path(f);
+            only_fields.iter().any(|v| v == &path_iter)
+        }) {
+            return Err("`except_fields` and `only_fields` should be mutually exclusive.".into());
+        }
+    }
+    Ok(())
 }
 
 // These types of traits will likely move into some kind of event container once the
@@ -273,21 +280,6 @@ pub enum TimestampFormat {
     Rfc3339,
 }
 
-fn deserialize_path_components<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<Vec<Vec<OwnedSegment>>>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    let fields: Option<Vec<String>> = serde::de::Deserialize::deserialize(deserializer)?;
-    Ok(fields.map(|fields| {
-        fields
-            .iter()
-            .map(|only| parse_path(only).segments)
-            .collect()
-    }))
-}
-
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
@@ -306,11 +298,6 @@ mod tests {
     #[serde(deny_unknown_fields)]
     struct TestConfig {
         encoding: EncodingConfig<TestEncoding>,
-    }
-
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<OwnedSegment> {
-        parse_path(a).segments
     }
 
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
@@ -334,10 +321,7 @@ mod tests {
         config.encoding.validate().unwrap();
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
-        assert_eq!(
-            config.encoding.only_fields,
-            Some(vec![as_path_components("Boop")])
-        );
+        assert_eq!(config.encoding.only_fields, Some(vec![parse_path("Boop")]));
     }
 
     const TOML_EXCLUSIVITY_VIOLATION: &str = indoc! {r#"

@@ -70,6 +70,7 @@ pub enum OutOfOrderAction {
     #[derivative(Default)]
     Drop,
     RewriteTimestamp,
+    Accept,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
