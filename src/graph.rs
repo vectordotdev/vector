@@ -64,7 +64,7 @@ impl Opts {
     }
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
         Some(paths) => paths,
