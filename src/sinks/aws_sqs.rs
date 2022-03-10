@@ -151,6 +151,7 @@ impl SinkConfig for SqsSinkConfig {
 impl SqsSinkConfig {
     pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
         client
+            .get_queue_attributes()
             .get_queue_attributes(GetQueueAttributesRequest {
                 attribute_names: None,
                 queue_url: self.queue_url.clone(),
