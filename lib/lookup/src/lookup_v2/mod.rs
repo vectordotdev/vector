@@ -1,14 +1,34 @@
 mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
+}
+
+impl<'de> Deserialize<'de> for OwnedPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path: String = Deserialize::deserialize(deserializer)?;
+        Ok(parse_path(&path))
+    }
+}
+
+impl Serialize for OwnedPath {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // TODO: Implement canonical way to serialize segments.
+        todo!()
+    }
 }
 
 impl OwnedPath {
@@ -47,8 +67,8 @@ impl From<Vec<OwnedSegment>> for OwnedPath {
     }
 }
 
-/// Use if you want to pre-parse paths so it can be used multiple times
-/// The return value implements `Path` so it can be used directly
+/// Use if you want to pre-parse paths so it can be used multiple times.
+/// The return value implements `Path` so it can be used directly.
 pub fn parse_path(path: &str) -> OwnedPath {
     let segments = JitPath::new(path)
         .segment_iter()
@@ -131,7 +151,7 @@ impl<'a> Path<'a> for &'a str {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
     Field(String),
     Index(usize),

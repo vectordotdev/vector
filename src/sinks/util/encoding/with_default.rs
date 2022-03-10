@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use lookup::lookup_v2::OwnedSegment;
+use lookup::lookup_v2::OwnedPath;
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Serialize,
@@ -11,7 +11,7 @@ use serde::{
 
 use crate::{
     serde::skip_serializing_if_default,
-    sinks::util::encoding::{deserialize_path_components, EncodingConfiguration, TimestampFormat},
+    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
 
 /// A structure to wrap sink encodings and enforce field privacy.
@@ -27,8 +27,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    pub(crate) only_fields: Option<Vec<Vec<OwnedSegment>>>,
+    pub(crate) only_fields: Option<Vec<OwnedPath>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
@@ -48,8 +47,7 @@ impl<E: Default + PartialEq> EncodingConfiguration for EncodingConfigWithDefault
         &self.schema
     }
 
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<OwnedSegment>>> {
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
         &self.only_fields
     }
 
@@ -152,8 +150,8 @@ pub struct InnerWithDefault<E: Default> {
     codec: E,
     #[serde(default)]
     schema: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_path_components")]
-    only_fields: Option<Vec<Vec<OwnedSegment>>>,
+    #[serde(default)]
+    only_fields: Option<Vec<OwnedPath>>,
     #[serde(default)]
     except_fields: Option<Vec<String>>,
     #[serde(default)]
