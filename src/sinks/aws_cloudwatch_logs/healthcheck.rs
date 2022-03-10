@@ -6,6 +6,7 @@ use snafu::Snafu;
 
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeLogGroups failed: {}", source))]
