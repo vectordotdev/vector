@@ -27,6 +27,7 @@ type = "loki"
 inputs = ["syslog"]
 endpoint = "http://http-blackhole:8080"
 encoding.codec = "json"
+out_of_order_action = "accept"
 
 [sinks.loki.labels]
 host = "{{ .host }}"
