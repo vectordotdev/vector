@@ -237,8 +237,8 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
                 total_size += bytes_written;
             }
 
-            assert_buffer_size!(ledger, 32, total_size);
-            assert_reader_writer_v2_file_positions!(ledger, 0, 31);
+            assert_buffer_size!(ledger, MAX_FILE_ID, total_size);
+            assert_reader_writer_v2_file_positions!(ledger, 0, MAX_FILE_ID - 1);
 
             let assertion = assertion_registry
                 .build()
@@ -283,8 +283,8 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             // deleted.
             let first_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(first_record_read, Some(SizedRecord(record_size)));
-            assert_buffer_size!(ledger, 32, total_size);
-            assert_reader_writer_v2_file_positions!(ledger, 0, 31);
+            assert_buffer_size!(ledger, MAX_FILE_ID, total_size);
+            assert_reader_writer_v2_file_positions!(ledger, 0, MAX_FILE_ID - 1);
 
             acker.ack(1);
 
@@ -297,8 +297,8 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(record_size)));
-            assert_buffer_records!(ledger, 31);
-            assert_reader_writer_v2_file_positions!(ledger, 1, 31);
+            assert_buffer_records!(ledger, MAX_FILE_ID - 1);
+            assert_reader_writer_v2_file_positions!(ledger, 1, MAX_FILE_ID - 1);
 
             // Now our writer should be woken up as we deleted the first data file when we went
             // through the second read, which triggers a writer wake-up.  We await the future
@@ -313,7 +313,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             // because again, we haven't acknowledged the second read, so the record is still
             // considered to be outstanding.  We should, however, have moved on to our next data
             // file in the writer:
-            assert_buffer_records!(ledger, 32);
+            assert_buffer_records!(ledger, MAX_FILE_ID);
             assert_reader_writer_v2_file_positions!(ledger, 1, 0);
         }
     });

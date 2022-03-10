@@ -15,7 +15,7 @@ use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::disk_v2::{writer::RecordWriter, Buffer, DiskBufferConfig, WriterError},
+    variants::disk_v2::{writer::RecordWriter, Buffer, DiskBufferConfig, WriterError, common::MAX_FILE_ID},
     EventCount, WhenFull,
 };
 
@@ -243,7 +243,7 @@ impl LedgerModel {
     }
 
     fn get_writer_file_id(&self) -> u16 {
-        self.writer_file_id.load(Ordering::SeqCst)
+        self.writer_file_id.load(Ordering::SeqCst) % MAX_FILE_ID
     }
 
     fn increment_writer_file_id(&self) {
@@ -251,7 +251,7 @@ impl LedgerModel {
     }
 
     fn get_reader_file_id(&self) -> u16 {
-        self.reader_file_id.load(Ordering::SeqCst)
+        self.reader_file_id.load(Ordering::SeqCst) % MAX_FILE_ID
     }
 
     fn increment_reader_file_id(&self) {
@@ -763,7 +763,7 @@ impl BufferModel {
 
 proptest! {
     #[test]
-    fn model_check(config in arb_buffer_config(), actions in arb_actions(0..30)) {
+    fn model_check(config in arb_buffer_config(), actions in arb_actions(0..64)) {
         let rt = Builder::new_current_thread()
             .enable_all()
             .build()

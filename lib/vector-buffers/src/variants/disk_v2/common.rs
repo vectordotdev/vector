@@ -25,7 +25,7 @@ pub const DEFAULT_WRITE_BUFFER_SIZE: usize = 256 * 1024;
 #[cfg(not(test))]
 pub const MAX_FILE_ID: u16 = u16::MAX;
 #[cfg(test)]
-pub const MAX_FILE_ID: u16 = 32;
+pub const MAX_FILE_ID: u16 = 6;
 
 pub(crate) fn create_crc32c_hasher() -> Hasher {
     crc32fast::Hasher::new()
