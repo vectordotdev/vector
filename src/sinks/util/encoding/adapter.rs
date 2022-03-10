@@ -34,10 +34,10 @@ where
         + Debug
         + Clone,
 {
-    /// The encoding configuration.
-    Encoding(EncodingConfig),
     /// The legacy sink-specific encoding configuration.
     LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig, Migrator>),
+    /// The encoding configuration.
+    Encoding(EncodingConfig),
 }
 
 impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
