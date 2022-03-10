@@ -688,7 +688,7 @@ mod test {
 
         assert_eq!(
             events[0].as_log()[log_schema().host_key()],
-            format!("{}", from).into()
+            from.to_string().into()
         );
     }
 

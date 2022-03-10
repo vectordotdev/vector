@@ -14,9 +14,9 @@ impl Value {
             Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
             Value::Regex(regex) => regex.as_bytes(),
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(format!("{}", num)),
-            Value::Float(num) => Bytes::from(format!("{}", num)),
-            Value::Boolean(b) => Bytes::from(format!("{}", b)),
+            Value::Integer(num) => Bytes::from(num.to_string()),
+            Value::Float(num) => Bytes::from(num.to_string()),
+            Value::Boolean(b) => Bytes::from(b.to_string()),
             Value::Object(map) => {
                 Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map"))
             }
@@ -34,9 +34,9 @@ impl Value {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Regex(regex) => regex.as_str().to_string(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => format!("{}", num),
-            Value::Float(num) => format!("{}", num),
-            Value::Boolean(b) => format!("{}", b),
+            Value::Integer(num) => num.to_string(),
+            Value::Float(num) => num.to_string(),
+            Value::Boolean(b) => b.to_string(),
             Value::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
             Value::Null => "<null>".to_string(),
