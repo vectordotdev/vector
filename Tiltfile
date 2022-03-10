@@ -20,4 +20,4 @@ helm_resource(
         ]
     )
 
-k8s_resource(workload='chart-vector', port_forwards=8686)
+k8s_resource(workload='vector', port_forwards=8686)

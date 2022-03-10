@@ -226,7 +226,7 @@ impl Source {
         config: &Config,
         globals: &GlobalOptions,
         key: &ComponentKey,
-        proxy: &ProxyConfig,
+        _proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
