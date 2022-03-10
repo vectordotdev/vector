@@ -60,7 +60,7 @@ pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) mod kafka;
 #[allow(unreachable_pub)]
-pub(crate) mod kubernetes;
+pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
@@ -85,7 +85,7 @@ pub(crate) mod stream;
 #[allow(unreachable_pub)]
 mod tap;
 pub(crate) mod tcp;
-pub(crate) mod template;
+pub mod template;
 pub mod test_util;
 #[allow(unreachable_pub)]
 pub(crate) mod tls;
