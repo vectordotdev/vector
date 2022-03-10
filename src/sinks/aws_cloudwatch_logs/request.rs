@@ -87,7 +87,7 @@ impl Future for CloudwatchFuture {
                         Ok(response) => response,
                         Err(err) => {
                             match &err {
-                                SdkError::ServiceError { err, raw } => match err.kind {
+                                SdkError::ServiceError { err, raw: _ } => match err.kind {
                                     DescribeLogStreamsErrorKind::ResourceNotFoundException(_) => {
                                         if self.create_missing_group {
                                             info!("Log group provided does not exist; creating a new one.");
@@ -135,7 +135,7 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw } => match err.kind {
+                                SdkError::ServiceError { err, raw: _ } => match err.kind {
                                     CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
                                         true
                                     }
@@ -162,7 +162,7 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw } => match err.kind {
+                                SdkError::ServiceError { err, raw: _ } => match err.kind {
                                     CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
                                         true
                                     }

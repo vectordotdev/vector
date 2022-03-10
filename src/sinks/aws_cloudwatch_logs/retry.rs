@@ -1,7 +1,6 @@
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatchlogs::error::{
-    CreateLogStreamErrorKind, DescribeLogStreamsError, DescribeLogStreamsErrorKind,
-    PutLogEventsError, PutLogEventsErrorKind,
+    CreateLogStreamErrorKind, DescribeLogStreamsErrorKind, PutLogEventsErrorKind,
 };
 use std::marker::PhantomData;
 
@@ -35,19 +34,19 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             CloudwatchError::Put(err) => match err {
-                SdkError::ServiceError { err, raw } => match err.kind {
+                SdkError::ServiceError { err, raw: _ } => match err.kind {
                     PutLogEventsErrorKind::ServiceUnavailableException(_) => {
                         error!(message = "Put logs service unavailable.", %error);
                         true
                     }
                     _ => false,
                 },
-                SdkError::DispatchFailure(err) => {
+                SdkError::DispatchFailure(_err) => {
                     error!(message = "Put logs HTTP dispatch.", %error);
                     true
                 }
 
-                SdkError::ResponseError { err, raw } => {
+                SdkError::ResponseError { err: _, raw } => {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
@@ -62,7 +61,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                 SdkError::TimeoutError(_) => true,
             },
             CloudwatchError::Describe(err) => match err {
-                SdkError::ServiceError { err, raw } => match err.kind {
+                SdkError::ServiceError { err, raw: _ } => match err.kind {
                     DescribeLogStreamsErrorKind::ServiceUnavailableException(_) => {
                         error!(message = "Describe streams service unavailable.", %error);
                         true
@@ -74,7 +73,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     error!(message = "Describe streams HTTP dispatch.", %error);
                     true
                 }
-                SdkError::ResponseError { err, raw } => {
+                SdkError::ResponseError { err: _, raw } => {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
@@ -88,7 +87,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                 SdkError::ConstructionFailure(_) => false,
             },
             CloudwatchError::CreateStream(err) => match err {
-                SdkError::ServiceError { err, raw } => match err.kind {
+                SdkError::ServiceError { err, raw: _ } => match err.kind {
                     CreateLogStreamErrorKind::ServiceUnavailableException(_) => {
                         error!(message = "Create stream service unavailable.", %error);
                         true
@@ -100,7 +99,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     error!(message = "Create stream HTTP dispatch.", %error);
                     true
                 }
-                SdkError::ResponseError { err, raw } => {
+                SdkError::ResponseError { err: _, raw } => {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);
