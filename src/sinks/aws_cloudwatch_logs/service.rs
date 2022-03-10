@@ -193,7 +193,7 @@ impl CloudwatchLogsSvc {
     pub fn new(
         config: &CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
-        client: CloudWatchLogsClient,
+        client: CloudwatchLogsClient,
     ) -> Self {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
@@ -290,7 +290,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 }
 
 pub struct CloudwatchLogsSvc {
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -310,5 +310,5 @@ pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
 }

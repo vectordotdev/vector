@@ -54,7 +54,7 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
         // TODO: make more generic
 
         let mut config_builder = aws_sdk_cloudwatchlogs::config::Builder::new()
@@ -99,7 +99,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let client = self.create_client(cx.proxy())?;
+        let client = self.create_client(cx.proxy()).await?;
         let svc = request.service(
             CloudwatchRetryLogic::new(),
             CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),

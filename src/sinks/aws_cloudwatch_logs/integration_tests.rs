@@ -431,7 +431,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: Default::default(),
     };
 
-    let client = config.create_client(&ProxyConfig::default()).unwrap();
+    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
     healthcheck(config, client).await.unwrap();
 }
 

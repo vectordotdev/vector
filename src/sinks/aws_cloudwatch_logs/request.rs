@@ -86,19 +86,22 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            match err.kind {
-                                DescribeLogStreamsErrorKind::ResourceNotFoundException(x) => {
-                                    if self.create_missing_group {
-                                        info!("Log group provided does not exist; creating a new one.");
+                            match &err {
+                                SdkError::ServiceError { err, raw } => match err.kind {
+                                    DescribeLogStreamsErrorKind::ResourceNotFoundException(_) => {
+                                        if self.create_missing_group {
+                                            info!("Log group provided does not exist; creating a new one.");
 
-                                        self.state =
-                                            State::CreateGroup(self.client.create_log_group());
-                                        continue;
+                                            self.state =
+                                                State::CreateGroup(self.client.create_log_group());
+                                            continue;
+                                        }
                                     }
-                                }
-                                _ => return Poll::Ready(Err(CloudwatchError::Describe(err))),
+                                    _ => {}
+                                },
+                                _ => {}
                             }
-                            unimplemented!()
+                            return Poll::Ready(Err(CloudwatchError::Describe(err)));
                         }
                     };
 
@@ -130,12 +133,20 @@ impl Future for CloudwatchFuture {
                 State::CreateGroup(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
-                        Err(err) => match err.kind {
-                            CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
-                                // do nothing
+                        Err(err) => {
+                            let resource_already_exists = match &err {
+                                SdkError::ServiceError { err, raw } => match err.kind {
+                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
+                                        true
+                                    }
+                                    _ => false,
+                                },
+                                _ => false,
+                            };
+                            if !resource_already_exists {
+                                return Poll::Ready(Err(CloudwatchError::CreateGroup(err)));
                             }
-                            _ => return Poll::Ready(Err(CloudwatchError::CreateGroup(err))),
-                        },
+                        }
                     };
 
                     info!(message = "Group created.", name = %self.client.group_name);
@@ -149,12 +160,20 @@ impl Future for CloudwatchFuture {
                 State::CreateStream(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
-                        Err(err) => match err.kind {
-                            CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
-                                // do nothing
+                        Err(err) => {
+                            let resource_already_exists = match &err {
+                                SdkError::ServiceError { err, raw } => match err.kind {
+                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
+                                        true
+                                    }
+                                    _ => false,
+                                },
+                                _ => false,
+                            };
+                            if !resource_already_exists {
+                                return Poll::Ready(Err(CloudwatchError::CreateStream(err)));
                             }
-                            _ => return Poll::Ready(Err(CloudwatchError::CreateStream(err))),
-                        },
+                        }
                     };
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
