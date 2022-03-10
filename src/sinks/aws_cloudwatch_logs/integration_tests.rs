@@ -21,7 +21,7 @@ use crate::aws::aws_sdk::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_sqs::{Endpoint, Region};
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use http::Uri;
 
 const GROUP_NAME: &str = "vector-cw";

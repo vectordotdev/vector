@@ -1,4 +1,4 @@
-use aws_sdk_cloudwatch::{Endpoint, Region};
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use std::num::NonZeroU64;
 
 use futures::FutureExt;
