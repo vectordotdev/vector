@@ -1,18 +1,74 @@
 mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
 }
 
-/// Use if you want to pre-parse paths so it can be used multiple times
-/// The return value implements `Path` so it can be used directly
+impl<'de> Deserialize<'de> for OwnedPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let path: String = Deserialize::deserialize(deserializer)?;
+        Ok(parse_path(&path))
+    }
+}
+
+impl Serialize for OwnedPath {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // TODO: Implement canonical way to serialize segments.
+        todo!()
+    }
+}
+
+impl OwnedPath {
+    pub fn root() -> Self {
+        vec![].into()
+    }
+
+    pub fn push_field(&mut self, field: &str) {
+        self.segments.push(OwnedSegment::field(field));
+    }
+
+    pub fn with_field_appended(&self, field: &str) -> Self {
+        let mut new_path = self.clone();
+        new_path.push_field(field);
+        new_path
+    }
+
+    pub fn push_index(&mut self, index: usize) {
+        self.segments.push(OwnedSegment::index(index));
+    }
+
+    pub fn with_index_appended(&self, index: usize) -> Self {
+        let mut new_path = self.clone();
+        new_path.push_index(index);
+        new_path
+    }
+
+    pub fn single_field(field: &str) -> Self {
+        vec![OwnedSegment::field(field)].into()
+    }
+}
+
+impl From<Vec<OwnedSegment>> for OwnedPath {
+    fn from(segments: Vec<OwnedSegment>) -> Self {
+        Self { segments }
+    }
+}
+
+/// Use if you want to pre-parse paths so it can be used multiple times.
+/// The return value implements `Path` so it can be used directly.
 pub fn parse_path(path: &str) -> OwnedPath {
     let segments = JitPath::new(path)
         .segment_iter()
@@ -95,7 +151,7 @@ impl<'a> Path<'a> for &'a str {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
     Field(String),
     Index(usize),
@@ -103,6 +159,12 @@ pub enum OwnedSegment {
 }
 
 impl OwnedSegment {
+    pub fn field(value: &str) -> OwnedSegment {
+        OwnedSegment::Field(value.into())
+    }
+    pub fn index(value: usize) -> OwnedSegment {
+        OwnedSegment::Index(value)
+    }
     pub fn is_field(&self) -> bool {
         matches!(self, OwnedSegment::Field(_))
     }
@@ -134,6 +196,9 @@ pub enum BorrowedSegment<'a> {
 impl BorrowedSegment<'_> {
     pub fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
+    }
+    pub fn index(value: usize) -> BorrowedSegment<'static> {
+        BorrowedSegment::Index(value)
     }
     pub fn is_field(&self) -> bool {
         matches!(self, BorrowedSegment::Field(_))

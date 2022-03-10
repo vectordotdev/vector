@@ -11,6 +11,8 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
@@ -342,6 +344,18 @@ jobs:
       - run: make check-component-features
       - name: Stop sccache
         run: sccache --stop-server
+
+  check-msrv:
+    name: Check MSRV
+    runs-on: [self-hosted, linux, x64, general]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: cargo install cargo-msrv --version 0.15.1
+      - run: cargo msrv verify
 
   checks:
     name: Checks

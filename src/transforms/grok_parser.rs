@@ -2,7 +2,7 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use grok::Pattern;
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -97,7 +97,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<OwnedSegment>>,
+    paths: HashMap<String, OwnedPath>,
 }
 
 impl Clone for GrokParser {
@@ -130,7 +130,7 @@ impl FunctionTransform for GrokParser {
                                 event.insert(path, value);
                             } else {
                                 let path = parse_path(name);
-                                self.paths.insert(name.to_string(), path.segments.clone());
+                                self.paths.insert(name.to_string(), path.clone());
                                 event.insert(&path, value);
                             }
                         }
