@@ -86,7 +86,7 @@ remap: functions: redact: {
 				"""#
 			return: {
 				name: "John Doe"
-				email:  "[REDACTED]"
+				email: "[REDACTED]"
 			}
 		},
 	]
