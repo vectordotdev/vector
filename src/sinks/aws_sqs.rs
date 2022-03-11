@@ -19,8 +19,8 @@ use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext, SinkDescription,
