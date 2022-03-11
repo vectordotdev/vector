@@ -4,7 +4,12 @@
 
 load('ext://helm_resource', 'helm_resource', 'helm_repo')
 
-docker_build(ref='timberio/vector', context='.', dockerfile='tilt/Dockerfile')
+docker_build(
+    ref='timberio/vector',
+    context='.',
+    build_args={'RUST_VERSION': '1.58'},
+    dockerfile='tilt/Dockerfile'
+    )
 
 helm_repo(name='vectordotdev', url='https://helm.vector.dev')
 helm_resource(
