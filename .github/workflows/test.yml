@@ -92,7 +92,6 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
       - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
@@ -106,21 +105,9 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
-      - name: Stop sccache
-        run: sccache --stop-server
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -133,34 +120,12 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-      - run: make ci-sweep
       - uses: actions/cache@v2.1.7
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test-cli
-      - name: Stop sccache
-        run: sccache --stop-server
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -173,9 +138,7 @@ jobs:
       CARGO_INCREMENTAL: 0
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
-      - run: make ci-sweep
       - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
@@ -188,21 +151,9 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test-behavior
       - run: make check-examples
       - run: make test-docs
-      - name: Stop sccache
-        run: sccache --stop-server
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
@@ -225,7 +176,6 @@ jobs:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - run: make ci-sweep
       - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
@@ -315,50 +265,10 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test-vrl
-      - name: Stop sccache
-        run: sccache --stop-server
-
-  check-stdlib-features:
-    name: VRL Stdlib Features - Linux
-    continue-on-error: true
-    runs-on: [linux, test-runner]
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: cargo install cargo-hack
-      - run: make check-stdlib-features
-      - name: Stop sccache
-        run: sccache --stop-server
 
   check-component-features:
     name: Component Features - Linux
@@ -366,25 +276,12 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server || true
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: cargo install cargo-hack
       - run: make check-component-features
-      - name: Stop sccache
-        run: sccache --stop-server
 
   check-msrv:
     name: Check MSRV
@@ -392,7 +289,6 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: cargo install cargo-msrv --version 0.15.1
