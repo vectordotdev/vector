@@ -537,6 +537,7 @@ transforms-logs = [
   "transforms-route",
   "transforms-sample",
   "transforms-split",
+  "transforms-switch",
   "transforms-throttle",
   "transforms-tokenizer",
 ]
@@ -551,6 +552,7 @@ transforms-metrics = [
   "transforms-pipelines",
   "transforms-remap",
   "transforms-remove_tags",
+  "transforms-switch",
   "transforms-tag_cardinality_limit",
   "transforms-throttle",
 ]
@@ -586,6 +588,7 @@ transforms-rename_fields = []
 transforms-route = []
 transforms-sample = ["seahash"]
 transforms-split = []
+transforms-switch = []
 transforms-tag_cardinality_limit = ["bloom"]
 transforms-throttle = ["governor"]
 transforms-tokenizer = []

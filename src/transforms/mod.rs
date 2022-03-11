@@ -63,6 +63,8 @@ pub mod route;
 pub mod sample;
 #[cfg(feature = "transforms-split")]
 pub mod split;
+#[cfg(feature = "transforms-switch")]
+pub mod switch;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
