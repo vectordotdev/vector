@@ -2,13 +2,12 @@ use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
 use futures::{stream, stream::StreamExt};
-use rusoto_core::Region;
-use rusoto_s3::S3Client;
-use rusoto_sqs::SqsClient;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use super::util::MultilineConfig;
+use crate::aws::aws_sdk::create_client;
+use crate::common::sqs::SqsClientBuilder;
 use crate::{
     aws::{
         auth::AwsAuthentication,
@@ -112,30 +111,53 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         use std::sync::Arc;
 
-        let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
+        // let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
-        let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
-        let creds: Arc<rusoto::AwsCredentialsProvider> = self
-            .auth
-            .build(&region, self.assume_role.clone())
-            .context(CredentialsSnafu {})?
-            .into();
-        let s3_client = S3Client::new_with(
-            client.clone(),
-            Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
-            region.clone(),
-        );
+        // let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
+        // let creds: Arc<rusoto::AwsCredentialsProvider> = self
+        //     .auth
+        //     .build(&region, self.assume_role.clone())
+        //     .context(CredentialsSnafu {})?
+        //     .into();
+
+        // let s3_client = S3Client::new_with(
+        //     client.clone(),
+        //     Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
+        //     region.clone(),
+        // );
+
+        let region = if let Some(region) = self.region.region() {
+            region
+        } else {
+            return Err(CreateSqsIngestorError::RegionMissing);
+        };
+
+        let s3_client = create_client(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+        )
+        .await?;
 
         match self.sqs {
             Some(ref sqs) => {
-                let sqs_client = SqsClient::new_with(
-                    client.clone(),
-                    Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
-                    region.clone(),
-                );
+                // let sqs_client = SqsClient::new_with(
+                //     client.clone(),
+                //     Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
+                //     region.clone(),
+                // );
+
+                let sqs_client = create_client::<SqsClientBuilder>(
+                    &self.auth,
+                    self.region.region(),
+                    self.region.endpoint()?,
+                    proxy,
+                )
+                .await?;
 
                 sqs::Ingestor::new(
-                    region.clone(),
+                    region,
                     sqs_client,
                     s3_client,
                     sqs.clone(),
@@ -160,8 +182,8 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Could not parse region configuration: {}", source))]
-    RegionParse { source: rusoto::region::ParseError },
+    #[snafu(display("Region is required: {}", source))]
+    RegionMissing,
 }
 
 /// None if body is empty

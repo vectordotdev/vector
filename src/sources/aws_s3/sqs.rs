@@ -4,18 +4,21 @@ use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
-use rusoto_core::{Region, RusotoError};
-use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
-use rusoto_sqs::{
-    DeleteMessageBatchError, DeleteMessageBatchRequest, DeleteMessageBatchRequestEntry,
-    DeleteMessageBatchResult, Message, ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
-};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_core::ByteSizeOf;
+
+use aws_sdk_s3::error::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
+use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::output::DeleteMessageBatchOutput;
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_client::SdkError;
+use aws_types::region::Region;
 
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
@@ -99,7 +102,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
-        source: RusotoError<GetObjectError>,
+        source: SdkError<GetObjectError>,
         bucket: String,
         key: String,
     },
@@ -142,9 +145,9 @@ pub struct State {
     compression: super::Compression,
 
     queue_url: String,
-    poll_secs: u32,
+    poll_secs: i32,
     client_concurrency: u32,
-    visibility_timeout_secs: i64,
+    visibility_timeout_secs: i32,
     delete_message: bool,
 }
 
@@ -288,10 +291,12 @@ impl IngestorProcess {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
-                        delete_entries.push(DeleteMessageBatchRequestEntry {
-                            id: message_id,
-                            receipt_handle,
-                        });
+                        delete_entries.push(
+                            DeleteMessageBatchRequestEntry::builder()
+                                .id(message_id)
+                                .receipt_handle(receipt_handle)
+                                .build(),
+                        );
                     }
                 }
                 Err(err) => {
@@ -382,11 +387,10 @@ impl IngestorProcess {
         let object = self
             .state
             .s3_client
-            .get_object(GetObjectRequest {
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
-                ..Default::default()
-            })
+            .get_object()
+            .bucket(s3_event.s3.bucket.name)
+            .key(s3_event.s3.object.key)
+            .send()
             .await
             .context(GetObjectSnafu {
                 bucket: s3_event.s3.bucket.name.clone(),
@@ -397,8 +401,7 @@ impl IngestorProcess {
         let timestamp = object
             .last_modified
             .and_then(|t| {
-                DateTime::parse_from_rfc2822(&t)
-                    .map(|ts| Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos()))
+                t.map(|ts| Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos()))
                     .ok()
             })
             .unwrap_or_else(Utc::now);
@@ -534,16 +537,15 @@ impl IngestorProcess {
         }
     }
 
-    async fn receive_messages(&mut self) -> Result<Vec<Message>, RusotoError<ReceiveMessageError>> {
+    async fn receive_messages(&mut self) -> Result<Vec<Message>, SdkError<ReceiveMessageError>> {
         self.state
             .sqs_client
-            .receive_message(ReceiveMessageRequest {
-                queue_url: self.state.queue_url.clone(),
-                max_number_of_messages: Some(10),
-                visibility_timeout: Some(self.state.visibility_timeout_secs),
-                wait_time_seconds: Some(i64::from(self.state.poll_secs)),
-                ..Default::default()
-            })
+            .receive_message()
+            .queue_url(self.state.queue_url.clone())
+            .max_number_of_messages(10)
+            .visibility_timeout(self.state.visibility_timeout_secs as i32)
+            .wait_time_seconds(self.state.poll_secs)
+            .send()
             .map_ok(|res| res.messages.unwrap_or_default())
             .await
     }
@@ -551,13 +553,13 @@ impl IngestorProcess {
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
-    ) -> Result<DeleteMessageBatchResult, RusotoError<DeleteMessageBatchError>> {
+    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
         self.state
             .sqs_client
-            .delete_message_batch(DeleteMessageBatchRequest {
-                queue_url: self.state.queue_url.clone(),
-                entries,
-            })
+            .delete_message_batch()
+            .queue_url(self.state.queue_url.clone())
+            .set_entries(Some(entries))
+            .send()
             .await
     }
 }
