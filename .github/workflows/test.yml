@@ -155,7 +155,6 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: make test-shutdown
       - run: make test-cli
       - run: make test-behavior
       - run: make check-examples
