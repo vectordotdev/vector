@@ -82,13 +82,7 @@ pub trait Function: Send + Sync + fmt::Debug {
         &self,
         _ctx: &mut Context,
         _args: &mut VmArgumentList,
-    ) -> Result<Value, ExpressionError> {
-        Err(ExpressionError::Error {
-            message: "unimplemented".to_string(),
-            labels: Vec::new(),
-            notes: Vec::new(),
-        })
-    }
+    ) -> Result<Value, ExpressionError>;
 }
 
 // -----------------------------------------------------------------------------
