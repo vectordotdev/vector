@@ -715,7 +715,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
+        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
     }
 
     fn create_sink(

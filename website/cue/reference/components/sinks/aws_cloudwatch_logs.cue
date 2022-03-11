@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_logs: components._aws & {
+components: sinks: aws_cloudwatch_logs: components._aws_new_sdk & {
 	title: "AWS Cloudwatch Logs"
 
 	classes: {

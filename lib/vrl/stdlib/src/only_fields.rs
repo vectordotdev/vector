@@ -28,7 +28,7 @@ impl Function for OnlyFields {
         paths.push(arguments.required_path("1")?);
 
         for i in 2..=16 {
-            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
+            if let Some(path) = arguments.optional_path(&i.to_string())? {
                 paths.push(path)
             }
         }

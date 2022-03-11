@@ -90,6 +90,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c38b6b6b79f671c25e1a3e785b7b82d7562ffc9cd3efdc98627e5668a2472490"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arc-swap"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -553,7 +562,7 @@ dependencies = [
  "ring",
  "tokio",
  "tower",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "zeroize",
 ]
 
@@ -567,7 +576,7 @@ dependencies = [
  "aws-types",
  "http",
  "regex",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -582,7 +591,52 @@ dependencies = [
  "http",
  "lazy_static",
  "percent-encoding",
- "tracing 0.1.31",
+ "tracing 0.1.32",
+]
+
+[[package]]
+name = "aws-sdk-cloudwatch"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8196fee59818e0097765fce8ed5fb824be526a4b5e33ae3c4d173059828cb1"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-query",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
+name = "aws-sdk-cloudwatchlogs"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9cefdd4806407b31b7a06672ddc02eb37d97a7ea0ce41dc71ffe6787b6a9369"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
 ]
 
 [[package]]
@@ -663,7 +717,7 @@ dependencies = [
  "aws-types",
  "http",
  "thiserror",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -681,7 +735,7 @@ dependencies = [
  "regex",
  "ring",
  "time 0.3.7",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -717,7 +771,7 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tower",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -737,7 +791,7 @@ dependencies = [
  "pin-project 1.0.10",
  "tokio",
  "tokio-util 0.6.8",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -752,7 +806,7 @@ dependencies = [
  "http-body",
  "pin-project 1.0.10",
  "tower",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -806,7 +860,7 @@ dependencies = [
  "aws-smithy-client",
  "aws-smithy-types",
  "rustc_version 0.4.0",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "zeroize",
 ]
 
@@ -1477,7 +1531,7 @@ dependencies = [
  "prost-types 0.9.0",
  "tonic",
  "tonic-build",
- "tracing-core 0.1.22",
+ "tracing-core 0.1.23",
 ]
 
 [[package]]
@@ -1499,8 +1553,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-subscriber",
 ]
 
@@ -1884,7 +1938,7 @@ dependencies = [
  "serde_json",
  "strum_macros 0.24.0",
  "thiserror",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "value",
  "vector_common",
  "vrl-compiler",
@@ -1946,6 +2000,17 @@ name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "syn 1.0.84",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b24629208e87a2d8b396ff43b15c4afb0a69cea3fbbaa9ed9b92b7c02f0aed73"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -2417,7 +2482,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "winapi 0.3.9",
 ]
 
@@ -2879,7 +2944,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util 0.6.8",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -3219,7 +3284,7 @@ dependencies = [
  "socket2 0.4.4",
  "tokio",
  "tower-service",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "want",
 ]
 
@@ -3563,7 +3628,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tokio",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -3810,7 +3875,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -4009,8 +4074,8 @@ dependencies = [
  "metrics",
  "metrics-util",
  "once_cell",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-subscriber",
 ]
 
@@ -6094,20 +6159,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusoto_cloudwatch"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b42eaedbdf15b452446aa00aee94230c41443673985807f1c12fb1fb1cc5799"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde_urlencoded 0.7.0",
- "xml-rs",
-]
-
-[[package]]
 name = "rusoto_core"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6185,20 +6236,6 @@ name = "rusoto_kinesis"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9060c90faec6784573af8379107ff26de934206231f4431dfa878382e5584e1b"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_logs"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a61dc73e8cda5d732b8512e00093c3537db6e95f1137998147f4d6d65041d129"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
@@ -7008,7 +7045,7 @@ dependencies = [
  "serde_yaml",
  "snafu",
  "tokio",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "tracing-subscriber",
  "uuid",
 ]
@@ -7574,7 +7611,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2 0.4.4",
  "tokio-macros",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "winapi 0.3.9",
 ]
 
@@ -7785,7 +7822,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "tracing-futures 0.2.5",
 ]
 
@@ -7818,7 +7855,7 @@ dependencies = [
  "tokio-util 0.7.0",
  "tower-layer",
  "tower-service",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -7859,15 +7896,15 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.31"
+version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6c650a8ef0cd2dd93736f033d21cbd1224c5a967aa0c258d00fcf7dafef9b9f"
+checksum = "4a1bdf54a7c28a2bbf701e1d2233f6c77f473486b94bee4f9678da5a148dca7f"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
  "pin-project-lite",
- "tracing-attributes 0.1.19",
- "tracing-core 0.1.22",
+ "tracing-attributes 0.1.20",
+ "tracing-core 0.1.23",
 ]
 
 [[package]]
@@ -7882,9 +7919,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.19"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8276d9a4a3a558d7b7ad5303ad50b53d58264641b82914b7ada36bd762e7a716"
+checksum = "2e65ce065b4b5c53e73bb28912318cb8c9e9ad3921f1d669eb0e68b4c8143a2b"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -7901,9 +7938,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.22"
+version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03cfcb51380632a72d3111cb8d3447a8d908e577d31beeac006f836383d29a23"
+checksum = "aa31669fa42c09c34d94d8165dd2012e8ff3c66aca50f3bb226b68f216f2706c"
 dependencies = [
  "lazy_static",
  "valuable",
@@ -7915,8 +7952,8 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-subscriber",
 ]
 
@@ -7929,7 +7966,7 @@ dependencies = [
  "futures 0.3.21",
  "futures-task",
  "pin-project 1.0.10",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -7949,8 +7986,8 @@ dependencies = [
  "criterion",
  "dashmap 5.1.0",
  "mock_instant",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-subscriber",
 ]
 
@@ -7962,7 +7999,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.22",
+ "tracing-core 0.1.23",
 ]
 
 [[package]]
@@ -7972,7 +8009,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6b213177105856957181934e4920de57730fc69bf42c37ee5bb664d406d9e1"
 dependencies = [
  "serde",
- "tracing-core 0.1.22",
+ "tracing-core 0.1.23",
 ]
 
 [[package]]
@@ -7990,8 +8027,8 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8392,7 +8429,7 @@ dependencies = [
  "serde_json",
  "snafu",
  "toml",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -8422,8 +8459,11 @@ dependencies = [
  "atty",
  "avro-rs",
  "aws-config",
+ "aws-sdk-cloudwatch",
+ "aws-sdk-cloudwatchlogs",
  "aws-sdk-sqs",
  "aws-smithy-client",
+ "aws-smithy-http",
  "aws-types",
  "azure_core",
  "azure_storage",
@@ -8520,13 +8560,11 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "roaring",
- "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
  "rusoto_es",
  "rusoto_firehose",
  "rusoto_kinesis",
- "rusoto_logs",
  "rusoto_s3",
  "rusoto_signature",
  "rusoto_sqs",
@@ -8566,8 +8604,8 @@ dependencies = [
  "tonic-build",
  "tower",
  "tower-test",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -8665,7 +8703,7 @@ dependencies = [
  "tokio-stream",
  "tokio-test",
  "tokio-util 0.7.0",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "tracing-fluent-assertions",
  "tracing-subscriber",
  "vector_common",
@@ -8686,7 +8724,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "snafu",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "value",
 ]
 
@@ -8744,8 +8782,8 @@ dependencies = [
  "tokio-util 0.6.8",
  "toml",
  "tower",
- "tracing 0.1.31",
- "tracing-core 0.1.22",
+ "tracing 0.1.32",
+ "tracing-core 0.1.23",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
@@ -8825,7 +8863,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "value",
  "vector_common",
  "vrl-core",
@@ -8854,6 +8892,7 @@ dependencies = [
 name = "vrl-parser"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "lalrpop",
  "lalrpop-util",
  "lookup",
@@ -8898,7 +8937,7 @@ dependencies = [
  "sha3",
  "strip-ansi-escapes",
  "syslog_loose",
- "tracing 0.1.31",
+ "tracing 0.1.32",
  "uaparser",
  "url",
  "utf8-width",
@@ -9014,7 +9053,7 @@ dependencies = [
  "tokio-tungstenite 0.15.0",
  "tokio-util 0.6.8",
  "tower-service",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]

@@ -91,16 +91,16 @@ resource "kubernetes_deployment" "vector" {
             read_only  = true
           }
 
+          # WARNING limits should match requests and both cpu and memory should be specified
+          # This guarantees that the Vector pod is given a QOS of Guaranteed
           resources {
-            # Because we do not have the ability to self-constrain vector's
-            # memory consumption we only make a request here on memory. This
-            # avoids vector crashing for want of a malloc.
             limits = {
               cpu = var.vector_cpus
+              memory = "4Gi"
             }
             requests = {
               cpu    = var.vector_cpus
-              memory = "512Mi"
+              memory = "4Gi"
             }
           }
 

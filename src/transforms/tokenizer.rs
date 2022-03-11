@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str};
 
 use bytes::Bytes;
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 
@@ -72,7 +72,7 @@ impl TransformConfig for TokenizerConfig {
 
 #[derive(Clone, Debug)]
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<OwnedSegment>, Conversion)>,
+    field_names: Vec<(String, OwnedPath, Conversion)>,
     field: String,
     drop_field: bool,
 }
@@ -88,7 +88,7 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path = parse_path(&name).segments;
+                let path = parse_path(&name);
                 (name, path, conversion)
             })
             .collect();

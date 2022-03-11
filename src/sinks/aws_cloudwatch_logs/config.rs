@@ -1,12 +1,13 @@
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use std::num::NonZeroU64;
 
 use futures::FutureExt;
-use rusoto_logs::CloudWatchLogsClient;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
+use crate::aws::aws_sdk::{create_client, ClientBuilder};
 use crate::{
-    aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_cloudwatch_logs::{
@@ -20,8 +21,46 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsOptions,
 };
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_client::erase::DynConnector;
+use aws_types::credentials::SharedCredentialsProvider;
+
+pub struct CloudwatchLogsClientBuilder;
+
+impl ClientBuilder for CloudwatchLogsClientBuilder {
+    type ConfigBuilder = aws_sdk_cloudwatchlogs::config::Builder;
+    type Client = CloudwatchLogsClient;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder {
+        aws_sdk_cloudwatchlogs::config::Builder::new().credentials_provider(credentials_provider)
+    }
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder {
+        builder.endpoint_resolver(endpoint)
+    }
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
+        builder.region(region)
+    }
+
+    fn client_from_conf_conn(
+        builder: Self::ConfigBuilder,
+        connector: DynConnector,
+    ) -> Self::Client {
+        Self::Client::from_conf_conn(builder.build(), connector)
+    }
+
+    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
+        Self::Client::from_conf(builder.build())
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -53,15 +92,14 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
-        let region = (&self.region).try_into()?;
-
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(CloudWatchLogsClient::new_with_client(client, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
+        create_client::<CloudwatchLogsClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+        )
+        .await
     }
 }
 
@@ -71,7 +109,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let client = self.create_client(cx.proxy())?;
+        let client = self.create_client(cx.proxy()).await?;
         let svc = request.service(
             CloudwatchRetryLogic::new(),
             CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),

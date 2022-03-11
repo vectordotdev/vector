@@ -141,7 +141,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -186,7 +186,7 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, soak_builder]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -530,6 +530,12 @@ jobs:
           ./soaks/bin/plot_analysis --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                     --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
+
+      - name: Plot up analysis
+        run: |
+          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
+          ./soaks/bin/plot_up --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+                              --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
 
       - name: Upload plots
         uses: actions/upload-artifact@v1
