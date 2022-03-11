@@ -7,20 +7,18 @@ fn assert_eq(
 ) -> std::result::Result<Value, ExpressionError> {
     if left == right {
         Ok(true.into())
+    } else if let Some(message) = message {
+        let message = message.try_bytes_utf8_lossy()?.into_owned();
+        Err(ExpressionError::Error {
+            message: message.clone(),
+            labels: vec![],
+            notes: vec![Note::UserErrorMessage(message)],
+        })
     } else {
-        if let Some(message) = message {
-            let message = message.try_bytes_utf8_lossy()?.into_owned();
-            Err(ExpressionError::Error {
-                message: message.clone(),
-                labels: vec![],
-                notes: vec![Note::UserErrorMessage(message)],
-            })
-        } else {
-            Err(ExpressionError::from(format!(
-                "assertion failed: {} == {}",
-                left, right
-            )))
-        }
+        Err(ExpressionError::from(format!(
+            "assertion failed: {} == {}",
+            left, right
+        )))
     }
 }
 

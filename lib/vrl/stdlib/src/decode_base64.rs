@@ -9,7 +9,7 @@ fn decode_base64(
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
     let charset = charset
-        .map(|v| Value::try_bytes(v))
+        .map(Value::try_bytes)
         .transpose()?
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?

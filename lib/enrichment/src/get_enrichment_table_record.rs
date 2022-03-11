@@ -30,7 +30,7 @@ fn get_enrichment_table_record(
     let data = enrichment_tables.find_table_row(
         table,
         case_sensitive,
-        &condition,
+        condition,
         select.as_ref().map(|select| select.as_ref()),
         index,
     )?;

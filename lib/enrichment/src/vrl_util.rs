@@ -41,7 +41,7 @@ impl DiagnosticError for Error {
 }
 
 /// Evaluates the condition object to search the enrichment tables with.
-pub(crate) fn evaluate_condition<'a>(key: &'a str, value: Value) -> Result<Condition<'a>> {
+pub(crate) fn evaluate_condition(key: &str, value: Value) -> Result<Condition> {
     Ok(match value {
         Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {
@@ -147,7 +147,7 @@ pub(crate) fn index_from_args(
         .unwrap();
 
     let index = Some(
-        add_index(registry, &table, case_sensitive, &condition)
+        add_index(registry, &table, case_sensitive, condition)
             .map_err(|err| Box::new(err) as Box<_>)?,
     );
 

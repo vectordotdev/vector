@@ -10,7 +10,7 @@ fn join(array: Value, separator: Option<Value>) -> std::result::Result<Value, Ex
         .collect::<Result<Vec<Cow<'_, str>>>>()
         .map_err(|_| "all array items must be strings")?;
     let separator: String = separator
-        .map(|v| Value::try_bytes(v))
+        .map(Value::try_bytes)
         .transpose()?
         .map(|s| String::from_utf8_lossy(&s).to_string())
         .unwrap_or_else(|| "".into());
