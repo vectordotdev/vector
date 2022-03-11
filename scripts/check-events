@@ -12,10 +12,10 @@ EVENT_CLASSES = {
     'Bytes received.', ['received_bytes'], ['byte_size'], ['protocol']
   ],
   'EventsReceived' => [
-    'Events received.', ['received_events', 'received_event_bytes'], ['count', 'byte_size']
+    'Events received.', ['received_events', 'received_event_bytes'], ['count', 'byte_size'], []
   ],
   'EventsSent' => [
-    'Events sent.', ['sent_events', 'sent_event_bytes'], ['count', 'byte_size']
+    'Events sent.', ['sent_events', 'sent_event_bytes'], ['count', 'byte_size'], []
   ],
   'BytesSent' => [
     'Bytes sent.', ['sent_bytes'], ['byte_size'], ['protocol']
