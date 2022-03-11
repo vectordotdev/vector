@@ -334,7 +334,7 @@ components: {
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
 				enabled:       bool
-				common:        bool | false
+				common?:       bool
 				max_bytes?:    uint | null
 				max_events?:   uint | null
 				timeout_secs?: float | null
