@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -73,11 +73,12 @@ pub struct HttpBadRequest<'a> {
     message: &'a str,
 }
 
+#[cfg(feature = "sources-utils-http")]
 impl<'a> HttpBadRequest<'a> {
     pub fn new(code: u16, message: &'a str) -> Self {
         Self {
             code,
-            error_code: http_error_code(code),
+            error_code: super::prelude::http_error_code(code),
             message,
         }
     }

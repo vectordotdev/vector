@@ -44,6 +44,11 @@ pub mod error_type {
     pub const WRITER_FAILED: &str = "writer_failed";
 }
 
+#[cfg(any(
+    feature = "sinks-azure_blob",
+    feature = "sinks-elasticsearch",
+    feature = "sources-utils-http",
+))]
 pub(crate) fn http_error_code(code: u16) -> String {
     format!("http_response_{}", code)
 }

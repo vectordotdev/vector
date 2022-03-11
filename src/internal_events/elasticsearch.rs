@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::{error_stage, error_type};
 use http::Response;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -26,9 +26,10 @@ pub struct ElasticsearchResponseError<'a> {
     error_code: String,
 }
 
+#[cfg(feature = "sinks-elasticsearch")]
 impl<'a> ElasticsearchResponseError<'a> {
     pub fn new(message: &'static str, response: &'a Response<bytes::Bytes>) -> Self {
-        let error_code = http_error_code(response.status().as_u16());
+        let error_code = super::prelude::http_error_code(response.status().as_u16());
         Self {
             message,
             response,
