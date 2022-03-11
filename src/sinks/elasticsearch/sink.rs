@@ -94,7 +94,9 @@ pub fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) = id_key_field.as_ref().and_then(|key| log.remove(key))
+    let id = if let Some(Value::Bytes(key)) = id_key_field
+        .as_ref()
+        .and_then(|key| log.remove(key.as_str()))
     {
         Some(String::from_utf8_lossy(&key).into_owned())
     } else {

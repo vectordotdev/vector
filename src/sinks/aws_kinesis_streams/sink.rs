@@ -72,7 +72,7 @@ pub fn process_log(
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
-        if let Some(v) = log.get(&partition_key_field) {
+        if let Some(v) = log.get(partition_key_field.as_str()) {
             v.to_string_lossy()
         } else {
             warn!(

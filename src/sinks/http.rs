@@ -11,17 +11,24 @@ use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Encoder;
 
 use crate::{
+    codecs::{
+        encoding::{self, FramingConfig, SerializerConfig},
+        CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializerConfig,
+        NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
+    },
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HttpEventEncoded, HttpEventMissingMessageError},
+    internal_events::HttpEventEncoded,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        self,
+        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
+        http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
     },
@@ -42,8 +49,28 @@ enum BuildError {
     },
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Migrator;
+
+impl EncodingConfigMigrator for Migrator {
+    type Codec = Encoding;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
+            Encoding::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+            Encoding::Json => (
+                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
@@ -52,7 +79,8 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     #[serde(default)]
     pub compression: Compression,
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, Migrator>,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
@@ -64,22 +92,6 @@ pub struct HttpSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
-}
-
-#[cfg(test)]
-fn default_config(e: Encoding) -> HttpSinkConfig {
-    HttpSinkConfig {
-        uri: Default::default(),
-        method: Default::default(),
-        auth: Default::default(),
-        headers: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        encoding: e.into(),
-        request: Default::default(),
-        tls: Default::default(),
-        acknowledgements: Default::default(),
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -126,6 +138,40 @@ impl HttpSinkConfig {
     }
 }
 
+struct HttpSink {
+    pub uri: UriSerde,
+    pub method: Option<HttpMethod>,
+    pub auth: Option<Auth>,
+    pub compression: Compression,
+    pub transformer: Transformer,
+    pub encoder: encoding::Encoder,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub request: RequestConfig,
+}
+
+#[cfg(test)]
+fn default_sink(encoding: Encoding) -> HttpSink {
+    let encoding =
+        EncodingConfigAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(encoding.into())
+            .encoding();
+    let framing = encoding
+        .0
+        .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+    let serializer = encoding.1;
+    let encoder = encoding::Encoder::new(framing, serializer);
+
+    HttpSink {
+        uri: Default::default(),
+        method: Default::default(),
+        auth: Default::default(),
+        compression: Default::default(),
+        transformer: Default::default(),
+        encoder,
+        batch: Default::default(),
+        request: Default::default(),
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
@@ -142,22 +188,36 @@ impl SinkConfig for HttpSinkConfig {
             None => future::ok(()).boxed(),
         };
 
-        let mut config = HttpSinkConfig {
-            auth: self.auth.choose_one(&self.uri.auth)?,
+        let mut request = self.request.clone();
+        request.add_old_option(self.headers.clone());
+        validate_headers(&request.headers, &self.auth)?;
+
+        let encoding = self.encoding.clone().encoding();
+        let framing = encoding
+            .0
+            .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+        let serializer = encoding.1;
+        let encoder = encoding::Encoder::new(framing, serializer);
+
+        let sink = HttpSink {
             uri: self.uri.with_default_parts(),
-            ..self.clone()
+            method: self.method.clone(),
+            auth: self.auth.choose_one(&self.uri.auth)?,
+            compression: self.compression,
+            transformer: self.encoding.transformer(),
+            encoder,
+            batch: self.batch,
+            request,
         };
 
-        config.request.add_old_option(config.headers.take());
-        validate_headers(&config.request.headers, &config.auth)?;
-
-        let batch = config.batch.into_batch_settings()?;
-        let request = config
+        let request = sink
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
+
+        let batch = sink.batch.into_batch_settings()?;
         let sink = BatchedHttpSink::new(
-            config,
+            sink,
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
@@ -184,48 +244,37 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpSinkConfig {
-    type Input = BytesMut;
-    type Output = BytesMut;
+pub struct HttpSinkEventEncoder {
+    encoder: encoding::Encoder,
+    transformer: Transformer,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
-        let event = event.into_log();
+impl HttpEventEncoder<BytesMut> for HttpSinkEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
+        self.transformer.transform(&mut event);
 
-        let body = match &self.encoding.codec() {
-            Encoding::Text => {
-                if let Some(v) = event.get(crate::config::log_schema().message_key()) {
-                    let mut body = BytesMut::new();
-                    body.put_slice(&v.to_string_lossy().into_bytes());
-                    body.put_u8(b'\n');
-                    body
-                } else {
-                    emit!(&HttpEventMissingMessageError);
-                    return None;
-                }
-            }
-            Encoding::Ndjson => {
-                let mut body = crate::serde::json::to_bytes(&event)
-                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
-                    .ok()?;
-                body.put_u8(b'\n');
-                body
-            }
-            Encoding::Json => {
-                let mut body = crate::serde::json::to_bytes(&event)
-                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
-                    .ok()?;
-                body.put_u8(b',');
-                body
-            }
-        };
+        let mut body = BytesMut::new();
+        self.encoder.encode(event, &mut body).ok()?;
 
         emit!(&HttpEventEncoded {
             byte_size: body.len(),
         });
 
         Some(body)
+    }
+}
+
+#[async_trait::async_trait]
+impl util::http::HttpSink for HttpSink {
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = HttpSinkEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        HttpSinkEventEncoder {
+            encoder: self.encoder.clone(),
+            transformer: self.transformer.clone(),
+        }
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -241,29 +290,42 @@ impl HttpSink for HttpSinkConfig {
         };
         let uri: Uri = self.uri.uri.clone();
 
-        let ct = match self.encoding.codec() {
-            Encoding::Text => "text/plain",
-            Encoding::Ndjson => "application/x-ndjson",
-            Encoding::Json => {
-                // TODO(https://github.com/vectordotdev/vector/issues/11253):
-                // Prepend before building a request body to eliminate the
-                // additional copy here.
-                let message = body.split();
-                body.put_u8(b'[');
-                if !message.is_empty() {
-                    body.unsplit(message);
-                    // remove trailing comma from last record
-                    body.truncate(body.len() - 1);
+        let content_type = {
+            use encoding::{Framer::*, Serializer::*};
+            match (self.encoder.serializer(), self.encoder.framer()) {
+                (RawMessage(_), _) => Some("text/plain"),
+                (Json(_), NewlineDelimited(_)) => {
+                    if !body.is_empty() {
+                        // Remove trailing newline for backwards-compatibility
+                        // with Vector `0.20.x`.
+                        body.truncate(body.len() - 1);
+                    }
+                    Some("application/x-ndjson")
                 }
-                body.put_u8(b']');
-                "application/json"
+                (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
+                    // TODO(https://github.com/vectordotdev/vector/issues/11253):
+                    // Prepend before building a request body to eliminate the
+                    // additional copy here.
+                    let message = body.split();
+                    body.put_u8(b'[');
+                    if !message.is_empty() {
+                        body.unsplit(message);
+                        // remove trailing comma from last record
+                        body.truncate(body.len() - 1);
+                    }
+                    body.put_u8(b']');
+
+                    Some("application/json")
+                }
+                _ => None,
             }
         };
 
-        let mut builder = Request::builder()
-            .method(method)
-            .uri(uri)
-            .header("Content-Type", ct);
+        let mut builder = Request::builder().method(method).uri(uri);
+
+        if let Some(content_type) = content_type {
+            builder = builder.header("Content-Type", content_type);
+        }
 
         match self.compression {
             Compression::Gzip(level) => {
@@ -343,12 +405,9 @@ mod tests {
     use crate::{
         assert_downcast_matches,
         config::SinkContext,
-        sinks::{
-            http::HttpSinkConfig,
-            util::{
-                http::HttpSink,
-                test::{build_test_server, build_test_server_generic, build_test_server_status},
-            },
+        sinks::util::{
+            http::HttpSink,
+            test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
@@ -360,24 +419,22 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let encoding = EncodingConfig::from(Encoding::Text);
         let event = Event::from("hello world");
 
-        let mut config = default_config(Encoding::Text);
-        config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let sink = default_sink(Encoding::Text);
+        let mut encoder = sink.build_encoder();
+        let bytes = encoder.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from("hello world\n"));
     }
 
     #[test]
-    fn http_encode_event_json() {
-        let encoding = EncodingConfig::from(Encoding::Ndjson);
+    fn http_encode_event_ndjson() {
         let event = Event::from("hello world");
 
-        let mut config = default_config(Encoding::Json);
-        config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let sink = default_sink(Encoding::Ndjson);
+        let mut encoder = sink.build_encoder();
+        let bytes = encoder.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
@@ -630,7 +687,7 @@ mod tests {
         user = "waldo"
         password = "hunter2"
     "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
+        .replace("$IN_ADDR", &in_addr.to_string());
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();

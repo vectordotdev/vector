@@ -21,7 +21,6 @@ pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 pub use trace::TraceEvent;
-pub use util::log::{PathComponent, PathIter};
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 

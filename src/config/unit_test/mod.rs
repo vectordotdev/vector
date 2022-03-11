@@ -566,7 +566,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.as_mut_log().insert(path, value);
+                    event.as_mut_log().insert(path.as_str(), value);
                 }
                 Ok(event)
             } else {

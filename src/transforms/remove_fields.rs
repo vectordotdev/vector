@@ -70,7 +70,7 @@ impl FunctionTransform for RemoveFields {
         let log = event.as_mut_log();
         for field in &self.fields {
             let field_string = field.to_string();
-            let old_val = log.remove_prune(&field_string, self.drop_empty);
+            let old_val = log.remove_prune(field_string.as_str(), self.drop_empty);
             if old_val.is_none() {
                 emit!(&RemoveFieldsFieldMissing {
                     field: &field_string

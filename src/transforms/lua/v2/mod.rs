@@ -742,7 +742,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["new field"], "new value".into());
+        assert_eq!(output.as_log()["\"new field\""], "new value".into());
         Ok(())
     }
 

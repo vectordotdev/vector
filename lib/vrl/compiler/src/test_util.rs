@@ -47,7 +47,7 @@ macro_rules! bench_function {
             let mut group = c.benchmark_group(&format!("vrl_stdlib/functions/{}", stringify!($name)));
             group.throughput(criterion::Throughput::Elements(1));
             $(
-                group.bench_function(&format!("{}", stringify!($case)), |b| {
+                group.bench_function(&stringify!($case).to_string(), |b| {
                     let mut compiler_state = $crate::state::Compiler::default();
                     let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let expression = expression.unwrap();
