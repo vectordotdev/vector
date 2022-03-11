@@ -1,9 +1,9 @@
 use aws_sdk_sqs::error::{GetQueueAttributesError, SendMessageError};
 use aws_sdk_sqs::output::SendMessageOutput;
 use aws_sdk_sqs::types::SdkError;
-use aws_sdk_sqs::{Client as SqsClient, Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_sqs::{Client as SqsClient};
+
+
 use std::{
     convert::TryFrom,
     num::NonZeroU64,
@@ -18,7 +18,7 @@ use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::aws_sdk::{create_client, is_retriable_error};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::sqs::SqsClientBuilder;
 use crate::{

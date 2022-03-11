@@ -1,4 +1,4 @@
-use crate::aws::aws_sdk::{create_client, ClientBuilder};
+use crate::aws::aws_sdk::{create_client};
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
@@ -8,9 +8,9 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
-use aws_sdk_sqs::{Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+
+
+
 use serde::{Deserialize, Serialize};
 use std::cmp;
 
