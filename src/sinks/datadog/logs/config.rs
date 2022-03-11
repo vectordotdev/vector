@@ -7,10 +7,7 @@ use tower::ServiceBuilder;
 use value::Kind;
 use vector_core::config::proxy::ProxyConfig;
 
-use super::{
-    service::LogApiRetry,
-    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
-};
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
@@ -18,8 +15,8 @@ use crate::{
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigWithDefault, service::ServiceBuilderExt, BatchConfig,
-            Compression, SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -134,16 +131,7 @@ impl DatadogLogsConfig {
                 cx.globals.enterprise,
             ));
 
-        let encoding = EncodingConfigWithDefault {
-            codec: DatadogLogsJsonEncoding::default().with_schema_support(cx.schema.enabled),
-            schema: Default::default(),
-            only_fields: Default::default(),
-            except_fields: Default::default(),
-            timestamp_format: Default::default(),
-        };
-
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(encoding)
             .compression(self.compression.unwrap_or_default())
             .build();
 
