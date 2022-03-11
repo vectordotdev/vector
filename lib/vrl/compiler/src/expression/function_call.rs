@@ -879,6 +879,14 @@ mod tests {
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
         }
+
+        fn call_by_vm(
+            &self,
+            _ctx: &mut Context,
+            _args: &mut crate::vm::VmArgumentList,
+        ) -> Result<value::Value, ExpressionError> {
+            unimplemented!()
+        }
     }
 
     fn create_node<T>(inner: T) -> Node<T> {
