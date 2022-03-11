@@ -28,6 +28,7 @@ pub struct RedisSendEventError<'a> {
     error_code: String,
 }
 
+#[cfg(feature = "sinks-redis")]
 impl<'a> RedisSendEventError<'a> {
     pub fn new(error: &'a redis::RedisError) -> Self {
         Self {
