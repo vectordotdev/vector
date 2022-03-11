@@ -167,6 +167,8 @@ impl SourceConfig for DatadogAgentConfig {
             // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => self.decoding.schema_definition(),
+
+            DeserializerConfig::Native => todo!("this probably doesn't make any sense"),
         };
 
         if self.multiple_outputs {

@@ -6,7 +6,7 @@ pub mod framing;
 
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
-    JsonDeserializerConfig,
+    JsonDeserializerConfig, NativeDeserializer, NativeDeserializerConfig,
 };
 #[cfg(feature = "sources-syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
@@ -223,6 +223,8 @@ pub enum DeserializerConfig {
     #[cfg(feature = "sources-syslog")]
     /// Configures the `SyslogDeserializer`.
     Syslog,
+    /// Configures the `NativeDeserializer`.
+    Native,
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -251,6 +253,7 @@ impl DeserializerConfig {
             DeserializerConfig::Json => Deserializer::Json(JsonDeserializerConfig.build()),
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => Deserializer::Syslog(SyslogDeserializerConfig.build()),
+            DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
         }
     }
 
@@ -261,6 +264,7 @@ impl DeserializerConfig {
             DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(),
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(),
+            DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(),
         }
     }
 }
@@ -275,6 +279,8 @@ pub enum Deserializer {
     #[cfg(feature = "sources-syslog")]
     /// Uses a `SyslogDeserializer` for deserialization.
     Syslog(SyslogDeserializer),
+    /// Uses a `NativeDeserializer` for deserialization.
+    Native(NativeDeserializer),
     /// Uses an opaque `Deserializer` implementation for deserialization.
     Boxed(BoxedDeserializer),
 }
@@ -286,6 +292,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::Json(deserializer) => deserializer.parse(bytes),
             #[cfg(feature = "sources-syslog")]
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes),
+            Deserializer::Native(deserializer) => deserializer.parse(bytes),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
         }
     }
