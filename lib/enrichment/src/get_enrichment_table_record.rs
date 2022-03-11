@@ -131,6 +131,7 @@ impl Function for GetEnrichmentTableRecord {
             enrichment_tables: registry.as_readonly(),
         }))
     }
+
     fn compile_argument(
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
