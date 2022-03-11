@@ -1,5 +1,7 @@
 use std::{
     cmp::Ordering,
+    convert::Infallible as StdInfallible,
+    fmt,
     io::{self, ErrorKind},
     marker::PhantomData,
     num::NonZeroUsize,
@@ -8,11 +10,10 @@ use std::{
 
 use bytes::BufMut;
 use crc32fast::Hasher;
-use memmap2::Mmap;
 use rkyv::{
     ser::{
         serializers::{
-            AlignedSerializer, AllocScratch, BufferScratch, CompositeSerializer,
+            AlignedSerializer, AllocScratch, AllocScratchError, BufferScratch, CompositeSerializer,
             CompositeSerializerError, FallbackScratch,
         },
         Serializer,
@@ -20,19 +21,19 @@ use rkyv::{
     AlignedVec, Infallible,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncWrite, AsyncWriteExt, BufWriter},
-};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{
     common::{create_crc32c_hasher, DiskBufferConfig},
+    io::Filesystem,
     ledger::Ledger,
     record::{validate_record_archive, Record, RecordStatus},
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
-    variants::disk_v2::{reader::decode_record_payload, record::try_as_record_archive},
+    variants::disk_v2::{
+        io::AsyncFile, reader::decode_record_payload, record::try_as_record_archive,
+    },
     Bufferable,
 };
 
@@ -134,6 +135,68 @@ where
     EmptyRecord,
 }
 
+impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Io { source: l_source }, Self::Io { source: r_source }) => {
+                l_source.kind() == r_source.kind()
+            }
+            (Self::RecordTooLarge { limit: l_limit }, Self::RecordTooLarge { limit: r_limit }) => {
+                l_limit == r_limit
+            }
+            (
+                Self::DataFileFull {
+                    record: l_record,
+                    serialized_size: l_serialized_size,
+                },
+                Self::DataFileFull {
+                    record: r_record,
+                    serialized_size: r_serialized_size,
+                },
+            ) => l_record == r_record && l_serialized_size == r_serialized_size,
+            (
+                Self::NonsensicalEventCount {
+                    encoded_len: l_encoded_len,
+                    event_count: l_event_count,
+                },
+                Self::NonsensicalEventCount {
+                    encoded_len: r_encoded_len,
+                    event_count: r_event_count,
+                },
+            ) => l_encoded_len == r_encoded_len && l_event_count == r_event_count,
+            (
+                Self::FailedToSerialize { reason: l_reason },
+                Self::FailedToSerialize { reason: r_reason },
+            )
+            | (
+                Self::FailedToValidate { reason: l_reason },
+                Self::FailedToValidate { reason: r_reason },
+            )
+            | (
+                Self::InconsistentState { reason: l_reason },
+                Self::InconsistentState { reason: r_reason },
+            ) => l_reason == r_reason,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl<T> From<CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>>
+    for WriterError<T>
+where
+    T: Bufferable,
+{
+    fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
+        match e {
+            CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
+                reason: format!("insufficient space to serialize encoded record: {}", sse),
+            },
+            // Only our scratch space strategy is fallible, so we should never get here.
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<T> From<io::Error> for WriterError<T>
 where
     T: Bufferable,
@@ -143,10 +206,145 @@ where
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub(super) struct FlushResult {
+    pub events_flushed: u64,
+    pub bytes_flushed: u64,
+}
+
+/// Wraps an [`AsyncWrite`] value and buffers individual writes, while signalling implicit flushes.
+///
+/// As the [`Writer`] must track when writes have theoretically made it to disk, we care about
+/// situations where the internal write buffer for a data file has been flushed to make room.  In
+/// order to provide this information, we track the number of events represented by a record when
+/// writing its serialized form.
+///
+/// If an implicit buffer flush must be performed before a write can complete, or a manual flush is
+/// requested, we return this information to the caller, letting them know how many events, and how
+/// many bytes, were flushed.
+struct TrackingBufWriter<W> {
+    inner: W,
+    buf: Vec<u8>,
+    unflushed_events: usize,
+}
+
+impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
+    /// Creates a new `TrackingBufWriter` with the specified buffer capacity.
+    fn with_capacity(cap: usize, inner: W) -> Self {
+        Self {
+            inner,
+            buf: Vec::with_capacity(cap),
+            unflushed_events: 0,
+        }
+    }
+
+    /// Writes the given buffer.
+    ///
+    /// If enough internal buffer capacity is available, then this write will be buffered internally
+    /// until [`flush`] is called.  If there's not enough remaining internal buffer capacity, then
+    /// the internal buffer will be flushed to the inner writer first.  If the given buffer is
+    /// larger than the internal buffer capacity, then it will be written directly to the inner
+    /// writer.
+    ///
+    /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
+    /// count is incremented every time `write` can fully buffer the record without having to flush
+    /// to the inner writer.
+    ///
+    /// If this call requires the internal buffer to be flushed out to the inner writer, then the
+    /// write result will indicate how many buffered events were flushed, and their total size in
+    /// bytes.  Additionally, if the given buffer is larger than the internal buffer itself, it will
+    /// also be included in the write result as well.
+    ///
+    /// # Errors
+    ///
+    /// If a write to the inner writer occurs, and that write encounters an error, an error variant
+    /// will be returned describing the error.
+    async fn write(&mut self, event_count: usize, buf: &[u8]) -> io::Result<Option<FlushResult>> {
+        let mut flush_result = None;
+
+        // If this write would cause us to exceed our internal buffer capacity, flush whatever we
+        // have buffered already.
+        if self.buf.len() + buf.len() > self.buf.capacity() {
+            flush_result = self.flush().await?;
+        }
+
+        // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
+        if buf.len() > self.buf.capacity() {
+            self.inner.write_all(buf).await?;
+
+            let flush_result = flush_result.get_or_insert(FlushResult::default());
+            flush_result.events_flushed += event_count as u64;
+            flush_result.bytes_flushed += buf.len() as u64;
+        } else {
+            self.buf.extend_from_slice(buf);
+            self.unflushed_events += event_count;
+        }
+
+        Ok(flush_result)
+    }
+
+    /// Flushes the internal buffer to the underlying writer.
+    ///
+    /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
+    /// count is incremented every time `write` can fully buffer the record without having to flush
+    /// to the inner writer.
+    ///
+    /// If any buffered record are present, then the write result will indicate how many
+    /// individual events were flushed, including their total size in bytes.
+    ///
+    /// # Errors
+    ///
+    /// If a write to the underlying writer occurs, and that write encounters an error, an error variant
+    /// will be returned describing the error.
+    async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
+        if self.buf.is_empty() {
+            return Ok(None);
+        }
+
+        let events_flushed = self.unflushed_events as u64;
+        let bytes_flushed = self.buf.len() as u64;
+
+        let result = self.inner.write_all(&self.buf[..]).await;
+        self.unflushed_events = 0;
+        self.buf.clear();
+
+        result.map(|_| {
+            Some(FlushResult {
+                events_flushed,
+                bytes_flushed,
+            })
+        })
+    }
+
+    /// Gets a reference to the underlying writer.
+    #[cfg(test)]
+    fn get_ref(&self) -> &W {
+        &self.inner
+    }
+
+    /// Gets a mutable reference to the underlying writer.
+    fn get_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+}
+
+impl<W: fmt::Debug> fmt::Debug for TrackingBufWriter<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrackingBufWriter")
+            .field("writer", &self.inner)
+            .field(
+                "buffer",
+                &format_args!("{}/{}", self.buf.len(), self.buf.capacity()),
+            )
+            .field("unflushed_events", &self.unflushed_events)
+            .finish()
+    }
+}
+
 /// Buffered writer that handles encoding, checksumming, and serialization of records.
 #[derive(Debug)]
 pub(super) struct RecordWriter<W, T> {
-    writer: BufWriter<W>,
+    writer: TrackingBufWriter<W>,
     encode_buf: Vec<u8>,
     ser_buf: AlignedVec,
     ser_scratch: AlignedVec,
@@ -159,7 +357,7 @@ pub(super) struct RecordWriter<W, T> {
 
 impl<W, T> RecordWriter<W, T>
 where
-    W: AsyncWrite + Unpin,
+    W: AsyncFile + Unpin,
     T: Bufferable,
 {
     /// Creates a new [`RecordWriter`] around the provided writer.
@@ -169,11 +367,12 @@ where
     pub fn new(
         writer: W,
         current_data_file_size: u64,
+        write_buffer_size: usize,
         max_data_file_size: u64,
         max_record_size: usize,
     ) -> Self {
         Self {
-            writer: BufWriter::with_capacity(256 * 1024, writer),
+            writer: TrackingBufWriter::with_capacity(write_buffer_size, writer),
             encode_buf: Vec::with_capacity(16_384),
             ser_buf: AlignedVec::with_capacity(16_384),
             ser_scratch: AlignedVec::with_capacity(16_384),
@@ -186,6 +385,7 @@ where
     }
 
     /// Gets a reference to the underlying writer.
+    #[cfg(test)]
     pub fn get_ref(&self) -> &W {
         self.writer.get_ref()
     }
@@ -201,18 +401,18 @@ where
             || self.current_data_file_size + amount as u64 <= self.max_data_file_size
     }
 
-    /// Writes a record.
+    /// Archives a record.
     ///
-    /// Returns the number of bytes written to serialize the record, including the framing. Writes
-    /// are not automatically flushed, so `flush` must be called after any record write if there is
-    /// a requirement for the record to immediately be written all the way to the underlying writer.
+    /// This encodes the record, as well as serializes it into its archival format that will be
+    /// stored on disk.  The total size of the archived record, including the length delimiter
+    /// inserted before the archived record, will be returned.
     ///
     /// # Errors
     ///
-    /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
+    /// Errors can occur during the encoding or serialization stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
-    #[instrument(skip(self, record), level = "debug")]
-    pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+    #[instrument(skip(self, record), level = "trace")]
+    pub fn archive_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
         self.ser_buf.clear();
         self.ser_scratch.clear();
@@ -237,7 +437,7 @@ where
         let encoded_len = encode_result
             .map(|_| self.encode_buf.len())
             .context(FailedToEncodeSnafu)?;
-        if encoded_len >= self.max_record_size {
+        if encoded_len > self.max_record_size {
             return Err(WriterError::RecordTooLarge {
                 limit: self.max_record_size,
             });
@@ -247,68 +447,52 @@ where
         let wrapped_record =
             Record::with_checksum(id, metadata, &self.encode_buf, &self.checksummer);
 
-        // TODO: This could be a good spot to potentially calculate the on-disk size of the archived
-        // record, but to do that correctly, it involves needing a few things:
-        // - correctly size the archived record (can already do)
-        // - getting the length of DST fields like slices (can do by hand, not resilient to `Record`
-        //   changing, though)
-        // - getting the serializer alignment  (doable by hand, but also subject to impl details
-        //   hidden under-the-hood)
+        // Push 8 dummy bytes where our length delimiter will sit.  We'll fix this up after
+        // serialization.  Notably, `AlignedSerializer` will report the serializer position as
+        // the length of its backing store, which now includes our 8 bytes, so we _subtract_
+        // those from the position when figuring out the actual value to write back after.
         //
-        // Since that stuff is tricky, it's easiest to just rely on the fully serialized archive,
-        // although it means we go through the serialization step needlessly when the record
-        // inevitably won't fit.  All things considered, though, this will occur very infrequently,
-        // though: something like once every ~32k writes if every write is ~4KB.
+        // We write it this way -- in the serializer buffer, and not as a separate write -- so that
+        // we can do a single write but also so that we always have an aligned buffer.
+        self.ser_buf
+            .extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         // Now serialize the record, which puts it into its archived form.  This is what powers our
         // ability to do zero-copy deserialization from disk.
-        //
-        // NOTE: This operation is put into its own block scope because otherwise `serializer` lives
-        // until the end of the function, and it contains a mutable buffer pointer, which is
-        // `!Send` and thus can't move across await points.  Do not rearrange.
-        let archive_len = {
-            let mut serializer = CompositeSerializer::new(
-                AlignedSerializer::new(&mut self.ser_buf),
-                FallbackScratch::new(
-                    BufferScratch::new(&mut self.ser_scratch),
-                    AllocScratch::new(),
-                ),
-                Infallible,
-            );
+        let mut serializer = CompositeSerializer::new(
+            AlignedSerializer::new(&mut self.ser_buf),
+            FallbackScratch::new(
+                BufferScratch::new(&mut self.ser_scratch),
+                AllocScratch::new(),
+            ),
+            Infallible,
+        );
 
-            match serializer.serialize_value(&wrapped_record) {
-                Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
-                Err(e) => match e {
-                    CompositeSerializerError::ScratchSpaceError(sse) => {
-                        return Err(WriterError::FailedToSerialize {
-                            reason: format!(
-                                "insufficient space to serialize encoded record: {}",
-                                sse
-                            ),
-                        })
-                    }
-                    // Only our scratch space strategy is fallible, so we should never get here.
-                    CompositeSerializerError::SerializerError(_)
-                    | CompositeSerializerError::SharedError(_) => unreachable!(),
-                },
-            }
-        }?;
+        let serializer_pos = serializer
+            .serialize_value(&wrapped_record)
+            .map(|_| serializer.pos())?;
+
+        // Sanity check before we do our length math.
+        if serializer_pos <= 8 || self.ser_buf.len() != serializer_pos {
+            return Err(WriterError::FailedToSerialize {
+                reason: format!(
+                    "serializer position invalid for context: pos={} len={}",
+                    serializer_pos,
+                    self.ser_buf.len(),
+                ),
+            });
+        }
 
         let archive_buf = self.ser_buf.as_slice();
-        debug_assert_eq!(archive_buf.len(), archive_len);
+        debug_assert_eq!(archive_buf.len(), serializer_pos);
 
         // With the record archived and serialized, do our final check to ensure we can fit this
         // write.  We always allow at least one write into an empty data file.
-        //
-        // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
-        // better/super low overhead way to capture "the bytes we wrote" rather than piecing
-        // together what we _believe_ we should have written.
-        let archive_on_disk_len = archive_len + 8;
-        if !self.can_write(archive_on_disk_len) {
+        if !self.can_write(serializer_pos) {
             debug!(
                 current_data_file_size = self.current_data_file_size,
                 max_data_file_size = self.max_data_file_size,
-                archive_on_disk_len,
+                archive_on_disk_len = serializer_pos,
                 "Archived record is too large to fit in remaining free space of current data file."
             );
 
@@ -323,26 +507,59 @@ where
 
             return Err(WriterError::DataFileFull {
                 record,
-                serialized_size: archive_on_disk_len,
+                serialized_size: serializer_pos,
             });
         }
 
+        // Fix up our length delimiter.
+        let archive_len = serializer_pos - 8;
         let wire_archive_len: u64 = archive_len
             .try_into()
             .expect("archive len should always fit into a u64");
         let archive_len_buf = wire_archive_len.to_be_bytes();
-        assert_eq!(archive_len_buf[..].len(), 8);
 
-        self.writer
-            .write_all(&archive_len_buf)
+        let length_delimiter_dst = &mut self.ser_buf.as_mut_slice()[0..8];
+        length_delimiter_dst.copy_from_slice(&archive_len_buf[..]);
+
+        Ok(serializer_pos)
+    }
+
+    /// Writes a record.
+    ///
+    /// If the write is successful, the number of bytes written to the buffer are returned.
+    /// Additionally, if any internal buffers required an implicit flush, the result of that flush
+    /// operation is returned as well.
+    ///
+    /// As we internally buffers write to the underlying data file, to reduce the number of syscalls
+    /// required to pushed serialized records to the data file, we sometimes will write a record
+    /// which would overflow the internal buffer.  Doing so means we have to first flush the buffer
+    /// before continuing with buffering the current write.  As some invariants are based on knowing
+    /// when a record has actually been written to the data file, we return any information of
+    /// implicit flushes so that the writer can be aware of when data has actually made it to the
+    /// data file or not.
+    ///
+    /// # Errors
+    ///
+    /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
+    /// during any of these stages, an appropriate error variant will be returned describing the error.
+    #[instrument(skip(self, record), level = "trace")]
+    pub async fn write_record(
+        &mut self,
+        id: u64,
+        record: T,
+    ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
+        let event_count = record.event_count();
+        let serialized_len = self.archive_record(id, record)?;
+        let flush_result = self
+            .writer
+            .write(event_count, self.ser_buf.as_slice())
             .await
             .context(IoSnafu)?;
-        self.writer.write_all(archive_buf).await.context(IoSnafu)?;
 
         // Update our current data file size.
-        self.current_data_file_size += wire_archive_len + 8;
+        self.current_data_file_size += serialized_len as u64;
 
-        Ok(archive_on_disk_len)
+        Ok((serialized_len, flush_result))
     }
 
     /// Flushes the writer.
@@ -354,12 +571,10 @@ where
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
     #[instrument(skip(self), level = "debug")]
-    pub async fn flush(&mut self) -> io::Result<()> {
+    pub async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
         self.writer.flush().await
     }
-}
 
-impl<T> RecordWriter<File, T> {
     /// Synchronizes the underlying file to disk.
     ///
     /// This tries to synchronize both data and metadata.
@@ -376,38 +591,79 @@ impl<T> RecordWriter<File, T> {
 
 /// Writes records to the buffer.
 #[derive(Debug)]
-pub struct Writer<T> {
-    ledger: Arc<Ledger>,
-    config: DiskBufferConfig,
-    writer: Option<RecordWriter<File, T>>,
+pub struct Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    ledger: Arc<Ledger<FS>>,
+    config: DiskBufferConfig<FS>,
+    writer: Option<RecordWriter<FS::File, T>>,
+    next_record_id: u64,
+    unflushed_events: u64,
     data_file_size: u64,
+    unflushed_bytes: u64,
     data_file_full: bool,
     skip_to_next: bool,
     _t: PhantomData<T>,
 }
 
-impl<T> Writer<T>
+impl<T, FS> Writer<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem + Clone,
+    FS::File: Unpin,
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let config = ledger.config().clone();
+        let next_record_id = ledger.state().get_next_writer_record_id();
         Writer {
             ledger,
             config,
             writer: None,
             data_file_size: 0,
             data_file_full: false,
+            unflushed_bytes: 0,
             skip_to_next: false,
+            next_record_id,
+            unflushed_events: 0,
             _t: PhantomData,
         }
     }
 
-    #[instrument(skip(self), level = "debug")]
-    fn track_write(&mut self, record_len: u64, record_size: u64) {
+    fn get_next_record_id(&mut self) -> u64 {
+        self.next_record_id.wrapping_add(self.unflushed_events)
+    }
+
+    fn track_write(&mut self, event_count: usize, record_size: u64) {
         self.data_file_size += record_size;
-        self.ledger.track_write(record_len, record_size);
+        self.unflushed_events += event_count as u64;
+        self.unflushed_bytes += record_size;
+    }
+
+    fn flush_write_state(&mut self) {
+        self.flush_write_state_partial(self.unflushed_events, self.unflushed_bytes);
+    }
+
+    fn flush_write_state_partial(&mut self, flushed_events: u64, flushed_bytes: u64) {
+        assert!(
+            flushed_events <= self.unflushed_events,
+            "tried to flush more events than are currently unflushed"
+        );
+        assert!(
+            flushed_bytes <= self.unflushed_bytes,
+            "tried to flush more bytes than are currently unflushed"
+        );
+
+        self.next_record_id = self
+            .ledger
+            .state()
+            .increment_next_writer_record_id(flushed_events);
+        self.unflushed_events -= flushed_events;
+        self.unflushed_bytes -= flushed_bytes;
+
+        self.ledger.track_write(flushed_events, flushed_bytes);
     }
 
     fn can_write(&mut self) -> bool {
@@ -467,18 +723,13 @@ where
         // current writer data file, which lets us treat it as one big buffer... which is useful for
         // asking `rkyv` to deserialize just the last record from the file, without having to seek
         // directly to the start of the record where the length delimiter is.
-        let data_file_handle = self
-            .writer
-            .as_ref()
-            .expect("writer should exist after `ensure_ready_for_write`")
-            .get_ref()
-            .try_clone()
+        let data_file_path = self.ledger.get_current_writer_data_file_path();
+        let data_file_mmap = self
+            .ledger
+            .filesystem()
+            .open_mmap_readable(&data_file_path)
             .await
-            .context(IoSnafu)?
-            .into_std()
-            .await;
-
-        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };
+            .context(IoSnafu)?;
 
         // We have bytes, so we should have an archived record... hopefully!  Go through the motions
         // of verifying it.  If we hit any invalid states, then we should bump to the next data file
@@ -545,9 +796,13 @@ where
                             "Ledger desynchronized from data files. Fast forwarding ledger state."
                         );
                         let ledger_record_delta = record_next - ledger_next;
-                        self.ledger
+                        let next_record_id = self
+                            .ledger
                             .state()
                             .increment_next_writer_record_id(ledger_record_delta);
+                        self.next_record_id = next_record_id;
+                        self.unflushed_events = 0;
+
                         false
                     }
                 }
@@ -604,7 +859,7 @@ where
             // wait for the reader to signal that they've made some progress.
             let total_buffer_size = self.ledger.get_total_buffer_size();
             let max_buffer_size = self.config.max_buffer_size;
-            if total_buffer_size <= max_buffer_size {
+            if total_buffer_size < max_buffer_size {
                 break;
             }
 
@@ -637,6 +892,7 @@ where
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
             self.flush_inner(true).await?;
+            self.flush_write_state();
 
             self.reset();
         }
@@ -662,13 +918,11 @@ where
                 self.ledger.get_current_writer_data_file_path()
             };
 
-            let maybe_data_file = OpenOptions::new()
-                .append(true)
-                .read(true)
-                .create_new(true)
-                .open(&data_file_path)
+            let maybe_data_file = self
+                .ledger
+                .filesystem()
+                .open_file_writable_atomic(&data_file_path)
                 .await;
-
             let file = match maybe_data_file {
                 // We were able to create the file, so we're good to proceed.
                 Ok(data_file) => Some((data_file, 0)),
@@ -685,11 +939,10 @@ where
                         //   it, or waiting for acknowledgements to be able to delete it
                         // - it may not be full, which could be because it's the data file the
                         //   writer left off on last time
-                        let data_file = OpenOptions::new()
-                            .append(true)
-                            .read(true)
-                            .create(true)
-                            .open(&data_file_path)
+                        let data_file = self
+                            .ledger
+                            .filesystem()
+                            .open_file_writable(&data_file_path)
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
@@ -726,6 +979,7 @@ where
                 self.writer = Some(RecordWriter::new(
                     data_file,
                     data_file_size,
+                    self.config.write_buffer_size,
                     self.config.max_data_file_size,
                     self.config.max_record_size,
                 ));
@@ -768,15 +1022,11 @@ where
             .event_count()
             .try_into()
             .map_err(|_| WriterError::EmptyRecord)?;
-        let record_events = record_events
-            .get()
-            .try_into()
-            .expect("Vector does not support 128-bit platforms.");
 
         // Grab the next record ID and attempt to write the record.
-        let record_id = self.ledger.state().get_next_writer_record_id();
+        let record_id = self.get_next_record_id();
 
-        let bytes_written = loop {
+        let (bytes_written, flush_result) = loop {
             // Make sure we have an open data file to write to, which might also be us opening the
             // next data file because our first attempt at writing had to finalize a data file that
             // was already full.
@@ -787,7 +1037,7 @@ where
                 .as_mut()
                 .expect("writer should exist after `ensure_ready_for_write`");
             match writer.write_record(record_id, record).await {
-                Ok(n) => break n,
+                Ok(result) => break result,
                 Err(WriterError::DataFileFull {
                     record: old_record,
                     serialized_size,
@@ -808,13 +1058,21 @@ where
             }
         };
 
-        // Since we succeeded in writing the record, increment the next record ID and metadata for
-        // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
-        // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
-        self.ledger
-            .state()
-            .increment_next_writer_record_id(record_events);
-        self.track_write(record_events, bytes_written as u64);
+        // Track our write since things appear to have succeeded. This only updates our internal
+        // state as we have not yet authoritatively flushed the write to the data file. This tracks
+        // not only how many bytes we have buffered, but also how many events, which in turn drives
+        // record ID generation.  We do this after the write appears to succeed to avoid issues with
+        // setting the ledger state to a record ID that we may never have actually written, which
+        // could lead to record ID gaps.
+        self.track_write(record_events.get(), bytes_written as u64);
+
+        // If we did flush some buffered writes during this write, however, we now compensate for
+        // that after updating our internal state.  We'll also notify the reader, too, since the
+        // data should be available to read:
+        if let Some(flush_result) = flush_result {
+            self.flush_write_state_partial(flush_result.events_flushed, flush_result.bytes_flushed);
+            self.ledger.notify_writer_waiters();
+        }
 
         trace!(
             record_id,
@@ -865,11 +1123,17 @@ where
     /// variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
-        self.flush_inner(false).await
+        self.flush_inner(false).await?;
+        self.flush_write_state();
+        Ok(())
     }
 }
 
-impl<T> Writer<T> {
+impl<T, FS> Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     /// Closes this [`Writer`], marking it as done.
     ///
     /// Closing the writer signals to the reader that that no more records will be written until the
@@ -888,7 +1152,11 @@ impl<T> Writer<T> {
     }
 }
 
-impl<T> Drop for Writer<T> {
+impl<T, FS> Drop for Writer<T, FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     fn drop(&mut self) {
         self.close();
     }

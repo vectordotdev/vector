@@ -1,9 +1,9 @@
 //! # Disk Buffer v2: Sequential File I/O Boogaloo.
 //!
-//! This disk buffer implementation is a replace from the LevelDB-based disk buffer implementation,
-//! referred internal to `disk` or `disk_v1`.  It focuses on avoiding external C/C++ dependencies,
-//! as well as optimizing itself for the job at hand to provide more consistent in both throughput
-//! and latency.
+//! This disk buffer implementation is a departure from the LevelDB-based disk buffer
+//! implementation, referred to internally as `disk` or `disk_v1`. It focuses on avoiding external
+//! C/C++ dependencies, as well as optimizing itself for the job at hand to provide more consistent
+//! in both throughput and latency.
 //!
 //! ## Design constraints
 //!
@@ -22,17 +22,18 @@
 //!
 //! At a high-level, records that are written end up in one of many underlying data files, while the
 //! ledger file -- number of records, writer and reader positions, etc -- is stored in a separate
-//! file.  Data files function primarily with a "last process who touched it" ownership model: the
+//! file. Data files function primarily with a "last process who touched it" ownership model: the
 //! writer always creates new files, and the reader deletes files when they have been fully read.
 //!
 //! ### Record structure
 //!
 //! Records are packed together with a relatively simple pseudo-structure:
+//!
 //!   record:
 //!     `record_len`: uint64
-//!     `checksum`: uint32 (CRC32C of `record_id` + `payload`)
-//!     `record_id`: uint64
-//!     `payload`: uint8[]
+//!     `checksum`:   uint32(CRC32C of `record_id` + `payload`)
+//!     `record_id`:  uint64
+//!     `payload`:    uint8[]
 //!
 //! We say pseudo-structure because we serialize these records to disk using `rkyv`, a zero-copy
 //! deserialization library which focuses on the speed of reading values by writing them to storage
@@ -44,62 +45,95 @@
 //! This represents a small amount of extra space overhead per record, but is beneficial to us as we
 //! avoid a more formal deserialization step, with scratch buffers and memory copies.
 //!
-//! ### Writing records
+//! ## Writing records
 //!
 //! Records are added to a data file sequentially, and contiguously, with no gaps or data alignment
 //! adjustments, excluding the padding/alignment used by `rkyv` itself to allow for zero-copy
 //! deserialization. This continues until adding another would exceed the configured data file size
-//! limit.  When this occurs, the current data file is flushed and synchronized to disk, and a new
+//! limit. When this occurs, the current data file is flushed and synchronized to disk, and a new
 //! data file will be open.
 //!
 //! If the number of data files open exceeds the maximum (65,536), or if the total data file size
 //! limit is exceeded, the writer will wait until enough space has been freed such that the record
-//! can be written.  As data files are only deleted after being read entirely, this means that space
-//! is recovered in increments of the target data file size, which is 128MB.  Thus, the minimum size
+//! can be written. As data files are only deleted after being read entirely, this means that space
+//! is recovered in increments of the target data file size, which is 128MB. Thus, the minimum size
 //! for a buffer must be equal to or greater than the target size of a single data file.
 //! Additionally, as data files are uniquely named based on an incrementing integer, of which will
 //! wrap around at 65,536 (2^16), the maximum data file size in total for a given buffer is ~8TB (6
 //! 5k files * 128MB).
 //!
-//! Additionally, if the configured maximum data size would be exceeded, then a writer will wait for
-//! the amount to drop (when a reader deletes a data file) before proceeding.
+//! ## Reading records
 //!
-//! ### Ledger structure
+//! Due to the on-disk layout, reading records is an incredibly straight-forward progress: we open a
+//! file, read it until there's no more data and we know the writer is done writing to the file, and
+//! then we open the next one, and repeat the process.
 //!
-//! Likewise, the ledger file consists of a simplified structure that is optimized for being
-//! shared via a memory-mapped file interface between the writer and reader.  Like the record
-//! structure, the below is a pseudo-structure as we use `rkyv` for the ledger, and so the on-disk
-//! layout will be slightly different:
+//! ## Deleting acknowledged records
+//!
+//! As the reader emits records, we cannot yet consider them fully processed until they are
+//! acknowledged. The acknowledgement process is tied into the normal acknowledgement machinery, and
+//! the reader collects and processes those acknowledgements incrementally as reads occur.
+//!
+//! When all records from a data file have been fully acknowledged, the data file is scheduled for
+//! deletion. We only delete entire data files, rather than truncating them piecemeal, which reduces
+//! the I/O burden of the buffer. This does mean, however, that a data file will stick around until
+//! it's entirely processed. We compensate for this fact in the buffer configuration by adjusting
+//! the logical buffer size based on when records are acknowledged, so that the writer can make
+//! progress as records are acknowledged, even if the buffer is close to, or at the maximum buffer
+//! size limit.
+//!
+//! ## Record ID generation, and its relation of events
+//!
+//! While the buffer talks a lot about writing "records", records are ostensibly a single event, or
+//! collection of events. We manage the organization and grouping of events at at a higher level
+//! (i.e. `EventArray`), but we're still required to confront this fact at the buffer layer. In
+//! order to maintain as little extra metadata as possible as records, and within the ledger, we
+//! encode the number of events in a buffer into the record ID. We do this by using the value
+//! returned by `EventCount::event_count` on a per-record basis.
+//!
+//! For example, a fresh buffer starts at a record ID of 1 for the writer: that is, the next write
+//! will start at 1. If we write a record that contains 10 events, we add that event count to the
+//! record ID we started from, which gives us 11. The next record write will start at 11, and the
+//! pattern continues going forward.
+//!
+//! The other reason we do this is to allow us to quickly and easily determine how many events exist
+//! in a buffer. Since we have the invariant of knowing that record IDs are tied, in a way, to event
+//! count, we can quickly and easily find the first and last unread record in the buffer, and do
+//! simple subtraction to calculate how many events we have outstanding. While there is logic that
+//! handles corrupted records, or other corner case errors, the core premise, and logic, follows
+//! this pattern.
+//!
+//! We need to track our reader progress, both in the form of how much data we've read in this data
+//! file, as well as the record ID. This is required not only for ensuring our general buffer
+//! accounting (event count, buffer size, etc) is accurate, but also to be able to handle corrupted
+//! records.
+//!
+//! We make sure to track enough information such that when we encounter a corrupted record, or if
+//! we skip records due to missing data, we can figure out how many events we've dropped or lost,
+//! and handle the necessary adjustments to the buffer accounting.
+//!
+//! ## Ledger structure
+//!
+//! Likewise, the ledger file consists of a simplified structure that is optimized for being shared
+//! via a memory-mapped file interface between the writer and reader. Like the record structure, the
+//! below is a pseudo-structure as we use `rkyv` for the ledger, and so the on-disk layout will be
+//! slightly different:
 //!
 //!   buffer.db:
-//!     [total record count - unsigned 64-bit integer]
-//!     [total buffer size - unsigned 64-bit integer]
-//!     [next record ID - unsigned 64-bit integer]
-//!     [writer current data file ID - unsigned 16-bit integer]
-//!     [reader current data file ID - unsigned 16-bit integer]
-//!     [reader last record ID - unsigned 64-bit integer]
+//!     writer next record ID:       uint64
+//!     writer current data file ID: uint16
+//!     reader current data file ID: uint16
+//!     reader last record ID:       uint64
 //!
-//! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves around the
-//! writer and reader being able to quickly figure out where they left off.  Record and data file
-//! IDs are simply rolled over when they reach the maximum of their data type, and are incremented
-//! monotonically as new data files are created, rather than trying to always allocate from the
-//! lowest available ID.
+//! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
+//! around the writer and reader being able to quickly figure out where they left off. Record and
+//! data file IDs are simply rolled over when they reach the maximum of their data type, and are
+//! incremented monotonically as new data files are created, rather than trying to always allocate
+//! from the lowest available ID.
 //!
 //! Additionally, record IDs are allocated in the same way: monotonic, sequential, and will wrap
-//! when they reach the maximum value for the data type.  For record IDs, however, this would mean
+//! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
-//!
-//! ## Behaviorial invariants, lemmas, proofs, and more: oh my!
-//!
-//! ### Lemmas
-//!
-//! Lemma 1: A writer always writes a new record using the "next writer record ID" from the ledger.
-//! Lemma 2: A writer always increments the "next writer record ID" by the number of events
-//!          contained within the record.
-//! Lemma 3: The number of unread events in the buffer is the delta between the last written record
-//!          ID, plus the number of events contained therein, and the last read record ID. (1, 2)
-//! Lemma 4: No record may represent a number of events greater than the number of bytes it takes to
-//!          encode said record, including all archival and framing overhead.
 
 use std::{
     error::Error,
@@ -120,6 +154,7 @@ use tokio_util::sync::{PollSender, ReusableBoxFuture};
 mod acknowledgements;
 mod backed_archive;
 mod common;
+mod io;
 mod ledger;
 mod reader;
 mod record;
@@ -132,6 +167,7 @@ mod tests;
 use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
+    io::Filesystem,
     ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
@@ -174,10 +210,14 @@ where
     T: Bufferable,
 {
     #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
-    pub(crate) async fn from_config_inner(
-        config: DiskBufferConfig,
+    pub(crate) async fn from_config_inner<FS>(
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
+    where
+        FS: Filesystem + Clone + 'static,
+        FS::File: Unpin,
+    {
         let ledger = Ledger::load_or_create(config, usage_handle)
             .await
             .context(LedgerSnafu)?;
@@ -205,7 +245,7 @@ where
     /// Creates a new disk buffer from the given [`DiskBufferConfig`].
     ///
     /// If successful, a [`Writer`] and [`Reader`] value, representing the write/read sides of the
-    /// buffer, respectively, will be returned.  Additionally, an [`Acker`] will be returned, which
+    /// buffer, respectively, will be returned. Additionally, an [`Acker`] will be returned, which
     /// must be used to indicate when records read from the [`Reader`] can be considered durably
     /// processed and able to be deleted from the buffer.
     ///
@@ -214,10 +254,14 @@ where
     /// If an error occurred during the creation or loading of the disk buffer, an error variant
     /// will be returned describing the error.
     #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
-    pub async fn from_config(
-        config: DiskBufferConfig,
+    pub async fn from_config<FS>(
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T>, Reader<T>, Acker), BufferError<T>> {
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
+    where
+        FS: Filesystem + Clone + 'static,
+        FS::File: Unpin,
+    {
         let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
 
         Ok((writer, reader, acker))
@@ -258,9 +302,9 @@ where
 
         // Create the actual buffer subcomponents.
         let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
-        let config = DiskBufferConfig::from_path(buffer_path)
+        let config = DiskBufferConfigBuilder::from_path(buffer_path)
             .max_buffer_size(self.max_size as u64)
-            .build();
+            .build()?;
         let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
 
         let wrapped_reader = WrappedReader::new(reader);
@@ -277,17 +321,22 @@ where
 }
 
 #[pin_project]
-struct WrappedReader<T> {
+struct WrappedReader<T, FS>
+where
+    FS: Filesystem,
+{
     #[pin]
-    reader: Option<Reader<T>>,
-    read_future: ReusableBoxFuture<'static, (Reader<T>, Option<T>)>,
+    reader: Option<Reader<T, FS>>,
+    read_future: ReusableBoxFuture<'static, (Reader<T, FS>, Option<T>)>,
 }
 
-impl<T> WrappedReader<T>
+impl<T, FS> WrappedReader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
-    pub fn new(reader: Reader<T>) -> Self {
+    pub fn new(reader: Reader<T, FS>) -> Self {
         Self {
             reader: Some(reader),
             read_future: ReusableBoxFuture::new(make_read_future(None)),
@@ -295,9 +344,11 @@ where
     }
 }
 
-impl<T> Stream for WrappedReader<T>
+impl<T, FS> Stream for WrappedReader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem + 'static,
+    FS::File: Unpin,
 {
     type Item = T;
 
@@ -316,9 +367,11 @@ where
     }
 }
 
-async fn make_read_future<T>(reader: Option<Reader<T>>) -> (Reader<T>, Option<T>)
+async fn make_read_future<T, FS>(reader: Option<Reader<T, FS>>) -> (Reader<T, FS>, Option<T>)
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     match reader {
         None => unreachable!("future should not be called in this state"),
@@ -326,7 +379,7 @@ where
             let result = match reader.next().await {
                 Ok(result) => result,
                 Err(e) => {
-                    // TODO: we can _probably_ avoid having to actually kill the task here,
+                    // TODO: We can _probably_ avoid having to actually kill the task here,
                     // because the reader will recover from read errors, but, things it won't
                     // automagically recover from:
                     // - if it rolls to the next data file mid-data file, the writer might still be
@@ -335,7 +388,7 @@ where
                     //
                     //   maybe there's an easy way we could propagate the rollover events to the
                     //   writer to also get it to rollover?  again, more of a technique to minimize
-                    //   the number of records we throw away by rolling over.  this could be tricky
+                    //   the number of records we throw away by rolling over. this could be tricky
                     //   to accomplish, though, for in-flight readers, but it's just a thought in a
                     //   code comment for now.
                     //
@@ -370,11 +423,13 @@ where
     }
 }
 
-async fn drive_disk_v2_writer<T>(mut writer: Writer<T>, mut input: Receiver<T>)
+async fn drive_disk_v2_writer<T, FS>(mut writer: Writer<T, FS>, mut input: Receiver<T>)
 where
     T: Bufferable,
+    FS: Filesystem + Clone,
+    FS::File: Unpin,
 {
-    // TODO: Use a control message struct so callers can send both items to write and flush
+    // TODO: Use a control message approach so callers can send both items to write and flush
     // requests, facilitating the ability to allow for `send_all` at the frontend.
     while let Some(record) = input.recv().await {
         if let Err(e) = writer.write_record(record).await {
