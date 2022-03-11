@@ -230,9 +230,9 @@ impl NotEqualsPredicate {
             arg: match arg {
                 CheckFieldsPredicateArg::String(s) => vec![s.clone()],
                 CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
-                CheckFieldsPredicateArg::Integer(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Float(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Boolean(a) => vec![format!("{}", a)],
+                CheckFieldsPredicateArg::Integer(a) => vec![a.to_string()],
+                CheckFieldsPredicateArg::Float(a) => vec![a.to_string()],
+                CheckFieldsPredicateArg::Boolean(a) => vec![a.to_string()],
             },
         }))
     }

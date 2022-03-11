@@ -328,6 +328,7 @@ test-integration: test-integration-eventstoredb_metrics test-integration-fluent 
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-shutdown
 
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
@@ -381,14 +382,6 @@ endif
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
 	@scripts/test-e2e-kubernetes.sh
-
-.PHONY: test-shutdown
-test-shutdown: ## Runs shutdown tests
-	make test-integration-shutdown
-	make test-shutdown-cleanup
-
-test-shutdown-cleanup:
-	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests

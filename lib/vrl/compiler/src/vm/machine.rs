@@ -33,6 +33,9 @@ pub enum OpCode {
     /// Merges the two objects at the top of the stack, placing the result back on the stack.
     Merge,
 
+    /// Ands the two objects at the top of the stack, placing the result back on the stack.
+    And,
+
     /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
     Not,
 
@@ -71,6 +74,11 @@ pub enum OpCode {
     /// If the top element of the stack is truthy (not null or false) advances the instruction
     /// pointer by the amount set by the ensuing primitive instruction.
     JumpIfTruthy,
+
+    /// If the top element of the stack is not truthy (not null or false) advances the instruction
+    /// pointer by the amount set by the ensuing primitive instruction.
+    /// The value at the top of the stack is swapped for False.
+    JumpAndSwapIfFalsey,
 
     /// If the error field of the VM is not set advances the instruction pointer by the amount
     /// set by the ensuing primitive instruction.
@@ -122,6 +130,10 @@ pub enum OpCode {
     /// will have been created by the `compile_argument` function of the `Function` that is about to be called
     /// at compile time. (Used, for example, to precompile and store regexes at compile time.)
     MoveStaticParameter,
+
+    /// After each statement (with the exception of the last one) within a block we need to pop the
+    /// stack, and if we are in an error state jump to the end of the block.
+    EndStatement,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -157,9 +169,17 @@ impl Vm {
         }
     }
 
+    /// Adds the given value to our list of constants and returns it's position in the list.
+    /// If the constant already exists, the position of that element is returned without adding
+    /// the value again.
     pub fn add_constant(&mut self, object: Value) -> usize {
-        self.values.push(object);
-        self.values.len() - 1
+        match self.values.iter().position(|value| value == &object) {
+            None => {
+                self.values.push(object);
+                self.values.len() - 1
+            }
+            Some(pos) => pos,
+        }
     }
 
     pub fn write_opcode(&mut self, code: OpCode) {
@@ -261,7 +281,10 @@ impl Vm {
                 }
                 OpCode::Return => {
                     // Ends the process and returns the top item from the stack - or `Null` if the stack is empty.
-                    return Ok(state.stack.pop().unwrap_or(Value::Null));
+                    return match state.error {
+                        None => Ok(state.stack.pop().unwrap_or(Value::Null)),
+                        Some(err) => Err(err),
+                    };
                 }
                 OpCode::Constant => {
                     let value = state.read_constant()?;
@@ -276,20 +299,25 @@ impl Vm {
                 OpCode::Multiply => binary_op(&mut state, Value::try_mul)?,
                 OpCode::Divide => binary_op(&mut state, Value::try_div)?,
                 OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
+                OpCode::And => binary_op(&mut state, Value::try_and)?,
                 OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
                 OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
                 OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
                 OpCode::Less => binary_op(&mut state, Value::try_lt)?,
                 OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
                 OpCode::NotEqual => {
-                    let rhs = state.pop_stack()?;
-                    let lhs = state.pop_stack()?;
-                    state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    if state.error.is_none() {
+                        let rhs = state.pop_stack()?;
+                        let lhs = state.pop_stack()?;
+                        state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    }
                 }
                 OpCode::Equal => {
-                    let rhs = state.pop_stack()?;
-                    let lhs = state.pop_stack()?;
-                    state.stack.push(lhs.eq_lossy(&rhs).into());
+                    if state.error.is_none() {
+                        let rhs = state.pop_stack()?;
+                        let lhs = state.pop_stack()?;
+                        state.stack.push(lhs.eq_lossy(&rhs).into());
+                    }
                 }
                 OpCode::Pop => {
                     // Removes the top item from the stack.
@@ -302,14 +330,14 @@ impl Vm {
                 OpCode::JumpIfFalse => {
                     // If the value at the top of the stack is false, jump by the given amount.
                     let jump = state.next_primitive()?;
-                    if !is_true(state.peek_stack()?) {
+                    if !is_true(state.peek_stack()?)? {
                         state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpIfTrue => {
                     // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
-                    if is_true(state.peek_stack()?) {
+                    if is_true(state.peek_stack()?)? {
                         state.instruction_pointer += jump;
                     }
                 }
@@ -317,6 +345,18 @@ impl Vm {
                     // If the value at the top of the stack is true, jump by the given amount.
                     let jump = state.next_primitive()?;
                     if is_truthy(state.peek_stack()?) {
+                        state.instruction_pointer += jump;
+                    }
+                }
+                OpCode::JumpAndSwapIfFalsey => {
+                    // If the value at the top of the stack is true, jump by the given amount.
+                    let jump = state.next_primitive()?;
+                    if state.error.is_some() {
+                        // Break out if we are in an error.
+                        state.instruction_pointer += jump;
+                    } else if !is_truthy(state.peek_stack()?) {
+                        state.pop_stack()?;
+                        state.push_stack(Value::Boolean(false));
                         state.instruction_pointer += jump;
                     }
                 }
@@ -334,6 +374,15 @@ impl Vm {
                         state.instruction_pointer += jump;
                     }
                 }
+                OpCode::EndStatement => {
+                    let jump = state.next_primitive()?;
+                    if state.error.is_some() {
+                        state.instruction_pointer += jump;
+                    } else {
+                        state.pop_stack()?;
+                    }
+                }
+
                 OpCode::Jump => {
                     // Moves the instruction pointer by the amount specified.
                     let jump = state.next_primitive()?;
@@ -407,9 +456,11 @@ impl Vm {
                         }
                         Variable::None => state.stack.push(Value::Null),
                         Variable::Stack(path) => {
-                            let value = state.pop_stack()?;
-                            let value = value.get_by_path(path).cloned().unwrap_or(Value::Null);
-                            state.stack.push(value);
+                            if state.error.is_none() {
+                                let value = state.pop_stack()?;
+                                let value = value.get_by_path(path).cloned().unwrap_or(Value::Null);
+                                state.stack.push(value);
+                            }
                         }
                     }
                 }
@@ -567,8 +618,11 @@ fn set_variable<'a>(
     Ok(())
 }
 
-fn is_true(object: &Value) -> bool {
-    matches!(object, Value::Boolean(true))
+fn is_true(object: &Value) -> Result<bool, ExpressionError> {
+    match object {
+        Value::Boolean(value) => Ok(*value),
+        _ => Err(format!("expected boolean, got {}", object.kind()).into()),
+    }
 }
 
 fn is_truthy(object: &Value) -> bool {

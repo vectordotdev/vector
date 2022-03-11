@@ -41,7 +41,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -57,6 +58,13 @@ services:
     environment:
       - KAFKA_HOST=kafka
     volumes:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
       - ${PWD}:/code
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+# this is made to improve the build when running locally
+volumes:
+  cargogit: {}
+  cargoregistry: {}
 
