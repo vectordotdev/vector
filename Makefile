@@ -338,9 +338,6 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
@@ -361,9 +358,6 @@ tests/data/dnstap/socket:
 .PHONY: test-integration-dnstap
 test-integration-dnstap: tests/data/dnstap/socket
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-dnstap-cleanup
 endif
@@ -373,9 +367,6 @@ test-integration-%-cleanup:
 
 test-integration-%:
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
 endif
