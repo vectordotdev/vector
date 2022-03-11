@@ -10,11 +10,79 @@ adjustement required for future extension to other trace types.
 - OpenTelemetry traces are already supported by Datadog:
   - Either with the [Datadog exporter][otlp-dd-exporter] using the Opentelemetry collector (without the `trace-agent`)
   - Or with the `trace-agent` [configured to receive OpenTelemtry traces][otlp-traces-with-dd-agent] (both grpc and http
-    transport layer are supported)
+    transport layer are supported
+
+## Usecases details
+
+As the whole traces processing inside Vector is pretty new, some details about confirmed most credible use cases in the
+near future to ensure the change will be implemented in a relevant way to be useful to potential users.
+
+One identified scenario is to demux a trace flow based on some conditions matching any metadata or tags values for
+single trace, a group of traces or per spans. From a config perspective this would expect to be functional with the
+following configuration:
+
+```yaml
+[...]
+sources:
+  otlp_traces:
+    type: opentelemetry_traces
+    address: "[::]:8081"
+    mode: grpc
+
+transforms:
+  set_key:
+   type: remap
+    source: |
+      if exists!(.tags.user_id) {
+        return
+      }
+      key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
+      set_dd_api_key(key) # this does not exists yet
+    inputs:
+      - otlp_traces
+
+sinks:
+  dd_trace:
+    type: datadog_traces
+    default_api_key: 12345678abcdef
+    inputs:
+     - set_key
+```
+
+This demux/conditional action can be seen as an extension of what currently exists in Vector. Other kind of conditional
+action like the `filter` transform to discard traces base on certain metadata can be considered to be very similar, as
+this also involve evaluating a VRL condition on traces. The key problem here is to exposes traces and spans field in a
+way that the user can still manipulate those easily.
+
+This however raises the case of the granularity of a single event ; for instance multiple traces can bundles into a
+single payload in both OpenTelemetry and Datadog wire format. Enabling clear processing withou ambiguity advocate for a
+clear constraint that should be enforced by all future traces sources : **a single Vector event shall not hold data
+relative to more that one trace**.
+
+A completely different use case is traces sampling, but it cover two major variation:
+
+- Simple sampling: either cap/pace the trace flow at a given rate or sample 1 trace per 10/100/1000/etc. traces, and
+  this is already available thanks to the `sample` and `throttle` transforms
+- Outliers isolation, this would mean keeping some traces based on some advanced criteria, like execution time above p99,
+  this would require comparison against histogram / sketches.
+
+Another valuable identified usecase is the ability to provide seemless conversion between any kind of Vector supported
+traces, this means that the Vector internal traces representation shall be flexible enough to acomodate conversion
+to/from any trace format in sources and sinks that work with traces. Given the traction from the Opentelemetry project,
+and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to cover most usecases.
+
+**Key requirements that can be extracted from the aforementioned usecases**:
+
+- A Vector trace event shall only contain data relative to one single trace, i.e. traces sources shall create one event
+  for each indivual trace ID and its associated spans and metadata.
+- Use the Opentelemetry trace format as the common denominator and base the Vector internal representation to ensure :
+  - A clear reference point for conversion between trace format
+  - Avoid destructive manipulation by transform and keep traces object fully functionnal even after heavy modifications
+    while flowing throw the topology
 
 ## Cross cutting concerns
 
-- Link to any ongoing or future work relevant to this change.
+- N/A
 
 ## Scope
 
@@ -69,9 +137,13 @@ And it should just work.
     payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
     All the expected behaviours regarding the kind of requests/responses code and sequence are clearly defined as well
     as the default URL path (`/v1/traces` for traces).
-- Internal traces representation/normalization, two options are opened see [outstanding questions](#outstanding-questions)
+- Internal traces representation/normalization, two options are opened see [outstanding
+  questions](#outstanding-questions)
 - APM stats computation:
-  - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on the [Agent codebase][-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
+  - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
+    Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
+    computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on
+    the [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
   - Where the APM stats computations is still under discusion, see [outstanding questions](#outstanding-questions)
 
 ## Rationale
@@ -110,7 +182,7 @@ For cross format operation like `opentelemetry_traces` source to `datadog_traces
   2. Move traces away from their current representation (as LogEvent) and build a new container based on a set of dedicated structs representing traces and spans with common properties and generic key/value store(s) to allow a certain degree of flexibility.
 
 The second option would have to provide a way to store, at least, all fields from both Opentelemetry and Datadog Traces:
-Datadog [newer trace format][dd-traces-proto] (condensed):
+Datadog [newer trace format][otlp-trace-proto-def] (condensed):
 
 ```protobuf
 message Span {
@@ -242,7 +314,7 @@ Conversion from Opentelemetry to Datadog is happening [here][span-conversion] in
 [otlp-traces-with-dd-agent]: https://docs.datadoghq.com/tracing/setup_overview/open_standards/#otlp-ingest-in-datadog-agent
 [otlp-protocols]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md
 [otlp-proto-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto
-[otlp-proto-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto
+[otlp-trace-proto-def]: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto
 [otlp-grpc-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto/collector
 [otlp-http]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp
 [apm-stats-computation]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/datadogexporter/stats.go#L30
