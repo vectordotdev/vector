@@ -113,10 +113,6 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
     ) -> Self::Client {
         Self::Client::from_conf_conn(builder.build(), connector)
     }
-
-    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
-        Self::Client::from_conf(builder.build())
-    }
 }
 
 #[async_trait::async_trait]
@@ -175,6 +171,7 @@ impl CloudWatchMetricsSinkConfig {
             region,
             self.region.endpoint()?,
             proxy,
+            &self.tls,
         )
         .await
     }

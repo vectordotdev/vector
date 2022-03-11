@@ -1,4 +1,6 @@
 use crate::aws::aws_sdk::{create_client, ClientBuilder};
+use crate::common::sqs::SqsClientBuilder;
+use crate::tls::TlsOptions;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
@@ -40,41 +42,8 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
-}
 
-struct SqsClientBuilder;
-
-impl ClientBuilder for SqsClientBuilder {
-    type ConfigBuilder = aws_sdk_sqs::config::Builder;
-    type Client = aws_sdk_sqs::Client;
-
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_sqs::config::Builder::new().credentials_provider(credentials_provider)
-    }
-
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
-    }
-
-    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
-        Self::Client::from_conf(builder.build())
-    }
+    tls: Option<TlsOptions>,
 }
 
 #[async_trait::async_trait]
@@ -118,6 +87,7 @@ impl AwsSqsConfig {
             self.region.region(),
             self.region.endpoint()?,
             &cx.proxy,
+            &self.tls,
         )
         .await
     }
