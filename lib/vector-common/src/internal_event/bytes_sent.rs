@@ -10,11 +10,8 @@ pub struct BytesSent<'a> {
 }
 
 impl<'a> InternalEvent for BytesSent<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_sent_bytes_total", self.byte_size as u64,
                  "protocol" => self.protocol.to_string());
     }

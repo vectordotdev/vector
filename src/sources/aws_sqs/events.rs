@@ -8,15 +8,12 @@ pub struct AwsSqsBytesReceived {
 }
 
 impl InternalEvent for AwsSqsBytesReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
             protocol = "http",
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_bytes_total", self.byte_size as u64);
     }
 }
@@ -27,11 +24,8 @@ pub struct SqsMessageDeleteError<'a> {
 }
 
 impl<'a> InternalEvent for SqsMessageDeleteError<'a> {
-    fn emit_logs(&self) {
-        warn!(message = "Failed to delete SQS events.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
+    fn emit(self) {
+        error!(message = "Failed to delete SQS events.", error = %self.error);
         counter!("sqs_message_delete_failed_total", 1);
     }
 }

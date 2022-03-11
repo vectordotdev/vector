@@ -191,10 +191,10 @@ async fn kafka_source(
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(&KafkaReadError { error });
+                emit!(KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(&BytesReceived {
+                emit!(BytesReceived {
                     byte_size: msg.payload_len(),
                     protocol: "tcp",
                 });
@@ -248,7 +248,7 @@ async fn kafka_source(
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((events, _byte_size)) => {
-                                emit!(&KafkaEventsReceived {
+                                emit!(KafkaEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
                                 });
@@ -284,7 +284,7 @@ async fn kafka_source(
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_event_stream(&mut stream).await {
                             Err(error) => {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                             }
                             Ok(_) => {
                                 // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
@@ -296,13 +296,13 @@ async fn kafka_source(
                     }
                     None => match out.send_event_stream(&mut stream).await {
                         Err(error) => {
-                            emit!(&StreamClosedError { error, count });
+                            emit!(StreamClosedError { error, count });
                         }
                         Ok(_) => {
                             if let Err(error) =
                                 consumer.store_offset(msg.topic(), msg.partition(), msg.offset())
                             {
-                                emit!(&KafkaOffsetUpdateError { error });
+                                emit!(KafkaOffsetUpdateError { error });
                             }
                         }
                     },
@@ -334,7 +334,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
     move |entry| {
         if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-            emit!(&KafkaOffsetUpdateError { error });
+            emit!(KafkaOffsetUpdateError { error });
         }
     }
 }

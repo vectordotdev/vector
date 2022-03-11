@@ -288,7 +288,7 @@ where
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
                                         if response.event_status() == EventStatus::Delivered {
-                                            emit(&response.events_sent());
+                                            emit(response.events_sent());
                                         }
                                     }
                                 };

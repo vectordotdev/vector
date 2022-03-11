@@ -336,7 +336,7 @@ pub(crate) use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
+        vector_core::internal_event::emit(vector_core::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })

@@ -96,7 +96,7 @@ impl SqsSource {
             let mut batch_receiver = None;
             for message in messages {
                 if let Some(body) = message.body {
-                    emit!(&AwsSqsBytesReceived {
+                    emit!(AwsSqsBytesReceived {
                         byte_size: body.len()
                     });
                     let timestamp = get_timestamp(&message.attributes);
@@ -161,7 +161,7 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(&SqsMessageDeleteError { error: &err });
+            emit!(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -192,7 +192,7 @@ fn decode_message(
                         total_events_size += event.size_of();
                         yield event;
                     }
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         byte_size: total_events_size,
                         count
                     });

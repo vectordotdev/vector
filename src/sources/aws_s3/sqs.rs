@@ -253,13 +253,13 @@ impl IngestorProcess {
         let messages = self.receive_messages().await;
         let messages = messages
             .map(|messages| {
-                emit!(&SqsMessageReceiveSucceeded {
+                emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             })
             .map_err(|err| {
-                emit!(&SqsMessageReceiveError { error: &err });
+                emit!(SqsMessageReceiveError { error: &err });
                 err
             })
             .unwrap_or_default();
@@ -284,7 +284,7 @@ impl IngestorProcess {
 
             match self.handle_sqs_message(message).await {
                 Ok(()) => {
-                    emit!(&SqsMessageProcessingSucceeded {
+                    emit!(SqsMessageProcessingSucceeded {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
@@ -295,7 +295,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageProcessingError {
+                    emit!(SqsMessageProcessingError {
                         message_id: &message_id,
                         error: &err,
                     });
@@ -311,19 +311,19 @@ impl IngestorProcess {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
                     if !result.successful.is_empty() {
-                        emit!(&SqsMessageDeleteSucceeded {
+                        emit!(SqsMessageDeleteSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(&SqsMessageDeletePartialError {
+                        emit!(SqsMessageDeletePartialError {
                             entries: result.failed
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(&SqsMessageDeleteBatchError {
+                    emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -360,7 +360,7 @@ impl IngestorProcess {
         }
 
         if s3_event.event_name.kind != "ObjectCreated" {
-            emit!(&SqsS3EventRecordInvalidEventIgnored {
+            emit!(SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
                 key: &s3_event.s3.object.key,
                 kind: &s3_event.event_name.kind,
@@ -433,7 +433,7 @@ impl IngestorProcess {
                     FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                         .map(|res| {
                             res.map(|bytes| {
-                                emit!(&BytesReceived {
+                                emit!(BytesReceived {
                                     byte_size: bytes.len(),
                                     protocol: "http",
                                 });
@@ -478,7 +478,7 @@ impl IngestorProcess {
                         }
                     }
 
-                    emit!(&SqsS3EventsReceived {
+                    emit!(SqsS3EventsReceived {
                         byte_size: log.size_of()
                     });
 
@@ -491,7 +491,7 @@ impl IngestorProcess {
                         // count is set to 0 to have no discarded events considering
                         // the events are not yet acknowledged and will be retried in
                         // case of error
-                        emit!(&StreamClosedError { error, count: 0 });
+                        emit!(StreamClosedError { error, count: 0 });
                         Some(crate::source_sender::ClosedError)
                     }
                 };

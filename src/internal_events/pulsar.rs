@@ -8,7 +8,7 @@ pub(crate) struct PulsarEncodeEventError<E> {
 }
 
 impl<E: std::fmt::Display> InternalEvent for PulsarEncodeEventError<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Event encode failed; dropping event.",
             error = %self.error,
@@ -17,9 +17,6 @@ impl<E: std::fmt::Display> InternalEvent for PulsarEncodeEventError<E> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "pulsar_encoding",

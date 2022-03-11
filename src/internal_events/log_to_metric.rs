@@ -11,7 +11,7 @@ pub struct LogToMetricFieldNullError<'a> {
 }
 
 impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Unable to convert null field {:?}.", self.field),
             error = "field_null",
@@ -20,9 +20,6 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             null_field = %self.field,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => "field_null",
@@ -44,7 +41,7 @@ pub struct LogToMetricParseFloatError<'a> {
 }
 
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Failed to parse field {:?} as float: {:?}", self.field, self.error),
             field = %self.field,
@@ -53,9 +50,6 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => "failed_parsing_float",
@@ -76,7 +70,7 @@ pub struct LogToMetricTemplateParseError {
 }
 
 impl InternalEvent for LogToMetricTemplateParseError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Failed to parse template: {:?}", self.error),
             error = "failed_parsing_template",
@@ -84,9 +78,6 @@ impl InternalEvent for LogToMetricTemplateParseError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => "failed_parsing_template",

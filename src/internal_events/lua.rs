@@ -8,7 +8,7 @@ pub struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("lua_memory_used_bytes", self.used_memory as f64);
     }
 }
@@ -19,7 +19,7 @@ pub struct LuaScriptError {
 }
 
 impl InternalEvent for LuaScriptError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
@@ -28,9 +28,6 @@ impl InternalEvent for LuaScriptError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "execution",
@@ -54,7 +51,7 @@ pub struct LuaBuildError {
 }
 
 impl InternalEvent for LuaBuildError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
@@ -62,9 +59,6 @@ impl InternalEvent for LuaBuildError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "build",

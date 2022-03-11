@@ -21,16 +21,13 @@ pub struct AwsSqsEventsSent<'a> {
 }
 
 impl InternalEvent for AwsSqsEventsSent<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events sent.",
             message_id = ?self.message_id,
             count = 1,
             byte_size = %self.byte_size,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_sent_events_total", 1);
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
         // deprecated
@@ -44,15 +41,12 @@ pub struct SqsS3EventsReceived {
 }
 
 impl InternalEvent for SqsS3EventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = 1,
             byte_size = %self.byte_size,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", 1);
         counter!(
             "component_received_event_bytes_total",
@@ -72,7 +66,7 @@ pub struct SqsMessageReceiveError<'a> {
 
 #[cfg(feature = "sources-aws_s3")]
 impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to fetch SQS events.",
             error = %self.error,
@@ -80,9 +74,6 @@ impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_fetching_sqs_events",
@@ -100,11 +91,8 @@ pub struct SqsMessageReceiveSucceeded {
 }
 
 impl InternalEvent for SqsMessageReceiveSucceeded {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Received SQS messages.", count = %self.count);
-    }
-
-    fn emit_metrics(&self) {
         counter!("sqs_message_receive_succeeded_total", 1);
         counter!("sqs_message_received_messages_total", self.count as u64);
     }
@@ -116,11 +104,8 @@ pub struct SqsMessageProcessingSucceeded<'a> {
 }
 
 impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Processed SQS message succeededly.", message_id = %self.message_id);
-    }
-
-    fn emit_metrics(&self) {
         counter!("sqs_message_processing_succeeded_total", 1);
     }
 }
@@ -134,7 +119,7 @@ pub struct SqsMessageProcessingError<'a> {
 
 #[cfg(feature = "sources-aws_s3")]
 impl<'a> InternalEvent for SqsMessageProcessingError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to process SQS message.",
             message_id = %self.message_id,
@@ -143,9 +128,6 @@ impl<'a> InternalEvent for SqsMessageProcessingError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_processing_sqs_message",
@@ -165,15 +147,12 @@ pub struct SqsMessageDeleteSucceeded {
 
 #[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeleteSucceeded {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Deleted SQS message(s).",
             message_ids = %self.message_ids.iter()
                 .map(|x| x.id.to_string())
                 .collect::<Vec<_>>()
                 .join(", "));
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "sqs_message_delete_succeeded_total",
             self.message_ids.len() as u64
@@ -189,7 +168,7 @@ pub struct SqsMessageDeletePartialError {
 
 #[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeletePartialError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Deletion of SQS message(s) failed.",
             message_ids = %self.entries.iter()
@@ -200,9 +179,6 @@ impl InternalEvent for SqsMessageDeletePartialError {
             error_type = error_type::ACKNOWLEDGMENT_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_deleting_some_sqs_messages",
@@ -223,7 +199,7 @@ pub struct SqsMessageDeleteBatchError {
 
 #[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeleteBatchError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Deletion of SQS message(s) failed.",
             message_ids = %self.entries.iter()
@@ -235,9 +211,6 @@ impl InternalEvent for SqsMessageDeleteBatchError {
             error_type = error_type::ACKNOWLEDGMENT_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_deleting_all_sqs_messages",
@@ -259,12 +232,9 @@ pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
 }
 
 impl<'a> InternalEvent for SqsS3EventRecordInvalidEventIgnored<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
             bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
-    }
-
-    fn emit_metrics(&self) {
         counter!("sqs_s3_event_record_ignored_total", 1, "ignore_type" => "invalid_event_kind");
     }
 }

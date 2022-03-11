@@ -254,7 +254,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
                 .queue_url(queue_url)
                 .send()
                 .inspect_ok(|result| {
-                    emit!(&AwsSqsEventsSent {
+                    emit!(AwsSqsEventsSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })
@@ -305,7 +305,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingError {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("message_group_id"),
                     drop_event: true
@@ -319,7 +319,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&TemplateRenderingError {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("message_deduplication_id"),
                     drop_event: true

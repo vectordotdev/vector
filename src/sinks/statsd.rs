@@ -229,7 +229,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMu
             }
         }
         _ => {
-            emit!(&StatsdInvalidMetricError {
+            emit!(StatsdInvalidMetricError {
                 value: metric.value(),
                 kind: &metric.kind(),
             });

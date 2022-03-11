@@ -60,7 +60,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                     Ok(())
                 })?;
 
-            emit!(&ElasticsearchEventEncoded {
+            emit!(ElasticsearchEventEncoded {
                 byte_size: written_bytes,
                 index: event.index,
             });

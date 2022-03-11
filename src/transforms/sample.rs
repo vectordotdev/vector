@@ -138,7 +138,7 @@ impl FunctionTransform for Sample {
                 .insert("sample_rate", self.rate.to_string());
             output.push(event);
         } else {
-            emit!(&SampleEventDiscarded);
+            emit!(SampleEventDiscarded);
         }
     }
 }

@@ -77,13 +77,13 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             let _response: PutRecordsOutput = client
                 .put_records(request)
                 .inspect_ok(|_| {
-                    emit!(&AwsBytesSent {
+                    emit!(AwsBytesSent {
                         byte_size: processed_bytes_total,
                         region,
                     });
 
                     // Deprecated
-                    emit!(&AwsKinesisStreamsEventSent {
+                    emit!(AwsKinesisStreamsEventSent {
                         byte_size: processed_bytes_total
                     });
                 })

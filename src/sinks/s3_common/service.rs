@@ -148,7 +148,7 @@ impl Service<S3Request> for S3Service {
                 .in_current_span()
                 .await
                 .map(|_inner| {
-                    emit!(&AwsBytesSent {
+                    emit!(AwsBytesSent {
                         byte_size: request_size,
                         region,
                     });
