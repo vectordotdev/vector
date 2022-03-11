@@ -458,7 +458,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
     ));
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy)
+    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None)
         .await
         .unwrap()
 }
