@@ -1,4 +1,4 @@
-use crate::aws::aws_sdk::{create_client};
+use crate::aws::aws_sdk::create_client;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
@@ -8,8 +8,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
-
-
 
 use serde::{Deserialize, Serialize};
 use std::cmp;
@@ -43,7 +41,7 @@ pub struct AwsSqsConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 
-    tls: Option<TlsOptions>,
+    pub tls: Option<TlsOptions>,
 }
 
 #[async_trait::async_trait]

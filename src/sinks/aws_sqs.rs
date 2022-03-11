@@ -1,8 +1,7 @@
 use aws_sdk_sqs::error::{GetQueueAttributesError, SendMessageError};
 use aws_sdk_sqs::output::SendMessageOutput;
 use aws_sdk_sqs::types::SdkError;
-use aws_sdk_sqs::{Client as SqsClient};
-
+use aws_sdk_sqs::Client as SqsClient;
 
 use std::{
     convert::TryFrom,
@@ -405,6 +404,7 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use aws_sdk_sqs::model::QueueAttributeName;
+    use aws_sdk_sqs::{Endpoint, Region};
     use http::Uri;
     use std::collections::HashMap;
     use std::str::FromStr;
