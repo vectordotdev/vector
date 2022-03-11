@@ -8,16 +8,17 @@ use aws_sdk_cloudwatch::error::PutMetricDataError;
 use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
-use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
+use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
+use aws_smithy_client::erase::DynConnector;
+use aws_types::credentials::SharedCredentialsProvider;
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::is_retriable_error;
+use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
 use crate::aws::RegionOrEndpoint;
-use crate::http::build_proxy_connector;
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -34,7 +35,7 @@ use crate::{
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
-    tls::{MaybeTlsSettings, TlsOptions},
+    tls::TlsOptions,
 };
 
 #[derive(Clone)]
@@ -82,6 +83,41 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
+
+struct CloudwatchMetricsClientBuilder;
+
+impl ClientBuilder for CloudwatchMetricsClientBuilder {
+    type ConfigBuilder = aws_sdk_cloudwatch::config::Builder;
+    type Client = CloudwatchClient;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder {
+        aws_sdk_cloudwatch::config::Builder::new().credentials_provider(credentials_provider)
+    }
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder {
+        builder.endpoint_resolver(endpoint)
+    }
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
+        builder.region(region)
+    }
+
+    fn client_from_conf_conn(
+        builder: Self::ConfigBuilder,
+        connector: DynConnector,
+    ) -> Self::Client {
+        Self::Client::from_conf_conn(builder.build(), connector)
+    }
+
+    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
+        Self::Client::from_conf(builder.build())
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
@@ -134,30 +170,13 @@ impl CloudWatchMetricsSinkConfig {
             self.region.region()
         };
 
-        let mut config_builder = aws_sdk_cloudwatch::config::Builder::new()
-            .credentials_provider(self.auth.credentials_provider().await?);
-
-        if let Some(endpont_override) = self.region.endpoint()? {
-            config_builder = config_builder.endpoint_resolver(endpont_override);
-        }
-
-        if let Some(region) = region {
-            config_builder = config_builder.region(region);
-        }
-
-        if proxy.enabled {
-            let tls_settings = MaybeTlsSettings::enable_client()?;
-            let proxy = build_proxy_connector(tls_settings, proxy)?;
-            let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-            let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
-            let client =
-                aws_sdk_cloudwatch::Client::from_conf_conn(config_builder.build(), connector);
-            Ok(client)
-        } else {
-            Ok(aws_sdk_cloudwatch::Client::from_conf(
-                config_builder.build(),
-            ))
-        }
+        create_client::<CloudwatchMetricsClientBuilder>(
+            &self.auth,
+            region,
+            self.region.endpoint()?,
+            proxy,
+        )
+        .await
     }
 }
 

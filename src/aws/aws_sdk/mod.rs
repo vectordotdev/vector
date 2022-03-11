@@ -1,4 +1,12 @@
+use crate::aws::AwsAuthentication;
+use crate::config::ProxyConfig;
+use crate::http::build_proxy_connector;
+use crate::tls::MaybeTlsSettings;
+use aws_smithy_client::erase::DynConnector;
 use aws_smithy_client::SdkError;
+use aws_smithy_http::endpoint::Endpoint;
+use aws_types::credentials::SharedCredentialsProvider;
+use aws_types::region::Region;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
 
@@ -44,5 +52,53 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
                 || (status.is_client_error() && re.is_match(response_body.as_ref()))
         }
         _ => false,
+    }
+}
+
+pub trait ClientBuilder {
+    type ConfigBuilder;
+    type Client;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder;
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder;
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder;
+
+    fn client_from_conf_conn(builder: Self::ConfigBuilder, connector: DynConnector)
+        -> Self::Client;
+
+    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client;
+}
+
+pub async fn create_client<T: ClientBuilder>(
+    auth: &AwsAuthentication,
+    region: Option<Region>,
+    endpoint: Option<Endpoint>,
+    proxy: &ProxyConfig,
+) -> crate::Result<T::Client> {
+    let mut config_builder = T::create_config_builder(auth.credentials_provider().await?);
+
+    if let Some(endpoint_override) = endpoint {
+        config_builder = T::with_endpoint_resolver(config_builder, endpoint_override);
+    }
+
+    if let Some(region) = region {
+        config_builder = T::with_region(config_builder, region);
+    }
+
+    if proxy.enabled {
+        let tls_settings = MaybeTlsSettings::enable_client()?;
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+        let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
+        Ok(T::client_from_conf_conn(config_builder, connector))
+    } else {
+        Ok(T::client_from_conf(config_builder))
     }
 }
