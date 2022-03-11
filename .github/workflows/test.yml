@@ -121,6 +121,49 @@ jobs:
           CARGO_BUILD_JOBS: 5
       - name: Stop sccache
         run: sccache --stop-server
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
+
+  test-cli:
+    name: CLI - Linux
+    runs-on: [self-hosted, linux, x64, general]
+    needs: changes
+    env:
+      CARGO_INCREMENTAL: 0
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
+      - run: make ci-sweep
+      - uses: actions/cache@v2.1.7
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      # We always make sure to stop any previous sccache process before starting it fresh, that
+      # way we can be sure we're using the right credentials for storage, etc.
+      - name: Start sccache
+        env:
+          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
+          SCCACHE_IDLE_TIMEOUT: 0
+        run: |
+          sccache --stop-server || true
+          sccache --start-server
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      - run: make test-cli
+      - name: Stop sccache
+        run: sccache --stop-server
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
 
   test-misc:
     name: Miscellaneous - Linux
@@ -155,7 +198,6 @@ jobs:
           sccache --stop-server || true
           sccache --start-server
           echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-      - run: make test-cli
       - run: make test-behavior
       - run: make check-examples
       - run: make test-docs
