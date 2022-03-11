@@ -83,6 +83,7 @@ jobs:
             env:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
+          - test: 'shutdown'
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep

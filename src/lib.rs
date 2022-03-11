@@ -54,7 +54,7 @@ pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
-pub mod graph;
+pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
@@ -73,26 +73,25 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
-#[deny(unreachable_pub)]
-pub mod sink;
+pub(crate) mod sink;
 #[allow(unreachable_pub)]
 pub mod sinks;
 pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub mod stream;
+pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
-pub mod tcp;
+pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
 #[allow(unreachable_pub)]
-pub mod tls;
+pub(crate) mod tls;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub mod top;
+pub(crate) mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
