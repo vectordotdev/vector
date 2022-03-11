@@ -272,7 +272,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
+        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:9","debian:10","debian:11"]
     container:
       image: ${{ matrix.container }}
     steps:

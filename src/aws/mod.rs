@@ -7,5 +7,5 @@ pub use region::RegionOrEndpoint;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 
-#[cfg(feature = "aws-config")]
+#[cfg(feature = "aws-core")]
 pub mod aws_sdk;

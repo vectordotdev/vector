@@ -297,6 +297,10 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 .PHONY: test
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
@@ -347,6 +351,10 @@ ifeq ($(AUTOSPAWN), true)
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
@@ -378,6 +386,10 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
+# https://github.com/vectordotdev/vector/issues/11762
+ifneq ($(OPERATING_SYSTEM), Windows)
+	@scripts/upload-test-results.sh
+endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
