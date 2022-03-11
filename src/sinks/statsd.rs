@@ -1,7 +1,6 @@
 use std::{
     fmt::Display,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -61,7 +60,7 @@ pub struct StatsdDefaultBatchSettings;
 impl SinkBatchSettings for StatsdDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(1300);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

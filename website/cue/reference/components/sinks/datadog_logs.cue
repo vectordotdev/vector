@@ -14,7 +14,7 @@ components: sinks: datadog_logs: {
 				common:       false
 				max_bytes:    4_250_000
 				max_events:   1000
-				timeout_secs: 5
+				timeout_secs: 5.0
 			}
 			compression: {
 				enabled: true

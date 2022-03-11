@@ -21,7 +21,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				common:       false
 				max_bytes:    5000000
 				max_events:   500
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true

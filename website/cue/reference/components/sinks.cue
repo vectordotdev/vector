@@ -56,7 +56,7 @@ components: sinks: [Name=string]: {
 								common:      true
 								description: "The maximum age of a batch before it is flushed."
 								required:    false
-								type: uint: {
+								type: float: {
 									default: features.send.batch.timeout_secs
 									unit:    "seconds"
 								}

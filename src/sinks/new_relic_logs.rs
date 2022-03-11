@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -46,7 +44,7 @@ pub struct NewRelicLogsDefaultBatchSettings;
 impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Derivative, Clone)]

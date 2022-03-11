@@ -1,4 +1,4 @@
-use std::{convert::TryInto, num::NonZeroU64};
+use std::convert::TryInto;
 
 use futures::FutureExt;
 use rusoto_core::RusotoError;
@@ -49,7 +49,7 @@ pub struct KinesisDefaultBatchSettings;
 impl SinkBatchSettings for KinesisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(500);
     const MAX_BYTES: Option<usize> = Some(5_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

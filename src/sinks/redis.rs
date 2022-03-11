@@ -1,6 +1,5 @@
 use std::{
     convert::TryFrom,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -88,7 +87,7 @@ pub struct RedisDefaultBatchSettings;
 impl SinkBatchSettings for RedisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

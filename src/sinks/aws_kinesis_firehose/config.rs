@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
@@ -40,7 +38,7 @@ pub struct KinesisFirehoseDefaultBatchSettings;
 impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(MAX_PAYLOAD_EVENTS);
     const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_SIZE);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
