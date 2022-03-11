@@ -40,6 +40,22 @@ where
     Encoding(EncodingConfig),
 }
 
+impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
+    for EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
+        + Debug
+        + Clone,
+{
+    fn from(encoding: LegacyEncodingConfig) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper {
+            encoding,
+            phantom: PhantomData,
+        })
+    }
+}
+
 impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 where
     LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
