@@ -56,10 +56,6 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
     ) -> Self::Client {
         Self::Client::from_conf_conn(builder.build(), connector)
     }
-
-    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
-        Self::Client::from_conf(builder.build())
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -98,6 +94,7 @@ impl CloudwatchLogsSinkConfig {
             self.region.region(),
             self.region.endpoint()?,
             proxy,
+            &self.tls,
         )
         .await
     }
