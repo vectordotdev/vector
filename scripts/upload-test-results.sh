@@ -8,6 +8,11 @@ IFS=$'\n\t'
 #
 #   Upload `cargo-nextest` JUnit output to Datadog
 
+if ! (${CI:-false}); then
+  # Only run in CI
+  exit 0
+fi
+
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
