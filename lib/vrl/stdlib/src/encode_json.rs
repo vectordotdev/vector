@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn encode_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn encode_json(value: Value) -> Resolved {
     // With `vrl::Value` it should not be possible to get `Err`.
     match serde_json::to_string(&value) {
         Ok(value) => Ok(value.into()),

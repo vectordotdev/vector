@@ -1,10 +1,6 @@
 use vrl::{diagnostic::Note, prelude::*};
 
-fn assert(
-    condition: Value,
-    message: Option<Value>,
-    format: Option<String>,
-) -> std::result::Result<Value, ExpressionError> {
+fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
     match condition.try_boolean()? {
         true => Ok(true.into()),
         false => {

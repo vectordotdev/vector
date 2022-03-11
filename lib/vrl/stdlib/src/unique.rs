@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 use vrl::prelude::*;
 
-fn unique(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn unique(value: Value) -> Resolved {
     let value = value.try_array()?;
     let set: IndexSet<_> = value.into_iter().collect();
     Ok(set.into_iter().collect())

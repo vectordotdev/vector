@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn to_syslog_facility(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_syslog_facility(value: Value) -> Resolved {
     let value = value.try_integer()?;
     // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
     let code = match value {

@@ -1,10 +1,6 @@
 use vrl::prelude::*;
 
-fn split(
-    value: Value,
-    limit: Value,
-    pattern: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let limit = limit.try_integer()? as usize;
     match pattern {

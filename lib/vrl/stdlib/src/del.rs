@@ -1,9 +1,6 @@
 use vrl::prelude::*;
 
-fn del(
-    query: &expression::Query,
-    ctx: &mut Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
     if query.is_external() {
         return Ok(ctx

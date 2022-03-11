@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn get_hostname() -> std::result::Result<Value, ExpressionError> {
+fn get_hostname() -> Resolved {
     Ok(hostname::get()
         .map_err(|error| format!("failed to get hostname: {}", error))?
         .to_string_lossy()

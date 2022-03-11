@@ -13,7 +13,7 @@ use nom::{
 };
 use vrl::{prelude::*, Value};
 
-fn parse_ruby_hash(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_ruby_hash(value: Value) -> Resolved {
     let input = value.try_bytes_utf8_lossy()?;
     parse(&input)
 }

@@ -1,11 +1,7 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn remove(
-    path: Value,
-    compact: Value,
-    mut value: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
     let path = match path {
         Value::Array(path) => {
             let mut lookup = LookupBuf::root();

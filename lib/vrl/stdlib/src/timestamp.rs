@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn timestamp(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn timestamp(value: Value) -> Resolved {
     match value {
         v @ Value::Timestamp(_) => Ok(v),
         v => Err(format!(r#"expected timestamp, got {}"#, v.kind()).into()),

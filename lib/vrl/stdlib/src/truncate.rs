@@ -1,10 +1,6 @@
 use vrl::prelude::*;
 
-fn truncate(
-    value: Value,
-    limit: Value,
-    ellipsis: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {
     let mut value = value.try_bytes_utf8_lossy()?.into_owned();
     let limit = limit.try_integer()?;
     let limit = if limit < 0 { 0 } else { limit as usize };

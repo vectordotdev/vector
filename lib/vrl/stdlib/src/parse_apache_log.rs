@@ -9,7 +9,7 @@ fn parse_apache_log(
     timestamp_format: Option<Value>,
     format: &Bytes,
     ctx: &Context,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => "%d/%b/%Y:%T %z".to_owned(),

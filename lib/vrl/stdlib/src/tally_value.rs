@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn tally_value(array: Value, value: Value) -> std::result::Result<Value, ExpressionError> {
+fn tally_value(array: Value, value: Value) -> Resolved {
     let array = array.try_array()?;
     Ok(array.iter().filter(|&v| v == &value).count().into())
 }

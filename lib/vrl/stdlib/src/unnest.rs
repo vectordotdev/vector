@@ -1,10 +1,7 @@
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
-fn unnest(
-    path: &expression::Query,
-    ctx: &mut Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
     let path_path = path.path();
     let value: Value;
     let target: Box<&dyn Target> = match path.target() {

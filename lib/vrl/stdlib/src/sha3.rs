@@ -1,7 +1,7 @@
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 use vrl::prelude::*;
 
-fn sha3(value: Value, variant: &Bytes) -> std::result::Result<Value, ExpressionError> {
+fn sha3(value: Value, variant: &Bytes) -> Resolved {
     let value = value.try_bytes()?;
     let hash = match variant.as_ref() {
         b"SHA3-224" => encode::<Sha3_224>(&value),

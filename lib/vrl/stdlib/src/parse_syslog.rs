@@ -5,10 +5,7 @@ use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vector_common::TimeZone;
 use vrl::prelude::*;
 
-pub(crate) fn parse_syslog(
-    value: Value,
-    ctx: &Context,
-) -> std::result::Result<Value, ExpressionError> {
+pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
     let message = value.try_bytes_utf8_lossy()?;
     let timezone = match ctx.timezone() {
         TimeZone::Local => None,

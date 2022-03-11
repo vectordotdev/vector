@@ -1,11 +1,7 @@
 use ::value::ValueRegex;
 use vrl::prelude::*;
 
-fn find(
-    value: Value,
-    pattern: Value,
-    from: Option<Value>,
-) -> std::result::Result<Value, ExpressionError> {
+fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {
     let from = match from {
         Some(value) => value.try_integer()?,
         None => 0,

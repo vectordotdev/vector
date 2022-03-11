@@ -12,7 +12,7 @@ fn compact(
     array: Option<Value>,
     nullish: Option<Value>,
     value: Value,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let options = CompactOptions {
         recursive: match recursive {
             Some(expr) => expr.try_boolean()?,

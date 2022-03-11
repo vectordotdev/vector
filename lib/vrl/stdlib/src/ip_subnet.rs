@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-fn ip_subnet(value: Value, mask: Value) -> std::result::Result<Value, ExpressionError> {
+fn ip_subnet(value: Value, mask: Value) -> Resolved {
     let value: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()

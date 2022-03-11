@@ -4,11 +4,7 @@ use vrl::prelude::*;
 
 use crate::log_util;
 
-fn parse_common_log(
-    bytes: Value,
-    timestamp_format: Option<Value>,
-    ctx: &Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Resolved {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => "%d/%b/%Y:%T %z".to_owned(),

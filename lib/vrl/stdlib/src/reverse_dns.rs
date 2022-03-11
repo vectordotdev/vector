@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
-fn reverse_dns(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn reverse_dns(value: Value) -> Resolved {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()

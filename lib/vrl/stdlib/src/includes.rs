@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn includes(list: Value, item: Value) -> std::result::Result<Value, ExpressionError> {
+fn includes(list: Value, item: Value) -> Resolved {
     let list = list.try_array()?;
     let included = list.iter().any(|i| i == &item);
     Ok(included.into())

@@ -5,7 +5,7 @@ use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use vrl::prelude::*;
 
-fn parse_duration(bytes: Value, unit: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_duration(bytes: Value, unit: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     let conversion_factor = {

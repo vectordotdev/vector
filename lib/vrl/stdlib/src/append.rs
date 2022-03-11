@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn append(value: Value, items: Value) -> std::result::Result<Value, ExpressionError> {
+fn append(value: Value, items: Value) -> Resolved {
     let mut value = value.try_array()?;
     let mut items = items.try_array()?;
     value.append(&mut items);

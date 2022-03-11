@@ -1,10 +1,6 @@
 use vrl::prelude::*;
 
-fn match_array(
-    list: Value,
-    pattern: Value,
-    all: Option<Value>,
-) -> std::result::Result<Value, ExpressionError> {
+fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {
     let pattern = pattern.try_regex()?;
     let list = list.try_array()?;
     let all = match all {

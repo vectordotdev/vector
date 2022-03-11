@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use vrl::prelude::*;
 
-fn strip_ansi_escape_codes(bytes: Value) -> std::result::Result<Value, ExpressionError> {
+fn strip_ansi_escape_codes(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     strip_ansi_escapes::strip(&bytes)
         .map(Bytes::from)

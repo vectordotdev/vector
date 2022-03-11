@@ -4,11 +4,7 @@ use vrl::prelude::*;
 
 use crate::util::Base64Charset;
 
-fn encode_base64(
-    value: Value,
-    padding: Option<Value>,
-    charset: Option<Value>,
-) -> std::result::Result<Value, ExpressionError> {
+fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
     let value = value.try_bytes()?;
     let padding = padding
         .map(|v| v.try_boolean())

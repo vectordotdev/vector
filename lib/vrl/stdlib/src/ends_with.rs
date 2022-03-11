@@ -1,10 +1,6 @@
 use vrl::prelude::*;
 
-fn ends_with(
-    value: Value,
-    substring: Value,
-    case_sensitive: bool,
-) -> std::result::Result<Value, ExpressionError> {
+fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
     let substring = {
         let bytes = substring.try_bytes()?;
         let string = String::from_utf8_lossy(&bytes);

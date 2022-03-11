@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use vrl::prelude::*;
 
-fn ipv6_to_ipv4(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn ipv6_to_ipv4(value: Value) -> Resolved {
     let ip = value
         .try_bytes_utf8_lossy()?
         .parse()

@@ -3,9 +3,7 @@ use std::collections::BTreeMap;
 use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 
-fn parse_aws_cloudwatch_log_subscription_message(
-    bytes: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
         .map_err(|e| format!("unable to parse: {}", e))?;

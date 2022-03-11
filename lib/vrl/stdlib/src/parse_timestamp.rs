@@ -1,11 +1,7 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn parse_timestamp(
-    value: Value,
-    format: Value,
-    ctx: &Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;

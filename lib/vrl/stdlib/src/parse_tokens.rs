@@ -1,7 +1,7 @@
 use vector_common::tokenize;
 use vrl::prelude::*;
 
-fn parse_tokens(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_tokens(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let tokens: Value = tokenize::parse(&string)
         .into_iter()

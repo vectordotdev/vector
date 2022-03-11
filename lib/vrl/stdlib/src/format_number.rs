@@ -6,7 +6,7 @@ fn format_number(
     scale: Option<Value>,
     grouping_separator: Option<Value>,
     decimal_separator: Option<Value>,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let value: Decimal = match value {
         Value::Integer(v) => v.into(),
         Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),

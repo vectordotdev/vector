@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn to_syslog_level(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_syslog_level(value: Value) -> Resolved {
     let value = value.try_integer()?;
     // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
     let level = match value {

@@ -1,7 +1,7 @@
 use md5::Digest;
 use vrl::prelude::*;
 
-fn md5(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn md5(value: Value) -> Resolved {
     let value = value.try_bytes()?;
     Ok(hex::encode(md5::Md5::digest(&value)).into())
 }

@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn parse_int(value: Value, base: Option<Value>) -> std::result::Result<Value, ExpressionError> {
+fn parse_int(value: Value, base: Option<Value>) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let (base, index) = match base {
         Some(base) => {

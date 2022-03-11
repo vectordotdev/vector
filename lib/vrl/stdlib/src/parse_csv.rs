@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use vrl::prelude::*;
 
-fn parse_csv(csv_string: Value, delimiter: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_csv(csv_string: Value, delimiter: Value) -> Resolved {
     let csv_string = csv_string.try_bytes()?;
     let delimiter = delimiter.try_bytes()?;
     if delimiter.len() != 1 {

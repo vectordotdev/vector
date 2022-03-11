@@ -1,7 +1,7 @@
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 
-fn encode_percent(value: Value, ascii_set: &Bytes) -> std::result::Result<Value, ExpressionError> {
+fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let ascii_set = match ascii_set.as_ref() {
         b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,

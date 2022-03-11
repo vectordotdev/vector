@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use url::form_urlencoded;
 use vrl::prelude::*;
 
-fn parse_query_string(bytes: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_query_string(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let mut query_string = bytes.as_ref();
     if !query_string.is_empty() && query_string[0] == b'?' {

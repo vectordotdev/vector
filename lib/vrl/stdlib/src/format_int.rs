@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use vrl::prelude::*;
 
-fn format_int(value: Value, base: Option<Value>) -> std::result::Result<Value, ExpressionError> {
+fn format_int(value: Value, base: Option<Value>) -> Resolved {
     let value = value.try_integer()?;
     let base = match base {
         Some(base) => {

@@ -1,7 +1,7 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn get(value: Value, path: Value) -> std::result::Result<Value, ExpressionError> {
+fn get(value: Value, path: Value) -> Resolved {
     let path = match path {
         Value::Array(path) => {
             let mut get = LookupBuf::root();

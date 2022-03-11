@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 use crate::util;
 
-fn is_nullish(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn is_nullish(value: Value) -> Resolved {
     Ok(util::is_nullish(&value).into())
 }
 

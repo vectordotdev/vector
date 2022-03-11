@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn round(precision: Value, value: Value) -> std::result::Result<Value, ExpressionError> {
+fn round(precision: Value, value: Value) -> Resolved {
     let precision = precision.try_integer()?;
     match value {
         Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(

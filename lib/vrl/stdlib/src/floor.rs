@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn floor(precision: Option<Value>, value: Value) -> std::result::Result<Value, ExpressionError> {
+fn floor(precision: Option<Value>, value: Value) -> Resolved {
     let precision = match precision {
         Some(value) => value.try_integer()?,
         None => 0,

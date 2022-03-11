@@ -1,7 +1,7 @@
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
 
-fn match_any(value: Value, pattern: &RegexSet) -> std::result::Result<Value, ExpressionError> {
+fn match_any(value: Value, pattern: &RegexSet) -> Resolved {
     let bytes = value.try_bytes()?;
     Ok(pattern.is_match(&bytes).into())
 }

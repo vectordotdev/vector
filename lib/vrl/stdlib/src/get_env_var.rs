@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn get_env_var(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn get_env_var(value: Value) -> Resolved {
     let name = value.try_bytes_utf8_lossy()?;
     std::env::var(name.as_ref())
         .map(Into::into)

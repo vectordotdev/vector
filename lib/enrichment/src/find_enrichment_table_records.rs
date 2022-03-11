@@ -14,7 +14,7 @@ fn find_enrichment_table_records(
     case_sensitive: Case,
     condition: &[Condition],
     index: Option<IndexHandle>,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let select = select
         .map(|select| match select {
             Value::Array(arr) => arr

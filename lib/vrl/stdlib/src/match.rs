@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn match_(value: Value, pattern: Value) -> std::result::Result<Value, ExpressionError> {
+fn match_(value: Value, pattern: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let pattern = pattern.try_regex()?;
     Ok(pattern.is_match(&string).into())

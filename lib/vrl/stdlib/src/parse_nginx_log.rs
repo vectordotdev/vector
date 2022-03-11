@@ -10,7 +10,7 @@ fn parse_nginx_log(
     timestamp_format: Option<Value>,
     format: &Bytes,
     ctx: &Context,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => time_format_for_format(format.as_ref()),

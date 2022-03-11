@@ -172,11 +172,7 @@ impl Function for ParseGroks {
         }
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let bytes = value.try_bytes_utf8_lossy()?;
 

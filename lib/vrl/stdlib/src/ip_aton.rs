@@ -2,7 +2,7 @@ use std::net::Ipv4Addr;
 
 use vrl::prelude::*;
 
-fn ip_aton(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn ip_aton(value: Value) -> Resolved {
     let ip: Ipv4Addr = value
         .try_bytes_utf8_lossy()?
         .parse()

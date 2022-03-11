@@ -1,7 +1,7 @@
 use ::sha1::Digest;
 use vrl::prelude::*;
 
-fn sha1(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn sha1(value: Value) -> Resolved {
     let value = value.try_bytes()?;
     Ok(hex::encode(sha1::Sha1::digest(&value)).into())
 }

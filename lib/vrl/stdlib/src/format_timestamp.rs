@@ -4,7 +4,7 @@ use chrono::{
 };
 use vrl::prelude::*;
 
-fn format_timestamp(bytes: Value, ts: Value) -> std::result::Result<Value, ExpressionError> {
+fn format_timestamp(bytes: Value, ts: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let format = String::from_utf8_lossy(&bytes);
     let ts = ts.try_timestamp()?;

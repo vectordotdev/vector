@@ -19,7 +19,7 @@ pub(crate) fn parse_key_value(
     field_delimiter: Value,
     standalone_key: Value,
     whitespace: Whitespace,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let bytes = bytes.try_bytes_utf8_lossy()?;
     let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
     let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;

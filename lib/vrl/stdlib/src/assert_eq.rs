@@ -1,10 +1,6 @@
 use vrl::{diagnostic::Note, prelude::*};
 
-fn assert_eq(
-    left: Value,
-    right: Value,
-    message: Option<Value>,
-) -> std::result::Result<Value, ExpressionError> {
+fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
     if left == right {
         Ok(true.into())
     } else if let Some(message) = message {

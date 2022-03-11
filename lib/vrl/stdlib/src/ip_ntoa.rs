@@ -2,7 +2,7 @@ use std::{convert::TryInto, net::Ipv4Addr};
 
 use vrl::prelude::*;
 
-fn ip_ntoa(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn ip_ntoa(value: Value) -> Resolved {
     let i: u32 = value
         .try_integer()?
         .try_into()

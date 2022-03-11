@@ -21,7 +21,7 @@ struct ParseOptions {
     parse_number: Option<Value>,
 }
 
-fn parse_xml(value: Value, options: ParseOptions) -> std::result::Result<Value, ExpressionError> {
+fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let trim = match options.trim {
         Some(value) => value.try_boolean()?,

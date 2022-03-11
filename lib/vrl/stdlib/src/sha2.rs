@@ -1,7 +1,7 @@
 use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
 use vrl::prelude::*;
 
-fn sha2(value: Value, variant: &Bytes) -> std::result::Result<Value, ExpressionError> {
+fn sha2(value: Value, variant: &Bytes) -> Resolved {
     let value = value.try_bytes()?;
     let hash = match variant.as_ref() {
         b"SHA-224" => encode::<Sha224>(&value),

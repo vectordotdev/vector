@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn length(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn length(value: Value) -> Resolved {
     match value {
         Value::Array(v) => Ok(v.len().into()),
         Value::Object(v) => Ok(v.len().into()),

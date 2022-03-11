@@ -4,10 +4,7 @@ use vrl::prelude::*;
 
 use crate::util::Base64Charset;
 
-fn decode_base64(
-    charset: Option<Value>,
-    value: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn decode_base64(charset: Option<Value>, value: Value) -> Resolved {
     let charset = charset
         .map(Value::try_bytes)
         .transpose()?

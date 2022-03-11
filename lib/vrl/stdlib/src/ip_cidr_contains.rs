@@ -1,7 +1,7 @@
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 
-fn ip_cidr_contains(value: Value, cidr: Value) -> std::result::Result<Value, ExpressionError> {
+fn ip_cidr_contains(value: Value, cidr: Value) -> Resolved {
     let value = value
         .try_bytes_utf8_lossy()?
         .parse()

@@ -1,7 +1,7 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn set(path: Value, mut value: Value, data: Value) -> std::result::Result<Value, ExpressionError> {
+fn set(path: Value, mut value: Value, data: Value) -> Resolved {
     let path = match path {
         Value::Array(segments) => {
             let mut insert = LookupBuf::root();

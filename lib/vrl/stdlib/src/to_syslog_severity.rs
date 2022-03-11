@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn to_syslog_severity(level: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_syslog_severity(level: Value) -> Resolved {
     let level = level.try_bytes_utf8_lossy()?;
     // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
     let severity = match &level[..] {

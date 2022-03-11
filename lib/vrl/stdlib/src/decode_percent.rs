@@ -1,7 +1,7 @@
 use percent_encoding::percent_decode;
 use vrl::prelude::*;
 
-fn decode_percent(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn decode_percent(value: Value) -> Resolved {
     let value = value.try_bytes()?;
     Ok(percent_decode(&value)
         .decode_utf8_lossy()

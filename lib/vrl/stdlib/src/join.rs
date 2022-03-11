@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use vrl::prelude::*;
 
-fn join(array: Value, separator: Option<Value>) -> std::result::Result<Value, ExpressionError> {
+fn join(array: Value, separator: Option<Value>) -> Resolved {
     let array = array.try_array()?;
     let string_vec = array
         .iter()

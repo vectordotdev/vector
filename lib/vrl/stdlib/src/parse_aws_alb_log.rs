@@ -10,7 +10,7 @@ use nom::{
 };
 use vrl::prelude::*;
 
-fn parse_aws_alb_log(bytes: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_aws_alb_log(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     parse_log(&String::from_utf8_lossy(&bytes))
 }

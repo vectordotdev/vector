@@ -5,11 +5,7 @@ use vrl::{
     prelude::*,
 };
 
-fn parse_grok(
-    value: Value,
-    remove_empty: Value,
-    pattern: Arc<grok::Pattern>,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Resolved {
     let bytes = value.try_bytes_utf8_lossy()?;
     let remove_empty = remove_empty.try_boolean()?;
     match pattern.match_against(&bytes) {

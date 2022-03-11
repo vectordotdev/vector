@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-fn parse_klog(bytes: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_klog(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = String::from_utf8_lossy(&bytes);
     let mut log: BTreeMap<String, Value> = BTreeMap::new();
