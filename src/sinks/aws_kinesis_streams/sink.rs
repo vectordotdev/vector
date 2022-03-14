@@ -1,21 +1,20 @@
-use std::num::NonZeroUsize;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
-use tower::util::BoxService;
-use vector_core::{buffers::Acker, stream::BatcherSettings};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    stream::{BatcherSettings, DriverResponse},
+};
 
 use crate::{
     event::{Event, LogEvent},
     sinks::{
-        aws_kinesis_streams::{
-            request_builder::{KinesisRequest, KinesisRequestBuilder},
-            service::KinesisResponse,
-        },
+        aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder},
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
     },
-    Error,
 };
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisMetadata>;
@@ -24,15 +23,21 @@ pub struct KinesisMetadata {
     pub partition_key: String,
 }
 
-pub struct KinesisSink {
+pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
     pub acker: Acker,
-    pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
+    pub service: S,
     pub request_builder: KinesisRequestBuilder,
     pub partition_key_field: Option<String>,
 }
 
-impl KinesisSink {
+impl<S> KinesisSink<S>
+where
+    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -61,7 +66,13 @@ impl KinesisSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for KinesisSink {
+impl<S> StreamSink<Event> for KinesisSink<S>
+where
+    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

@@ -123,11 +123,11 @@ impl SinkConfig for KinesisSinkConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let region = self.region.clone().try_into()?;
         let service = ServiceBuilder::new()
-            .settings(request_limits, KinesisRetryLogic)
+            .settings(request_settings, KinesisRetryLogic)
             .service(KinesisService {
                 client,
                 stream_name: self.stream_name.clone(),
