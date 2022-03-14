@@ -3,11 +3,12 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct RouteEventDiscarded<'a> {
-    pub output: &'a str,
+    pub outputs: Vec<&'a str>,
 }
 
 impl<'a> InternalEvent for RouteEventDiscarded<'a> {
     fn emit_metrics(&self) {
-        counter!("events_discarded_total", 1, "output" => self.output.to_string());
+        let outputs = self.outputs.join(", ");
+        counter!("events_discarded_total", self.outputs.len() as u64, "outputs" => outputs);
     }
 }

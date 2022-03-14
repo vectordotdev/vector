@@ -16,36 +16,93 @@ use crate::{
 
 //------------------------------------------------------------------------------
 
+fn build_conditions(
+    config: &RouteConfig,
+    context: &TransformContext,
+) -> crate::Result<Vec<(String, Condition)>> {
+    let mut conditions = Vec::with_capacity(config.route.len());
+    for (output_name, condition) in config.route.iter() {
+        let condition = condition.build(&context.enrichment_tables)?;
+        conditions.push((output_name.clone(), condition));
+    }
+    Ok(conditions)
+}
+
+//------------------------------------------------------------------------------
+
 #[derive(Clone)]
-pub struct Route {
+pub struct EveryMatchRoute {
     conditions: Vec<(String, Condition)>,
 }
 
-impl Route {
+impl EveryMatchRoute {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
-        let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
-            let condition = condition.build(&context.enrichment_tables)?;
-            conditions.push((output_name.clone(), condition));
-        }
-        Ok(Self { conditions })
+        Ok(Self {
+            conditions: build_conditions(config, context)?,
+        })
     }
 }
 
-impl SyncTransform for Route {
+impl SyncTransform for EveryMatchRoute {
     fn transform(
         &mut self,
         event: Event,
         output: &mut vector_core::transform::TransformOutputsBuf,
     ) {
+        let mut discarded = Vec::with_capacity(self.conditions.len());
         for (output_name, condition) in &self.conditions {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
-                emit!(&RouteEventDiscarded {
-                    output: output_name.as_ref()
-                })
+                discarded.push(output_name.as_ref());
             }
+        }
+        if discarded.len() == self.conditions.len() {
+            output.push(event);
+        }
+        if !discarded.is_empty() {
+            emit!(&RouteEventDiscarded { outputs: discarded });
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Clone)]
+pub struct FirstMatchRoute {
+    conditions: Vec<(String, Condition)>,
+}
+
+impl FirstMatchRoute {
+    pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
+        Ok(Self {
+            conditions: build_conditions(config, context)?,
+        })
+    }
+}
+
+impl SyncTransform for FirstMatchRoute {
+    fn transform(
+        &mut self,
+        event: Event,
+        output: &mut vector_core::transform::TransformOutputsBuf,
+    ) {
+        if let Some((output_name, _)) = self
+            .conditions
+            .iter()
+            .filter(|(_, condition)| condition.check(&event))
+            .next()
+        {
+            output.push_named(output_name, event.clone());
+        } else {
+            emit!(&RouteEventDiscarded {
+                outputs: self
+                    .conditions
+                    .iter()
+                    .map(|(name, _)| name.as_str())
+                    .collect()
+            });
+            output.push(event);
         }
     }
 }
@@ -53,11 +110,33 @@ impl SyncTransform for Route {
 //------------------------------------------------------------------------------
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum RouteMode {
+    FirstMatch,
+    EveryMatch,
+}
+
+// to avoid having the mode field when serializing
+impl RouteMode {
+    pub fn is_default(&self) -> bool {
+        matches!(self, RouteMode::EveryMatch)
+    }
+}
+
+impl Default for RouteMode {
+    fn default() -> Self {
+        RouteMode::EveryMatch
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
     // Deprecated name
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,
+    #[serde(default, skip_serializing_if = "RouteMode::is_default")]
+    mode: RouteMode,
 }
 
 inventory::submit! {
@@ -72,6 +151,7 @@ impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             route: IndexMap::new(),
+            mode: Default::default(),
         })
         .unwrap()
     }
@@ -81,8 +161,14 @@ impl GenerateConfig for RouteConfig {
 #[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let route = Route::new(self, context)?;
-        Ok(Transform::synchronous(route))
+        match self.mode {
+            RouteMode::FirstMatch => {
+                FirstMatchRoute::new(self, context).map(Transform::synchronous)
+            }
+            RouteMode::EveryMatch => {
+                EveryMatchRoute::new(self, context).map(Transform::synchronous)
+            }
+        }
     }
 
     fn input(&self) -> Input {
@@ -90,10 +176,13 @@ impl TransformConfig for RouteConfig {
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        self.route
+        let mut result: Vec<Output> = self
+            .route
             .keys()
             .map(|output_name| Output::from((output_name, DataType::all())))
-            .collect()
+            .collect();
+        result.push(Output::default(DataType::all()));
+        result
     }
 
     fn transform_type(&self) -> &'static str {
@@ -212,14 +301,13 @@ mod test {
         )
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
-        let mut outputs = TransformOutputsBuf::new_with_capacity(
-            output_names
-                .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
-                .collect(),
-            1,
-        );
+        let mut transform = EveryMatchRoute::new(&config, &Default::default()).unwrap();
+        let mut outputs: Vec<Output> = output_names
+            .iter()
+            .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+            .collect();
+        outputs.push(Output::default(DataType::all()));
+        let mut outputs = TransformOutputsBuf::new_with_capacity(outputs, 1);
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
@@ -227,6 +315,8 @@ mod test {
             assert_eq!(events.len(), 1);
             assert_eq!(events.pop().unwrap(), event);
         }
+        let events: Vec<_> = outputs.drain().collect();
+        assert!(events.is_empty(), "default output should be empty");
     }
 
     #[test]
@@ -247,14 +337,13 @@ mod test {
         )
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
-        let mut outputs = TransformOutputsBuf::new_with_capacity(
-            output_names
-                .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
-                .collect(),
-            1,
-        );
+        let mut transform = EveryMatchRoute::new(&config, &Default::default()).unwrap();
+        let mut outputs: Vec<Output> = output_names
+            .iter()
+            .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+            .collect();
+        outputs.push(Output::default(DataType::all()));
+        let mut outputs = TransformOutputsBuf::new_with_capacity(outputs, 1);
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
@@ -265,6 +354,44 @@ mod test {
             }
             assert_eq!(events.len(), 0);
         }
+        let events: Vec<_> = outputs.drain().collect();
+        assert!(events.is_empty(), "default output should be empty");
+    }
+
+    #[test]
+    fn route_pass_no_route_condition() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(serde_json::json!({"message": "foo"})).unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = EveryMatchRoute::new(&config, &Default::default()).unwrap();
+        let mut outputs: Vec<Output> = output_names
+            .iter()
+            .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+            .collect();
+        outputs.push(Output::default(DataType::all()));
+        let mut outputs = TransformOutputsBuf::new_with_capacity(outputs, 1);
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let events: Vec<_> = outputs.drain_named(output_name).collect();
+            assert!(events.is_empty());
+        }
+        let mut events: Vec<_> = outputs.drain().collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events.pop().unwrap(), event);
     }
 
     #[tokio::test]
@@ -297,5 +424,54 @@ mod test {
         assert!(tests.remove(0).run().await.errors.is_empty());
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+    }
+
+    #[test]
+    fn route_pass_first_route_condition() {
+        let output_names = vec!["first", "second", "third"];
+        let event = Event::try_from(
+            serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
+        )
+        .unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            mode = "first_match"
+
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = FirstMatchRoute::new(&config, &Default::default()).unwrap();
+        let mut outputs: Vec<Output> = output_names
+            .iter()
+            .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+            .collect();
+        outputs.push(Output::default(DataType::all()));
+        let mut outputs = TransformOutputsBuf::new_with_capacity(outputs, 1);
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
+            if output_name == "first" {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            } else {
+                assert!(
+                    events.is_empty(),
+                    "output {:?} should be empty",
+                    output_name
+                );
+            }
+        }
+        let events: Vec<_> = outputs.drain().collect();
+        assert!(events.is_empty(), "default output should be empty");
     }
 }
