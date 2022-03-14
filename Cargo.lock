@@ -80,7 +80,7 @@ checksum = "9797cd3a8f1491e4828818341aea5e1378029ec89dc2422cd85d62715f913080"
 dependencies = [
  "amq-protocol-uri",
  "tcp-stream",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]
@@ -5306,7 +5306,7 @@ checksum = "9bf8cda6f8e1500338634e4e3ce90ac59eb7929a1e088b6946c742be1cc44dc1"
 dependencies = [
  "doc-comment",
  "parking_lot 0.11.2",
- "tracing 0.1.31",
+ "tracing 0.1.32",
 ]
 
 [[package]]

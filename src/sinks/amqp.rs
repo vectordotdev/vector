@@ -26,6 +26,7 @@ use std::{
     task::{Context, Poll},
 };
 use vector_buffers::Acker;
+use vector_core::config::AcknowledgementsConfig;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -112,8 +113,8 @@ impl SinkConfig for AmqpSinkConfig {
         "amqp"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

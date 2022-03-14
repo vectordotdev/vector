@@ -12,7 +12,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use lapin::{Channel, Connection};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -162,18 +162,18 @@ async fn run_amqp_source(
                     log.insert(log_schema().source_type_key(), Bytes::from("amqp"));
 
                     if let Some(key_field) = &config.routing_key {
-                        log.insert(key_field, Value::from(msg.routing_key.to_string()));
+                        log.insert(key_field.as_str(), Value::from(msg.routing_key.to_string()));
                     }
 
                     if let Some(exchange_key) = &config.exchange_key {
-                        log.insert(exchange_key, Value::from(msg.exchange.to_string()));
+                        log.insert(exchange_key.as_str(), Value::from(msg.exchange.to_string()));
                     }
 
                     if let Some(offset_key) = &config.offset_key {
-                        log.insert(offset_key, Value::from(msg.delivery_tag as i64));
+                        log.insert(offset_key.as_str(), Value::from(msg.delivery_tag as i64));
                     }
 
-                    if let Err(error) = out.send(event).await {
+                    if let Err(error) = out.send_event(event).await {
                         emit!(&AmqpDeliveryFailed { error });
                     }
                     if let Err(error) = msg.acker.ack(ack_options).await {
