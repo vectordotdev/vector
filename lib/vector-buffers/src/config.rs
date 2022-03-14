@@ -1,4 +1,8 @@
-use std::{fmt, path::PathBuf};
+use std::{
+    fmt,
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
@@ -19,6 +23,8 @@ pub enum BufferBuildError {
     RequiresDataDir,
     #[snafu(display("error occurred when building buffer: {}", source))]
     FailedToBuildTopology { source: TopologyError },
+    #[snafu(display("`max_events` must be greater than zero"))]
+    InvalidMaxEvents,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -41,8 +47,8 @@ impl BufferTypeVisitor {
         A: de::MapAccess<'de>,
     {
         let mut kind: Option<BufferTypeKind> = None;
-        let mut max_events: Option<usize> = None;
-        let mut max_size: Option<u64> = None;
+        let mut max_events: Option<NonZeroUsize> = None;
+        let mut max_size: Option<NonZeroU64> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
@@ -197,8 +203,8 @@ impl Serialize for BufferConfig {
     }
 }
 
-pub const fn memory_buffer_default_max_events() -> usize {
-    500
+pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
+    unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
 /// A specific type of buffer stage.
@@ -210,21 +216,21 @@ pub enum BufferType {
     #[serde(rename = "memory")]
     Memory {
         #[serde(default = "memory_buffer_default_max_events")]
-        max_events: usize,
+        max_events: NonZeroUsize,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
     #[serde(rename = "disk")]
     DiskV1 {
-        max_size: u64,
+        max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
     #[serde(rename = "disk_v2")]
     DiskV2 {
-        max_size: u64,
+        max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },

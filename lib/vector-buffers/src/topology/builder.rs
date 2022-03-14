@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
@@ -210,7 +210,7 @@ where
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     pub async fn standalone_memory(
-        max_events: usize,
+        max_events: NonZeroUsize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop(when_full);
