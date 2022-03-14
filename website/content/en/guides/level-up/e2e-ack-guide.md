@@ -127,7 +127,7 @@ behavior will be put in the hands of script writers.
 ## Parting thoughts
 
 This guide intended to serve as a basic guide on how you can start
-leveraging `acknowledgement`. If you have any feedback regarding this feature,
+leveraging Vector's end-to-end acknowledgement feature. If you have any feedback regarding this feature,
 please let us know on our [Discord chat] or [Twitter], along with
 any feedback or request for additional support you have for the Vector team!
 
