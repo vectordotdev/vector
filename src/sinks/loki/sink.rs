@@ -3,20 +3,21 @@ use std::{collections::HashMap, num::NonZeroUsize};
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
+use tower::Service;
 use vector_common::encode_logfmt;
 use vector_core::{
     buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
 use super::{
     config::{Encoding, LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
-    service::{LokiRequest, LokiResponse, LokiRetryLogic, LokiService},
+    service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
     config::{log_schema, SinkContext},
@@ -312,16 +313,22 @@ impl RecordFilter {
     }
 }
 
-pub struct LokiSink {
+pub struct LokiSink<S> {
     acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
-    service: tower::util::BoxService<LokiRequest, LokiResponse, crate::Error>,
+    service: S,
 }
 
-impl LokiSink {
+impl<S> LokiSink<S>
+where
+    S: Service<LokiRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         let compression = config.compression;
@@ -413,7 +420,13 @@ impl LokiSink {
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for LokiSink {
+impl<S> StreamSink<Event> for LokiSink<S>
+where
+    S: Service<LokiRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
