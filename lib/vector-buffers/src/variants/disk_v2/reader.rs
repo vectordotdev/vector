@@ -8,25 +8,22 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use memmap2::Mmap;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{self, File},
-    io::{AsyncBufReadExt, AsyncRead, BufReader},
-};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::internal_event::emit;
 
 use super::{
     common::create_crc32c_hasher,
     ledger::Ledger,
     record::{validate_record_archive, ArchivedRecord, Record, RecordStatus},
+    Filesystem,
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
     internal_events::EventsCorrupted,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
-    variants::disk_v2::record::try_as_record_archive,
+    variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
     Bufferable,
 };
 
@@ -142,8 +139,36 @@ where
     }
 }
 
+impl<T: Bufferable> PartialEq for ReaderError<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Io { source: l_source }, Self::Io { source: r_source }) => {
+                l_source.kind() == r_source.kind()
+            }
+            (
+                Self::Deserialization { reason: l_reason },
+                Self::Deserialization { reason: r_reason },
+            ) => l_reason == r_reason,
+            (
+                Self::Checksum {
+                    calculated: l_calculated,
+                    actual: l_actual,
+                },
+                Self::Checksum {
+                    calculated: r_calculated,
+                    actual: r_actual,
+                },
+            ) => l_calculated == r_calculated && l_actual == r_actual,
+            (Self::Decode { .. }, Self::Decode { .. }) => true,
+            (Self::Incompatible { reason: l_reason }, Self::Incompatible { reason: r_reason }) => {
+                l_reason == r_reason
+            }
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 /// Buffered reader that handles deserialization, checksumming, and decoding of records.
-#[derive(Debug)]
 pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
@@ -154,7 +179,7 @@ pub(super) struct RecordReader<R, T> {
 
 impl<R, T> RecordReader<R, T>
 where
-    R: AsyncRead + Unpin + fmt::Debug,
+    R: AsyncRead + Unpin,
     T: Bufferable,
 {
     /// Creates a new [`RecordReader`] around the provided reader.
@@ -169,11 +194,6 @@ where
             current_record_id: 0,
             _t: PhantomData,
         }
-    }
-
-    /// Gets a reference to the underlying reader.
-    pub fn get_ref(&self) -> &R {
-        self.reader.get_ref()
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
@@ -334,11 +354,28 @@ where
     }
 }
 
+impl<R, T> fmt::Debug for RecordReader<R, T>
+where
+    R: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecordReader")
+            .field("reader", &self.reader)
+            .field("aligned_buf", &self.aligned_buf)
+            .field("checksummer", &self.checksummer)
+            .field("current_record_id", &self.current_record_id)
+            .finish()
+    }
+}
+
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T> {
-    ledger: Arc<Ledger>,
-    reader: Option<RecordReader<File, T>>,
+pub struct Reader<T, FS>
+where
+    FS: Filesystem,
+{
+    ledger: Arc<Ledger<FS>>,
+    reader: Option<RecordReader<FS::File, T>>,
     bytes_read: u64,
     last_reader_record_id: u64,
     data_file_start_record_id: Option<u64>,
@@ -350,12 +387,14 @@ pub struct Reader<T> {
     _t: PhantomData<T>,
 }
 
-impl<T> Reader<T>
+impl<T, FS> Reader<T, FS>
 where
     T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
 {
     /// Creates a new [`Reader`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
 
@@ -381,18 +420,6 @@ where
     }
 
     fn track_read(&mut self, record_id: u64, record_bytes: u64, event_count: NonZeroU64) {
-        // TODO: We explain this ID design in multiple places now, which probably means we should
-        // encapsulate it in a new method/function/single doc comment somewhere.
-
-        // We need to track our reader progress, both in the form of how much data we've read in
-        // this data file, as well as the record ID. This is required not only for ensuring our
-        // general buffer accounting (event count, buffer size, etc) is accurate, but also to be
-        // able to handle corrupted records.
-        //
-        // We make sure to track enough information such that when we encounter a corrupted record,
-        // or if we skip records due to missing data, we can figure out how many events we've
-        // dropped or lost, and handle the necessary adjustments to the buffer accounting.
-
         // We explicitly reduce the event count by one here in order to correctly calculate the
         // "last" record ID, which you can visualize as follows...
         //
@@ -458,7 +485,11 @@ where
         // occur at all, so we're relying on this method to correct the buffer size for us.  This is
         // why `bytes_read` is optional: when it's specified, we calculate a delta for handling
         // partial-read scenarios, otherwise, we just use the entire data file size as is.
-        let data_file = File::open(&data_file_path).await?;
+        let data_file = self
+            .ledger
+            .filesystem()
+            .open_file_readable(&data_file_path)
+            .await?;
         let metadata = data_file.metadata().await?;
 
         let decrease_amount = bytes_read.map_or_else(
@@ -484,7 +515,10 @@ where
         drop(data_file);
 
         // Delete the current data file, and increment our actual reader file ID.
-        fs::remove_file(&data_file_path).await?;
+        self.ledger
+            .filesystem()
+            .delete_file(&data_file_path)
+            .await?;
         self.ledger.increment_acked_reader_file_id();
         self.ledger.flush()?;
 
@@ -706,7 +740,12 @@ where
         loop {
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
             let data_file_path = self.ledger.get_current_reader_data_file_path();
-            let data_file = match File::open(&data_file_path).await {
+            let data_file = match self
+                .ledger
+                .filesystem()
+                .open_file_readable(&data_file_path)
+                .await
+            {
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
@@ -781,20 +820,15 @@ where
         //
         // Once the reader/writer file IDs are identical, we fall back to the slow path.
         while self.ledger.get_current_reader_file_id() != self.ledger.get_current_writer_file_id() {
-            let current_data_file_path = self.ledger.get_current_reader_data_file_path();
+            let data_file_path = self.ledger.get_current_reader_data_file_path();
             self.ensure_ready_for_read().await.context(IoSnafu)?;
-            let data_file_handle = self
-                .reader
-                .as_ref()
-                .expect("writer should exist after `ensure_ready_for_read`")
-                .get_ref()
-                .try_clone()
+            let data_file_mmap = self
+                .ledger
+                .filesystem()
+                .open_mmap_readable(&data_file_path)
                 .await
-                .context(IoSnafu)?
-                .into_std()
-                .await;
+                .context(IoSnafu)?;
 
-            let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(IoSnafu)? };
             match validate_record_archive(data_file_mmap.as_ref(), &Hasher::new()) {
                 RecordStatus::Valid {
                     id: last_record_id, ..
@@ -828,7 +862,7 @@ where
                         // By passing 0 bytes, `delete_completed_data_file` does the work of
                         // ensuring the buffer size is updated to reflect the data file being
                         // deleted in its entirety.
-                        self.delete_completed_data_file(current_data_file_path, None)
+                        self.delete_completed_data_file(data_file_path, None)
                             .await
                             .context(IoSnafu)?;
                         self.reset();
@@ -966,31 +1000,36 @@ where
             // 2. we've hit the end of the data file and need to go to the next one
             // 3. the writer has closed/dropped/finished/etc
             //
-            // When we're at this point, we "wait" for the writer to wake us up.  This might
-            // be an existing buffered wake-up, or we might actually be waiting for the next
-            // wake-up.  Regardless of which type of wakeup it is, we wait for a wake up.  The
-            // writer will always issue a wake-up when it finishes any major operation: creating a
-            // new data file, flushing, closing, etc.
+            // When we're at this point, we check the reader/writer file IDs.  If the file IDs are
+            // not identical, we now know the writer has moved on.  Crucially, since we always flush
+            // our writes before waking up, including before moving to a new file, then we know that
+            // if the reader/writer were not identical at the start the loop, and `try_read_record`
+            // returned `None`, that we have hit the actual end of the reader's current data file,
+            // and need to move on.
             //
-            // After that, we check the reader/writer file IDs.  If the file IDs were identical, it
-            // would imply that reader is still on the writer's current data file.  We simply
-            // continue the loop in this case.  It may lead to the same thing --`try_read_record`
-            // returning `None` with an identical reader/writer file ID -- but that's OK, because it
-            // would mean we were actually waiting for the writer to make progress now.  If the
-            // wake-up was valid, due to writer progress, then, well... we'd actually be able to
-            // read data.
-            //
-            // If the file IDs were not identical, we now know the writer has moved on.  Crucially,
-            // since we always flush our writes before waking up, including before moving to a new
-            // file, then we know that if the reader/writer were not identical at the start the
-            // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
-            // reader's current data file, and need to move on.
+            // If the file IDs were identical, it would imply that reader is still on the writer's
+            // current data file. We then "wait" for the writer to wake us up. It may lead to the
+            // same thing -- `try_read_record` returning `None` with an identical reader/writer file
+            // ID -- but that's OK, because it would mean we were actually waiting for the writer to
+            // make progress now.  If the wake-up was valid, due to writer progress, then, well...
+            // we'd actually be able to read data.
             //
             // The case of "the writer has closed/dropped/finished/etc" is handled at the top of the
             // loop, because otherwise we could get stuck waiting for the writer after an empty
             // `try_read_record` attempt when the writer is done and we're at the end of the file,
             // etc.
             if self.ready_to_read {
+                if reader_file_id != writer_file_id {
+                    debug!(
+                        reader_file_id,
+                        writer_file_id, "Reached the end of current data file."
+                    );
+
+                    self.roll_to_next_data_file();
+                    force_check_pending_data_files = true;
+                    continue;
+                }
+
                 self.ledger.wait_for_writer().await;
             } else {
                 debug!(
@@ -1005,16 +1044,6 @@ where
                     // we're caught up.
                     return Ok(None);
                 }
-            }
-
-            if reader_file_id != writer_file_id {
-                debug!(
-                    reader_file_id,
-                    writer_file_id, "Reached the end of current data file."
-                );
-
-                self.roll_to_next_data_file();
-                force_check_pending_data_files = true;
             }
         };
 
