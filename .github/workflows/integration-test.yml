@@ -27,6 +27,8 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
@@ -87,10 +89,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
+      - run: sudo npm -g install @datadog/datadog-ci
       - run: make test-integration-${{ matrix.test }}
         env:
           TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 
