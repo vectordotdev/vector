@@ -17,11 +17,11 @@ components: _amqp: {
 			}
 		}
 		tls: {
-            enabled:                true
-            can_enable:             true
-            can_verify_certificate: true
-            enabled_default:        false
-        }
+			enabled:                true
+			can_enable:             true
+			can_verify_certificate: true
+			enabled_default:        false
+		}
 	}
 
 	support: {
@@ -59,7 +59,7 @@ components: _amqp: {
 				The `amqp` source and sink uses [`lapin`](\(urls.lapin)) under the hood. This
 				is a reliable pure rust library that facilitates communication with Ampq servers
 				such as RabbitMQ.
-            """
+                        """
 		}
 	}
 }
