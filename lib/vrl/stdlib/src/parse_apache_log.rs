@@ -27,6 +27,10 @@ fn parse_apache_log(
     log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
 }
 
+fn variants() -> Vec<Value> {
+    vec![value!("common"), value!("combined"), value!("error")]
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
 
@@ -61,11 +65,9 @@ impl Function for ParseApacheLog {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let variants = vec![value!("common"), value!("combined"), value!("error")];
-
         let value = arguments.required("value");
         let format = arguments
-            .required_enum("format", &variants)?
+            .required_enum("format", &variants())?
             .try_bytes()
             .expect("format not bytes");
 
@@ -87,9 +89,8 @@ impl Function for ParseApacheLog {
     ) -> CompiledArgument {
         match (name, expr) {
             ("format", Some(expr)) => {
-                let variants = vec![value!("common"), value!("combined"), value!("error")];
                 let format = expr
-                    .as_enum("format", variants)?
+                    .as_enum("format", variants())?
                     .try_bytes()
                     .expect("format not bytes");
                 Ok(Some(Box::new(format) as _))
