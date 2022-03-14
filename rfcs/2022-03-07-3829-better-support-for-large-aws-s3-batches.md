@@ -11,19 +11,19 @@ This RFC discusses improving vector's support for sending large batches to AWS S
 
 ### In scope
 
-* Improving Vector's support for sending large batches to the AWS S3 sink.
+- Improving Vector's support for sending large batches to the AWS S3 sink.
 
 ### Out of scope
 
-* Support for large batches in the Azure Blob, Datadog Archive, and
+- Support for large batches in the Azure Blob, Datadog Archive, and
   GCP Cloud Storage sinks.
 
 ## Terminology
 
-* Batch: A sequence of events collected within vector in preparation
+- Batch: A sequence of events collected within vector in preparation
   for uploading to a storage sink.
-* Object: A completed upload stored on the destination sink's server(s).
-* Part: A completed partial upload that will be composed into an object.
+- Object: A completed upload stored on the destination sink's server(s).
+- Part: A completed partial upload that will be composed into an object.
 
 ## Pain
 
@@ -31,10 +31,10 @@ The current iteration of our S3 sink is built for sending
 small-to-medium size objects relatively frequently. This is apparent
 in a few aspects of the config:
 
-* The default maximum batch size is just 1,000 events.
-* The default batch timeout is just 5 minutes.
-* There is no way to set an unlimited batch size.
-* There is no way to flush the batch at a fixed interval.
+- The default maximum batch size is just 1,000 events.
+- The default batch timeout is just 5 minutes.
+- There is no way to set an unlimited batch size.
+- There is no way to flush the batch at a fixed interval.
 
 This is in contrast with some other tools like fluentd that will
 create one file per hour by default. While the different approaches
@@ -46,10 +46,10 @@ While users could technically just increase Vector's batch sizes and
 timeouts to approach the desired behavior, the implementation is not
 designed for it and would cause significant problems:
 
-* End-to-end acknowledgements are not issued until the batch is
+- End-to-end acknowledgements are not issued until the batch is
   finished, which will cause backpressure to sources and possibly
   timeouts with retransmissions.
-* The batches are stored in memory which could cause out of memory
+- The batches are stored in memory which could cause out of memory
   crashes.
 
 ## Proposal
@@ -111,22 +111,22 @@ This change will introduce the following new configuration items for
 this sink, which will all default to operating the same as the
 existing sink.
 
-* `data_dir` (string): The path to the directory in which the state
+- `data_dir` (string): The path to the directory in which the state
   data is stored. If this is not set, it is derived from the global
   `data_dir` setting.
-* `batch.min_bytes` (integer): This specifies the target size a
+- `batch.min_bytes` (integer): This specifies the target size a
   locally-stored part must reach before it is uploaded. Due to the
   limitations of the S3 API, this has an minimum value of 5MB, which
   is also the default value when `upload_interval` is set.
-* `upload_interval` (duration or enum): How often should the sink
+- `upload_interval` (duration or enum): How often should the sink
   complete the upload process and initiate a new one. If this is
   unset, the existing batch-based object creation mechanism is
   used. In addition to common interval specifications (ie `"15
   minutes"`, etc), the following values are permitted:
-  * `"minutely"`: Complete the upload at the end of the minute exactly.
-  * `"hourly"`: Complete the upload at the end of the hour exactly.
-  * `"daily"`: Complete the upload at midnight each day.
-* `upload_incomplete` (boolean): Controls if the sink will upload
+  - `"minutely"`: Complete the upload at the end of the minute exactly.
+  - `"hourly"`: Complete the upload at the end of the hour exactly.
+  - `"daily"`: Complete the upload at midnight each day.
+- `upload_incomplete` (boolean): Controls if the sink will upload
   parts and assemble the upload on shutdown. This causes data to be
   persisted to S3 across restarts, but will cause the creation of
   multiple objects where normally there would only be one. Defaults to
@@ -295,7 +295,7 @@ struct MultipartUploadData {
 
 ## Drawbacks
 
-* By increasing the time over which events are written to the sink, we
+- By increasing the time over which events are written to the sink, we
   are increasing the chances of data loss due to crashes and network
   interruptions.
 
@@ -351,11 +351,11 @@ pattern for high volume uploads.
 
 ## Outstanding Questions
 
-* Should incomplete parts be unconditionally buffered to disk, to
+- Should incomplete parts be unconditionally buffered to disk, to
   allow for producing parts larger than would be feasible in memory,
   or buffered in memory as usual and only saved to disk to handle
   persistence across reloads?
-* It's not entirely clear to me where shutdown behavior should be
+- It's not entirely clear to me where shutdown behavior should be
   handled to effect a state dump.
 
 ## Plan Of Attack
