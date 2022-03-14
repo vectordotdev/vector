@@ -28,6 +28,20 @@ components: transforms: route: {
 	}
 
 	configuration: {
+		mode: {
+			description: """
+				If you want Vector to only send the event to the first matching condition or just to match against
+				all the conditions.
+				Note, if no condition matches, the event will be sent to the default output `<transform_name>`.
+				"""
+			required: false
+			default: "every_match"
+			enum: {
+				every_match: "Will send to all the matching routes"
+				first_match: "Will only send to the first matchin route"
+			}
+		}
+
 		route: {
 			description: """
 				A table of route identifiers to logical conditions representing the filter of the route. Each route
@@ -67,6 +81,7 @@ components: transforms: route: {
 			title: "Split by log level"
 
 			configuration: {
+				mode: "every_match"
 				route: {
 					debug: #".level == "debug""#
 					info:  #".level == "info""#
@@ -86,6 +101,7 @@ components: transforms: route: {
 			title: "Split by metric namespace"
 
 			configuration: {
+				mode: "every_match"
 				route: {
 					app:  #".namespace == "app""#
 					host: #".namespace == "host""#
