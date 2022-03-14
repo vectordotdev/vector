@@ -13,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

@@ -10,26 +10,14 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use vector_buffers::{Acker, BufferConfig, BufferType};
-pub use vector_core::{
-    config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output},
-    transform::{ExpandType, TransformConfig, TransformContext},
-};
+pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
+pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
 
-use crate::{
-    conditions,
-    event::Metric,
-    schema,
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    sinks::{self, util::UriSerde},
-    sources,
-    transforms::noop::Noop,
-    SourceSender,
-};
+use crate::{conditions, event::Metric};
 
 pub mod api;
 mod builder;
+mod cmd;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -40,20 +28,27 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
-mod recursive;
+mod schema;
+mod sink;
+mod source;
+mod transform;
 mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
+pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
+pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
+pub use transform::{TransformDescription, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
@@ -100,6 +95,7 @@ impl ConfigPath {
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub schema: schema::Options,
     pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
     pub datadog: Option<datadog::Options>,
@@ -128,12 +124,25 @@ impl Config {
             .unwrap_or_else(|| vec![identifier.clone()])
     }
 
-    pub fn propagate_acknowledgements(&mut self) {
+    pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        if self.global.acknowledgements.enabled() {
+            for (name, sink) in &self.sinks {
+                if sink.inner.acknowledgements().is_none() {
+                    warn!(
+                        message = "Acknowledgements are globally enabled but sink does not support them.",
+                        sink = %name,
+                    );
+                }
+            }
+        }
+
         let inputs: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
-                sink.acknowledgements
+                sink.inner
+                    .acknowledgements()
+                    .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
@@ -144,6 +153,7 @@ impl Config {
             })
             .collect();
         self.propagate_acks_rec(inputs);
+        Ok(())
     }
 
     fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
@@ -154,7 +164,7 @@ impl Config {
                     source.sink_acknowledgements = true;
                 } else {
                     warn!(
-                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Data loss could occur.",
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
                         source = component.id(),
                         sink = sink.id(),
                     );
@@ -214,399 +224,6 @@ macro_rules! impl_generate_config_from_default {
         }
     };
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SourceOuter {
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
-    #[serde(flatten)]
-    pub(super) inner: Box<dyn SourceConfig>,
-    #[serde(default, skip)]
-    pub sink_acknowledgements: bool,
-}
-
-impl SourceOuter {
-    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
-        Self {
-            inner: Box::new(source),
-            proxy: Default::default(),
-            sink_acknowledgements: false,
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SourceConfig: core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
-
-    fn outputs(&self) -> Vec<Output>;
-
-    fn source_type(&self) -> &'static str;
-
-    /// Resources that the source is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-
-    fn can_acknowledge(&self) -> bool;
-}
-
-pub struct SourceContext {
-    pub key: ComponentKey,
-    pub globals: GlobalOptions,
-    pub shutdown: ShutdownSignal,
-    pub out: SourceSender,
-    pub proxy: ProxyConfig,
-    pub acknowledgements: bool,
-
-    /// Tracks the schema IDs assigned to schemas exposed by the source.
-    ///
-    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
-    pub schema_ids: HashMap<Option<String>, schema::Id>,
-}
-
-impl SourceContext {
-    #[cfg(test)]
-    pub fn new_shutdown(
-        key: &ComponentKey,
-        out: SourceSender,
-    ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
-        let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(key);
-        (
-            Self {
-                key: key.clone(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out,
-                proxy: Default::default(),
-                acknowledgements: false,
-                schema_ids: HashMap::default(),
-            },
-            shutdown,
-        )
-    }
-
-    #[cfg(test)]
-    pub fn new_test(
-        out: SourceSender,
-        schema_ids: Option<HashMap<Option<String>, schema::Id>>,
-    ) -> Self {
-        Self {
-            key: ComponentKey::from("default"),
-            globals: GlobalOptions::default(),
-            shutdown: ShutdownSignal::noop(),
-            out,
-            proxy: Default::default(),
-            acknowledgements: false,
-            schema_ids: schema_ids.unwrap_or_default(),
-        }
-    }
-
-    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
-        if config.enabled() {
-            warn!(
-                message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
-                component_name = self.key.id(),
-            );
-        }
-
-        config
-            .merge_default(&self.globals.acknowledgements)
-            .merge_default(&self.acknowledgements.into())
-            .enabled()
-    }
-}
-
-pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
-
-inventory::collect!(SourceDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    // We are accepting this option for backward compatibility.
-    healthcheck_uri: Option<UriSerde>,
-
-    // We are accepting bool for backward compatibility.
-    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
-    #[serde(default)]
-    healthcheck: SinkHealthcheckOptions,
-
-    #[serde(default)]
-    pub buffer: BufferConfig,
-
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
-
-    #[serde(flatten)]
-    pub inner: Box<dyn SinkConfig>,
-
-    #[serde(
-        default,
-        deserialize_with = "bool_or_struct",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
-}
-
-impl<T> SinkOuter<T> {
-    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
-        SinkOuter {
-            inputs,
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
-            proxy: Default::default(),
-            acknowledgements: Default::default(),
-        }
-    }
-
-    pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
-        let mut resources = self.inner.resources();
-        for stage in self.buffer.stages() {
-            match stage {
-                BufferType::Memory { .. } => {}
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
-                    resources.push(Resource::DiskBuffer(id.to_string()))
-                }
-            }
-        }
-        resources
-    }
-
-    pub fn healthcheck(&self) -> SinkHealthcheckOptions {
-        if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
-            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
-        } else if self.healthcheck_uri.is_some() {
-            warn!(
-                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
-            )
-        }
-        SinkHealthcheckOptions {
-            uri: self
-                .healthcheck
-                .uri
-                .clone()
-                .or_else(|| self.healthcheck_uri.clone()),
-            ..self.healthcheck.clone()
-        }
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
-        SinkOuter {
-            inputs,
-            inner: self.inner,
-            buffer: self.buffer,
-            healthcheck: self.healthcheck,
-            healthcheck_uri: self.healthcheck_uri,
-            proxy: self.proxy,
-            acknowledgements: self.acknowledgements,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(default)]
-pub struct SinkHealthcheckOptions {
-    pub enabled: bool,
-    pub uri: Option<UriSerde>,
-}
-
-impl Default for SinkHealthcheckOptions {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            uri: None,
-        }
-    }
-}
-
-impl From<bool> for SinkHealthcheckOptions {
-    fn from(enabled: bool) -> Self {
-        Self { enabled, uri: None }
-    }
-}
-
-impl From<UriSerde> for SinkHealthcheckOptions {
-    fn from(uri: UriSerde) -> Self {
-        Self {
-            enabled: true,
-            uri: Some(uri),
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
-
-    fn input(&self) -> Input;
-
-    fn sink_type(&self) -> &'static str;
-
-    /// Resources that the sink is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SinkContext {
-    pub acker: Acker,
-    pub healthcheck: SinkHealthcheckOptions,
-    pub globals: GlobalOptions,
-    pub proxy: ProxyConfig,
-}
-
-impl SinkContext {
-    #[cfg(test)]
-    pub fn new_test() -> Self {
-        Self {
-            acker: Acker::passthrough(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            globals: GlobalOptions::default(),
-            proxy: ProxyConfig::default(),
-        }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
-    }
-
-    pub const fn globals(&self) -> &GlobalOptions {
-        &self.globals
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-}
-
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
-
-inventory::collect!(SinkDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
-
-impl<T> TransformOuter<T> {
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
-        TransformOuter {
-            inputs,
-            inner: self.inner,
-        }
-    }
-}
-
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.transform_type(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand()
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.transform_type());
-
-        if let Some((expanded, expand_type)) = expansion {
-            let mut children = Vec::new();
-            let mut inputs = self.inputs.clone();
-
-            for (name, content) in expanded {
-                let full_name = key.join(name);
-
-                let child = TransformOuter {
-                    inputs,
-                    inner: content,
-                };
-                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
-                children.push(full_name.clone());
-
-                inputs = match expand_type {
-                    ExpandType::Parallel { .. } => self.inputs.clone(),
-                    ExpandType::Serial { .. } => vec![full_name.to_string()],
-                }
-            }
-
-            if matches!(expand_type, ExpandType::Parallel { aggregates: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs: children.iter().map(ToString::to_string).collect(),
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            } else if matches!(expand_type, ExpandType::Serial { alias: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            }
-
-            expansions.insert(key.clone(), children);
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
-    }
-}
-
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
-
-inventory::collect!(TransformDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct EnrichmentTableOuter {
@@ -862,7 +479,7 @@ pub struct TestOutput<T = OutputId> {
     feature = "sinks-console",
     feature = "transforms-json_parser"
 ))]
-mod test {
+mod tests {
     use std::path::PathBuf;
 
     use indoc::indoc;
@@ -1188,9 +805,21 @@ mod test {
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-file",
+    feature = "sinks-file",
+    feature = "transforms-json_parser"
+))]
+mod acknowledgements_tests {
+    use indoc::indoc;
+
+    use super::*;
 
     #[test]
-    fn propagates_acknowledgement_settings() {
+    fn propagates_settings() {
         // The topology:
         // in1 => out1
         // in2 => out2 (acks enabled)
@@ -1208,18 +837,21 @@ mod test {
                     type = "json_parser"
                     inputs = ["in3"]
                 [sinks.out1]
-                    type = "console"
+                    type = "file"
                     inputs = ["in1"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out1"
                 [sinks.out2]
-                    type = "console"
+                    type = "file"
                     inputs = ["in2"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
-                    type = "console"
+                    type = "file"
                     inputs = ["parse3"]
-                    encoding = "json"
+                    encoding = "text"
+                    path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
             Format::Toml,

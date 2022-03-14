@@ -7,7 +7,7 @@ use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -99,6 +99,10 @@ impl SinkConfig for HecLogsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "splunk_hec_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements.inner)
+    }
 }
 
 impl HecLogsSinkConfig {
@@ -178,6 +182,10 @@ impl SinkConfig for HecSinkCompatConfig {
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        self.config.acknowledgements()
     }
 }
 

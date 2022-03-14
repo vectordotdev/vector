@@ -4,7 +4,7 @@ use lookup::LookupBuf;
 use snafu::Snafu;
 use vrl_lib::prelude::VrlValueConvert;
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
@@ -56,10 +56,10 @@ impl VrlTarget {
             VrlTarget::Metric(metric) => {
                 Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
             }
-            VrlTarget::Trace(value, metadata) => {
-                Box::new(value_into_logevents(value, metadata).map(Event::Trace))
-                    as Box<dyn Iterator<Item = Event>>
-            }
+            VrlTarget::Trace(value, metadata) => Box::new(
+                value_into_logevents(value, metadata)
+                    .map(|log| Event::Trace(TraceEvent::from(log))),
+            ) as Box<dyn Iterator<Item = Event>>,
         }
     }
 }

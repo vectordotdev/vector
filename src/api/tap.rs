@@ -12,13 +12,22 @@ use tokio::sync::{
     oneshot,
 };
 use uuid::Uuid;
-use vector_core::event::Metric;
+use vector_buffers::{
+    topology::channel::{BufferSender, SenderAdapter},
+    WhenFull,
+};
 
-use super::{schema::events::TapPatterns, ShutdownRx, ShutdownTx};
+use super::{
+    schema::events::{
+        notification::{InvalidMatch, Matched, NotMatched, Notification},
+        TapPatterns,
+    },
+    ShutdownRx, ShutdownTx,
+};
 use crate::{
-    config::{ComponentKey, OutputId},
-    event::{Event, LogEvent, TraceEvent},
-    topology::{fanout, fanout::ControlChannel, TapResource, WatchRx},
+    config::ComponentKey,
+    event::{EventArray, LogArray, MetricArray, TraceArray},
+    topology::{fanout, fanout::ControlChannel, TapOutput, TapResource, WatchRx},
 };
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
@@ -66,49 +75,74 @@ impl GlobMatcher<&str> for Pattern {
     }
 }
 
-/// A tap notification signals whether a pattern matches a component.
-#[derive(Debug)]
-pub enum TapNotification {
-    Matched,
-    NotMatched,
-}
-
-/// A tap payload can either contain a log/metric event or a notification that's intended
-/// to be communicated back to the client to alert them about the status of the tap request.
+/// A tap payload contains events or notifications that alert users about the
+/// status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
-    Log(OutputId, LogEvent),
-    Metric(OutputId, Metric),
-    Notification(String, TapNotification),
-    Trace(OutputId, TraceEvent),
+    Log(TapOutput, LogArray),
+    Metric(TapOutput, MetricArray),
+    Trace(TapOutput, TraceArray),
+    Notification(Notification),
 }
 
 impl TapPayload {
     /// Raise a `matched` event against the provided pattern.
     pub fn matched<T: Into<String>>(pattern: T) -> Self {
-        Self::Notification(pattern.into(), TapNotification::Matched)
+        Self::Notification(Notification::Matched(Matched::new(pattern.into())))
     }
 
     /// Raise a `not_matched` event against the provided pattern.
     pub fn not_matched<T: Into<String>>(pattern: T) -> Self {
-        Self::Notification(pattern.into(), TapNotification::NotMatched)
+        Self::Notification(Notification::NotMatched(NotMatched::new(pattern.into())))
+    }
+
+    /// Raise an `invalid_match` event against the provided input pattern.
+    pub fn invalid_input_pattern_match<T: Into<String>>(
+        pattern: T,
+        invalid_matches: Vec<String>,
+    ) -> Self {
+        let pattern = pattern.into();
+        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{}' matches sources {:?}", pattern, invalid_matches);
+        Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
+            message,
+            pattern,
+            invalid_matches,
+        )))
+    }
+
+    /// Raise an `invalid_match`event against the provided output pattern.
+    pub fn invalid_output_pattern_match<T: Into<String>>(
+        pattern: T,
+        invalid_matches: Vec<String>,
+    ) -> Self {
+        let pattern = pattern.into();
+        let message = format!(
+            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{}' matches sinks {:?}",
+            pattern, invalid_matches
+        );
+        Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
+            message,
+            pattern,
+            invalid_matches,
+        )))
     }
 }
 
 /// A `TapSink` is used as an output channel for a topology component, and receives
-/// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
+/// `Event`s.
+#[derive(Clone)]
 pub struct TapSink {
     tap_tx: TapSender,
-    output_id: OutputId,
+    output: TapOutput,
 }
 
 impl TapSink {
-    pub const fn new(tap_tx: TapSender, output_id: OutputId) -> Self {
-        Self { tap_tx, output_id }
+    pub const fn new(tap_tx: TapSender, output: TapOutput) -> Self {
+        Self { tap_tx, output }
     }
 }
 
-impl Sink<Event> for TapSink {
+impl Sink<EventArray> for TapSink {
     type Error = ();
 
     /// This sink is always ready to accept, because TapSink should never cause back-pressure.
@@ -118,18 +152,18 @@ impl Sink<Event> for TapSink {
     }
 
     /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
-    fn start_send(self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        let payload = match event {
-            Event::Log(log) => TapPayload::Log(self.output_id.clone(), log),
-            Event::Metric(metric) => TapPayload::Metric(self.output_id.clone(), metric),
-            Event::Trace(trace) => TapPayload::Trace(self.output_id.clone(), trace),
+    fn start_send(self: Pin<&mut Self>, events: EventArray) -> Result<(), Self::Error> {
+        let payload = match events {
+            EventArray::Logs(logs) => TapPayload::Log(self.output.clone(), logs),
+            EventArray::Metrics(metrics) => TapPayload::Metric(self.output.clone(), metrics),
+            EventArray::Traces(traces) => TapPayload::Trace(self.output.clone(), traces),
         };
 
         if let Err(TrySendError::Closed(payload)) = self.tap_tx.try_send(payload) {
             debug!(
                 message = "Couldn't send event.",
                 payload = ?payload,
-                component_id = ?self.output_id,
+                component_id = ?self.output.output_id,
             );
         }
 
@@ -197,6 +231,34 @@ async fn send_not_matched(tx: TapSender, pattern: String) -> Result<(), SendErro
     tx.send(TapPayload::not_matched(pattern)).await
 }
 
+/// Sends an 'invalid input pattern match' tap payload.
+async fn send_invalid_input_pattern_match(
+    tx: TapSender,
+    pattern: String,
+    invalid_matches: Vec<String>,
+) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending invalid input pattern match notification.", pattern = ?pattern, invalid_matches = ?invalid_matches);
+    tx.send(TapPayload::invalid_input_pattern_match(
+        pattern,
+        invalid_matches,
+    ))
+    .await
+}
+
+/// Sends an 'invalid output pattern match' tap payload.
+async fn send_invalid_output_pattern_match(
+    tx: TapSender,
+    pattern: String,
+    invalid_matches: Vec<String>,
+) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending invalid output pattern match notification.", pattern = ?pattern, invalid_matches = ?invalid_matches);
+    tx.send(TapPayload::invalid_output_pattern_match(
+        pattern,
+        invalid_matches,
+    ))
+    .await
+}
+
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
@@ -209,7 +271,7 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks: HashMap<OutputId, _> = HashMap::new();
+    let mut sinks: HashMap<ComponentKey, _> = HashMap::new();
 
     // Recording user-provided patterns for later use in sending notifications
     // (determining patterns which did not match)
@@ -231,7 +293,19 @@ async fn tap_handler(
                 let TapResource {
                     outputs,
                     inputs,
+                    source_keys,
+                    sink_keys,
+                    removals,
                 } = watch_rx.borrow().clone();
+
+                // Remove tap sinks from components that have gone away/can no longer match.
+                let updated_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
+                sinks.retain(|key, _| {
+                    !removals.contains(key) && updated_keys.contains(key) || {
+                        debug!(message = "Removing component.", component_id = %key);
+                        false
+                    }
+                });
 
                 let mut component_id_patterns = patterns.for_outputs.iter().cloned().map(Pattern::OutputPattern).collect::<HashSet<_>>();
 
@@ -251,43 +325,47 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output_id,  control_tx) in outputs.iter() {
+                for (output, control_tx) in outputs.iter() {
                     match component_id_patterns
                         .iter()
-                        .filter(|pattern| pattern.matches_glob(&output_id.to_string()))
+                        .filter(|pattern| pattern.matches_glob(&output.output_id.to_string()))
                         .collect_vec()
                     {
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                ?output_id, ?component_id_patterns, matched = ?found
+                                ?output.output_id, ?component_id_patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
                             // reconfigured with the same id as a previous, and we are not
                             // getting involved in config diffing at this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), output_id.clone());
+                            let sink = TapSink::new(tx.clone(), output.clone());
+                            // TODO: don't want to emit event with DropNewest
+                            let sink = SenderAdapter::opaque(sink);
+                            let sink = BufferSender::new(sink, WhenFull::DropNewest);
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::pin(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), sink))
                             {
                                 Ok(_) => {
                                     debug!(
-                                        message = "Sink connected.", ?sink_id, ?output_id,
+                                        message = "Sink connected.", ?sink_id, ?output.output_id,
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
-                                    sinks
-                                        .insert(output_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
+                                    sinks.entry(output.output_id.component.clone()).or_insert_with(Vec::new).push(
+                                        shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str()))
+                                    );
                                 }
                                 Err(error) => {
                                     error!(
                                         message = "Couldn't connect sink.",
                                         ?error,
-                                        ?output_id,
+                                        ?output.output_id,
                                         ?sink_id,
                                     );
                                 }
@@ -302,23 +380,14 @@ async fn tap_handler(
                         }
                         _ => {
                             debug!(
-                                message="Component not matched.", ?output_id, ?component_id_patterns
+                                message="Component not matched.", ?output.output_id, ?component_id_patterns
                             );
                         }
                     }
                 }
 
-                // Remove components that have gone away.
-                sinks.retain(|id, _| {
-                    outputs.contains_key(id) || {
-                        debug!(message = "Removing component.", component_id = %id);
-                        false
-                    }
-                });
-
-                // Send notifications to the client. The # of notifications will always be
-                // exactly equal to the number of patterns, so we can pre-allocate capacity.
-                let mut notifications = Vec::with_capacity(component_id_patterns.len());
+                // Notifications to send to the client.
+                let mut notifications = Vec::new();
 
                 // Matched notifications.
                 for pattern in matched.difference(&last_matches) {
@@ -328,6 +397,20 @@ async fn tap_handler(
                 // Not matched notifications.
                 for pattern in user_provided_patterns.difference(&matched) {
                     notifications.push(send_not_matched(tx.clone(), pattern.clone()).boxed());
+                }
+
+                // Warnings on invalid matches.
+                for pattern in patterns.for_inputs.iter() {
+                    let invalid_matches = source_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    if !invalid_matches.is_empty() {
+                        notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    }
+                }
+                for pattern in patterns.for_outputs.iter() {
+                    let invalid_matches = sink_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    if !invalid_matches.is_empty() {
+                        notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                    }
                 }
 
                 last_matches = matched;
@@ -347,22 +430,20 @@ async fn tap_handler(
 
 #[cfg(all(
     test,
+    feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-remap",
     feature = "transforms-log_to_metric",
-    feature = "sinks-blackhole"
+    feature = "transforms-remap",
 ))]
 mod tests {
     use crate::api::schema::events::{create_events_stream, log, metric};
-    use crate::config::Config;
+    use crate::config::{Config, OutputId};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
-    use futures::SinkExt;
     use tokio::sync::watch;
 
     use super::*;
-    use crate::api::schema::events::notification::{EventNotification, EventNotificationType};
     use crate::api::schema::events::output::OutputEventsPayload;
-    use crate::event::{Metric, MetricKind, MetricValue};
+    use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::start_topology;
@@ -395,10 +476,20 @@ mod tests {
 
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
-        outputs.insert(id.clone(), control_tx);
+        outputs.insert(
+            TapOutput {
+                output_id: id.clone(),
+                component_kind: "source",
+                component_type: "demo".to_string(),
+            },
+            control_tx,
+        );
         let tap_resource = TapResource {
             outputs,
             inputs: HashMap::new(),
+            source_keys: Vec::new(),
+            sink_keys: Vec::new(),
+            removals: HashSet::new(),
         };
 
         let (watch_tx, watch_rx) = watch::channel(TapResource::default());
@@ -423,13 +514,13 @@ mod tests {
 
         for notification in notifications.into_iter() {
             match notification {
-                Some(TapPayload::Notification(returned_id, TapNotification::Matched))
-                    if returned_id == pattern_matched =>
+                Some(TapPayload::Notification(Notification::Matched(matched)))
+                    if matched.pattern == pattern_matched =>
                 {
                     continue
                 }
-                Some(TapPayload::Notification(returned_id, TapNotification::NotMatched))
-                    if returned_id == pattern_not_matched =>
+                Some(TapPayload::Notification(Notification::NotMatched(not_matched)))
+                    if not_matched.pattern == pattern_not_matched =>
                 {
                     continue
                 }
@@ -439,32 +530,32 @@ mod tests {
 
         // Send some events down the wire. Waiting until the first notifications are in
         // to ensure the event handler has been initialized.
-        let log_event = Event::new_empty_log();
-        let metric_event = Event::from(Metric::new(
+        let log_event = LogEvent::default();
+        let metric_event = Metric::new(
             id.to_string(),
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
-        ));
+        );
 
-        let _ = fanout.send(metric_event).await.unwrap();
-        let _ = fanout.send(log_event).await.unwrap();
+        let _ = fanout.send(vec![metric_event].into()).await;
+        let _ = fanout.send(vec![log_event].into()).await;
 
         // 3rd payload should be the metric event
         assert!(matches!(
             sink_rx.recv().await,
-            Some(TapPayload::Metric(returned_id, _)) if returned_id == id
+            Some(TapPayload::Metric(output, _)) if output.output_id == id
         ));
 
         // 4th payload should be the log event
         assert!(matches!(
             sink_rx.recv().await,
-            Some(TapPayload::Log(returned_id, _)) if returned_id == id
+            Some(TapPayload::Log(output, _)) if output.output_id == id
         ));
     }
 
-    fn assert_notification(payload: OutputEventsPayload) -> EventNotification {
-        if let OutputEventsPayload::Notification(notification) = payload {
-            notification
+    fn assert_notification(payload: OutputEventsPayload) -> Notification {
+        if let OutputEventsPayload::Notification(event_notification) = payload {
+            event_notification.notification
         } else {
             panic!("Expected payload to be a Notification")
         }
@@ -504,6 +595,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -520,7 +612,7 @@ mod tests {
 
         assert_eq!(
             assert_notification(source_tap_events[0][0].clone()),
-            EventNotification::new("in".to_string(), EventNotificationType::Matched)
+            Notification::Matched(Matched::new("in".to_string()))
         );
         let _log = assert_log(source_tap_events[1][0].clone());
     }
@@ -558,6 +650,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -574,7 +667,7 @@ mod tests {
 
         assert_eq!(
             assert_notification(source_tap_events[0][0].clone()),
-            EventNotification::new("to_metric".to_string(), EventNotificationType::Matched)
+            Notification::Matched(Matched::new("to_metric".to_string()))
         );
         assert_metric(source_tap_events[1][0].clone());
     }
@@ -605,6 +698,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -621,7 +715,7 @@ mod tests {
 
         assert_eq!(
             assert_notification(transform_tap_events[0][0].clone()),
-            EventNotification::new("transform".to_string(), EventNotificationType::Matched)
+            Notification::Matched(Matched::new("transform".to_string()))
         );
         let _log = assert_log(transform_tap_events[1][0].clone());
     }
@@ -655,6 +749,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -670,22 +765,27 @@ mod tests {
             100,
         );
 
-        let tap_events: Vec<_> = tap_stream.take(3).collect().await;
+        let tap_events: Vec<_> = tap_stream.take(4).collect().await;
 
         let notifications = [
             assert_notification(tap_events[0][0].clone()),
             assert_notification(tap_events[1][0].clone()),
+            assert_notification(tap_events[2][0].clone()),
         ];
-        assert!(notifications.iter().any(|n| *n
-            == EventNotification::new("transform".to_string(), EventNotificationType::Matched)));
+        assert!(notifications
+            .iter()
+            .any(|n| *n == Notification::Matched(Matched::new("transform".to_string()))));
         // "in" is not matched since it corresponds to a source
         assert!(notifications
             .iter()
-            .any(|n| *n
-                == EventNotification::new("in".to_string(), EventNotificationType::NotMatched)));
+            .any(|n| *n == Notification::NotMatched(NotMatched::new("in".to_string()))));
+        // "in" generates an invalid match notification to warn against an
+        // attempt to tap the input of a source
+        assert!(notifications.iter().any(|n| *n
+            == Notification::InvalidMatch(InvalidMatch::new("[tap] Warning: source inputs cannot be tapped. Input pattern 'in' matches sources [\"in\"]".to_string(), "in".to_string(), vec!["in".to_string()]))));
 
         assert_eq!(
-            assert_log(tap_events[2][0].clone())
+            assert_log(tap_events[3][0].clone())
                 .get_message()
                 .unwrap_or_default(),
             "test"
@@ -721,6 +821,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -737,7 +838,7 @@ mod tests {
 
         assert_eq!(
             assert_notification(tap_events[0][0].clone()),
-            EventNotification::new("out".to_string(), EventNotificationType::Matched)
+            Notification::Matched(Matched::new("out".to_string()))
         );
         assert_eq!(
             assert_log(tap_events[1][0].clone())
@@ -778,6 +879,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -798,10 +900,7 @@ mod tests {
 
         assert_eq!(
             assert_notification(transform_tap_events[0][0].clone()),
-            EventNotification::new(
-                "transform.dropped".to_string(),
-                EventNotificationType::Matched
-            )
+            Notification::Matched(Matched::new("transform.dropped".to_string()))
         );
         assert_eq!(
             assert_log(transform_tap_events[1][0].clone())
@@ -854,6 +953,7 @@ mod tests {
             BlackholeConfig {
                 print_interval_secs: 1,
                 rate: None,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -869,7 +969,7 @@ mod tests {
         let transform_tap_notifications = transform_tap_all_outputs_stream.next().await.unwrap();
         assert_eq!(
             assert_notification(transform_tap_notifications[0].clone()),
-            EventNotification::new("transform*".to_string(), EventNotificationType::Matched)
+            Notification::Matched(Matched::new("transform*".to_string()))
         );
 
         let mut default_output_found = false;

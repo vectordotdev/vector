@@ -4,6 +4,7 @@ components: sources: kafka: {
 	title: "Kafka"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
 			tls: {

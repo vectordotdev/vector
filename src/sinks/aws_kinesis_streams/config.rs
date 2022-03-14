@@ -13,7 +13,7 @@ use crate::{
         rusoto,
         rusoto::{AwsAuthentication, RegionOrEndpoint},
     },
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::{
             request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
@@ -71,6 +71,12 @@ pub struct KinesisSinkConfig {
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl KinesisSinkConfig {
@@ -149,6 +155,10 @@ impl SinkConfig for KinesisSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_streams"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

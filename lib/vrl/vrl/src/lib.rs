@@ -1,22 +1,24 @@
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+#![allow(clippy::module_name_repetitions)]
+
 pub mod prelude;
 mod runtime;
 
-use std::any::Any;
-
 pub use compiler::{
     function, state, value, vm::Vm, Context, Expression, Function, Program, Target, Value,
+    VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 
 /// Compile a given source into the final [`Program`].
-pub fn compile(
-    source: &str,
-    fns: &[Box<dyn Function>],
-    external_context: Option<Box<dyn Any>>,
-) -> compiler::Result {
+pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
     let mut state = state::Compiler::new();
-    state.set_external_context(external_context);
 
     compile_with_state(source, fns, &mut state)
 }

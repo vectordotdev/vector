@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use indexmap::{IndexMap, IndexSet};
 
-use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
+use super::{
+    builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
+};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -46,6 +48,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         global,
         #[cfg(feature = "api")]
         api,
+        schema,
         #[cfg(feature = "datadog-pipelines")]
         datadog,
         healthchecks,
@@ -99,6 +102,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             global,
             #[cfg(feature = "api")]
             api,
+            schema,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
             version,
@@ -111,7 +115,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             expansions,
         };
 
-        config.propagate_acknowledgements();
+        config.propagate_acknowledgements()?;
 
         let warnings = validation::warnings(&config);
 
@@ -162,10 +166,13 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
             })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            t.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            t.inner
+                .outputs(&schema::Definition::empty())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
@@ -227,8 +234,8 @@ mod test {
     use super::*;
     use crate::{
         config::{
-            DataType, Input, Output, SinkConfig, SinkContext, SourceConfig, SourceContext,
-            TransformConfig, TransformContext,
+            AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
+            SourceContext, TransformConfig, TransformContext,
         },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
@@ -279,7 +286,7 @@ mod test {
             Input::all()
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
     }
@@ -297,6 +304,10 @@ mod test {
 
         fn input(&self) -> Input {
             Input::all()
+        }
+
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
         }
     }
 

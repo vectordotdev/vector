@@ -1,15 +1,15 @@
+use aws_sdk_sqs::error::{GetQueueAttributesError, SendMessageError};
+use aws_sdk_sqs::output::SendMessageOutput;
+use aws_sdk_sqs::types::SdkError;
+use aws_sdk_sqs::Client as SqsClient;
+
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     num::NonZeroU64,
     task::{Context, Poll},
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
-    SendMessageResult, Sqs, SqsClient,
-};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
@@ -17,21 +17,24 @@ use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
+use crate::aws::aws_sdk::{create_client, is_retriable_error};
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::common::sqs::SqsClientBuilder;
 use crate::{
-    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     config::{
-        log_schema, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{AwsSqsEventSent, TemplateRenderingError},
+    internal_events::{AwsSqsEventsSent, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::{self, Response},
+        sink::Response,
         BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsOptions,
 };
 
 #[derive(Debug, Snafu)]
@@ -50,7 +53,7 @@ enum BuildError {
 enum HealthcheckError {
     #[snafu(display("GetQueueAttributes failed: {}", source))]
     GetQueueAttributes {
-        source: RusotoError<GetQueueAttributesError>,
+        source: SdkError<GetQueueAttributesError>,
     },
 }
 
@@ -85,6 +88,12 @@ pub struct SqsSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -116,7 +125,7 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
         Ok((
@@ -132,30 +141,33 @@ impl SinkConfig for SqsSinkConfig {
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 impl SqsSinkConfig {
     pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
         client
-            .get_queue_attributes(GetQueueAttributesRequest {
-                attribute_names: None,
-                queue_url: self.queue_url.clone(),
-            })
+            .get_queue_attributes()
+            .queue_url(self.queue_url.clone())
+            .send()
             .await
             .map(|_| ())
             .context(GetQueueAttributesSnafu)
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
-        let region = (&self.region).try_into()?;
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        Ok(SqsClient::new_with(client, creds, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
+        create_client::<SqsClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+            &self.tls,
+        )
+        .await
     }
 }
 
@@ -200,7 +212,6 @@ impl SqsSink {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
@@ -218,8 +229,8 @@ impl SqsSink {
 }
 
 impl Service<Vec<SendMessageEntry>> for SqsSink {
-    type Response = SendMessageResult;
-    type Error = RusotoError<SendMessageError>;
+    type Response = SendMessageOutput;
+    type Error = SdkError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -233,19 +244,17 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         let byte_size = entry.message_body.len();
 
         let client = self.client.clone();
-        let request = SendMessageRequest {
-            message_body: entry.message_body,
-            message_group_id: entry.message_group_id,
-            message_deduplication_id: entry.message_deduplication_id,
-            queue_url: self.queue_url.clone(),
-            ..Default::default()
-        };
-
+        let queue_url = self.queue_url.clone();
         Box::pin(async move {
             client
-                .send_message(request)
+                .send_message()
+                .message_body(entry.message_body)
+                .set_message_group_id(entry.message_group_id)
+                .set_message_deduplication_id(entry.message_deduplication_id)
+                .queue_url(queue_url)
+                .send()
                 .inspect_ok(|result| {
-                    emit!(&AwsSqsEventSent {
+                    emit!(&AwsSqsEventsSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })
@@ -269,17 +278,17 @@ impl EncodedLength for SendMessageEntry {
     }
 }
 
-impl Response for SendMessageResult {}
+impl Response for SendMessageOutput {}
 
 #[derive(Debug, Clone)]
 struct SqsRetryLogic;
 
 impl RetryLogic for SqsRetryLogic {
-    type Error = RusotoError<SendMessageError>;
-    type Response = SendMessageResult;
+    type Error = SdkError<SendMessageError>;
+    type Response = SendMessageOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        rusoto::is_retriable_error(error)
+        is_retriable_error(error)
     }
 }
 
@@ -394,10 +403,11 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
+    use aws_sdk_sqs::model::QueueAttributeName;
+    use aws_sdk_sqs::{Endpoint, Region};
+    use http::Uri;
     use std::collections::HashMap;
-
-    use rusoto_core::Region;
-    use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
+    use std::str::FromStr;
     use tokio::time::{sleep, Duration};
 
     use super::*;
@@ -408,20 +418,31 @@ mod integration_tests {
         std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
     }
 
+    async fn create_test_client() -> SqsClient {
+        let auth = AwsAuthentication::test_auth();
+
+        let endpoint = sqs_address();
+        let proxy = ProxyConfig::default();
+        create_client::<SqsClientBuilder>(
+            &auth,
+            Some(Region::new("localstack")),
+            Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
+            &proxy,
+            &None,
+        )
+        .await
+        .unwrap()
+    }
+
     #[tokio::test]
     async fn sqs_send_message_batch() {
         let cx = SinkContext::new_test();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: sqs_address(),
-        };
-
         let queue_name = gen_queue_name();
-        ensure_queue(region.clone(), queue_name.clone()).await;
-        let queue_url = get_queue_url(region.clone(), queue_name.clone()).await;
+        ensure_queue(queue_name.clone()).await;
+        let queue_url = get_queue_url(queue_name.clone()).await;
 
-        let client = SqsClient::new(region);
+        let client = create_test_client().await;
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
@@ -433,6 +454,7 @@ mod integration_tests {
             tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();
@@ -446,11 +468,10 @@ mod integration_tests {
         sleep(Duration::from_secs(1)).await;
 
         let response = client
-            .receive_message(ReceiveMessageRequest {
-                max_number_of_messages: Some(input_lines.len() as i64),
-                queue_url,
-                ..Default::default()
-            })
+            .receive_message()
+            .max_number_of_messages(input_lines.len() as i32)
+            .queue_url(queue_url)
+            .send()
             .await
             .unwrap();
 
@@ -469,37 +490,40 @@ mod integration_tests {
         assert_eq!(input_lines.len(), response.messages.unwrap().len());
     }
 
-    async fn ensure_queue(region: Region, queue_name: String) {
-        let client = SqsClient::new(region);
+    async fn ensure_queue(queue_name: String) {
+        let client = create_test_client().await;
 
-        let attributes: Option<HashMap<String, String>> = if queue_name.ends_with(".fifo") {
-            let mut hash_map = HashMap::new();
-            hash_map.insert("FifoQueue".into(), "true".into());
-            Some(hash_map)
-        } else {
-            None
-        };
+        let attributes: Option<HashMap<QueueAttributeName, String>> =
+            if queue_name.ends_with(".fifo") {
+                let mut hash_map = HashMap::new();
+                hash_map.insert(QueueAttributeName::FifoQueue, "true".into());
+                Some(hash_map)
+            } else {
+                None
+            };
 
-        let req = CreateQueueRequest {
-            attributes,
-            queue_name,
-            tags: None,
-        };
-
-        if let Err(error) = client.create_queue(req).await {
+        if let Err(error) = client
+            .create_queue()
+            .set_attributes(attributes)
+            .queue_name(queue_name)
+            .send()
+            .await
+        {
             println!("Unable to check the queue {:?}", error);
         }
     }
 
-    async fn get_queue_url(region: Region, queue_name: String) -> String {
-        let client = SqsClient::new(region);
+    async fn get_queue_url(queue_name: String) -> String {
+        let client = create_test_client().await;
 
-        let req = GetQueueUrlRequest {
-            queue_name,
-            queue_owner_aws_account_id: None,
-        };
-
-        client.get_queue_url(req).await.unwrap().queue_url.unwrap()
+        client
+            .get_queue_url()
+            .queue_name(queue_name)
+            .send()
+            .await
+            .unwrap()
+            .queue_url
+            .unwrap()
     }
 
     fn gen_queue_name() -> String {

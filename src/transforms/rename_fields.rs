@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
+    schema,
     serde::Fields,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -53,7 +54,7 @@ impl TransformConfig for RenameFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -72,9 +73,9 @@ impl FunctionTransform for RenameFields {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key, self.drop_empty) {
+            match log.remove_prune(old_key.as_str(), self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key, v).is_some() {
+                    if event.as_mut_log().insert(new_key.as_str(), v).is_some() {
                         emit!(&RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }

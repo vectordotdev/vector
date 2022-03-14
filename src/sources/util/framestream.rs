@@ -503,7 +503,7 @@ pub fn build_framestream_unix_source(
                 });
 
                 let handler = async move {
-                    if let Err(e) = event_sink.send_stream(&mut events).await {
+                    if let Err(e) = event_sink.send_event_stream(&mut events).await {
                         error!("Error sending event: {:?}.", e);
                     }
 
@@ -566,7 +566,7 @@ fn spawn_event_handling_tasks(
     tokio::spawn(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data) {
-                if event_sink.send(evt).await.is_err() {
+                if event_sink.send_event(evt).await.is_err() {
                     error!("Encountered error while sending event.");
                 }
             }
@@ -668,7 +668,7 @@ mod test {
                 .as_mut_log()
                 .insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.as_mut_log().insert(self.host_key(), host);
+                event.as_mut_log().insert(self.host_key().as_str(), host);
             }
 
             (self.extra_task_handling_routine.clone())();

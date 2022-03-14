@@ -130,7 +130,7 @@ mod integration_tests {
             } else {
                 3
             };
-            e.insert("i", format!("{}", i));
+            e.insert("i", i.to_string());
             Event::from(e)
         });
 
@@ -331,6 +331,7 @@ mod integration_tests {
             tls: Default::default(),
             assume_role: None,
             auth: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 

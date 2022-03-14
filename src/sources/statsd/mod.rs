@@ -265,7 +265,7 @@ mod test {
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
-    use crate::{series, test_util::metrics::AbsoluteMetricState};
+    use crate::{event::into_event_stream, series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -333,6 +333,7 @@ mod test {
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
         let (tx, rx) = SourceSender::new_with_buffer(4096);
+        let rx = rx.flat_map(into_event_stream);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)

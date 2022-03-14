@@ -8,6 +8,7 @@ use crate::{
     },
     event::Event,
     internal_events::SampleEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -56,7 +57,7 @@ impl TransformConfig for SampleConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -80,8 +81,8 @@ impl TransformConfig for SampleCompatConfig {
         self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -120,7 +121,7 @@ impl FunctionTransform for Sample {
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field))
+            .and_then(|key_field| event.as_log().get(key_field.as_str()))
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -183,7 +184,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 2.0f64;
@@ -201,7 +202,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 25.0f64;
@@ -224,7 +225,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
         let second_run = events
@@ -232,7 +233,7 @@ mod tests {
             .filter_map(|event| {
                 let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
 

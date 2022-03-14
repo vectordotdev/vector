@@ -19,6 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {

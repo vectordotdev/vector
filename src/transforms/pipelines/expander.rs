@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{DataType, ExpandType, Input, Output, TransformConfig, TransformContext},
+    schema,
     transforms::Transform,
 };
 
@@ -35,7 +36,7 @@ impl TransformConfig for ExpanderConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        Ok(Some((self.inner.clone(), self.mode.clone())))
+        Ok(Some((self.inner.clone(), self.mode)))
     }
 
     fn input(&self) -> Input {
@@ -45,10 +46,10 @@ impl TransformConfig for ExpanderConfig {
             .unwrap_or_else(Input::all)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         self.inner
             .last()
-            .map(|(_, item)| item.outputs())
+            .map(|(_, item)| item.outputs(merged_definition))
             .unwrap_or_else(|| vec![Output::default(DataType::all())])
     }
 

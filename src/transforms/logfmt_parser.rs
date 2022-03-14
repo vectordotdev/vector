@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str};
 
+use lookup::lookup_v2::BorrowedSegment;
 use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
 
@@ -7,6 +8,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -48,7 +50,7 @@ impl TransformConfig for LogfmtConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -70,7 +72,10 @@ pub struct Logfmt {
 
 impl FunctionTransform for Logfmt {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;
         if let Some(value) = &value {
@@ -87,7 +92,9 @@ impl FunctionTransform for Logfmt {
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
-                            event.as_mut_log().insert(key, value);
+                            event
+                                .as_mut_log()
+                                .insert(&[BorrowedSegment::field(key.as_str())], value);
                         }
                         Err(error) => {
                             emit!(&ParserConversionError {
@@ -97,12 +104,14 @@ impl FunctionTransform for Logfmt {
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(key, val);
+                    event
+                        .as_mut_log()
+                        .insert(&[BorrowedSegment::field(key.as_str())], val);
                 }
             }
 
             if drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError { field: &self.field });
@@ -143,7 +152,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.into_events().next().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
@@ -222,11 +231,11 @@ mod tests {
             log["dyno"],
             "heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456".into()
         );
-        assert_eq!(log["sample#memory_total"], "21.00MB".into());
-        assert_eq!(log["sample#memory_rss"], "21.22MB".into());
-        assert_eq!(log["sample#memory_cache"], "0.00MB".into());
-        assert_eq!(log["sample#memory_swap"], "0.00MB".into());
-        assert_eq!(log["sample#memory_pgpgin"], "348836pages".into());
-        assert_eq!(log["sample#memory_pgpgout"], "343403pages".into());
+        assert_eq!(log["\"sample#memory_total\""], "21.00MB".into());
+        assert_eq!(log["\"sample#memory_rss\""], "21.22MB".into());
+        assert_eq!(log["\"sample#memory_cache\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_swap\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_pgpgin\""], "348836pages".into());
+        assert_eq!(log["\"sample#memory_pgpgout\""], "343403pages".into());
     }
 }

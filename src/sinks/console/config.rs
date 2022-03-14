@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         console::sink::WriterSink,
         util::encoding::{EncodingConfig, StandardEncodings},
@@ -66,6 +66,10 @@ impl SinkConfig for ConsoleSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "console"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

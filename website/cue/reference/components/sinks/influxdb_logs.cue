@@ -13,6 +13,7 @@ components: sinks: influxdb_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

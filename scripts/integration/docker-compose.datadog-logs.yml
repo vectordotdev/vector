@@ -8,7 +8,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -18,6 +19,6 @@ services:
       - "--"
       - "--nocapture"
     environment:
-      - CI_TEST_DATADOG_API_KEY
+      - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code

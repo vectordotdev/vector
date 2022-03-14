@@ -16,12 +16,10 @@ use tokio::{
 use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
-    event::Event,
+    event::{EventArray, EventContainer},
     internal_events::BlackholeEventReceived,
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
-
-const MAX_CHUNK_SIZE: usize = 1024;
 
 pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
@@ -44,8 +42,8 @@ impl BlackholeSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for BlackholeSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<EventArray> for BlackholeSink {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, EventArray>) -> Result<(), ()> {
         // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
         // that rate limiting support can be added more simply without having to interleave it with
         // the printing.
@@ -73,12 +71,7 @@ impl StreamSink<Event> for BlackholeSink {
                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
             }, "Total events collected");
         });
-        let chunk_size = match self.config.rate {
-            None => MAX_CHUNK_SIZE,
-            Some(rate) => rate.min(MAX_CHUNK_SIZE),
-        };
-        let mut chunks = input.ready_chunks(chunk_size);
-        while let Some(events) = chunks.next().await {
+        while let Some(events) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;
                 let secs: f32 = factor * (events.len() as f32);

@@ -196,7 +196,7 @@ impl Ingestor {
                 cx.shutdown.clone(),
                 acknowledgements,
             );
-            let fut = async move { process.run().await };
+            let fut = process.run();
             let handle = tokio::spawn(fut.in_current_span());
             handles.push(handle);
         }
@@ -474,7 +474,7 @@ impl IngestorProcess {
 
                     if let Some(metadata) = &metadata {
                         for (key, value) in metadata {
-                            log.insert(key, value.clone());
+                            log.insert(key.as_str(), value.clone());
                         }
                     }
 
@@ -485,7 +485,7 @@ impl IngestorProcess {
                     ready(Some(log))
                 });
 
-                let send_error = match self.out.send_stream(&mut stream).await {
+                let send_error = match self.out.send_event_stream(&mut stream).await {
                     Ok(_) => None,
                     Err(error) => {
                         // count is set to 0 to have no discarded events considering

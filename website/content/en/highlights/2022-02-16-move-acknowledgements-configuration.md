@@ -28,7 +28,7 @@ configured to wait for sinks to acknowledge before issuing their own
 acknowledgements (where possible).
 
 The source configuration `acknowledgements` option will remain in this
-version, but is deprecated and will be removed in version 0.22.0.
+version, but is deprecated and will be removed in a future version.
 
 See [the documentation for end-to-end
 acknowledgements][acknowledgements] for more details on the

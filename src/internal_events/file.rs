@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use super::prelude::{error_stage, error_type};
+use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -33,6 +35,60 @@ impl InternalEvent for FileBytesSent<'_> {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "file",
             "file" => self.file.clone().into_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct FileIoError<'a> {
+    pub error: std::io::Error,
+    pub code: &'static str,
+    pub message: &'static str,
+    pub path: Option<&'a Bytes>,
+}
+
+impl<'a> InternalEvent for FileIoError<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_code = %self.code,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.code,
+            "error_type" => error_type::IO_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct FileExpiringError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed expiring a file.",
+            error = %self.error,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error" => self.error.to_string(),
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
         );
     }
 }
@@ -143,7 +199,7 @@ mod source {
                 message = "Failed reading file for fingerprinting.",
                 file = %self.file.display(),
                 error = %self.error,
-                error_code = "failed_reading_fingerprint",
+                error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
             );
@@ -152,7 +208,7 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "failed_reading_fingerprint",
+                "error_code" => "reading_fingerprint",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
@@ -244,8 +300,6 @@ mod source {
         }
     }
 
-    const WATCH_FAILED: &str = "watch_failed";
-
     #[derive(Debug)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
@@ -257,7 +311,7 @@ mod source {
             error!(
                 message = "Failed to watch file.",
                 error = %self.error,
-                error_code = WATCH_FAILED,
+                error_code = "watching",
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
@@ -267,7 +321,7 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => WATCH_FAILED,
+                "error_code" => "watching",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
                 "file" => self.file.to_string_lossy().into_owned(),
@@ -354,7 +408,7 @@ mod source {
             error!(
                 message = "Failed writing checkpoints.",
                 error = %self.error,
-                error_code = "failed_writing_checkpoints",
+                error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING
             );
@@ -364,7 +418,7 @@ mod source {
             counter!("checkpoint_write_errors_total", 1);
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "failed_writing_checkpoints",
+                "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
@@ -382,7 +436,7 @@ mod source {
             error!(
                 message = "Failed to glob path.",
                 error = %self.error,
-                error_code = "failed_globbing",
+                error_code = "globbing",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
@@ -392,7 +446,7 @@ mod source {
         fn emit_metrics(&self) {
             counter!(
                 "component_errors_total", 1,
-                "error_code" => "failed_globbing",
+                "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
                 "path" => self.path.to_string_lossy().into_owned(),

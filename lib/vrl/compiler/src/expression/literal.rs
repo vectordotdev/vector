@@ -275,7 +275,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("invalid regular expression")]
     InvalidRegex(#[from] regex::Error),
 

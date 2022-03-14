@@ -19,7 +19,7 @@ services:
       - ${PWD}/tests/data:/etc/ssl:ro
 
   prometheus:
-    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.31.0}
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.33.4}
     command: --config.file=/etc/vector/prometheus.yaml
     network_mode: host
     volumes:
@@ -35,7 +35,8 @@ services:
     network_mode: host
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -57,4 +58,3 @@ services:
 volumes:
   cargogit: {}
   cargoregistry: {}
-

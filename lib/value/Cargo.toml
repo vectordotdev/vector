@@ -13,13 +13,13 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde", "s
 indoc = { version = "1.0.4", default-features = false }
 lookup = { path = "../lookup", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
-regex = { version = "1.5.4", default-features = false, features = ["std", "perf"]}
+regex = { version = "1.5.5", default-features = false, features = ["std", "perf"]}
 snafu = { version = "0.7.0", default-features = false }
-tracing = { version = "0.1.31", default-features = false }
+tracing = { version = "0.1.32", default-features = false }
 
 # Optional
-async-graphql = { version = "3.0.31", default-features = false, optional = true }
-mlua = { version = "0.7.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
+async-graphql = { version = "3.0.34", default-features = false, optional = true }
+mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"], optional = true }
 serde_json = { version = "1.0.79", optional = true }
 toml = { version = "0.5.8", default-features = false, optional = true }

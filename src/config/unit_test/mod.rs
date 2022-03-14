@@ -9,6 +9,7 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
+    schema,
     topology::{
         self,
         builder::{self, Pieces},
@@ -102,7 +103,7 @@ pub async fn build_unit_tests(
             Err(errors) => {
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
-                test_error = test_error.replace("\n", "\n  ");
+                test_error = test_error.replace('\n', "\n  ");
                 test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
                 build_errors.push(test_error);
             }
@@ -166,7 +167,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs()
+                    .outputs(&schema::Definition::empty())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -182,7 +183,7 @@ impl UnitTestBuildMetadata {
                     key.clone(),
                     format!(
                         "{}-{}-{}",
-                        key.to_string().replace(".", "-"),
+                        key.to_string().replace('.', "-"),
                         "sink",
                         random_id
                     ),
@@ -374,7 +375,7 @@ async fn build_unit_test(
         .iter()
         .filter_map(|component| {
             component
-                .split_once(".")
+                .split_once('.')
                 .map(|(original_name, _)| original_name.to_string())
         })
         .collect::<Vec<_>>();
@@ -431,7 +432,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs()
+            .outputs(&schema::Definition::empty())
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {
@@ -565,7 +566,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.as_mut_log().insert(path.to_owned(), value);
+                    event.as_mut_log().insert(path.as_str(), value);
                 }
                 Ok(event)
             } else {

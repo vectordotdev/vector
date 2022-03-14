@@ -28,7 +28,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+        TcpBytesReceived, TcpSendAckError, TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -243,7 +243,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(&TcpSocketConnectionError { error });
+                emit!(&TcpSocketTlsConnectionError { error });
                 return;
             }
         },
@@ -289,6 +289,9 @@ async fn handle_stream<T>(
             else => break,
         };
 
+        let timeout = tokio::time::sleep(Duration::from_millis(10));
+        tokio::pin!(timeout);
+
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
@@ -296,6 +299,11 @@ async fn handle_stream<T>(
                     break;
                 }
             },
+            _ = &mut timeout => {
+                // This connection is currently holding a permit, but has not received data for some time. Release
+                // the permit to let another connection try
+                continue;
+            }
             res = reader.next() => {
                 match res {
                     Some(Ok((frames, _byte_size))) => {
@@ -304,7 +312,7 @@ async fn handle_stream<T>(
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
 
-                        let mut events = frames.into_iter().map(Into::into).flatten().collect::<Vec<Event>>();
+                        let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
                         emit!(&SocketEventsReceived {

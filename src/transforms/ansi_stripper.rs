@@ -9,6 +9,7 @@ use crate::{
     internal_events::{
         AnsiStripperError, AnsiStripperFieldInvalidError, AnsiStripperFieldMissingError,
     },
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
@@ -45,7 +46,7 @@ impl TransformConfig for AnsiStripperConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -63,7 +64,7 @@ impl FunctionTransform for AnsiStripper {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
 
-        match log.get_mut(&self.field) {
+        match log.get_mut(self.field.as_str()) {
             None => emit!(&AnsiStripperFieldMissingError { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {

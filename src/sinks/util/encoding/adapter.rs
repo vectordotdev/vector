@@ -1,12 +1,14 @@
 #![deny(missing_docs)]
 
-use super::{EncodingConfiguration, TimestampFormat};
+use super::{validate_fields, EncodingConfiguration, TimestampFormat};
 use crate::{
     codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
-    event::{Event, PathComponent},
+    event::Event,
+    serde::skip_serializing_if_default,
 };
 use core::fmt::Debug;
-use serde::{Deserialize, Serialize};
+use lookup::lookup_v2::OwnedPath;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::marker::PhantomData;
 
 /// Trait used to migrate from a sink-specific `Codec` enum to the new
@@ -32,10 +34,26 @@ where
         + Debug
         + Clone,
 {
-    /// The encoding configuration.
-    Encoding(EncodingConfig),
     /// The legacy sink-specific encoding configuration.
     LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig, Migrator>),
+    /// The encoding configuration.
+    Encoding(EncodingConfig),
+}
+
+impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
+    for EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
+        + Debug
+        + Clone,
+{
+    fn from(encoding: LegacyEncodingConfig) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper {
+            encoding,
+            phantom: PhantomData,
+        })
+    }
 }
 
 impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
@@ -51,7 +69,8 @@ where
             framing,
             encoding: EncodingWithTransformationConfig {
                 encoding,
-                filter: None,
+                only_fields: None,
+                except_fields: None,
                 timestamp_format: None,
             },
         })
@@ -76,48 +95,13 @@ where
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
     pub fn transformer(&self) -> Transformer {
         match self {
-            Self::Encoding(config) => {
-                let only_fields = config
-                    .encoding
-                    .filter
-                    .as_ref()
-                    .and_then(|filter| match filter {
-                        OnlyOrExceptFieldsConfig::OnlyFields(fields) => {
-                            Some(fields.only_fields.clone())
-                        }
-                        _ => None,
-                    });
-                let except_fields =
-                    config
-                        .encoding
-                        .filter
-                        .as_ref()
-                        .and_then(|filter| match filter {
-                            OnlyOrExceptFieldsConfig::ExceptFields(fields) => {
-                                Some(fields.except_fields.clone())
-                            }
-                            _ => None,
-                        });
-                let timestamp_format = config.encoding.timestamp_format;
-
-                Transformer {
-                    only_fields,
-                    except_fields,
-                    timestamp_format,
-                }
-            }
+            Self::Encoding(config) => Transformer {
+                only_fields: config.encoding.only_fields.clone(),
+                except_fields: config.encoding.except_fields.clone(),
+                timestamp_format: config.encoding.timestamp_format,
+            },
             Self::LegacyEncodingConfig(config) => Transformer {
-                only_fields: config.encoding.only_fields().as_ref().map(|fields| {
-                    fields
-                        .iter()
-                        .map(|field| {
-                            field
-                                .iter()
-                                .map(|component| component.clone().into_static())
-                                .collect()
-                        })
-                        .collect()
-                }),
+                only_fields: config.encoding.only_fields().clone(),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
             },
@@ -159,39 +143,46 @@ pub struct EncodingConfig {
     encoding: EncodingWithTransformationConfig,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct EncodingWithTransformationConfigValidated(EncodingWithTransformationConfig);
+
+impl<'de> Deserialize<'de> for EncodingWithTransformationConfigValidated {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let config: EncodingWithTransformationConfig = Deserialize::deserialize(deserializer)?;
+        validate_fields(
+            config.only_fields.as_deref(),
+            config.except_fields.as_deref(),
+        )
+        .map_err(serde::de::Error::custom)?;
+        Ok(Self(config))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodingWithTransformationConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
-    #[serde(flatten)]
-    filter: Option<OnlyOrExceptFieldsConfig>,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    only_fields: Option<Vec<OwnedPath>>,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    except_fields: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     timestamp_format: Option<TimestampFormat>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OnlyOrExceptFieldsConfig {
-    OnlyFields(OnlyFieldsConfig),
-    ExceptFields(ExceptFieldsConfig),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnlyFieldsConfig {
-    only_fields: Vec<Vec<PathComponent<'static>>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExceptFieldsConfig {
-    except_fields: Vec<String>,
-}
-
+#[derive(Debug, Clone, Default)]
+/// Transformations to prepare an event for serialization.
 pub struct Transformer {
-    only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
+    only_fields: Option<Vec<OwnedPath>>,
     except_fields: Option<Vec<String>>,
     timestamp_format: Option<TimestampFormat>,
 }
 
 impl Transformer {
+    /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
         self.apply_rules(event);
     }
@@ -208,7 +199,7 @@ impl EncodingConfiguration for Transformer {
         &None
     }
 
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
         &self.only_fields
     }
 
@@ -224,6 +215,7 @@ impl EncodingConfiguration for Transformer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lookup::lookup_v2::parse_path;
 
     #[test]
     fn deserialize_encoding_with_transformation() {
@@ -231,8 +223,9 @@ mod tests {
             {
                 "encoding": {
                     "codec": "raw_message",
-                    "timestamp_format": "unix",
-                    "except_fields": ["ignore_me"]
+                    "only_fields": ["a.b[0]"],
+                    "except_fields": ["ignore_me"],
+                    "timestamp_format": "unix"
                 }
             }
         "#;
@@ -240,14 +233,9 @@ mod tests {
         let config = serde_json::from_str::<EncodingConfig>(string).unwrap();
         let encoding = config.encoding;
 
+        assert_eq!(encoding.only_fields, Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(encoding.except_fields, Some(vec!["ignore_me".to_owned()]));
         assert_eq!(encoding.timestamp_format.unwrap(), TimestampFormat::Unix);
-        assert_eq!(
-            match encoding.filter.unwrap() {
-                OnlyOrExceptFieldsConfig::ExceptFields(config) => config.except_fields,
-                _ => panic!(),
-            },
-            vec!["ignore_me".to_owned()]
-        );
     }
 
     #[test]

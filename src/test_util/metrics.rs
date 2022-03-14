@@ -92,21 +92,19 @@ impl<N: Default> Default for MetricState<N> {
 pub fn read_counter_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Counter { value } => Some(*value),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Gauge { value } => Some(*value),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_distribution_samples(
@@ -115,21 +113,19 @@ pub fn read_distribution_samples(
 ) -> Option<Vec<Sample>> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Distribution { samples, .. } => Some(samples.clone()),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<HashSet<String>> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Set { values } => Some(values.iter().cloned().collect()),
             _ => None,
         })
-        .flatten()
 }
 
 #[macro_export]

@@ -21,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

@@ -65,7 +65,7 @@ components: _aws: {
 
 		endpoint: {
 			common:        false
-			description:   "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
+			description:   "Custom endpoint for use with AWS-compatible services."
 			relevant_when: "region = null"
 			required:      false
 			type: string: {

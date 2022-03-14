@@ -8,6 +8,8 @@ components: sources: syslog: {
 	classes: sources.socket.classes
 
 	features: {
+		acknowledgements: sources.socket.features.acknowledgements
+
 		multiline: sources.socket.features.multiline
 
 		receive: {

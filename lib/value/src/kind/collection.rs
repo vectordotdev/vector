@@ -16,7 +16,7 @@ use super::{merge, Kind};
 ///
 /// A collection contains one or more kinds for known positions within the collection (e.g. indices
 /// or fields), and contains a global "unknown" state that applies to all unknown paths.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Collection<T: Ord> {
     known: BTreeMap<T, Kind>,
 

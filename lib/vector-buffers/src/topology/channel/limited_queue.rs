@@ -1,7 +1,8 @@
 use crossbeam_queue::ArrayQueue;
-use futures::{ready, task::AtomicWaker};
+use futures::{ready, Sink, Stream};
 use std::{
     cmp, fmt,
+    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -26,11 +27,12 @@ impl<T> fmt::Display for SendError<T> {
 
 impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 
+#[derive(Debug)]
 struct Inner<T> {
     data: Arc<ArrayQueue<(OwnedSemaphorePermit, T)>>,
     limit: usize,
     limiter: PollSemaphore,
-    read_waker: Arc<AtomicWaker>,
+    read_waker: PollNotify,
     write_waker: PollNotify,
 }
 
@@ -46,14 +48,11 @@ impl<T> Clone for Inner<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct LimitedSender<T> {
     inner: Inner<T>,
     sender_count: Arc<AtomicUsize>,
     slot: Option<T>,
-}
-
-pub struct LimitedReceiver<T> {
-    inner: Inner<T>,
 }
 
 impl<T: Bufferable> LimitedSender<T> {
@@ -155,7 +154,7 @@ impl<T: Bufferable> LimitedSender<T> {
                         );
 
                         // Don't forget to wake the reader since there's data to consume now. :)
-                        self.inner.read_waker.wake();
+                        self.inner.read_waker.as_ref().notify_one();
 
                         Poll::Ready(Ok(()))
                     }
@@ -189,6 +188,31 @@ impl<T: Bufferable> LimitedSender<T> {
     }
 }
 
+impl<T: Bufferable> Sink<T> for LimitedSender<T> {
+    type Error = SendError<T>;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), SendError<T>> {
+        Pin::into_inner(self).start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::into_inner(self).poll_close(cx)
+    }
+}
+
+#[derive(Debug)]
+pub struct LimitedReceiver<T> {
+    inner: Inner<T>,
+}
+
 impl<T: Bufferable> LimitedReceiver<T> {
     /// Gets the number of items that this channel could accept.
     pub fn available_capacity(&self) -> usize {
@@ -196,25 +220,40 @@ impl<T: Bufferable> LimitedReceiver<T> {
     }
 
     pub fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        match self.inner.data.pop() {
-            Some((permit, item)) => {
+        loop {
+            if let Some((permit, item)) = self.inner.data.pop() {
                 // We got an item, woohoo! Now, drop the permit which will properly free up permits
                 // in the semaphore, and then also try to notify a pending writer.
                 drop(permit);
                 self.inner.write_waker.as_ref().notify_one();
-                Poll::Ready(Some(item))
+
+                return Poll::Ready(Some(item));
             }
-            // Figure out if we're actually closed or not, to determine if more items might be
-            // coming or if it's time to also close up shop.
-            None => {
-                if self.inner.limiter.is_closed() {
-                    Poll::Ready(None)
-                } else {
-                    self.inner.read_waker.register(cx.waker());
-                    Poll::Pending
-                }
+
+            // There wasn't an item for us to pop, so see if the channel is actually closed.  If so,
+            // then it's time for us to close up shop as well.
+            if self.inner.limiter.is_closed() {
+                return Poll::Ready(None);
             }
+
+            // We're not closed, so we need to wait for a writer to tell us they made some
+            // progress.  This might end up being a spurious wakeup since `Notify` will
+            // store up to one wakeup that gets consumed by the next call to `poll_notify`,
+            // but alas.
+            ready!(self.inner.read_waker.poll_notify(cx));
         }
+    }
+
+    pub fn close(&mut self) {
+        self.inner.limiter.close();
+    }
+}
+
+impl<T: Bufferable> Stream for LimitedReceiver<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        Pin::into_inner(self).poll_next(cx)
     }
 }
 
@@ -235,7 +274,7 @@ impl<T> Drop for LimitedSender<T> {
         // If we're the last sender to drop, close the semaphore on our way out the door.
         if self.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.inner.limiter.close();
-            self.inner.read_waker.wake();
+            self.inner.read_waker.as_ref().notify_one();
         }
     }
 }
@@ -245,7 +284,7 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
         data: Arc::new(ArrayQueue::new(limit)),
         limit,
         limiter: PollSemaphore::new(Arc::new(Semaphore::new(limit))),
-        read_waker: Arc::new(AtomicWaker::new()),
+        read_waker: PollNotify::new(Arc::new(Notify::new())),
         write_waker: PollNotify::new(Arc::new(Notify::new())),
     };
 
@@ -283,7 +322,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async move { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -315,7 +354,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv1 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send1.is_woken());
@@ -352,7 +391,7 @@ mod tests {
 
         assert_eq!(1, rx.available_capacity());
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_pending!(recv2.poll());
 
@@ -392,7 +431,7 @@ mod tests {
             Ok::<_, SendError<MultiEventRecord>>(())
         });
 
-        let mut recv1 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!small_sends.is_woken());
@@ -438,7 +477,7 @@ mod tests {
         assert!(!send2.is_woken());
 
         // Our second read should unlock enough available capacity for the second send once complete.
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv2.poll()));
         drop(recv2);
@@ -449,14 +488,14 @@ mod tests {
         assert_eq!(Ok(()), assert_ready!(send2.poll()));
 
         // And just make sure we see those last two sends.
-        let mut recv3 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv3 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv3.is_woken());
         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv3.poll()));
         drop(recv3);
 
         assert_eq!(3, rx.available_capacity());
 
-        let mut recv4 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv4 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv4.is_woken());
         assert_eq!(Some(MultiEventRecord(4)), assert_ready!(recv4.poll()));
         drop(recv4);
@@ -481,7 +520,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -506,7 +545,7 @@ mod tests {
         assert_eq!(Some(42), assert_ready!(recv.poll()));
         drop(recv);
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv2.is_woken());
         assert_eq!(None, assert_ready!(recv2.poll()));
     }
@@ -520,7 +559,7 @@ mod tests {
         let tx2 = tx.clone();
 
         // Create our receive future.
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!recv.is_woken());
@@ -553,7 +592,7 @@ mod tests {
             poll_fn(|cx| tx.poll_flush(cx)).await
         });
 
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -611,7 +650,7 @@ mod tests {
 
         // Now do a receive which should return the one consumed slot, essentially allowing all
         // permits to be acquired by the blocked send.
-        let mut recv = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert!(!recv.is_woken());
         assert!(!send2.is_woken());
 
@@ -627,7 +666,7 @@ mod tests {
 
         assert_eq!(0, tx.available_capacity());
 
-        let mut recv2 = spawn(async { poll_fn(|cx| rx.poll_next(cx)).await });
+        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv2.poll()));
 
         assert_eq!(2, tx.available_capacity());

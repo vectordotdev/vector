@@ -13,6 +13,7 @@ use crate::{
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
     },
+    schema,
     serde::Fields,
     template::Template,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -76,7 +77,7 @@ impl TransformConfig for AddFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -126,13 +127,17 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key_string, value).is_some() {
+                if event
+                    .as_mut_log()
+                    .insert(key_string.as_str(), value)
+                    .is_some()
+                {
                     emit!(&AddFieldsFieldOverwritten { field: &key });
                 }
-            } else if event.as_mut_log().contains(&key_string) {
+            } else if event.as_mut_log().contains(key_string.as_str()) {
                 emit!(&AddFieldsFieldNotOverwritten { field: &key });
             } else {
-                event.as_mut_log().insert(&key_string, value);
+                event.as_mut_log().insert(key_string.as_str(), value);
             }
         }
 

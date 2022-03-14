@@ -13,6 +13,7 @@ components: sources: journald: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -58,6 +59,12 @@ components: sources: journald: {
 			description: "Include only entries from the current boot."
 			required:    false
 			type: bool: default: true
+		}
+		since_now: {
+			common:      true
+			description: "Include only future entries."
+			required:    false
+			type: bool: default: false
 		}
 		exclude_units: {
 			common:      true

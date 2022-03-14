@@ -9,6 +9,7 @@ use crate::{
     config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
+    schema,
     transforms::Transform,
 };
 
@@ -98,7 +99,7 @@ impl LuaConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self) -> Vec<Output> {
+    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
@@ -741,7 +742,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["new field"], "new value".into());
+        assert_eq!(output.as_log()["\"new field\""], "new value".into());
         Ok(())
     }
 

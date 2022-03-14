@@ -10,14 +10,14 @@ use snafu::{ResultExt, Snafu};
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, UriParseSnafu, VectorSink,
@@ -65,6 +65,13 @@ pub struct PubsubConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_skip_authentication() -> bool {
@@ -121,6 +128,10 @@ impl SinkConfig for PubsubConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 struct PubsubSink {
@@ -167,18 +178,31 @@ impl PubsubSink {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for PubsubSink {
-    type Input = Value;
-    type Output = Vec<BoxedRawValue>;
+struct PubSubSinkEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<Value> {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
         let log = event.into_log();
         let json = serde_json::to_string(&log).unwrap();
         Some(json!({ "data": base64::encode(&json) }))
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for PubsubSink {
+    type Input = Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = PubSubSinkEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        PubSubSinkEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {

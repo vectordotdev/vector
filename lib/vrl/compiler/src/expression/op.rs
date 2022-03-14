@@ -201,6 +201,21 @@ impl Expression for Op {
                 }
             }
 
+            // ... % ...
+            Rem => {
+                // Division is infallible if the rhs is a literal normal float or integer.
+                match self.rhs.as_value() {
+                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
+                        Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
+                        Value::Float(_) => TypeDef::float().fallible(),
+                        Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
+                        Value::Integer(_) => TypeDef::integer().fallible(),
+                        _ => TypeDef::float().add_integer().fallible(),
+                    },
+                    _ => TypeDef::float().add_integer().fallible(),
+                }
+            }
+
             // "bar" + ...
             // ... + "bar"
             Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
@@ -216,7 +231,7 @@ impl Expression for Op {
             // 1.0 - ...
             // 1.0 * ...
             // 1.0 % ...
-            Add | Sub | Mul | Rem if lhs_def.is_float() || rhs_def.is_float() => lhs_def
+            Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
                 .fallible_unless(K::integer().or_float())
                 .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::float()),
@@ -225,7 +240,7 @@ impl Expression for Op {
             // 1 - 1
             // 1 * 1
             // 1 % 1
-            Add | Sub | Mul | Rem if lhs_def.is_integer() && rhs_def.is_integer() => {
+            Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
                 lhs_def.merge_deep(rhs_def).with_kind(K::integer())
             }
 
@@ -247,8 +262,7 @@ impl Expression for Op {
                 .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
-            // ... % ...
-            Sub | Rem => lhs_def
+            Sub => lhs_def
                 .merge_deep(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
@@ -290,9 +304,11 @@ impl Expression for Op {
             }
             ast::Opcode::And => {
                 // And is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-                vm.write_opcode(OpCode::Pop);
+                // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
+                // replace it with False
+                let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
                 self.rhs.compile_to_vm(vm)?;
+                vm.write_opcode(OpCode::And);
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Err => {
@@ -577,6 +593,11 @@ mod tests {
         remainder_integer {
             expr: |_| op(Rem, 5, 5),
             want: TypeDef::integer().infallible(),
+        }
+
+        remainder_integer_zero {
+            expr: |_| op(Rem, 5, 0),
+            want: TypeDef::integer().fallible(),
         }
 
         remainder_float {

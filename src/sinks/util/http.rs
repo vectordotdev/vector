@@ -21,9 +21,8 @@ use vector_core::{buffers::Acker, ByteSizeOf};
 
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink::{self, ServiceLogic},
-    uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    sink, uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     event::Event,
@@ -31,12 +30,17 @@ use crate::{
     internal_events::EndpointBytesSent,
 };
 
+pub trait HttpEventEncoder<Output> {
+    fn encode_event(&mut self, event: Event) -> Option<Output>;
+}
+
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
+    type Encoder: HttpEventEncoder<Self::Input>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input>;
+    fn build_encoder(&self) -> Self::Encoder;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>>;
 }
 
@@ -54,16 +58,12 @@ pub trait HttpSink: Send + Sync + 'static {
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
 #[pin_project]
-pub struct BatchedHttpSink<
-    T,
-    B,
-    RL = HttpRetryLogic,
-    SL = sink::StdServiceLogic<http::Response<Bytes>>,
-> where
+pub struct BatchedHttpSink<T, B, RL = HttpRetryLogic>
+where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
@@ -71,8 +71,8 @@ pub struct BatchedHttpSink<
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
         B,
         RL,
-        SL,
     >,
+    encoder: T::Encoder,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
@@ -101,17 +101,15 @@ where
             batch_timeout,
             client,
             acker,
-            sink::StdServiceLogic::default(),
         )
     }
 }
 
-impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
+impl<T, B, RL> BatchedHttpSink<T, B, RL>
 where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_logic(
@@ -122,7 +120,6 @@ where
         batch_timeout: Duration,
         client: HttpClient,
         acker: Acker,
-        service_logic: SL,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -133,30 +130,24 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(
-            retry_logic,
-            svc,
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        );
+        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let encoder = sink.build_encoder();
 
         Self {
             sink,
             inner,
+            encoder,
             slot: None,
         }
     }
 }
 
-impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
+impl<T, B, RL> Sink<Event> for BatchedHttpSink<T, B, RL>
 where
     B: Batch,
     B::Output: ByteSizeOf + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
-    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -176,10 +167,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let byte_size = event.size_of();
         let finalizers = event.metadata_mut().take_finalizers();
-        if let Some(item) = self.sink.encode_event(event) {
+        if let Some(item) = self.encoder.encode_event(event) {
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,
@@ -213,8 +204,8 @@ where
     B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
@@ -223,8 +214,8 @@ where
         B,
         RL,
         K,
-        sink::StdServiceLogic<hyper::Response<Bytes>>,
     >,
+    encoder: T::Encoder,
     slot: Option<EncodedEvent<B::Input>>,
 }
 
@@ -262,8 +253,8 @@ where
     B::Output: ByteSizeOf + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
 {
     pub fn with_retry_logic(
         sink: T,
@@ -283,18 +274,13 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.partition_sink(
-            retry_logic,
-            svc,
-            batch,
-            batch_timeout,
-            acker,
-            sink::StdServiceLogic::default(),
-        );
+        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let encoder = sink.build_encoder();
 
         Self {
             sink,
             inner,
+            encoder,
             slot: None,
         }
     }
@@ -333,10 +319,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
-        if let Some(item) = self.sink.encode_event(event) {
+        if let Some(item) = self.encoder.encode_event(event) {
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,

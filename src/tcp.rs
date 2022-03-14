@@ -9,23 +9,26 @@ use tokio::net::TcpStream;
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TcpKeepaliveConfig {
-    pub time_secs: Option<u64>,
+    pub(crate) time_secs: Option<u64>,
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
-pub fn set_keepalive(socket: &TcpStream, params: &socket2::TcpKeepalive) -> std::io::Result<()> {
+pub(crate) fn set_keepalive(
+    socket: &TcpStream,
+    params: &socket2::TcpKeepalive,
+) -> std::io::Result<()> {
     SockRef::from(socket).set_tcp_keepalive(params)
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
-pub fn set_receive_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
+pub(crate) fn set_receive_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
     SockRef::from(socket).set_recv_buffer_size(size)
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
-pub fn set_send_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
+pub(crate) fn set_send_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
     SockRef::from(socket).set_send_buffer_size(size)
 }

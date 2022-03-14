@@ -13,6 +13,7 @@ components: sinks: azure_monitor_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

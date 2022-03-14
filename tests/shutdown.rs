@@ -90,7 +90,7 @@ fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Comman
         .arg(if quiet { "--quiet" } else { "-v" })
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
-        .env("VECTOR_TEST_ADDRESS", format!("{}", address));
+        .env("VECTOR_TEST_ADDRESS", address.to_string());
 
     cmd
 }

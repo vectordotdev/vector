@@ -85,6 +85,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -93,6 +94,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -113,6 +115,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -148,6 +151,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -156,6 +160,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -175,6 +180,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -213,6 +219,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -221,6 +228,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -240,6 +248,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 

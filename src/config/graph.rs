@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use indexmap::{set::IndexSet, IndexMap};
 
-use super::{ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter};
+use super::{
+    schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
+};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -71,7 +73,7 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: config.inner.input().data_type(),
-                    outputs: config.inner.outputs(),
+                    outputs: config.inner.outputs(&schema::Definition::empty()),
                 },
             );
         }
