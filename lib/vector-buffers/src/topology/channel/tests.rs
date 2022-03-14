@@ -187,6 +187,17 @@ async fn test_sender_overflow_drop_newest() {
 }
 
 #[tokio::test]
+async fn test_sender_overflow_drop_newest_when_semaphore_yields() {
+    // TODO: essentially, we want to try and test that the code does _not_ drop an event when
+    // there's sender capacity but the `poll_ready` call to `SenderAdapter` results in
+    // `Poll::Pending`.
+    //
+    // this exercises the logic that prevents us from indiscriminately discarding events when
+    // tokio's coop budget kicks in against an in-memory channel, but there's still actual capacity
+    // that could be consumed.
+}
+
+#[tokio::test]
 async fn test_buffer_metrics_normal() {
     // Get a regular blocking buffer.
     let (mut tx, rx, handle) = build_buffer(5, WhenFull::Block, None).await;
