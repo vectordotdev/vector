@@ -13,10 +13,15 @@ components: sinks: amqp: {
 	}
 
 	features: {
+		acknowledgements: false
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			batch: enabled: false
+			batch: {
+			       enabled: false
+			       common: false
+			timeout_secs: null
+			}
 			compression: {
 				enabled: true
 				default: "none"
@@ -27,7 +32,6 @@ components: sinks: amqp: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}
@@ -47,13 +51,14 @@ components: sinks: amqp: {
 
 	configuration: {
 		connection: {
-			common:      true
 			description: "Connection options for Amqp sink"
 			required:    true
 			warnings: []
 			type: object: {
+			      examples: []
+			      options: {
 				connection_string: components._amqp.configuration.connection_string
-				tls: components._amqp.configuration.tls
+				}
 			}
 		}
 		exchange: {
@@ -66,18 +71,21 @@ components: sinks: amqp: {
 			}
 		}
 		routing_key: {
+			common: false
 			description: "Template use to generate a routing key which corresponds to a queue binding"
 			required:    false
 			warnings: []
 			type: string: {
 				examples: ["{{ field_a }}-{{ field_b }}"]
 				syntax: "literal"
+				default: null
 			}
 		}
 	}
 
 	input: {
 		logs: true
+		metrics: null
 	}
 
 	how_it_works: components._amqp.how_it_works
