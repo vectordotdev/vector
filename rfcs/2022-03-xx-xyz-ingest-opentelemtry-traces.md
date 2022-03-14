@@ -77,7 +77,7 @@ and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to c
   for each indivual trace ID and its associated spans and metadata.
 - Use the Opentelemetry trace format as the common denominator and base the Vector internal representation to ensure :
   - A clear reference point for conversion between trace format
-  - Avoid destructive manipulation by transform and keep traces object fully functionnal even after heavy modifications
+  - Avoid destructive manipulation by transforms and keep traces object fully functionnal even after heavy modifications
     while flowing throw the topology
 
 ## Cross cutting concerns
@@ -89,11 +89,11 @@ and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to c
 ### In scope
 
 - `opentelemetry_traces` source, with both http and grpc support
-- `opentelemetry_traces` source to `datadog_traces` sink forwarding
-- Settle on a signle internal representation for all traces form inside vector
+- Support `opentelemetry_traces` source to `datadog_traces` sink forwarding by dealing with:
+  - Traces normalization to a single format inside Vector
+  - Conversion to/from this format in all traces sources/sinks
 - APM stats computation logic, with an implementation for the `opentelemetry_traces` sources, applicable for all traces
   sources
-
 
 ### Out of scope
 
@@ -109,7 +109,7 @@ N/A
 ### User Experience
 
 - User would point OpenTelemtry tracing lib directly to a local Vector deployement
-- Vector would be configured with a config looking like:
+- Vector would be configured with a minimal config looking like:
 
 ```yaml
 sources:
@@ -138,7 +138,9 @@ And it should just work.
     All the expected behaviours regarding the kind of requests/responses code and sequence are clearly defined as well
     as the default URL path (`/v1/traces` for traces).
 - Internal traces representation/normalization, two options are opened see [outstanding
-  questions](#outstanding-questions)
+  questions](#outstanding-questions), but the consensus is leaning towards a new dedicated container that would:
+    - Borrow most of its semantic from the Opentelemetry Traces format
+    - Move from the current `LogEvent` to a dedicated container
 - APM stats computation:
   - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
     Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
