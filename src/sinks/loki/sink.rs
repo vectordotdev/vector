@@ -377,6 +377,13 @@ where
         let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
 
+        // out_of_order_action's that require a complete ordering are limited to building 1 request
+        // at a time
+        let request_builder_concurrency = match config.out_of_order_action {
+            OutOfOrderAction::Accept => NonZeroUsize::new(50),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => NonZeroUsize::new(1),
+        };
+
         let sink = input
             .map(|event| encoder.encode_event(event))
             .map(|record| filter.filter_record(record))
@@ -403,7 +410,10 @@ where
                     None
                 }
             })
-            .request_builder(NonZeroUsize::new(50), self.request_builder)
+            .request_builder(
+                NonZeroUsize::new(request_builder_concurrency),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
