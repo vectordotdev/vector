@@ -370,6 +370,10 @@ impl MaybeTlsSettings {
         Ok(Self::Tls(tls))
     }
 
+    pub fn tls_client(config: &Option<TlsOptions>) -> Result<Self> {
+        Ok(Self::Tls(TlsSettings::from_options_base(config, false)?))
+    }
+
     /// Generate an optional settings struct from the given optional
     /// configuration reference. If `config` is `None`, TLS is
     /// disabled. The `for_server` parameter indicates the options

@@ -104,38 +104,6 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
 }
 
 #[derive(Debug)]
-pub struct HttpEventMissingMessageError;
-
-impl InternalEvent for HttpEventMissingMessageError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Event missing the message key; dropping event.",
-            error_code = "missing_event_key",
-            error_type = error_type::ENCODER_FAILED,
-            error_stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "missing_event_key",
-            "error_type" => error_type::ENCODER_FAILED,
-            "error_stage" => error_stage::PROCESSING,
-        );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => "missing_event_key",
-            "error_type" => error_type::ENCODER_FAILED,
-            "error_stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("events_discarded_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct HttpEventEncoded {
     pub byte_size: usize,
 }
