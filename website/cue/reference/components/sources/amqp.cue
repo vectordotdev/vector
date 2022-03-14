@@ -43,16 +43,12 @@ components: sources: amqp: {
             required: true
             warnings: []
             type: object: {
-                user: components._amqp.configuration.user
-                password: components._amqp.configuration.password
-                host: components._amqp.configuration.host
-                port: components._amqp.configuration.port
-                connection_timeout: components._amqp.configuration.connection_timeout
-                vhost: components._amqp.configuration.vhost
+                connection_string: components._amqp.configuration.connection_string
+                tls: components._amqp.configuration.tls
             }
         }
         group_id: {
-            description: "The consumer group name to be used to consume events from Amqp.\n"
+            description: "The consumer group name to be used to consume events from Amqp."
             required:    true
             warnings: []
             type: string: {

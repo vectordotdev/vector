@@ -16,13 +16,7 @@ components: sinks: amqp: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			batch: {
-				enabled:      true
-				common:       true
-				max_bytes:    null
-				max_events:   null
-				timeout_secs: null
-			}
+			batch: enabled: false
 			compression: {
 				enabled: true
 				default: "none"
@@ -76,7 +70,7 @@ components: sinks: amqp: {
 			required:    false
 			warnings: []
 			type: string: {
-				examples: ["{{ field_a }}-{{ field_b}}"]
+				examples: ["{{ field_a }}-{{ field_b }}"]
 				syntax: "literal"
 			}
 		}
@@ -84,14 +78,6 @@ components: sinks: amqp: {
 
 	input: {
 		logs: true
-		metrics: {
-			counter:      true
-			distribution: true
-			gauge:        true
-			histogram:    true
-			set:          true
-			summary:      true
-		}
 	}
 
 	how_it_works: components._amqp.how_it_works

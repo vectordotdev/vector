@@ -279,17 +279,6 @@ mod tests {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
     }
 
-    pub fn make_config() -> AmqpSinkConfig {
-        let mut config = AmqpSinkConfig::default();
-        config.exchange = "it".to_string();
-        let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
-        let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
-        let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-        config.connection.connection_string =
-            format!("amqp://{}:{}@127.0.0.1:5672/{}", user, pass, vhost);
-        config
-    }
-
     #[test]
     fn amqp_encode_event_log_text() {
         crate::test_util::trace_init();
@@ -345,7 +334,6 @@ mod tests {
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::tests::make_config;
     use super::*;
     use crate::{
         shutdown::ShutdownSignal,
@@ -355,6 +343,17 @@ mod integration_tests {
     use futures::StreamExt;
     use std::time::Duration;
     use vector_buffers::Acker;
+
+    pub fn make_config() -> AmqpSinkConfig {
+        let mut config = AmqpSinkConfig::default();
+        config.exchange = "it".to_string();
+        let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
+        let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+        let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
+        config.connection.connection_string =
+            format!("amqp://{}:{}@127.0.0.1:5672/{}", user, pass, vhost);
+        config
+    }
 
     #[tokio::test]
     async fn healthcheck() {
