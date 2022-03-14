@@ -355,6 +355,7 @@ impl BufferConfig {
 #[cfg(test)]
 mod test {
     use crate::{BufferConfig, BufferType, WhenFull};
+    use std::num::{NonZeroU64, NonZeroUsize};
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
@@ -407,7 +408,7 @@ max_events: 42
           max_events: 100
           "#,
             BufferType::Memory {
-                max_events: 100,
+                max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -423,11 +424,11 @@ max_events: 42
           "#,
             &[
                 BufferType::Memory {
-                    max_events: 42,
+                    max_events: NonZeroUsize::new(42).unwrap(),
                     when_full: WhenFull::Block,
                 },
                 BufferType::Memory {
-                    max_events: 100,
+                    max_events: NonZeroUsize::new(100).unwrap(),
                     when_full: WhenFull::DropNewest,
                 },
             ],
@@ -442,7 +443,7 @@ max_events: 42
           max_size: 1024
           "#,
             BufferType::DiskV1 {
-                max_size: 1024,
+                max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -452,7 +453,7 @@ max_events: 42
           type: memory
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -463,7 +464,7 @@ max_events: 42
           max_events: 100
           "#,
             BufferType::Memory {
-                max_events: 100,
+                max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -474,7 +475,7 @@ max_events: 42
           when_full: drop_newest
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::DropNewest,
             },
         );
@@ -485,7 +486,7 @@ max_events: 42
           when_full: overflow
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Overflow,
             },
         );
@@ -496,7 +497,7 @@ max_events: 42
           max_size: 1024
           "#,
             BufferType::DiskV2 {
-                max_size: 1024,
+                max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,
             },
         );

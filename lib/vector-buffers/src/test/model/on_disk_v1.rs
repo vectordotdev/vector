@@ -26,9 +26,9 @@ impl OnDiskV1 {
                 when_full,
                 ..
             } => OnDiskV1 {
-                inner: VecDeque::with_capacity((*max_size).try_into().unwrap_or(usize::MAX)),
+                inner: VecDeque::with_capacity((max_size.get()).try_into().unwrap_or(usize::MAX)),
                 current_bytes: 0,
-                capacity: (*max_size).try_into().unwrap_or(usize::MAX),
+                capacity: (max_size.get()).try_into().unwrap_or(usize::MAX),
                 when_full: *when_full,
             },
             _ => unreachable!(),

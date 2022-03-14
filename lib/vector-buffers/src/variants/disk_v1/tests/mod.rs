@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{num::NonZeroU64, path::Path};
 
 use futures::StreamExt;
 use tokio_test::{assert_pending, task::spawn};
@@ -17,7 +17,8 @@ mod event_count;
 mod naming;
 
 // Default of 1GB.
-const DEFAULT_DISK_BUFFER_V1_SIZE_BYTES: u64 = 1024 * 1024 * 1024;
+const DEFAULT_DISK_BUFFER_V1_SIZE_BYTES: NonZeroU64 =
+    unsafe { NonZeroU64::new_unchecked(1024 * 1024 * 1024) };
 
 pub(crate) fn create_default_buffer_v1<P, R>(data_dir: P) -> (Writer<R>, Reader<R>, Acker)
 where
