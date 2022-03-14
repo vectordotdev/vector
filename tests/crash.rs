@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
-    config::{self, Input, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{
+        self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SourceConfig, SourceContext,
+    },
     event::Event,
     sinks::{self, Healthcheck, VectorSink},
     sources,
@@ -40,8 +42,8 @@ impl SinkConfig for PanicSink {
         "panic"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -130,8 +132,8 @@ impl SinkConfig for ErrorSink {
         "panic"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

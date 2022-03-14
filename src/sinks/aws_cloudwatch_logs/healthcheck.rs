@@ -1,14 +1,17 @@
-use rusoto_core::RusotoError;
-use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient, DescribeLogGroupsRequest};
+use aws_sdk_cloudwatchlogs::error::DescribeLogGroupsError;
+use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+
 use snafu::Snafu;
 
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeLogGroups failed: {}", source))]
     DescribeLogGroupsFailed {
-        source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
+        source: SdkError<DescribeLogGroupsError>,
     },
     #[snafu(display("No log group found"))]
     NoLogGroup,
@@ -20,20 +23,21 @@ enum HealthcheckError {
 
 pub async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
 ) -> crate::Result<()> {
     let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
-    let request = DescribeLogGroupsRequest {
-        limit: Some(1),
-        log_group_name_prefix: Some(group_name),
-        ..Default::default()
-    };
-
     // This will attempt to find the group name passed in and verify that
     // it matches the one that AWS sends back.
-    match client.describe_log_groups(request).await {
+    let result = client
+        .describe_log_groups()
+        .limit(1)
+        .log_group_name_prefix(group_name)
+        .send()
+        .await;
+
+    match result {
         Ok(resp) => match resp.log_groups.and_then(|g| g.into_iter().next()) {
             Some(group) => {
                 if let Some(name) = group.log_group_name {

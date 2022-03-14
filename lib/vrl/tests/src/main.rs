@@ -146,8 +146,12 @@ fn main() {
         let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
-        let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
-        let program = vrl::compile(&test.source, &functions, Some(test_enrichment.clone()));
+        let test_enrichment = test_enrichment::test_enrichment_table();
+
+        let mut state = vrl::state::Compiler::new();
+        state.set_external_context(test_enrichment.clone());
+
+        let program = vrl::compile_with_state(&test.source, &functions, &mut state);
         test_enrichment.finish_load();
 
         let want = test.result.clone();

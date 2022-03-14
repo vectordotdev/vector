@@ -18,6 +18,7 @@ components: sources: postgresql_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {

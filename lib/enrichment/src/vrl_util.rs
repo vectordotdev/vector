@@ -70,29 +70,69 @@ pub(crate) fn evaluate_condition<'a>(
 
 /// Add an index for the given condition to the given enrichment table.
 pub(crate) fn add_index(
-    state: &mut state::Compiler,
+    registry: &mut TableRegistry,
     tablename: &str,
     case: Case,
     condition: &BTreeMap<String, expression::Expr>,
 ) -> std::result::Result<IndexHandle, ExpressionError> {
-    let mut registry = state.get_external_context_mut::<TableRegistry>();
+    let fields = condition
+        .iter()
+        .filter_map(|(field, value)| match value {
+            expression::Expr::Container(expression::Container {
+                variant: expression::Variant::Object(map),
+            }) if map.contains_key("from") && map.contains_key("to") => None,
+            _ => Some(field.as_ref()),
+        })
+        .collect::<Vec<_>>();
+    let index = registry.add_index(tablename, case, &fields)?;
 
-    match registry {
-        Some(ref mut table) => {
-            let fields = condition
-                .iter()
-                .filter_map(|(field, value)| match value {
-                    expression::Expr::Container(expression::Container {
-                        variant: expression::Variant::Object(map),
-                    }) if map.contains_key("from") && map.contains_key("to") => None,
-                    _ => Some(field.as_ref()),
-                })
-                .collect::<Vec<_>>();
-            let index = table.add_index(tablename, case, &fields)?;
+    Ok(index)
+}
 
-            Ok(index)
-        }
-        // We shouldn't reach this point since the type checker will ensure the table exists before this function is called.
-        None => unreachable!("enrichment tables aren't loaded"),
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use chrono::{TimeZone, Utc};
+    use vector_common::btreemap;
+
+    use super::*;
+    use crate::test_util;
+
+    #[test]
+    fn add_indexes() {
+        let mut registry = test_util::get_table_registry();
+        let conditions = BTreeMap::from([(
+            "field".to_owned(),
+            expression::Literal::from("value").into(),
+        )]);
+        let index = add_index(&mut registry, "dummy1", Case::Insensitive, &conditions).unwrap();
+
+        assert_eq!(IndexHandle(0), index);
+    }
+
+    #[test]
+    fn add_indexes_with_dates() {
+        let indexes = Arc::new(Mutex::new(Vec::new()));
+        let dummy = test_util::DummyEnrichmentTable::new_with_index(indexes.clone());
+
+        let mut registry =
+            test_util::get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
+
+        let conditions = btreemap! {
+            "field1" =>  expression::Literal::from("value"),
+            "field2" => expression::Container::new(expression::Variant::Object(btreemap! {
+                "from" => expression::Literal::from(Utc.ymd(2015, 5,15).and_hms(0,0,0)),
+                "to" => expression::Literal::from(Utc.ymd(2015, 6,15).and_hms(0,0,0))
+            }.into()))
+        };
+
+        let index = add_index(&mut registry, "dummy1", Case::Sensitive, &conditions).unwrap();
+
+        assert_eq!(IndexHandle(0), index);
+
+        // Ensure only the exact match has been added as an index.
+        let indexes = indexes.lock().unwrap();
+        assert_eq!(vec![vec!["field1".to_string()]], *indexes);
     }
 }

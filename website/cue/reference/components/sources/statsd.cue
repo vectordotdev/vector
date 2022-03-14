@@ -15,6 +15,7 @@ components: sources: statsd: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		receive: {
 			from: {

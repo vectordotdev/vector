@@ -8,8 +8,8 @@ use vector_core::{sink::StreamSink, transform::Transform};
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{
-        GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription, TransformConfig,
-        TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        TransformConfig, TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -46,6 +46,12 @@ struct HumioMetricsConfig {
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
     // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -95,6 +101,7 @@ impl SinkConfig for HumioMetricsConfig {
             batch: self.batch,
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
+            acknowledgements: Default::default(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -115,8 +122,8 @@ impl SinkConfig for HumioMetricsConfig {
         "humio_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

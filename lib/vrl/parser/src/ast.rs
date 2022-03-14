@@ -1,3 +1,8 @@
+#[cfg(feature = "fuzz")]
+use arbitrary::Arbitrary;
+use diagnostic::Span;
+use lookup::LookupBuf;
+use ordered_float::NotNan;
 use std::{
     collections::BTreeMap,
     fmt,
@@ -7,11 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use diagnostic::Span;
-use lookup::LookupBuf;
-use ordered_float::NotNan;
-
-use crate::lex::Error;
+use crate::Error;
 
 // -----------------------------------------------------------------------------
 // node
@@ -652,6 +653,7 @@ impl fmt::Debug for Op {
     }
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Opcode {
     Mul,
@@ -764,6 +766,7 @@ pub enum Assignment {
     // }
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[derive(Clone, PartialEq)]
 pub enum AssignmentOp {
     Assign,

@@ -28,7 +28,7 @@ use tower::Service;
 
 use super::controller::ControllerStatistics;
 use crate::{
-    config::{self, Input, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self},
     sinks::{
@@ -198,8 +198,8 @@ impl SinkConfig for TestConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

@@ -8,7 +8,7 @@ use crate::{
     schema,
 };
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 pub enum ExpandType {
     /// Chain components together one after another. Components will be named according
     /// to this order (e.g. component_name.0 and so on). If alias is set to true,

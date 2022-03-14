@@ -16,6 +16,7 @@ pub use framing::{
 use crate::{
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
+    schema,
 };
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
@@ -107,6 +108,24 @@ pub enum Framer {
     Boxed(BoxedFramer),
 }
 
+impl From<CharacterDelimitedEncoder> for Framer {
+    fn from(encoder: CharacterDelimitedEncoder) -> Self {
+        Self::CharacterDelimited(encoder)
+    }
+}
+
+impl From<NewlineDelimitedEncoder> for Framer {
+    fn from(encoder: NewlineDelimitedEncoder) -> Self {
+        Self::NewlineDelimited(encoder)
+    }
+}
+
+impl From<BoxedFramer> for Framer {
+    fn from(encoder: BoxedFramer) -> Self {
+        Self::Boxed(encoder)
+    }
+}
+
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
@@ -154,6 +173,14 @@ impl SerializerConfig {
             }
         }
     }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        match self {
+            SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+        }
+    }
 }
 
 /// Serialize structured events as bytes.
@@ -198,6 +225,16 @@ impl Encoder {
     /// frame.
     pub const fn new(framer: Framer, serializer: Serializer) -> Self {
         Self { framer, serializer }
+    }
+
+    /// Get the framer.
+    pub const fn framer(&self) -> &Framer {
+        &self.framer
+    }
+
+    /// Get the serializer.
+    pub const fn serializer(&self) -> &Serializer {
+        &self.serializer
     }
 }
 

@@ -15,6 +15,7 @@ components: sources: logstash: {
 	}
 
 	features: {
+		acknowledgements: true
 		receive: {
 			from: {
 				service: services.logstash

@@ -20,7 +20,7 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, Finalizable},
     ByteSizeOf,
 };
@@ -96,6 +96,12 @@ pub struct DatadogArchivesSinkConfig {
     tls: Option<TlsOptions>,
     #[serde(default, skip_serializing)]
     batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -151,6 +157,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             tls: None,
             azure_blob: None,
             batch: BatchConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -180,7 +187,7 @@ impl DatadogArchivesSinkConfig {
                 let client = service.client();
                 let svc = self
                     .build_s3_sink(&s3_config.options, service, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((
                     svc,
                     s3_common::config::build_healthcheck(self.bucket.clone(), client)?,
@@ -197,7 +204,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
                 Ok((svc, healthcheck))
@@ -222,7 +229,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let sink = self
                     .build_gcs_sink(client, base_url, creds, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
 
@@ -447,7 +454,7 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                 .map(|v| v.to_owned())
                 .collect();
             for path in custom_attributes {
-                if let Some(value) = log_event.remove(&path) {
+                if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);
                 }
             }
@@ -700,8 +707,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         "datadog_archives"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -962,6 +969,7 @@ mod tests {
                 gcp_cloud_storage: None,
                 tls: None,
                 batch: BatchConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

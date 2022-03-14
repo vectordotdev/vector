@@ -386,37 +386,20 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, _byte_size), stream)) = receiver.recv().await {
+    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+        let count = events.len();
         emit!(&ExecEventsReceived {
-            count: events.len(),
+            count,
             command: config.command_line().as_str(),
             byte_size: events.size_of(),
         });
 
-        let total_count = events.len();
-        let mut processed_count = 0;
-
-        for mut event in events {
-            handle_event(
-                &config,
-                &hostname,
-                &Some(stream.to_string()),
-                pid,
-                &mut event,
-            );
-
-            match out.send(event).await {
-                Ok(_) => {
-                    processed_count += 1;
-                }
-                Err(error) => {
-                    emit!(&StreamClosedError {
-                        count: total_count - processed_count,
-                        error,
-                    });
-                    break 'send;
-                }
-            }
+        for event in &mut events {
+            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
+        }
+        if let Err(error) = out.send_batch(events).await {
+            emit!(&StreamClosedError { count, error });
+            break;
         }
     }
 

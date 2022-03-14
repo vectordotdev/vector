@@ -263,7 +263,7 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
@@ -391,7 +391,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                             tags.get("endpoint"),
                             Some(&format!("http://{}/metrics", in_addr))
                         );
-                        assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

@@ -106,7 +106,12 @@ impl<'a> VmArgumentList<'a> {
             match args.as_ref() {
                 None if param.required => return Err("parameter is required".into()),
                 Some(arg) if matches!(arg.kind(), Some(kind) if !param.kind().intersects(&kind)) => {
-                    return Err("parameter type mismatch".into())
+                    return Err(format!(
+                        "expected {}, got {}",
+                        param.kind(),
+                        arg.kind().expect("argument has valid kind"),
+                    )
+                    .into());
                 }
                 _ => (),
             }
@@ -133,9 +138,7 @@ where
     // in the tests if we don't work on our own copy.
     let mut args = args.clone();
     let mut result = BTreeMap::new();
-    let context = FunctionCompileContext {
-        span: Default::default(),
-    };
+    let context = FunctionCompileContext::new(Default::default());
     let params = function.parameters();
     let function_arguments: Vec<(&'static str, Option<FunctionArgument>)> = args.clone().into();
 

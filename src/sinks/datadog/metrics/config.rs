@@ -13,7 +13,7 @@ use super::{
     sink::DatadogMetricsSink,
 };
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
@@ -111,6 +111,12 @@ pub struct DatadogMetricsConfig {
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -134,8 +140,8 @@ impl SinkConfig for DatadogMetricsConfig {
         "datadog_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

@@ -1,8 +1,8 @@
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::collections::BTreeMap;
 
 use super::{Error, Value};
-use crate::value::VrlValueConvert;
+use crate::value::{Kind, VrlValueConvert};
 use crate::ExpressionError;
 
 pub trait VrlValueArithmetic: Sized {
@@ -100,23 +100,27 @@ impl VrlValueArithmetic for Value {
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
     fn try_add(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Add(self.kind(), rhs.kind());
-
-        let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => {
-                Value::from_f64_or_zero(lhv as f64 + rhs.try_float()?)
-            }
-            Value::Integer(lhv) => (lhv + rhs.try_into_i64().map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + rhs.try_into_f64().map_err(|_| err())?).into(),
-            Value::Bytes(_) if rhs.is_null() => self,
-            Value::Bytes(_) if rhs.is_bytes() => format!(
-                "{}{}",
-                self.try_bytes_utf8_lossy()?,
-                rhs.try_bytes_utf8_lossy()?,
-            )
+        let value = match (self, rhs) {
+            (Value::Integer(lhs), Value::Float(rhs)) => Value::from_f64_or_zero(lhs as f64 + *rhs),
+            (Value::Integer(lhs), rhs) => (lhs
+                + rhs
+                    .try_into_i64()
+                    .map_err(|_| Error::Add(Kind::integer(), rhs.kind()))?)
             .into(),
-            Value::Null if rhs.is_bytes() => rhs,
-            _ => return Err(err()),
+            (Value::Float(lhs), rhs) => (lhs
+                + rhs
+                    .try_into_f64()
+                    .map_err(|_| Error::Add(Kind::float(), rhs.kind()))?)
+            .into(),
+            (lhs @ Value::Bytes(_), Value::Null) => lhs,
+            (Value::Bytes(lhs), Value::Bytes(rhs)) => {
+                let mut value = BytesMut::with_capacity(lhs.len() + rhs.len());
+                value.put(lhs);
+                value.put(rhs);
+                value.freeze().into()
+            }
+            (Value::Null, rhs @ Value::Bytes(_)) => rhs,
+            (lhs, rhs) => return Err(Error::Add(lhs.kind(), rhs.kind())),
         };
 
         Ok(value)
@@ -175,6 +179,12 @@ impl VrlValueArithmetic for Value {
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
     fn try_rem(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Rem(self.kind(), rhs.kind());
+
+        let rhv = rhs.try_into_f64().map_err(|_| err())?;
+
+        if rhv == 0.0 {
+            return Err(Error::DivideByZero);
+        }
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => {

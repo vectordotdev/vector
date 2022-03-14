@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 
-use crate::event::Event;
+use crate::{event::Event, schema};
 
 /// Config used to build a `JsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -17,6 +17,13 @@ impl JsonSerializerConfig {
     /// Build the `JsonSerializer` from this configuration.
     pub const fn build(&self) -> JsonSerializer {
         JsonSerializer
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        // While technically we support `Value` variants that can't be losslessly serialized to
+        // JSON, we don't want to enforce that limitation to users yet.
+        schema::Requirement::empty()
     }
 }
 

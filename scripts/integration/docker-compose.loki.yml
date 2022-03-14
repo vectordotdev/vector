@@ -1,10 +1,8 @@
 services:
 
   loki:
-    image: grafana/loki:${LOKI_VERSION:-2.1.0}
-    command: -config.file=/etc/loki/loki-config.yaml
-    volumes:
-      - ${PWD}/tests/data:/etc/loki
+    image: grafana/loki:${LOKI_VERSION:-2.4.1}
+    command: -config.file=/etc/loki/local-config.yaml -auth.enabled=true
 
   runner:
     build:
@@ -15,7 +13,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"

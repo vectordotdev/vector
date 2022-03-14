@@ -47,27 +47,22 @@ impl TraceEvent {
         self.0.as_map()
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.0.as_map(), key.as_ref())
+        self.0.get(key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.0.as_map().get(key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.0.as_map_mut(), key.as_ref())
+        self.0.get_mut(key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
         util::log::contains(self.0.as_map(), key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn insert(
         &mut self,
         key: impl AsRef<str>,
@@ -80,6 +75,12 @@ impl TraceEvent {
 impl From<LogEvent> for TraceEvent {
     fn from(log: LogEvent) -> Self {
         Self(log)
+    }
+}
+
+impl From<BTreeMap<String, Value>> for TraceEvent {
+    fn from(map: BTreeMap<String, Value>) -> Self {
+        Self(map.into())
     }
 }
 

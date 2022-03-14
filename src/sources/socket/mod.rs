@@ -228,7 +228,7 @@ mod test {
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
-        futures::SinkExt,
+        futures::{SinkExt, Stream},
         std::path::PathBuf,
         tokio::{
             io::AsyncWriteExt,
@@ -239,14 +239,12 @@ mod test {
     };
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
-    #[cfg(unix)]
-    use crate::source_sender::ReceiverStream;
     use crate::{
         codecs::NewlineDelimitedDecoderConfig,
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
-        event::Event,
+        event::{into_event_stream, Event},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
@@ -504,6 +502,7 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = SourceSender::new_with_buffer(10_000);
+        let rx = rx.flat_map(into_event_stream);
         let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
@@ -689,7 +688,7 @@ mod test {
 
         assert_eq!(
             events[0].as_log()[log_schema().host_key()],
-            format!("{}", from).into()
+            from.to_string().into()
         );
     }
 
@@ -811,7 +810,7 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_message(message: &str, stream: bool) -> ReceiverStream<Event> {
+    async fn unix_message(message: &str, stream: bool) -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
         let path = init_unix(tx, stream).await;
 

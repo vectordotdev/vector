@@ -9,7 +9,6 @@
 pub(super) use vector_core::fanout;
 
 pub mod builder;
-pub(self) mod ready_events;
 mod running;
 mod schema;
 mod task;
@@ -64,6 +63,10 @@ pub struct TapResource {
     pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Source component keys used to warn against invalid pattern matches
+    pub source_keys: Vec<String>,
+    // Sink component keys used to warn against invalid pattern amtches
+    pub sink_keys: Vec<String>,
     // Components removed on a reload (used to drop TapSinks)
     pub removals: HashSet<ComponentKey>,
 }

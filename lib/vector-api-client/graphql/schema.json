@@ -1011,8 +1011,24 @@
           "description": "A notification regarding events observation",
           "fields": [
             {
-              "name": "pattern",
-              "description": "Pattern that raised the event",
+              "name": "notification",
+              "description": "Notification details",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "UNION",
+                  "name": "Notification",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "message",
+              "description": "The human-readable message associated with the notification",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1025,50 +1041,11 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
-            },
-            {
-              "name": "notification",
-              "description": "Event notification type",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "EventNotificationType",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [],
           "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "ENUM",
-          "name": "EventNotificationType",
-          "description": "Event notification type",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "MATCHED",
-              "description": "A component was found that matched the provided pattern",
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "NOT_MATCHED",
-              "description": "There isn't currently a component that matches this pattern",
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
           "possibleTypes": null
         },
         {
@@ -2166,6 +2143,57 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "InvalidMatch",
+          "description": "The pattern matched source(s) which cannot be tapped for inputs or sink(s)\nwhich cannot be tapped for outputs",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "invalidMatches",
+              "description": "Any invalid matches for the pattern",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Json",
           "description": "Raw JSON data`",
@@ -2365,6 +2393,33 @@
                 "kind": "SCALAR",
                 "name": "Json",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Matched",
+          "description": "A component was found that matched the provided pattern",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -2974,6 +3029,59 @@
           "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "NotMatched",
+          "description": "There isn't currently a component that matches this pattern",
+          "fields": [
+            {
+              "name": "pattern",
+              "description": "Pattern that raised the notification",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "UNION",
+          "name": "Notification",
+          "description": "A specific kind of notification with additional details",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Matched",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "NotMatched",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "InvalidMatch",
+              "ofType": null
+            }
+          ]
         },
         {
           "kind": "OBJECT",

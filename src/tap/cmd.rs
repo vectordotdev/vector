@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 
 use colored::{ColoredString, Colorize};
 use tokio_stream::StreamExt;
@@ -6,10 +6,7 @@ use url::Url;
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::{
-            EventNotificationType,
-            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
-        },
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns,
         TapEncodingFormat, TapSubscriptionExt,
     },
     Client,
@@ -19,6 +16,9 @@ use crate::{
     config,
     signal::{SignalRx, SignalTo},
 };
+
+/// Delay (in milliseconds) before attempting to reconnect to the Vector API
+const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
@@ -45,17 +45,6 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     })
     .expect("Couldn't build WebSocket URL. Please report.");
 
-    let subscription_client = match connect_subscription_client(url).await {
-        Ok(c) => c,
-        Err(e) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
-            }
-            return exitcode::UNAVAILABLE;
-        }
-    };
-
     // If no patterns are provided, tap all components' outputs
     let outputs_patterns = if opts.component_id_patterns.is_empty()
         && opts.outputs_of.is_empty()
@@ -70,50 +59,18 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
             .collect()
     };
 
-    // Issue the 'tap' request, printing to stdout.
-    let res = subscription_client.output_events_by_component_id_patterns_subscription(
-        outputs_patterns,
-        opts.inputs_of.clone(),
-        opts.format,
-        opts.limit as i64,
-        opts.interval as i64,
-    );
-
-    tokio::pin! {
-        let stream = res.stream();
-    };
-
     let formatter = EventFormatter::new(opts.meta, opts.format);
 
-    // Loop over the returned results, printing out tap events.
     loop {
         tokio::select! {
             biased;
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
-            Some(Some(res)) = stream.next() => {
-                if let Some(d) = res.data {
-                    for tap_event in d.output_events_by_component_id_patterns.iter() {
-                        match tap_event {
-                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            },
-                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            },
-                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            },
-                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
-                                if !opts.quiet {
-                                    match ev.notification {
-                                        EventNotificationType::MATCHED => eprintln!(r#"[tap] Pattern "{}" successfully matched."#, ev.pattern),
-                                        EventNotificationType::NOT_MATCHED => eprintln!(r#"[tap] Pattern "{}" failed to match: will retry on configuration reload."#, ev.pattern),
-                                        EventNotificationType::Other(_) => {},
-                                    }
-                                }
-                            },
-                        }
-                    }
+            status = run(url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
+                if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL && !opts.no_reconnect {
+                    eprintln!("[tap] Connection failed. Reconnecting in {:?} seconds.", RECONNECT_DELAY / 1000);
+                    tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                } else {
+                    break;
                 }
             }
         }
@@ -122,6 +79,66 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     exitcode::OK
 }
 
+async fn run(
+    url: Url,
+    opts: &super::Opts,
+    outputs_patterns: Vec<String>,
+    formatter: EventFormatter,
+) -> exitcode::ExitCode {
+    let subscription_client = match connect_subscription_client(url).await {
+        Ok(c) => c,
+        Err(e) => {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("[tap] Couldn't connect to Vector API via WebSockets: {}", e);
+            }
+            return exitcode::UNAVAILABLE;
+        }
+    };
+
+    tokio::pin! {
+        let stream = subscription_client.output_events_by_component_id_patterns_subscription(
+            outputs_patterns,
+            opts.inputs_of.clone(),
+            opts.format,
+            opts.limit as i64,
+            opts.interval as i64,
+        );
+    };
+
+    // Loop over the returned results, printing out tap events.
+    #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
+    loop {
+        let message = stream.next().await;
+        if let Some(Some(res)) = message {
+            if let Some(d) = res.data {
+                for tap_event in d.output_events_by_component_id_patterns.iter() {
+                    match tap_event {
+                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
+                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                        },
+                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
+                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                        },
+                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
+                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                        },
+                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
+                            if !opts.quiet {
+                                eprintln!("{}", ev.message);
+                            }
+                        },
+                    }
+                }
+            }
+        } else {
+            return exitcode::TEMPFAIL;
+        }
+    }
+}
+
+#[derive(Clone)]
 struct EventFormatter {
     meta: bool,
     format: TapEncodingFormat,

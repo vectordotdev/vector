@@ -41,7 +41,7 @@ impl TransformConfig for SplitConfig {
 
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)
-            .map_err(|error| format!("{}", error))?;
+            .map_err(|error| error.to_string())?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
@@ -103,7 +103,10 @@ impl Split {
 
 impl FunctionTransform for Split {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             for ((name, conversion), value) in self
@@ -113,7 +116,7 @@ impl FunctionTransform for Split {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert(name.clone(), value);
+                        event.as_mut_log().insert(name.as_str(), value);
                     }
                     Err(error) => {
                         emit!(&ParserConversionError { name, error });
@@ -121,7 +124,7 @@ impl FunctionTransform for Split {
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
             emit!(&ParserMissingFieldError { field: &self.field });

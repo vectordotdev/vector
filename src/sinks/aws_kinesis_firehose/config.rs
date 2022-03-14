@@ -12,7 +12,7 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_firehose::{
             request_builder::KinesisRequestBuilder,
@@ -61,6 +61,12 @@ pub struct KinesisFirehoseSinkConfig {
     pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Debug, PartialEq, Snafu)]
@@ -145,8 +151,8 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         "aws_kinesis_firehose"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

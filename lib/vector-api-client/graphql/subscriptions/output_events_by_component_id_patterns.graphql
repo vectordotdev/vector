@@ -24,8 +24,7 @@ subscription OutputEventsByComponentIdPatternsSubscription(
             string(encoding: $encoding)
         }
         ... on EventNotification {
-            pattern
-            notification
+            message
         }
     }
 }

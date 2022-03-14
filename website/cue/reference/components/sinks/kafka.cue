@@ -13,6 +13,7 @@ components: sinks: kafka: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

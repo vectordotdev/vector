@@ -6,22 +6,20 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
-		if features.acknowledgements != _|_ {
-			if features.acknowledgements.enabled {
-				acknowledgements: {
-					common: true
-					description: """
-						Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
-						"""
-					required: false
-					type: object: options: {
-						enabled: {
-							common:      true
-							description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
-							warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
-							required: false
-							type: bool: default: false
-						}
+		if features.acknowledgements {
+			acknowledgements: {
+				common: true
+				description: """
+					Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
+					"""
+				required: false
+				type: object: options: {
+					enabled: {
+						common:      true
+						description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
+						warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
+						required: false
+						type: bool: default: false
 					}
 				}
 			}
@@ -172,9 +170,10 @@ components: sinks: [Name=string]: {
 					description: "Configures the encoding specific sink behavior."
 					required:    features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
-					type: object: options: {
+					type: object: {
 						if features.send.encoding.codec.enabled {
-							codec: {
+							examples: [{codec: "json"}]
+							options: codec: {
 								description: "The encoding codec used to serialize the events before outputting."
 								required:    true
 								type: string: {
@@ -192,10 +191,10 @@ components: sinks: [Name=string]: {
 											}
 											if codec == "logfmt" {
 												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt]\(urls.logfmt)."
+													logfmt: "Newline delimited list of events encoded by [logfmt](\(urls.logfmt))."
 												}
 												if !batched {
-													logfmt: "[logfmt]\(urls.logfmt) encoded event."
+													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 												}
 											}
 											if codec == "json" {
@@ -214,42 +213,43 @@ components: sinks: [Name=string]: {
 								}
 							}
 						}
-
-						except_fields: {
-							common:      false
-							description: "Prevent the sink from encoding the specified fields."
-							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+						options: {
+							except_fields: {
+								common:      false
+								description: "Prevent the sink from encoding the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
 								}
 							}
-						}
 
-						only_fields: {
-							common:      false
-							description: "Makes the sink encode only the specified fields."
-							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+							only_fields: {
+								common:      false
+								description: "Makes the sink encode only the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
 								}
 							}
-						}
 
-						timestamp_format: {
-							common:      false
-							description: "How to format event timestamps."
-							required:    false
-							type: string: {
-								default: "rfc3339"
-								enum: {
-									rfc3339: "Formats as a RFC3339 string"
-									unix:    "Formats as a unix timestamp"
+							timestamp_format: {
+								common:      false
+								description: "How to format event timestamps."
+								required:    false
+								type: string: {
+									default: "rfc3339"
+									enum: {
+										rfc3339: "Formats as a RFC3339 string"
+										unix:    "Formats as a unix timestamp"
+									}
 								}
 							}
 						}

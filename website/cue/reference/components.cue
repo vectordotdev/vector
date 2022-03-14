@@ -165,12 +165,13 @@ components: {
 		let Args = _args
 
 		if Args.kind == "source" {
-			collect?:  #FeaturesCollect
-			generate?: #FeaturesGenerate
-			multiline: #FeaturesMultiline
-			codecs?:   #FeaturesCodecs
-			encoding?: #FeaturesEncoding
-			receive?:  #FeaturesReceive
+			acknowledgements: bool
+			collect?:         #FeaturesCollect
+			generate?:        #FeaturesGenerate
+			multiline:        #FeaturesMultiline
+			codecs?:          #FeaturesCodecs
+			encoding?:        #FeaturesEncoding
+			receive?:         #FeaturesReceive
 		}
 
 		if Args.kind == "transform" {
@@ -188,6 +189,8 @@ components: {
 		}
 
 		if Args.kind == "sink" {
+			acknowledgements: #FeaturesAcknowledgements
+
 			// `buffer` describes how the component buffers data.
 			buffer: {
 				enabled: true
@@ -204,6 +207,8 @@ components: {
 
 		descriptions: [Name=string]: string
 	}
+
+	#FeaturesAcknowledgements: bool
 
 	#FeaturesAggregate: {
 	}
