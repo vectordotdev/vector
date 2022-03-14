@@ -1,4 +1,4 @@
-version: "2"
+version: "3"
 
 services:
   eventstoredb:
@@ -7,7 +7,6 @@ services:
     network_mode: host
     volumes:
       - ${PWD}/tests/data:/etc/vector:ro
-
   runner:
     build:
       context: ${PWD}
@@ -31,12 +30,10 @@ services:
     depends_on:
       - eventstoredb
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-
