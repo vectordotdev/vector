@@ -187,14 +187,41 @@ async fn test_sender_overflow_drop_newest() {
 }
 
 #[tokio::test]
-async fn test_sender_overflow_drop_newest_when_semaphore_yields() {
-    // TODO: essentially, we want to try and test that the code does _not_ drop an event when
-    // there's sender capacity but the `poll_ready` call to `SenderAdapter` results in
-    // `Poll::Pending`.
+async fn test_sender_drop_newest_when_tokio_coop_preemptively_yields() {
+    // TODO: This unit test depends on behavior that is not (yet?) exposed, namely the ability to
+    // utilize a custom coop budget, such that we could cause `PollSender` to return `Poll::Pending`
+    // early, before capacity has actuallky been exhausted.
     //
-    // this exercises the logic that prevents us from indiscriminately discarding events when
-    // tokio's coop budget kicks in against an in-memory channel, but there's still actual capacity
-    // that could be consumed.
+    // The skeleton is here as a reminder to do so when possible, if changes to remove `Sink` and
+    // switch entirely to `async fn` don't land first.
+
+    /*
+    // Get a normal buffer set to "drop newest" mode.
+    let (mut tx, rx, _) = build_buffer(4, WhenFull::DropNewest, None).await;
+
+    // We should be able to send three message through unimpeded before our custom coop budget kicks
+    // in and tells us our fourth send resulted in a `Poll::Pending` response:
+
+    secret_custom_coop_budget_fn();
+    assert_current_send_capacity(&mut tx, Some(4), None);
+    assert_send_ok_with_capacities(&mut tx, 7, Some(3), None).await;
+    assert_send_ok_with_capacities(&mut tx, 8, Some(2), None).await;
+    assert_send_ok_with_capacities(&mut tx, 2, Some(1), None).await;
+    assert_send_pending_with_capacities(&mut tx, 1, Some(1), Some(0)).await;
+
+    // Now undo our custom coop budget, and try again, where capacity is present, such that we
+    // should be able to send a fourth value and seemingly send a fifth, but the fifth wil be
+    // correctly dropped as we're at capacity:
+    undo_secret_custom_coop_budget_fn();
+    assert_send_ok_with_capacities(&mut tx, 1, Some(0), None).await;
+    assert_send_ok_with_capacities(&mut tx, 6, Some(0), None).await;
+
+    // Then, when we collect all of the messages from the receiver, we should only get back the
+    // first four of them.
+    let mut results = drain_receiver(tx, rx).await;
+    results.sort_unstable();
+    assert_eq!(results, vec![1, 2, 7, 8]);
+    */
 }
 
 #[tokio::test]
