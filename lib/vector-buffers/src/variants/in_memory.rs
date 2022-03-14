@@ -34,10 +34,6 @@ where
         usage_handle.set_buffer_limits(None, Some(self.capacity));
 
         let (tx, rx) = limited(self.capacity);
-        Ok((
-            SenderAdapter::channel(tx),
-            ReceiverAdapter::channel(rx),
-            None,
-        ))
+        Ok((tx.into(), rx.into(), None))
     }
 }

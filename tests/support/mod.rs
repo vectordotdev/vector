@@ -186,7 +186,7 @@ impl SourceConfig for MockSourceConfig {
                         Poll::Ready(res) => {
                             _token = Some(res);
                             shutdown.take();
-                            recv.close();
+                            // recv.close();
                         }
                         Poll::Pending => {}
                     }
