@@ -54,9 +54,10 @@ designed for it and would cause significant problems:
 
 ## Proposal
 
-Vector will use the AWS S3 multipart upload API to be able to upload
-smaller batches. Due to the requirements of this API, this will
-require some local storage but will not store full objects.
+Vector will use the AWS S3 multipart upload API as the primary upload
+process. This allows the sink to persist data to S3 sooner, to
+acknowledge data within Vector earlier, and to reduce the memory
+required for buffering the upload batches.
 
 The AWS S3 multipart upload API uses the following process:
 
@@ -94,20 +95,18 @@ incrementally, but will not be visible in the bucket until all the
 parts of it are complete.
 
 The following upload behaviors are possible through the configuration
-described below:
+described below. In all cases, where possible, the sink will upload
+the batch in multiple parts to reduce the amount of data buffered
+locally.
 
-1. The sink operates as before, where batches are buffered based only
-   on the existing batch settings and uploaded directly to individual
-   objects. This will initially be the default configuration to avoid
-   breaking existing setups.
+1. The sink operates as before, where objects are created based only
+   on the existing batch settings. This will initially be the default
+   configuration to avoid breaking existing setups but will be
+   deprecated.
 1. The sink buffers batches until it can generate a complete part, and
    assembles the parts into an object only at the end of an
    interval. None of the intermediate parts are visible until the
    final object is assembled.
-1. The sink uploads batches into parts as required to ensure the data
-   is persisted to S3, and assembles the parts into an object at the
-   end of an interval _or_ when restarting the upload would
-   not be possible due to an undersized part.
 
 This change will introduce the following new configuration items for
 this sink, which will all default to operating the same as the
@@ -120,19 +119,13 @@ existing sink.
   locally-stored part must reach before it is uploaded. Due to the
   limitations of the S3 API, this has an minimum value of 5MB, which
   is also the default value when `upload_interval` is set.
-- `upload_interval` (duration or enum): How often should the sink
+- `upload_interval` (string): When should the sink
   complete the upload process and initiate a new one. If this is
   unset, the existing batch-based object creation mechanism is
-  used. In addition to common interval specifications (ie `"15
-  minutes"`, etc), the following values are permitted:
-  - `"minutely"`: Complete the upload at the end of the minute exactly.
+  used. the following values are permitted:
   - `"hourly"`: Complete the upload at the end of the hour exactly.
-  - `"daily"`: Complete the upload at midnight each day.
-- `upload_incomplete` (boolean): Controls if the sink will upload
-  parts and assemble the upload on shutdown. This causes data to be
-  persisted to S3 across restarts, but will cause the creation of
-  multiple objects where normally there would only be one. Defaults to
-  `false`.
+  - `"daily"`: Complete the upload at midnight local time each day.
+  - `"at TIME"`: Complete the upload at a specific time each day.
 
 ### Implementation
 
@@ -200,46 +193,16 @@ struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
 }
 ```
 
-#### Add support for spilling batches to disk and reloading
-
-The batcher interface described above will also include support for
-storing the persistent batches across reloads. This will be used when
-multipart mode is enabled and incomplete upload is disabled. This
-process will serialize the partition batch data and save it to a file
-during shutdown and reload and deserialize at sink startup.
-
-```rust
-/// Require that batches be serializable to allow the sink to dump and
-/// restore batches.
-trait BatchConfig<T>: Deserialize + Serialize { … }
-
-impl<S, C, P> PartitionBatcher<S, C, P>
-where
-    S: Stream<Item = P::Item>,
-    C: BatchConfig<S::Item>,
-    P: Partitioner,
-    P::Key: Deserialize + Serialize,
-{
-    /// Create a new partitioned batcher, optionally loading the state
-    /// from the given stored state.
-    fn new(stream: S, config: C, state: Option<Bytes>) -> Self { … }
-
-    //// Convert this batcher into a stored state, consuming the batcher.
-    fn into_state(self) -> Bytes;
-}
-```
-
-#### Enhance the S3 sink to support multi-part upload
+#### Modify the S3 sink to use multi-part upload by default
 
 As described above, the S3 sink will require additional configuration
 items to support the new upload mode:
 
 ```rust
 enum UploadInterval {
-    Minutely,
     Hourly,
     Daily,
-    Timed(Duration),
+    DailyAt(LocalTime),
 }
 
 struct S3SinkConfig {
@@ -247,19 +210,7 @@ struct S3SinkConfig {
     pub data_dir: Option<PathBuf>,
     #[serde(deserialize_with = "upload_interval_or_duration")]
     pub upload_interval: Option<UploadInterval>,
-    pub upload_incomplete: bool,
 }
-
-pub fn create_service(
-    region: &RegionOrEndpoint,
-    auth: &AwsAuthentication,
-    assume_role: Option<String>,
-    proxy: &ProxyConfig,
-    upload_interval: Option<UploadInterval>,
-    upload_incomplete: bool,
-) -> crate::Result<S3Service> {
-    match upload_interval {
-
 ```
 
 When `upload_interval` is `Some`, `S3SinkConfig::build_processor` will
@@ -288,8 +239,10 @@ type MultipartUploadKey = String;
 
 /// Multipart upload state data
 struct MultipartUploadData {
-    /// the identifier for the upload process
+    /// The identifier for the upload process.
     upload_id: String,
+    /// The time after which this batch will be completed.
+    completion_time: DateTime<UTC>,
     /// A list of uploaded parts e_tags. The part number is derived from the index.
     parts: Vec<String>,
 }
@@ -341,7 +294,8 @@ is required:
 The downside with this scheme is the additional complexity of tracking
 the intermediate object names and the deletion step at the end of the
 process, both of which are handled automatically when uploading parts
-as above.
+as above. Additionally, processes that monitor the destination bucket
+would end up seeing the events twice.
 
 ### Use the multipart upload copy to effect append behavior
 
@@ -351,16 +305,8 @@ from and replace an object at the same time, allowing for effective
 append (or prepend) behavior without using extra bandwidth. It is
 unclear, however, if this behavior will interact badly with object
 tracking sources like SQS, or if AWS would penalize this action
-pattern for high volume uploads.
-
-## Outstanding Questions
-
-- Should incomplete parts be unconditionally buffered to disk, to
-  allow for producing parts larger than would be feasible in memory,
-  or buffered in memory as usual and only saved to disk to handle
-  persistence across reloads?
-- It's not entirely clear to me where shutdown behavior should be
-  handled to effect a state dump.
+pattern for high volume uploads. As above, the data would end up being
+visible multiple times.
 
 ## Plan Of Attack
 
@@ -370,8 +316,6 @@ Incremental steps to execute this change. These will be converted to issues afte
 - [ ] Initial MVP implementation in S3 with only the simplest upload
       interval and no persistent buffers.
 - [ ] Add support for all upload interval types.
-- [ ] Add support for persisting batch buffers to disk, allowing for
-      completing objects across reloads/restarts.
 
 ## Future Improvements
 
