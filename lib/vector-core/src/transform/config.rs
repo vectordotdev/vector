@@ -22,6 +22,32 @@ pub enum ExpandType {
     Serial { alias: bool },
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct InnerTopologyTransform {
+    pub inputs: Vec<String>,
+    pub inner: Box<dyn TransformConfig>,
+}
+
+#[derive(Debug, Default)]
+pub struct InnerTopology {
+    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
+    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
+}
+
+impl InnerTopology {
+    pub fn outputs(&self) -> Vec<String> {
+        self.outputs
+            .iter()
+            .flat_map(|(name, outputs)| {
+                outputs.iter().map(|output| match output.port {
+                    Some(ref port) => name.port(port),
+                    None => name.id().to_string(),
+                })
+            })
+            .collect()
+    }
+}
+
 #[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
@@ -117,7 +143,9 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// for various patterns.
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
+        _name: &ComponentKey,
+        _inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
         Ok(None)
     }
 }
