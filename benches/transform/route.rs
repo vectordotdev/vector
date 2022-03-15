@@ -8,7 +8,7 @@ use criterion::{
 };
 use value::Value;
 use vector::transforms::{
-    route::{Route, RouteConfig},
+    route::{EveryMatchRoute, FirstMatchRoute, RouteConfig},
     TransformOutputsBuf,
 };
 use vector_core::{
@@ -60,6 +60,11 @@ fn route(c: &mut Criterion) {
             log_schema_definition: None,
         });
     }
+    outputs.push(Output {
+        port: Some(String::from("_else")),
+        ty: DataType::Log,
+        log_schema_definition: None,
+    });
     let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);
 
     for param in &[
@@ -149,20 +154,46 @@ fn route(c: &mut Criterion) {
         },
     ] {
         group.throughput(Throughput::Elements(param.input.len() as u64));
-        group.bench_with_input(BenchmarkId::new("transform", param), &param, |b, param| {
-            b.iter_batched(
-                || {
-                    let route =
-                        Route::new(&param.route_config.clone(), &TransformContext::default())
-                            .unwrap();
-                    (route, param.input.clone(), param.output_buffer.clone())
-                },
-                |(mut route, input, mut output_buffer)| {
-                    black_box(route.transform(input, &mut output_buffer));
-                },
-                BatchSize::SmallInput,
-            )
-        });
+        group.bench_with_input(
+            BenchmarkId::new("transform_every_match", param),
+            &param,
+            |b, param| {
+                b.iter_batched(
+                    || {
+                        let route = EveryMatchRoute::new(
+                            &param.route_config.clone(),
+                            &TransformContext::default(),
+                        )
+                        .unwrap();
+                        (route, param.input.clone(), param.output_buffer.clone())
+                    },
+                    |(mut route, input, mut output_buffer)| {
+                        black_box(route.transform(input, &mut output_buffer));
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("transform_first_match", param),
+            &param,
+            |b, param| {
+                b.iter_batched(
+                    || {
+                        let route = FirstMatchRoute::new(
+                            &param.route_config.clone(),
+                            &TransformContext::default(),
+                        )
+                        .unwrap();
+                        (route, param.input.clone(), param.output_buffer.clone())
+                    },
+                    |(mut route, input, mut output_buffer)| {
+                        black_box(route.transform(input, &mut output_buffer));
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
     }
 }
 
