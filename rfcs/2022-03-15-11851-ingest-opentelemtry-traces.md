@@ -32,22 +32,22 @@ sources:
 
 transforms:
   set_key:
-   type: remap
-    source: |
-      if exists!(.tags.user_id) {
-        return
-      }
-      key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
-      set_dd_api_key(key) # this does not exists yet
-    inputs:
-      - otlp_traces
+    type: remap
+      source: |
+        if exists!(.tags.user_id) {
+          return
+        }
+        key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
+        set_dd_api_key(key) # this does not exists yet
+      inputs:
+        - otlp_traces
 
 sinks:
   dd_trace:
     type: datadog_traces
     default_api_key: 12345678abcdef
     inputs:
-     - set_key
+      - set_key
 ```
 
 This demux/conditional action can be seen as an extension of what currently exists in Vector. Other kind of conditional
@@ -113,46 +113,46 @@ message Span {
 }
 
 message TraceChunk {
-	// priority specifies sampling priority of the trace.
-	int32 priority = 1;
-	// origin specifies origin product ("lambda", "rum", etc.) of the trace.
-	string origin = 2;
-	// spans specifies list of containing spans.
-	repeated Span spans = 3;
-	// tags specifies tags common in all `spans`.
-	map<string, string> tags = 4;
-	// droppedTrace specifies whether the trace was dropped by samplers or not.
-	bool droppedTrace = 5;
+  // priority specifies sampling priority of the trace.
+  int32 priority = 1;
+  // origin specifies origin product ("lambda", "rum", etc.) of the trace.
+  string origin = 2;
+  // spans specifies list of containing spans.
+  repeated Span spans = 3;
+  // tags specifies tags common in all `spans`.
+  map<string, string> tags = 4;
+  // droppedTrace specifies whether the trace was dropped by samplers or not.
+  bool droppedTrace = 5;
 }
 
 // TracerPayload represents a payload the trace agent receives from tracers.
 message TracerPayload {
-	// containerID specifies the ID of the container where the tracer is running on.
-	string containerID;
-	// languageName specifies language of the tracer.
-	string languageName;
-	// languageVersion specifies language version of the tracer.
-	string languageVersion = 3 ;
-	// tracerVersion specifies version of the tracer.
-	string tracerVersion = 4;
-	// runtimeID specifies V4 UUID representation of a tracer session.
-	string runtimeID = 5;
-	// chunks specifies list of containing trace chunks.
-	repeated TraceChunk chunks = 6;
-	// tags specifies tags common in all `chunks`.
-	map<string, string> tags = 7;
-	// env specifies `env` tag that set with the tracer.
-	string env = 8;
-	// hostname specifies hostname of where the tracer is running.
-	string hostname = 9;
-	// version specifies `version` tag that set with the tracer.
-	string appVersion = 10;
+  // containerID specifies the ID of the container where the tracer is running on.
+  string containerID;
+  // languageName specifies language of the tracer.
+  string languageName;
+  // languageVersion specifies language version of the tracer.
+  string languageVersion = 3 ;
+  // tracerVersion specifies version of the tracer.
+  string tracerVersion = 4;
+  // runtimeID specifies V4 UUID representation of a tracer session.
+  string runtimeID = 5;
+  // chunks specifies list of containing trace chunks.
+  repeated TraceChunk chunks = 6;
+  // tags specifies tags common in all `chunks`.
+  map<string, string> tags = 7;
+  // env specifies `env` tag that set with the tracer.
+  string env = 8;
+  // hostname specifies hostname of where the tracer is running.
+  string hostname = 9;
+  // version specifies `version` tag that set with the tracer.
+  string appVersion = 10;
 }
 
 ```
 
-
 Opentelemetry [trace format][otlp-proto-def] (condensed):
+
 ```protobuf
 message InstrumentationLibrarySpans {
   opentelemetry.proto.common.v1.InstrumentationLibrary instrumentation_library = 1;
@@ -289,15 +289,15 @@ And it should just work.
     as the default URL path (`/v1/traces` for traces).
 - Internal traces representation/normalization, two options are opened see [outstanding
   questions](#outstanding-questions), but the consensus is leaning towards a new dedicated container that would:
-    - Move away from from the current implementation that relies on `LogEvent` to a dedicated container, the
-      implementation will stay  in [./lib/vector-core/src/event/trace.rs][current-trace-in-vector]
-    - Borrow most of its semantic from the Opentelemetry Traces format, the `TraceEvent` would then evolve toward a
-      concrete dedicated container and contains a slice of spans, the span being directly inspired by the Opentelemtry
-      specification.
-    - Some top-level information (Like trace ID, trace-wide tags/metrics, the original format)
-    - Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should
-      probably be adressed separately. As an interim measure few fields may be exposed (like trace ID & trace-wide
-      tags).
+  - Move away from from the current implementation that relies on `LogEvent` to a dedicated container, the
+    implementation will stay  in [./lib/vector-core/src/event/trace.rs][current-trace-in-vector]
+  - Borrow most of its semantic from the Opentelemetry Traces format, the `TraceEvent` would then evolve toward a
+    concrete dedicated container and contains a slice of spans, the span being directly inspired by the Opentelemtry
+    specification.
+  - Some top-level information (Like trace ID, trace-wide tags/metrics, the original format)
+  - Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should
+    probably be adressed separately. As an interim measure few fields may be exposed (like trace ID & trace-wide
+    tags).
 - APM stats computation:
   - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
     Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
