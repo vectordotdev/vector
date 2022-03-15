@@ -1153,7 +1153,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "thiserror",
  "tokio",
  "tokio-util 0.6.8",
@@ -3236,7 +3236,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_qs",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "url",
 ]
 
@@ -6048,9 +6048,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.9"
+version = "0.11.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f242f1488a539a79bac6dbe7c8609ae43b7914b7736210f239a37cccb32525"
+checksum = "46a1f7aa4f35e5e8b4160449f51afc758f0ce6454315a9fa7d0d113e958c41eb"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -6072,7 +6072,7 @@ dependencies = [
  "pin-project-lite",
  "serde",
  "serde_json",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "tokio",
  "tokio-native-tls",
  "tokio-util 0.6.8",
@@ -6080,7 +6080,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "winreg 0.7.0",
+ "winreg 0.10.1",
 ]
 
 [[package]]
@@ -6334,7 +6334,7 @@ dependencies = [
  "bytes 1.1.0",
  "futures 0.3.21",
  "rusoto_core",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "xml-rs",
 ]
 
@@ -6349,7 +6349,7 @@ dependencies = [
  "chrono",
  "futures 0.3.21",
  "rusoto_core",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "xml-rs",
 ]
 
@@ -6752,12 +6752,12 @@ dependencies = [
 
 [[package]]
 name = "serde_urlencoded"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edfa57a7f8d9c1d260a549e7224100f6c43d43f9103e06dd8b4095a9b2b43ce9"
+checksum = "d3491c14715ca2294c4d6a88f15e84739788c1d030eed8c110436aafdaa2f3fd"
 dependencies = [
  "form_urlencoded",
- "itoa 0.4.8",
+ "itoa 1.0.1",
  "ryu",
  "serde",
 ]
@@ -9087,7 +9087,7 @@ dependencies = [
  "scoped-tls",
  "serde",
  "serde_json",
- "serde_urlencoded 0.7.0",
+ "serde_urlencoded 0.7.1",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.15.0",
@@ -9431,9 +9431,9 @@ dependencies = [
 
 [[package]]
 name = "winreg"
-version = "0.7.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0120db82e8a1e0b9fb3345a539c478767c0048d842860994d96113d5b667bd69"
+checksum = "80d0f4e272c85def139476380b12f9ac60926689dd2e01d4923222f40580869d"
 dependencies = [
  "winapi 0.3.9",
 ]
