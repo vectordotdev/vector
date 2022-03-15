@@ -8933,7 +8933,6 @@ name = "vrl-parser"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
- "indoc",
  "lalrpop",
  "lalrpop-util",
  "lookup",

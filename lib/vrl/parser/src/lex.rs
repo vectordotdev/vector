@@ -1202,7 +1202,6 @@ mod test {
 
     use super::{StringLiteral, *};
     use crate::lex::Token::*;
-    use indoc::indoc;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
@@ -1923,12 +1922,7 @@ mod test {
     #[test]
     fn comment_in_block() {
         test(
-            data(indoc!(
-                r#"if x {
-                      # It's an apostrophe.
-                      3
-                   }"#
-            )),
+            data("if x {\n   # It's an apostrophe.\n   3\n}"),
             vec![
                 ("~~                                    ", If),
                 ("   ~                                  ", Identifier("x")),

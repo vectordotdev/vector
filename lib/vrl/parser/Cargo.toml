@@ -18,7 +18,6 @@ thiserror = "1"
 
 [dev-dependencies]
 test-case = "2"
-indoc = "1.0.4"
 
 [build-dependencies]
 lalrpop = "0.19.7"
