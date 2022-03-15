@@ -27,9 +27,7 @@ async fn acking_single_event_advances_delete_offset() {
             // expected amount, since the entry key should be increment by event count:
             let record = SizedRecord(360);
             assert_eq!(record.event_count(), 1);
-            writer
-                .send(record.clone())
-                .await;
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
@@ -95,9 +93,7 @@ async fn acking_multi_event_advances_delete_offset() {
             // expected amount, since the entry key should be increment by event count:
             let record = MultiEventRecord(14);
             assert_eq!(record.event_count(), 14);
-            writer
-                .send(record.clone())
-                .await;
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
@@ -161,9 +157,7 @@ async fn acking_multi_event_advances_delete_offset_incremental() {
             // expected amount, since the entry key should be increment by event count:
             let record = MultiEventRecord(14);
             assert_eq!(record.event_count(), 14);
-            writer
-                .send(record.clone())
-                .await;
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 

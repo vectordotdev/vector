@@ -1,9 +1,10 @@
+version: "3"
+
 services:
   influxdb-v1:
     image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
-
   influxdb-v1-tls:
     image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
     environment:
@@ -13,13 +14,11 @@ services:
       - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/influxdb.key
     volumes:
       - ${PWD}/tests/data:/etc/ssl:ro
-
   influxdb-v2:
     image: influxdb:2.0
     command: influxd --reporting-disabled
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
-
   runner:
     build:
       context: ${PWD}
@@ -48,12 +47,10 @@ services:
       - INFLUXDB_V1_HTTPS_ADDRESS=https://influxdb-v1-tls:8086
       - INFLUXDB_V2_ADDRESS=http://influxdb-v2:8086
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

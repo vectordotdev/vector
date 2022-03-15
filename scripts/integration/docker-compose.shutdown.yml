@@ -1,10 +1,10 @@
-version: "2"
+version: "3"
+
 services:
   zookeeper:
     image: wurstmeister/zookeeper
     ports:
       - 2181:2181
-
   kafka:
     image: wurstmeister/kafka:2.13-2.6.0
     depends_on:
@@ -31,7 +31,6 @@ services:
     volumes:
       - ${PWD}/tests/data/kafka.p12:/certs/kafka.p12:ro
       - ${PWD}/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
-
   runner:
     build:
       context: ${PWD}
@@ -58,13 +57,11 @@ services:
     environment:
       - KAFKA_HOST=kafka
     volumes:
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
       - ${PWD}:/code
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

@@ -261,9 +261,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             last_write_offset = total_write_offset;
             total_write_offset += poisoned_event_count;
 
-            writer
-                .send(poisoned_record)
-                .await;
+            writer.send(poisoned_record).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset);
 

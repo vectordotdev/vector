@@ -1,10 +1,11 @@
+version: "3"
+
 services:
   pulsar:
     image: apachepulsar/pulsar
     command: bin/pulsar standalone
     ports:
       - 6650:6650
-
   runner:
     build:
       context: ${PWD}
@@ -29,12 +30,10 @@ services:
     environment:
       - PULSAR_ADDRESS=pulsar://pulsar:6650
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

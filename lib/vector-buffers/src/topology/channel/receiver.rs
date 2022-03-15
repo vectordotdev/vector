@@ -6,7 +6,10 @@ use tokio::select;
 use super::limited_queue::LimitedReceiver;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::{disk_v1, disk_v2},
+    variants::{
+        disk_v1,
+        disk_v2::{self, ProductionFilesystem},
+    },
     Bufferable,
 };
 
@@ -20,7 +23,7 @@ pub enum ReceiverAdapter<T: Bufferable> {
     DiskV1(disk_v1::Reader<T>),
 
     /// The disk v2 buffer.
-    DiskV2(disk_v2::Reader<T>),
+    DiskV2(disk_v2::Reader<T, ProductionFilesystem>),
 }
 
 impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
@@ -35,8 +38,8 @@ impl<T: Bufferable> From<disk_v1::Reader<T>> for ReceiverAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Reader<T>> for ReceiverAdapter<T> {
-    fn from(v: disk_v2::Reader<T>) -> Self {
+impl<T: Bufferable> From<disk_v2::Reader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
+    fn from(v: disk_v2::Reader<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(v)
     }
 }

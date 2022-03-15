@@ -349,8 +349,7 @@ async fn main() {
                     let count = cmp::min(n, remaining);
                     let record_chunk = (&mut records).take(count);
                     for record in record_chunk {
-                        writer.send(record).await
-                            .expect("failed to write record");
+                        writer.send(record).await.expect("failed to write record");
                     }
                     count
                 }

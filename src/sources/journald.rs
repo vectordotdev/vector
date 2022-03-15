@@ -79,6 +79,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
+    pub since_now: Option<bool>,
     pub current_boot_only: Option<bool>,
     pub units: Vec<String>,
     pub include_units: Vec<String>,
@@ -172,6 +173,7 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
+        let since_now = self.since_now.unwrap_or(false);
         let journal_dir = self.journal_directory.clone();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
@@ -180,6 +182,7 @@ impl SourceConfig for JournaldConfig {
                 &journalctl_path,
                 journal_dir.as_ref(),
                 current_boot_only,
+                since_now,
                 cursor,
             );
             start_journalctl(&mut command)
@@ -464,6 +467,7 @@ fn create_command(
     path: &Path,
     journal_dir: Option<&PathBuf>,
     current_boot_only: bool,
+    since_now: bool,
     cursor: &Option<String>,
 ) -> Command {
     let mut command = Command::new(path);
@@ -483,6 +487,8 @@ fn create_command(
 
     if let Some(cursor) = cursor {
         command.arg(format!("--after-cursor={}", cursor));
+    } else if since_now {
+        command.arg("--since=now");
     } else {
         // journalctl --follow only outputs a few lines without a starting point
         command.arg("--since=2000-01-01");
@@ -1143,18 +1149,31 @@ mod tests {
         let journal_dir = None;
         let current_boot_only = false;
         let cursor = None;
+        let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
+        let since_now = true;
+
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(cmd_line.contains("--since=now"));
+
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
         let current_boot_only = true;
         let cursor = Some(String::from("2021-01-01"));
 
-        let command = create_command(&path, journal_dir.as_ref(), current_boot_only, &cursor);
+        let command = create_command(
+            &path,
+            journal_dir.as_ref(),
+            current_boot_only,
+            since_now,
+            &cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));

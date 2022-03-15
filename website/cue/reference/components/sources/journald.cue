@@ -60,6 +60,12 @@ components: sources: journald: {
 			required:    false
 			type: bool: default: true
 		}
+		since_now: {
+			common:      true
+			description: "Include only future entries."
+			required:    false
+			type: bool: default: false
+		}
 		exclude_units: {
 			common:      true
 			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."

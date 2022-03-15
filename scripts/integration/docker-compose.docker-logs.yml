@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   runner:
     build:
@@ -24,8 +26,6 @@ services:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -23,26 +23,14 @@ pub struct GeoipConfig {
     pub target: String,
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct Geoip {
     #[derivative(Debug = "ignore")]
-    pub dbreader: maxminddb::Reader<Vec<u8>>,
+    pub dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
     pub database: String,
     pub source: String,
     pub target: String,
-}
-
-impl Clone for Geoip {
-    fn clone(&self) -> Self {
-        Self {
-            dbreader: maxminddb::Reader::open_readfile(self.database.clone())
-                .expect("Panicked while cloning GeoIP lookup database. Did you move the GeoIP database on disk during runtime?"),
-            database: self.database.clone(),
-            source: self.source.clone(),
-            target: self.target.clone()
-        }
-    }
 }
 
 fn default_geoip_target_field() -> String {
@@ -97,7 +85,7 @@ const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 impl Geoip {
     pub fn new(database: String, source: String, target: String) -> crate::Result<Self> {
         Ok(Geoip {
-            dbreader: maxminddb::Reader::open_readfile(database.clone())?,
+            dbreader: Arc::new(maxminddb::Reader::open_readfile(database.clone())?),
             database,
             source,
             target,

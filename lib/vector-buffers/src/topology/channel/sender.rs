@@ -6,7 +6,10 @@ use tokio::sync::Mutex;
 use super::limited_queue::LimitedSender;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    variants::{disk_v1, disk_v2},
+    variants::{
+        disk_v1,
+        disk_v2::{self, ProductionFilesystem},
+    },
     Bufferable, WhenFull,
 };
 
@@ -20,7 +23,7 @@ pub enum SenderAdapter<T: Bufferable> {
     DiskV1(disk_v1::Writer<T>),
 
     /// The disk v2 buffer.
-    DiskV2(Arc<Mutex<disk_v2::Writer<T>>>),
+    DiskV2(Arc<Mutex<disk_v2::Writer<T, ProductionFilesystem>>>),
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -35,8 +38,8 @@ impl<T: Bufferable> From<disk_v1::Writer<T>> for SenderAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Writer<T>> for SenderAdapter<T> {
-    fn from(v: disk_v2::Writer<T>) -> Self {
+impl<T: Bufferable> From<disk_v2::Writer<T, ProductionFilesystem>> for SenderAdapter<T> {
+    fn from(v: disk_v2::Writer<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(Arc::new(Mutex::new(v)))
     }
 }
