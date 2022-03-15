@@ -586,7 +586,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -603,7 +603,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -620,7 +620,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone().or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -630,7 +630,8 @@ impl RunningTopology {
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
+        let source_task =
+            handle_errors(source_task, self.abort_tx.clone()).instrument(span.or_current());
         self.source_tasks
             .insert(key.clone(), tokio::spawn(source_task));
     }
