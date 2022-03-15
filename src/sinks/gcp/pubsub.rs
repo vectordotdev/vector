@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -152,7 +152,7 @@ impl PubsubSink {
 
         let uri_base = match config.endpoint.as_ref() {
             Some(host) => host.to_string(),
-            None => "https://pubsub.googleapis.com".into(),
+            None => PUBSUB_URL.into(),
         };
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
@@ -259,8 +259,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "gcp-pubsub-integration-tests")]
+#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};

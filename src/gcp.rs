@@ -19,6 +19,8 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
+pub(crate) const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum GcpError {
@@ -92,12 +94,15 @@ impl GcpCredentials {
         })
     }
 
-    pub fn apply<T>(&self, request: &mut http::Request<T>) {
+    pub fn make_token(&self) -> String {
         let token = self.token.read().unwrap();
-        let value = format!("{} {}", token.token_type(), token.access_token());
+        format!("{} {}", token.token_type(), token.access_token())
+    }
+
+    pub fn apply<T>(&self, request: &mut http::Request<T>) {
         request
             .headers_mut()
-            .insert(AUTHORIZATION, value.parse().unwrap());
+            .insert(AUTHORIZATION, self.make_token().parse().unwrap());
     }
 
     async fn regenerate_token(&self) -> crate::Result<()> {

@@ -311,7 +311,7 @@ where
 }
 
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
         let e = stream.next().await.unwrap();
