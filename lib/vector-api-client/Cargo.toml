@@ -16,7 +16,7 @@ serde_json = { version = "1.0.79", features = ["raw_value"] }
 anyhow = "1.0.56"
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "1.17.0", features = ["full"] }
