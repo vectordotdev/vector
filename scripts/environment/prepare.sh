@@ -3,9 +3,15 @@ set -e -o verbose
 
 rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
-rustup run stable cargo install cargo-deb --version 1.29.2
-rustup run stable cargo install cross --version 0.2.1
-rustup run stable cargo install cargo-nextest --version 0.9.8
+if [[ "$(cargo-deb --version)" != "1.29.2" ]] ; then
+  rustup run stable cargo install cargo-deb --version 1.29.2 --force
+fi
+if [[ "$(cross --version | grep cross)" != "cross 0.2.1" ]] ; then
+  rustup run stable cargo install cross --version 0.2.1 --force
+fi
+if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.11" ]] ; then
+  rustup run stable cargo install cargo-nextest --version 0.9.11 --force
+fi
 
 cd scripts
 bundle install
