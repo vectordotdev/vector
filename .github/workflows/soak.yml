@@ -531,6 +531,12 @@ jobs:
                                     --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
 
+      - name: Plot up analysis
+        run: |
+          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
+          ./soaks/bin/plot_up --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+                              --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
+
       - name: Upload plots
         uses: actions/upload-artifact@v1
         with:

@@ -1,5 +1,13 @@
 use vrl::prelude::*;
 
+fn encode_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+    // With `vrl::Value` it should not be possible to get `Err`.
+    match serde_json::to_string(&value) {
+        Ok(value) => Ok(value.into()),
+        Err(error) => unreachable!("unable encode to json: {}", error),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeJson;
 
@@ -34,6 +42,15 @@ impl Function for EncodeJson {
             result: Ok(r#"s'{"another":[1,2,3],"field":"value"}'"#),
         }]
     }
+
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> std::result::Result<Value, ExpressionError> {
+        let value = args.required("value");
+        encode_json(value)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -44,12 +61,7 @@ struct EncodeJsonFn {
 impl Expression for EncodeJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        // With `vrl::Value` it should not be possible to get `Err`.
-        match serde_json::to_string(&value) {
-            Ok(value) => Ok(value.into()),
-            Err(error) => unreachable!("unable encode to json: {}", error),
-        }
+        encode_json(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -423,7 +423,7 @@ impl Quantile {
     /// "9999".
     pub fn as_percentile(&self) -> String {
         let clamped = self.quantile.clamp(0.0, 1.0);
-        let raw = format!("{}", (clamped * 100.0));
+        let raw = (clamped * 100.0).to_string();
         raw.chars()
             .take(5)
             .filter(|c| c.is_numeric())

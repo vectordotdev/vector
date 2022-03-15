@@ -187,7 +187,7 @@ impl DatadogArchivesSinkConfig {
                 let client = service.client();
                 let svc = self
                     .build_s3_sink(&s3_config.options, service, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((
                     svc,
                     s3_common::config::build_healthcheck(self.bucket.clone(), client)?,
@@ -204,7 +204,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
                 Ok((svc, healthcheck))
@@ -229,7 +229,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let sink = self
                     .build_gcs_sink(client, base_url, creds, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
 

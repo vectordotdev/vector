@@ -254,7 +254,7 @@ impl HttpSink for LogdnaConfig {
             .as_millis();
 
         query.append_pair("hostname", &key.hostname);
-        query.append_pair("now", &format!("{}", now));
+        query.append_pair("now", &now.to_string());
 
         if let Some(mac) = &self.mac {
             query.append_pair("mac", mac);
