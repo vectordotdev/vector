@@ -20,7 +20,7 @@ result in bugs.
 
 ## User Experience
 
-We will be loosely basing our format strings on Pythons [f-strings](https://datagy.io/python-f-strings/).
+We will be loosely basing our format strings on Pythons [f-strings](https://peps.python.org/pep-0498/).
 
 To format a string there will be a string type denoted with the prefix `f'`.
 
@@ -114,7 +114,7 @@ elegant form for string creation.
 
 - Template strings are used within certain fields within Vector.
 - Many programming languages offer string interpolation.
-  - [Python](https://datagy.io/python-f-strings/)
+  - [Python](https://peps.python.org/pep-0498/)
   - [Javascript](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals)
   - [Ruby](http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html)
 
