@@ -1,10 +1,11 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_core::transform::{InnerTopology, InnerTopologyTransform};
 
 use crate::{
     conditions::AnyCondition,
-    config::TransformConfig,
-    transforms::pipelines::{expander, filter},
+    config::{ComponentKey, DataType, Output, TransformConfig},
+    transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
 //------------------------------------------------------------------------------
@@ -40,23 +41,55 @@ impl Clone for PipelineConfig {
 }
 
 impl PipelineConfig {
-    /// Expands a single pipeline into a series of its transforms.
-    fn serial(&self) -> Box<dyn TransformConfig> {
-        let transforms: IndexMap<String, Box<dyn TransformConfig>> = self
+    pub(super) fn expand(
+        &mut self,
+        name: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
+        let mut result = InnerTopology::default();
+        // take the latest step insert at an output
+        let _last_step = self
             .transforms
-            .iter()
-            .enumerate()
-            .map(|(index, config)| (index.to_string(), config.clone()))
-            .collect();
-        let transforms = Box::new(expander::ExpanderConfig::serial(transforms));
-        if let Some(ref filter) = self.filter {
-            Box::new(filter::PipelineFilterConfig::new(
-                filter.clone(),
-                transforms,
-            ))
+            .last()
+            .ok_or("must specify at least one transform")?;
+        let last_name = name.join(self.transforms.len() - 1);
+        result
+            .outputs
+            .push((last_name, vec![Output::default(DataType::all())]));
+        // insert the filter if needed and return the next inputs
+        let mut next_inputs = if let Some(ref filter) = self.filter {
+            let mut conditions = IndexMap::new();
+            conditions.insert("success".to_string(), filter.to_owned());
+            let filter_name = name.join("filter");
+            result.inner.insert(
+                filter_name.clone(),
+                InnerTopologyTransform {
+                    inputs: inputs.to_vec(),
+                    inner: Box::new(RouteConfig::new(conditions)),
+                },
+            );
+            result.outputs.push((
+                filter_name.clone(),
+                vec![Output::from((UNMATCHED_ROUTE, DataType::all()))],
+            ));
+            vec![filter_name.port("success")]
         } else {
-            transforms
+            inputs.to_vec()
+        };
+        // compound like
+        for (index, transform) in self.transforms.iter().enumerate() {
+            let step_name = name.join(index);
+            result.inner.insert(
+                step_name.clone(),
+                InnerTopologyTransform {
+                    inputs: next_inputs,
+                    inner: transform.to_owned(),
+                },
+            );
+            next_inputs = vec![step_name.id().to_string()];
         }
+        //
+        Ok(Some(result))
     }
 }
 
@@ -106,21 +139,27 @@ impl EventTypeConfig {
     /// This function expands the sub-pipelines according to the order passed by
     /// the user, or, absent an explicit order, by the position of the
     /// sub-pipeline in the configuration file.
-    pub(super) fn expand(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
-        self.names()
-            .into_iter()
-            .filter_map(|name: String| {
-                self.pipelines
-                    .get(&name)
-                    .map(|config: &PipelineConfig| (name, config.serial()))
-            })
-            .collect()
-    }
-
-    /// Expands a group of pipelines into a series of pipelines.
-    /// They will then be expanded into a series of transforms.
-    pub(super) fn serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self.expand();
-        Box::new(expander::ExpanderConfig::serial(pipelines))
+    pub(super) fn expand(
+        &mut self,
+        name: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
+        let mut result = InnerTopology::default();
+        let mut next_inputs = inputs.to_vec();
+        for pipe_name in self.names() {
+            let pipeline_name = name.join(&pipe_name);
+            let pipeline_config = self
+                .pipelines
+                .get_mut(&pipe_name)
+                .ok_or_else(|| format!("Unable to find pipeline with name {:?}", pipe_name))?;
+            let topology = pipeline_config
+                .expand(&pipeline_name, &next_inputs)?
+                .ok_or_else(|| format!("Unable to expand pipeline named {:?}", pipe_name))?;
+            result.inner.extend(topology.inner.into_iter());
+            result.outputs = topology.outputs;
+            next_inputs = result.outputs();
+        }
+        //
+        Ok(Some(result))
     }
 }
