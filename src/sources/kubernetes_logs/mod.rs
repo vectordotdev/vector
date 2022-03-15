@@ -18,7 +18,7 @@ use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
-    runtime::{reflector, watcher},
+    runtime::watcher,
     Client, Config as ClientConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,7 @@ use crate::{
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
+    kubernetes::reflector,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer, TaskTransform},

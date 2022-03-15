@@ -8664,6 +8664,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "vector"
 version = "0.21.0"
 dependencies = [
+ "ahash",
  "approx",
  "arc-swap",
  "assert_cmd",
@@ -8757,6 +8758,7 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "ordered-float",
+ "parking_lot 0.12.0",
  "percent-encoding",
  "pin-project 1.0.10",
  "portpicker",
