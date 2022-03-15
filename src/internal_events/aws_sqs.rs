@@ -85,7 +85,7 @@ mod s3 {
         fn emit_logs(&self) {
             trace!(message = "Deleted SQS message(s).",
             message_ids = %self.message_ids.iter()
-                .map(|x| x.id.to_string())
+                .flat_map(|x| x.id.clone())
                 .collect::<Vec<_>>()
                 .join(", "));
         }
@@ -108,7 +108,7 @@ mod s3 {
             error!(
                 message = "Deletion of SQS message(s) failed.",
                 message_ids = %self.entries.iter()
-                    .map(|x| format!("{}/{}", x.id, x.code))
+                    .map(|x| format!("{}/{}", x.id.clone().unwrap_or_default(), x.code.clone().unwrap_or_default()))
                     .collect::<Vec<_>>()
                     .join(", "),
                 error_code = "failed_deleting_some_sqs_messages",
@@ -140,7 +140,7 @@ mod s3 {
             error!(
                 message = "Deletion of SQS message(s) failed.",
                 message_ids = %self.entries.iter()
-                    .map(|x| x.id.to_string())
+                    .flat_map(|x| x.id.clone())
                     .collect::<Vec<_>>()
                     .join(", "),
                 error = %self.error,

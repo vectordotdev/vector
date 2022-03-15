@@ -20,6 +20,7 @@ use aws_sdk_sqs::Client as SqsClient;
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 
+use crate::tls::TlsOptions;
 use crate::{
     codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
@@ -47,12 +48,12 @@ pub(super) struct Config {
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
-    pub(super) poll_secs: u32,
+    pub(super) poll_secs: i32,
 
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
-    pub(super) visibility_timeout_secs: u32,
+    pub(super) visibility_timeout_secs: i32,
 
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
@@ -62,13 +63,17 @@ pub(super) struct Config {
     #[serde(default = "default_client_concurrency")]
     #[derivative(Default(value = "default_client_concurrency()"))]
     pub(super) client_concurrency: u32,
+
+    #[serde(default)]
+    #[derivative(Default)]
+    pub(super) tls_options: Option<TlsOptions>,
 }
 
-const fn default_poll_secs() -> u32 {
+const fn default_poll_secs() -> i32 {
     15
 }
 
-const fn default_visibility_timeout_secs() -> u32 {
+const fn default_visibility_timeout_secs() -> i32 {
     300
 }
 
@@ -164,8 +169,6 @@ impl Ingestor {
         compression: super::Compression,
         multiline: Option<line_agg::Config>,
     ) -> Result<Ingestor, IngestorNewError> {
-        let visibility_timeout_secs: i64 = config.visibility_timeout_secs.into();
-
         let state = Arc::new(State {
             region,
 
@@ -178,7 +181,7 @@ impl Ingestor {
             queue_url: config.queue_url,
             poll_secs: config.poll_secs,
             client_concurrency: config.client_concurrency,
-            visibility_timeout_secs,
+            visibility_timeout_secs: config.visibility_timeout_secs,
             delete_message: config.delete_message,
         });
 
@@ -315,16 +318,20 @@ impl IngestorProcess {
                 Ok(result) => {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
-                    if !result.successful.is_empty() {
-                        emit!(&SqsMessageDeleteSucceeded {
-                            message_ids: result.successful,
-                        });
+                    if let Some(success_entries) = result.successful {
+                        if !success_entries.is_empty() {
+                            emit!(&SqsMessageDeleteSucceeded {
+                                message_ids: success_entries,
+                            });
+                        }
                     }
 
-                    if !result.failed.is_empty() {
-                        emit!(&SqsMessageDeletePartialError {
-                            entries: result.failed
-                        });
+                    if let Some(failed_entries) = result.failed {
+                        if !failed_entries.is_empty() {
+                            emit!(&SqsMessageDeletePartialError {
+                                entries: failed_entries
+                            });
+                        }
                     }
                 }
                 Err(err) => {
@@ -376,7 +383,7 @@ impl IngestorProcess {
 
         // S3 has to send notifications to a queue in the same region so I don't think this will
         // actually ever be hit unless messages are being forwarded from one queue to another
-        if self.state.region.name() != s3_event.aws_region {
+        if self.state.region.as_ref() != s3_event.aws_region.as_str() {
             return Err(ProcessingError::WrongRegion {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
@@ -388,8 +395,8 @@ impl IngestorProcess {
             .state
             .s3_client
             .get_object()
-            .bucket(s3_event.s3.bucket.name)
-            .key(s3_event.s3.object.key)
+            .bucket(s3_event.s3.bucket.name.clone())
+            .key(s3_event.s3.object.key.clone())
             .send()
             .await
             .context(GetObjectSnafu {
@@ -400,140 +407,131 @@ impl IngestorProcess {
         let metadata = object.metadata;
         let timestamp = object
             .last_modified
-            .and_then(|t| {
-                t.map(|ts| Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos()))
-                    .ok()
-            })
+            .map(|ts| Utc.timestamp(ts.secs(), ts.subsec_nanos()))
             .unwrap_or_else(Utc::now);
 
-        match object.body {
-            Some(body) => {
-                let (batch, receiver) =
-                    BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-                let object_reader = super::s3_object_decoder(
-                    self.state.compression,
-                    &s3_event.s3.object.key,
-                    object.content_encoding.as_deref(),
-                    object.content_type.as_deref(),
-                    body,
+        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
+        let object_reader = super::s3_object_decoder(
+            self.state.compression,
+            &s3_event.s3.object.key,
+            object.content_encoding.as_deref(),
+            object.content_type.as_deref(),
+            object.body,
+        )
+        .await;
+
+        // Record the read error seen to propagate up later so we avoid ack'ing the SQS
+        // message
+        //
+        // String is used as we cannot clone std::io::Error to take ownership in closure
+        //
+        // FramedRead likely stops when it gets an i/o error but I found it more clear to
+        // show that we `take_while` there hasn't been an error
+        //
+        // This can result in objects being partially processed before an error, but we
+        // prefer duplicate lines over message loss. Future work could include recording
+        // the offset of the object that has been read, but this would only be relevant in
+        // the case that the same vector instance processes the same message.
+        let mut read_error = None;
+        let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
+            FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
+                .map(|res| {
+                    res.map(|bytes| {
+                        emit!(&BytesReceived {
+                            byte_size: bytes.len(),
+                            protocol: "http",
+                        });
+                        bytes
+                    })
+                    .map_err(|err| {
+                        read_error = Some(err);
+                    })
+                    .ok()
+                })
+                .take_while(|res| ready(res.is_some()))
+                .map(|r| r.expect("validated by take_while")),
+        );
+
+        let lines = match &self.state.multiline {
+            Some(config) => Box::new(
+                LineAgg::new(
+                    lines.map(|line| ((), line, ())),
+                    line_agg::Logic::new(config.clone()),
                 )
-                .await;
+                .map(|(_src, line, _context)| line),
+            ),
+            None => lines,
+        };
 
-                // Record the read error seen to propagate up later so we avoid ack'ing the SQS
-                // message
-                //
-                // String is used as we cannot clone std::io::Error to take ownership in closure
-                //
-                // FramedRead likely stops when it gets an i/o error but I found it more clear to
-                // show that we `take_while` there hasn't been an error
-                //
-                // This can result in objects being partially processed before an error, but we
-                // prefer duplicate lines over message loss. Future work could include recording
-                // the offset of the object that has been read, but this would only be relevant in
-                // the case that the same vector instance processes the same message.
-                let mut read_error = None;
-                let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
-                        .map(|res| {
-                            res.map(|bytes| {
-                                emit!(&BytesReceived {
-                                    byte_size: bytes.len(),
-                                    protocol: "http",
-                                });
-                                bytes
-                            })
-                            .map_err(|err| {
-                                read_error = Some(err);
-                            })
-                            .ok()
-                        })
-                        .take_while(|res| ready(res.is_some()))
-                        .map(|r| r.expect("validated by take_while")),
-                );
+        let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
+        let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
+        let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
-                let lines = match &self.state.multiline {
-                    Some(config) => Box::new(
-                        LineAgg::new(
-                            lines.map(|line| ((), line, ())),
-                            line_agg::Logic::new(config.clone()),
-                        )
-                        .map(|(_src, line, _context)| line),
-                    ),
-                    None => lines,
-                };
+        let mut stream = lines.filter_map(move |line| {
+            let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
 
-                let bucket_name = Bytes::from(s3_event.s3.bucket.name.as_str().as_bytes().to_vec());
-                let object_key = Bytes::from(s3_event.s3.object.key.as_str().as_bytes().to_vec());
-                let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
+            log.insert_flat("bucket", bucket_name.clone());
+            log.insert_flat("object", object_key.clone());
+            log.insert_flat("region", aws_region.clone());
+            log.insert_flat(log_schema().source_type_key(), Bytes::from("aws_s3"));
+            log.insert_flat(log_schema().timestamp_key(), timestamp);
 
-                let mut stream = lines.filter_map(move |line| {
-                    let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
-
-                    log.insert_flat("bucket", bucket_name.clone());
-                    log.insert_flat("object", object_key.clone());
-                    log.insert_flat("region", aws_region.clone());
-                    log.insert_flat(log_schema().source_type_key(), Bytes::from("aws_s3"));
-                    log.insert_flat(log_schema().timestamp_key(), timestamp);
-
-                    if let Some(metadata) = &metadata {
-                        for (key, value) in metadata {
-                            log.insert(key.as_str(), value.clone());
-                        }
-                    }
-
-                    emit!(&SqsS3EventsReceived {
-                        byte_size: log.size_of()
-                    });
-
-                    ready(Some(log))
-                });
-
-                let send_error = match self.out.send_event_stream(&mut stream).await {
-                    Ok(_) => None,
-                    Err(error) => {
-                        // count is set to 0 to have no discarded events considering
-                        // the events are not yet acknowledged and will be retried in
-                        // case of error
-                        emit!(&StreamClosedError { error, count: 0 });
-                        Some(crate::source_sender::ClosedError)
-                    }
-                };
-
-                // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
-                // so we explicitly drop it so that we can again utilize `read_error` below.
-                drop(stream);
-
-                if let Some(error) = read_error {
-                    Err(ProcessingError::ReadObject {
-                        source: error,
-                        bucket: s3_event.s3.bucket.name.clone(),
-                        key: s3_event.s3.object.key.clone(),
-                    })
-                } else if let Some(error) = send_error {
-                    Err(ProcessingError::PipelineSend {
-                        source: error,
-                        bucket: s3_event.s3.bucket.name.clone(),
-                        key: s3_event.s3.object.key.clone(),
-                    })
-                } else {
-                    match receiver {
-                        None => Ok(()),
-                        Some(receiver) => match receiver.await {
-                            BatchStatus::Delivered => Ok(()),
-                            BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
-                            BatchStatus::Rejected => {
-                                error!(
-                                    message = "Sink reported events were rejected.",
-                                    internal_log_rate_secs = 5,
-                                );
-                                // Failed events cannot be retried, so continue to delete the SQS source message.
-                                Ok(())
-                            }
-                        },
-                    }
+            if let Some(metadata) = &metadata {
+                for (key, value) in metadata {
+                    log.insert(key.as_str(), value.clone());
                 }
             }
-            None => Ok(()),
+
+            emit!(&SqsS3EventsReceived {
+                byte_size: log.size_of()
+            });
+
+            ready(Some(log))
+        });
+
+        let send_error = match self.out.send_event_stream(&mut stream).await {
+            Ok(_) => None,
+            Err(error) => {
+                // count is set to 0 to have no discarded events considering
+                // the events are not yet acknowledged and will be retried in
+                // case of error
+                emit!(&StreamClosedError { error, count: 0 });
+                Some(crate::source_sender::ClosedError)
+            }
+        };
+
+        // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
+        // so we explicitly drop it so that we can again utilize `read_error` below.
+        drop(stream);
+
+        if let Some(error) = read_error {
+            Err(ProcessingError::ReadObject {
+                source: error,
+                bucket: s3_event.s3.bucket.name.clone(),
+                key: s3_event.s3.object.key.clone(),
+            })
+        } else if let Some(error) = send_error {
+            Err(ProcessingError::PipelineSend {
+                source: error,
+                bucket: s3_event.s3.bucket.name.clone(),
+                key: s3_event.s3.object.key.clone(),
+            })
+        } else {
+            match receiver {
+                None => Ok(()),
+                Some(receiver) => match receiver.await {
+                    BatchStatus::Delivered => Ok(()),
+                    BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                    BatchStatus::Rejected => {
+                        error!(
+                            message = "Sink reported events were rejected.",
+                            internal_log_rate_secs = 5,
+                        );
+                        // Failed events cannot be retried, so continue to delete the SQS source message.
+                        Ok(())
+                    }
+                },
+            }
         }
     }
 

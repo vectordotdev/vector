@@ -1,5 +1,6 @@
 use crate::aws::aws_sdk::{create_client, ClientBuilder};
 use crate::common::sqs::SqsClientBuilder;
+use crate::tls::TlsOptions;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
@@ -7,9 +8,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
-use aws_sdk_sqs::{Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+
 use serde::{Deserialize, Serialize};
 use std::cmp;
 
@@ -41,6 +40,7 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
+    pub tls: Option<TlsOptions>,
 }
 
 #[async_trait::async_trait]
@@ -84,6 +84,7 @@ impl AwsSqsConfig {
             self.region.region(),
             self.region.endpoint()?,
             &cx.proxy,
+            &self.tls,
         )
         .await
     }

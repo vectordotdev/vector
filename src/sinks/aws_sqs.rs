@@ -1,9 +1,8 @@
 use aws_sdk_sqs::error::{GetQueueAttributesError, SendMessageError};
 use aws_sdk_sqs::output::SendMessageOutput;
 use aws_sdk_sqs::types::SdkError;
-use aws_sdk_sqs::{Client as SqsClient, Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_sqs::Client as SqsClient;
+
 use std::{
     convert::TryFrom,
     num::NonZeroU64,
@@ -18,8 +17,9 @@ use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::aws_sdk::{create_client, is_retriable_error};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::common::sqs::SqsClientBuilder;
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -118,41 +118,6 @@ impl GenerateConfig for SqsSinkConfig {
     }
 }
 
-struct SqsClientBuilder;
-
-impl ClientBuilder for SqsClientBuilder {
-    type ConfigBuilder = aws_sdk_sqs::config::Builder;
-    type Client = SqsClient;
-
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_sqs::config::Builder::new().credentials_provider(credentials_provider)
-    }
-
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
-    }
-
-    fn client_from_conf(builder: Self::ConfigBuilder) -> Self::Client {
-        Self::Client::from_conf(builder.build())
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
@@ -200,6 +165,7 @@ impl SqsSinkConfig {
             self.region.region(),
             self.region.endpoint()?,
             proxy,
+            &self.tls,
         )
         .await
     }
@@ -438,6 +404,7 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use aws_sdk_sqs::model::QueueAttributeName;
+    use aws_sdk_sqs::{Endpoint, Region};
     use http::Uri;
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -461,6 +428,7 @@ mod integration_tests {
             Some(Region::new("localstack")),
             Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
             &proxy,
+            &None,
         )
         .await
         .unwrap()

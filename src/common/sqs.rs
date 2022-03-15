@@ -3,7 +3,7 @@ use aws_sdk_sqs::{Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 
-pub struct SqsClientBuilder;
+pub(crate) struct SqsClientBuilder;
 
 impl ClientBuilder for SqsClientBuilder {
     type ConfigBuilder = aws_sdk_sqs::config::Builder;

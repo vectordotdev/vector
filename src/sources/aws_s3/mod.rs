@@ -1,13 +1,20 @@
 use std::convert::TryInto;
+use std::io::ErrorKind;
 
 use async_compression::tokio::bufread;
-use futures::{stream, stream::StreamExt};
+use aws_sdk_cloudwatch::{Endpoint, Region};
+use aws_sdk_s3::types::ByteStream;
+use aws_smithy_client::erase::DynConnector;
+use aws_types::credentials::SharedCredentialsProvider;
+use futures::{stream, stream::StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tokio_util::io::StreamReader;
 
 use super::util::MultilineConfig;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::aws_sdk::{create_client, ClientBuilder};
 use crate::common::sqs::SqsClientBuilder;
+use crate::tls::TlsOptions;
 use crate::{
     aws::{
         auth::AwsAuthentication,
@@ -63,6 +70,8 @@ struct AwsS3Config {
 
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+
+    tls_options: Option<TlsOptions>,
 }
 
 inventory::submit! {
@@ -70,6 +79,37 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(AwsS3Config);
+
+struct S3ClientBuilder {}
+
+impl ClientBuilder for S3ClientBuilder {
+    type ConfigBuilder = aws_sdk_s3::config::Builder;
+    type Client = aws_sdk_s3::Client;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder {
+        aws_sdk_s3::Config::builder().credentials_provider(credentials_provider)
+    }
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder {
+        builder.endpoint_resolver(endpoint)
+    }
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
+        builder.region(region)
+    }
+
+    fn client_from_conf_conn(
+        builder: Self::ConfigBuilder,
+        connector: DynConnector,
+    ) -> Self::Client {
+        Self::Client::from_conf_conn(builder.build(), connector)
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
@@ -108,7 +148,7 @@ impl AwsS3Config {
         &self,
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
-    ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
+    ) -> crate::Result<sqs::Ingestor> {
         use std::sync::Arc;
 
         // let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
@@ -126,17 +166,22 @@ impl AwsS3Config {
         //     region.clone(),
         // );
 
-        let region = if let Some(region) = self.region.region() {
-            region
-        } else {
-            return Err(CreateSqsIngestorError::RegionMissing);
-        };
+        let region = self
+            .region
+            .region()
+            .ok_or_else(|| CreateSqsIngestorError::RegionMissing)?;
 
-        let s3_client = create_client(
+        let endpoint = self
+            .region
+            .endpoint()
+            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
+
+        let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            self.region.region(),
-            self.region.endpoint()?,
+            Some(region.clone()),
+            endpoint.clone(),
             proxy,
+            &self.tls_options,
         )
         .await?;
 
@@ -150,13 +195,14 @@ impl AwsS3Config {
 
                 let sqs_client = create_client::<SqsClientBuilder>(
                     &self.auth,
-                    self.region.region(),
-                    self.region.endpoint()?,
+                    Some(region.clone()),
+                    endpoint,
                     proxy,
+                    &sqs.tls_options,
                 )
                 .await?;
 
-                sqs::Ingestor::new(
+                let ingestor = sqs::Ingestor::new(
                     region,
                     sqs_client,
                     s3_client,
@@ -164,10 +210,11 @@ impl AwsS3Config {
                     self.compression,
                     multiline,
                 )
-                .await
-                .context(InitializeSnafu {})
+                .await?;
+
+                Ok(ingestor)
             }
-            None => Err(CreateSqsIngestorError::ConfigMissing {}),
+            None => Err(CreateSqsIngestorError::ConfigMissing {}.into()),
         }
     }
 }
@@ -182,8 +229,10 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Region is required: {}", source))]
+    #[snafu(display("Region is required"))]
     RegionMissing,
+    #[snafu(display("Endpoint is invalid"))]
+    InvalidEndpoint,
 }
 
 /// None if body is empty
@@ -192,7 +241,7 @@ async fn s3_object_decoder(
     key: &str,
     content_encoding: Option<&str>,
     content_type: Option<&str>,
-    mut body: rusoto_s3::StreamingBody,
+    mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
     let first = if let Some(first) = body.next().await {
         first
@@ -201,8 +250,13 @@ async fn s3_object_decoder(
     };
 
     let r = tokio::io::BufReader::new(
-        rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
+        // rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
+        StreamReader::new(body.map_err(|e| std::io::Error::new(ErrorKind::Other, e))),
     );
+
+    // let r = unim
+
+    // body.
 
     let compression = match compression {
         Auto => {
@@ -276,6 +330,7 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
+    use aws_sdk_s3::types::ByteStream;
     use tokio::io::AsyncReadExt;
 
     use super::{s3_object_decoder, Compression};
@@ -318,7 +373,7 @@ mod test {
             &key,
             Some("gzip"),
             None,
-            rusoto_s3::StreamingBody::new(futures::stream::empty()),
+            ByteStream::default(),
         )
         .await
         .read_to_end(&mut data)
@@ -336,14 +391,19 @@ mod integration_tests {
     use std::io::{self, BufRead};
     use std::path::Path;
 
+    use aws_sdk_s3::model::{Event, NotificationConfiguration, QueueConfiguration};
+    use aws_sdk_s3::types::ByteStream;
+    use aws_sdk_s3::{Client as S3Client, Endpoint, Region};
+    use aws_sdk_sqs::Client as SqsClient;
     use pretty_assertions::assert_eq;
-    use rusoto_core::Region;
-    use rusoto_s3::{PutObjectRequest, S3Client, S3};
-    use rusoto_sqs::{Sqs, SqsClient};
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
+    use crate::aws::aws_sdk::create_client;
+    use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+    use crate::common::sqs::SqsClientBuilder;
+    use crate::config::ProxyConfig;
+    use crate::sources::aws_s3::S3ClientBuilder;
     use crate::{
-        aws::rusoto::RegionOrEndpoint,
         config::{SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
@@ -546,24 +606,26 @@ mod integration_tests {
     ) {
         let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        let s3 = s3_client();
-        let sqs = sqs_client();
+        let s3 = s3_client().await;
+        let sqs = sqs_client().await;
 
         let queue = create_queue(&sqs).await;
         let bucket = create_bucket(&s3, &queue).await;
 
         let config = config(&queue, multiline);
 
-        s3.put_object(PutObjectRequest {
-            bucket: bucket.clone(),
-            key: key.clone(),
-            body: Some(rusoto_core::ByteStream::from(payload)),
-            content_type: content_type.map(|t| t.to_owned()),
-            content_encoding: content_encoding.map(|t| t.to_owned()),
-            ..Default::default()
-        })
-        .await
-        .expect("Could not put object");
+        let put_object_result = s3
+            .put_object()
+            .bucket(bucket.clone())
+            .key(key.clone())
+            .body(ByteStream::from(payload))
+            .set_content_type(content_type.map(|t| t.to_owned()))
+            .set_content_encoding(content_encoding.map(|t| t.to_owned()))
+            .send()
+            .await
+            .expect("Could not put object");
+
+        println!("Put object result: {:?}", put_object_result);
 
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
@@ -598,15 +660,12 @@ mod integration_tests {
     ///
     /// returns the queue name
     async fn create_queue(client: &SqsClient) -> String {
-        use rusoto_sqs::CreateQueueRequest;
-
         let queue_name = uuid::Uuid::new_v4().to_string();
 
         let res = client
-            .create_queue(CreateQueueRequest {
-                queue_name: queue_name.clone(),
-                ..Default::default()
-            })
+            .create_queue()
+            .queue_name(queue_name.clone())
+            .send()
             .await
             .expect("Could not create queue");
 
@@ -616,11 +675,10 @@ mod integration_tests {
     /// count the number of messages in a SQS queue
     async fn count_messages(client: &SqsClient, queue: &str) -> usize {
         client
-            .receive_message(rusoto_sqs::ReceiveMessageRequest {
-                queue_url: queue.into(),
-                visibility_timeout: Some(0),
-                ..Default::default()
-            })
+            .receive_message()
+            .queue_url(queue)
+            .visibility_timeout(0)
+            .send()
             .await
             .unwrap()
             .messages
@@ -632,55 +690,69 @@ mod integration_tests {
     ///
     /// returns the bucket name
     async fn create_bucket(client: &S3Client, queue_name: &str) -> String {
-        use rusoto_s3::{
-            CreateBucketRequest, NotificationConfiguration,
-            PutBucketNotificationConfigurationRequest, QueueConfiguration,
-        };
-
         let bucket_name = uuid::Uuid::new_v4().to_string();
 
         client
-            .create_bucket(CreateBucketRequest {
-                bucket: bucket_name.clone(),
-                ..Default::default()
-            })
+            .create_bucket()
+            .bucket(bucket_name.clone())
+            .send()
             .await
             .expect("Could not create bucket");
 
         client
-            .put_bucket_notification_configuration(PutBucketNotificationConfigurationRequest {
-                bucket: bucket_name.clone(),
-                expected_bucket_owner: None,
-                notification_configuration: NotificationConfiguration {
-                    queue_configurations: Some(vec![QueueConfiguration {
-                        events: vec!["s3:ObjectCreated:*".to_string()],
-                        queue_arn: format!("arn:aws:sqs:us-east-1:000000000000:{}", queue_name),
-                        ..Default::default()
-                    }]),
-                    ..Default::default()
-                },
-            })
+            .put_bucket_notification_configuration()
+            .bucket(bucket_name.clone())
+            .set_expected_bucket_owner(None)
+            .notification_configuration(
+                NotificationConfiguration::builder()
+                    .queue_configurations(
+                        QueueConfiguration::builder()
+                            .set_events(Some(vec![Event::from("s3:ObjectCreated:*")]))
+                            .queue_arn(format!("arn:aws:sqs:us-east-1:000000000000:{}", queue_name))
+                            .build(),
+                    )
+                    .build(),
+            )
+            .send()
             .await
             .expect("Could not create bucket notification");
 
         bucket_name
     }
 
-    fn s3_client() -> S3Client {
-        let region = Region::Custom {
-            name: "minio".to_owned(),
-            endpoint: s3_address(),
+    async fn s3_client() -> S3Client {
+        let auth = AwsAuthentication::test_auth();
+        let region_endpoint = RegionOrEndpoint {
+            region: Some("minio".to_owned()),
+            endpoint: Some(s3_address()),
         };
-
-        S3Client::new(region)
+        let proxy_config = ProxyConfig::default();
+        create_client::<S3ClientBuilder>(
+            &auth,
+            region_endpoint.region(),
+            region_endpoint.endpoint().unwrap(),
+            &proxy_config,
+            &None,
+        )
+        .await
+        .unwrap()
     }
 
-    fn sqs_client() -> SqsClient {
-        let region = Region::Custom {
-            name: "minio".to_owned(),
-            endpoint: s3_address(),
+    async fn sqs_client() -> SqsClient {
+        let auth = AwsAuthentication::test_auth();
+        let region_endpoint = RegionOrEndpoint {
+            region: Some("minio".to_owned()),
+            endpoint: Some(s3_address()),
         };
-
-        SqsClient::new(region)
+        let proxy_config = ProxyConfig::default();
+        create_client::<SqsClientBuilder>(
+            &auth,
+            region_endpoint.region(),
+            region_endpoint.endpoint().unwrap(),
+            &proxy_config,
+            &None,
+        )
+        .await
+        .unwrap()
     }
 }
