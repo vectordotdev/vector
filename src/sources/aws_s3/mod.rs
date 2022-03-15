@@ -6,9 +6,9 @@ use aws_sdk_cloudwatch::{Endpoint, Region};
 use aws_sdk_s3::types::ByteStream;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
-use futures::{stream, stream::StreamExt, TryStreamExt};
+use futures::{stream::StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{Snafu};
 use tokio_util::io::StreamReader;
 
 use super::util::MultilineConfig;
@@ -18,7 +18,7 @@ use crate::tls::TlsOptions;
 use crate::{
     aws::{
         auth::AwsAuthentication,
-        rusoto::{self, RegionOrEndpoint},
+        rusoto::{RegionOrEndpoint},
     },
     config::{
         AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
@@ -149,7 +149,7 @@ impl AwsS3Config {
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
     ) -> crate::Result<sqs::Ingestor> {
-        use std::sync::Arc;
+        
 
         // let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
 
@@ -243,7 +243,7 @@ async fn s3_object_decoder(
     content_type: Option<&str>,
     mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    let first = if let Some(first) = body.next().await {
+    let _first = if let Some(first) = body.next().await {
         first
     } else {
         return Box::new(tokio::io::empty());
