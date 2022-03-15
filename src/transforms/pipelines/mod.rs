@@ -57,21 +57,27 @@
 //! expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 //! (`my_pipelines.logs.transforms.foo`).
 mod config;
-mod expander;
-mod filter;
-mod router;
+// mod expander;
+// mod filter;
+// mod router;
 
 use crate::{
+    conditions::is_log::IsLogConfig,
+    conditions::is_metric::IsMetricConfig,
+    conditions::AnyCondition,
     config::{GenerateConfig, TransformDescription},
     schema,
+    transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 use config::EventTypeConfig;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt::Debug};
 use vector_core::{
-    config::{DataType, Input, Output},
-    transform::{ExpandType, Transform, TransformConfig, TransformContext},
+    config::{ComponentKey, DataType, Input, Output},
+    transform::{
+        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
+    },
 };
 
 //------------------------------------------------------------------------------
@@ -102,30 +108,6 @@ impl PipelinesConfig {
     }
 }
 
-impl PipelinesConfig {
-    /// Transforms the actual transform in 2 parallel transforms.
-    /// They are wrapped into an EventRouterConfig transform in order to filter logs and metrics.
-    fn parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-
-        if !self.logs.is_empty() {
-            map.insert(
-                "logs".to_string(),
-                Box::new(router::EventRouterConfig::log(self.logs.serial())),
-            );
-        }
-
-        if !self.metrics.is_empty() {
-            map.insert(
-                "metrics".to_string(),
-                Box::new(router::EventRouterConfig::metric(self.metrics.serial())),
-            );
-        }
-
-        map
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "pipelines")]
 impl TransformConfig for PipelinesConfig {
@@ -135,12 +117,55 @@ impl TransformConfig for PipelinesConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        Ok(Some((
-            self.parallel(),
-            // need to aggregate to be able to use the transform name as an input.
-            ExpandType::Parallel { aggregates: true },
-        )))
+        name: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
+        let router_name = name.join("type_router");
+        let mut result = InnerTopology {
+            inner: Default::default(),
+            // the default route of the type router should always be redirected
+            outputs: vec![(
+                router_name.clone(),
+                vec![Output::from((UNMATCHED_ROUTE, DataType::all()))],
+            )],
+        };
+        let mut conditions = IndexMap::new();
+        if !self.logs.is_empty() {
+            let logs_route = name.join("metrics");
+            conditions.insert(
+                "logs".to_string(),
+                AnyCondition::Map(Box::new(IsLogConfig {})),
+            );
+            let logs_inputs = vec![router_name.port("logs")];
+            let inner_topology = self
+                .logs
+                .expand(&logs_route, &logs_inputs)?
+                .ok_or("Unable to expand pipeline stream")?;
+            result.inner.extend(inner_topology.inner.into_iter());
+            result.outputs.extend(inner_topology.outputs.into_iter());
+        }
+        if !self.metrics.is_empty() {
+            let metrics_route = name.join("metrics");
+            conditions.insert(
+                "metrics".to_string(),
+                AnyCondition::Map(Box::new(IsMetricConfig {})),
+            );
+            let metrics_inputs = vec![router_name.port("metrics")];
+            let inner_topology = self
+                .metrics
+                .expand(&metrics_route, &metrics_inputs)?
+                .ok_or("Unable to expand pipeline stream")?;
+            result.inner.extend(inner_topology.inner.into_iter());
+            result.outputs.extend(inner_topology.outputs.into_iter());
+        }
+        result.inner.insert(
+            router_name,
+            InnerTopologyTransform {
+                inputs: inputs.to_vec(),
+                inner: Box::new(RouteConfig::new(conditions)),
+            },
+        );
+        Ok(Some(result))
     }
 
     fn input(&self) -> Input {
@@ -239,19 +264,11 @@ mod tests {
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
             vec![
-                "foo.logs.filter",
-                "foo.logs.pipelines.foo.truthy.filter",
-                "foo.logs.pipelines.foo.truthy.transforms.0",
-                "foo.logs.pipelines.foo.truthy.transforms.1",
-                "foo.logs.pipelines.foo.truthy.transforms",
-                "foo.logs.pipelines.foo.truthy",
-                "foo.logs.pipelines.foo.falsy",
-                "foo.logs.pipelines.foo",
-                "foo.logs.pipelines.bar.0",
-                "foo.logs.pipelines.bar",
-                "foo.logs.pipelines",
-                "foo.logs",
-                "foo"
+                "foo.metrics.foo.filter",
+                "foo.metrics.foo.0",
+                "foo.metrics.foo.1",
+                "foo.metrics.bar.0",
+                "foo.type_router",
             ],
         );
     }

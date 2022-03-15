@@ -3,10 +3,9 @@ use std::collections::HashSet;
 use component::ComponentDescription;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use vector_core::transform::{ExpandType, TransformConfig};
+use vector_core::transform::TransformConfig;
 
 use super::{component, ComponentKey};
-use crate::transforms::noop::Noop;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter<T> {
@@ -56,16 +55,34 @@ impl TransformOuter<String> {
 
         let expansion = self
             .inner
-            .expand()
+            .expand(&key, &self.inputs)
             .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
 
         let mut ptypes = parent_types.clone();
         ptypes.insert(self.inner.transform_type());
 
-        if let Some((expanded, expand_type)) = expansion {
+        if let Some(inner_topology) = expansion {
             let mut children = Vec::new();
-            let mut inputs = self.inputs.clone();
 
+            expansions.insert(
+                key.clone(),
+                inner_topology
+                    .outputs()
+                    .into_iter()
+                    .map(ComponentKey::from)
+                    .collect(),
+            );
+
+            for (inner_name, inner_transform) in inner_topology.inner {
+                let child = TransformOuter {
+                    inputs: inner_transform.inputs,
+                    inner: inner_transform.inner,
+                };
+                children.push(inner_name.clone());
+                transforms.insert(inner_name, child);
+            }
+
+            /*
             for (name, content) in expanded {
                 let full_name = key.join(name);
 
@@ -102,6 +119,7 @@ impl TransformOuter<String> {
                 children.push(key.clone());
             }
 
+            */
             expansions.insert(key.clone(), children);
         } else {
             transforms.insert(key, self);

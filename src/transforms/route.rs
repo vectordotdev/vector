@@ -63,6 +63,12 @@ pub struct RouteConfig {
     route: IndexMap<String, AnyCondition>,
 }
 
+impl RouteConfig {
+    pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
+        Self { route }
+    }
+}
+
 inventory::submit! {
     TransformDescription::new::<RouteConfig>("swimlanes")
 }

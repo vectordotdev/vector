@@ -72,7 +72,9 @@ impl TransformConfig for EventRouterConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
+        name: &ComponentKey,
+        inputs: &Vec<String>,
+    ) -> crate::Result<Option<InnerTopology>> {
         if let Some(ref inner) = self.inner {
             let mut res: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
             res.insert(
