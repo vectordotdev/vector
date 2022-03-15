@@ -16,7 +16,7 @@ impl<'a> InternalEvent for BytesSent<'a> {
                  "protocol" => self.protocol.to_string());
     }
 
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         Some("BytesSent")
     }
 }

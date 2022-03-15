@@ -10,18 +10,18 @@ pub trait InternalEvent: Sized {
     fn emit(self) {}
 
     // Optional for backwards compat until all events implement this
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         None
     }
 }
 
 // Sets the name of an event if it doesn't have one
-pub struct DefaultName<'a, E> {
-    pub name: &'a str,
+pub struct DefaultName<E> {
+    pub name: &'static str,
     pub event: E,
 }
 
-impl<'a, E> InternalEvent for DefaultName<'a, E>
+impl<E> InternalEvent for DefaultName<E>
 where
     E: InternalEvent,
 {
@@ -29,22 +29,22 @@ where
         self.event.emit();
     }
 
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         Some(self.event.name().unwrap_or(self.name))
     }
 }
 
 #[cfg(any(test, feature = "test"))]
 pub fn emit(event: impl InternalEvent) {
-    if let Some(name) = event.name().map(ToString::to_string) {
+    if let Some(name) = event.name() {
         event.emit();
-        super::event_test_util::record_internal_event(name.as_str());
+        super::event_test_util::record_internal_event(name);
     } else {
         event.emit();
     }
 }
 
 #[cfg(not(any(test, feature = "test")))]
-pub fn emit(event: impl Internal_event) {
+pub fn emit(event: impl InternalEvent) {
     event.emit();
 }

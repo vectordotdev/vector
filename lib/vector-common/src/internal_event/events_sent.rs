@@ -33,7 +33,7 @@ impl<'a> InternalEvent for EventsSent<'a> {
         }
     }
 
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         Some("EventsSent")
     }
 }
