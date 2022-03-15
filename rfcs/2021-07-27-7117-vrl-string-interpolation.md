@@ -25,7 +25,7 @@ We will be loosely basing our format strings on Pythons [f-strings](https://peps
 To format a string there will be a string type denoted with the prefix `f'`.
 
 Within that string, it is possible to embed VRL expressions by surrounding them
-with `{..}`. VRL will evaluate the expressions and will call `to_string` on
+with `{..}`. VRL will evaluate the expressions and will call `as_string` on
 that expression to return the text representation.
 
 ```coffee
@@ -83,7 +83,7 @@ concatenation.
 The VRL parser will take a template literal string such as:
 
 ```
-i'The message is {{ .message }} created at {{ .timestamp: %v %R }}'
+f'The message is { .message } created at { .timestamp: %v %R }'
 ```
 
 and create an AST identical to the AST for the following expression:
@@ -152,20 +152,6 @@ Downsides are that the format strings are a hidden DSL themselves and there is
 a cognitive overhead involved in maintaining the position of the format tags
 within the string and the parameters passed to the function.
 
-### Extended template strings
-
-The advantage of format strings over string interpolation is that format strings
-provide for parameters to indicate how numbers could be formatted.
-
-For example, `sprintf("%.2f", 3.14159)` will return `3.14`. With simple string
-interpolation `i'{{ 3.14159 }}'` there is no way to control the number of
-decimals output.
-
-We could extend the format strings to allow for any format parameters to be
-added after a `|` character in the template string. So
-`i'{{ 3.14159 | decimals: 2 }}'` would result in the number formatted to 2
-decimal places - `3.14`.
-
 ### Fallibility
 
 F-strings could be fallible and their use could require any errors to be handled.
@@ -183,7 +169,6 @@ f'The date is { timestamp!(.date): %v %R }'
 
 ## Outstanding Questions
 
-- Is there a better prefix than `i` for string interpolation?
 
 ## Plan Of Attack
 
