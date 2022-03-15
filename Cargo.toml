@@ -118,7 +118,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1.52"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.17.0", default-features = false, features = ["full"] }
@@ -189,7 +189,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.35", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -325,7 +325,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.119"
-pretty_assertions = "1.1.0"
+pretty_assertions = "1.2.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }

@@ -1,9 +1,10 @@
+version: "3"
+
 services:
   redis:
     image: redis:6-alpine
     networks:
       - backend
-
   runner:
     build:
       context: ${PWD}
@@ -31,6 +32,12 @@ services:
       - backend
     volumes:
       - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
 
 networks:
   backend: {}
+
+volumes:
+  cargogit: {}
+  cargoregistry: {}

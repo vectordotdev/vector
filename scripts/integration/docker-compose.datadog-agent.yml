@@ -1,4 +1,4 @@
-version: "2"
+version: "3"
 
 services:
   datadog-agent:
@@ -16,7 +16,6 @@ services:
       - DD_USE_DOGSTATSD=false
     volumes:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
-
   datadog-trace-agent:
     # Using 7.31.0 image to have the ability mimic tracing lib using json
     image: datadog/agent:7.31.0
@@ -28,7 +27,6 @@ services:
       - DD_HEALTH_PORT=8183
       - DD_CMD_PORT=5002
       - DD_USE_DOGSTATSD=false
-
   runner:
     build:
       context: ${PWD}
@@ -53,12 +51,10 @@ services:
       - datadog-agent
       - datadog-trace-agent
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-
