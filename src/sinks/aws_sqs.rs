@@ -259,7 +259,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
                         message_id: result.message_id.as_ref()
                     })
                 })
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await
         })
     }
