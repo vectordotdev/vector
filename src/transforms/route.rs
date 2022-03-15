@@ -20,12 +20,15 @@ fn build_conditions(
     config: &RouteConfig,
     context: &TransformContext,
 ) -> crate::Result<Vec<(String, Condition)>> {
-    let mut conditions = Vec::with_capacity(config.route.len());
-    for (output_name, condition) in config.route.iter() {
-        let condition = condition.build(&context.enrichment_tables)?;
-        conditions.push((output_name.clone(), condition));
-    }
-    Ok(conditions)
+    config
+        .route
+        .iter()
+        .map(|(output_name, condition)| {
+            condition
+                .build(&context.enrichment_tables)
+                .map(|condition| (output_name.clone(), condition))
+        })
+        .collect()
 }
 
 //------------------------------------------------------------------------------
@@ -90,8 +93,7 @@ impl SyncTransform for FirstMatchRoute {
         if let Some((output_name, _)) = self
             .conditions
             .iter()
-            .filter(|(_, condition)| condition.check(&event))
-            .next()
+            .find(|(_, condition)| condition.check(&event))
         {
             output.push_named(output_name, event.clone());
         } else {
@@ -118,7 +120,7 @@ pub enum RouteMode {
 
 // to avoid having the mode field when serializing
 impl RouteMode {
-    pub fn is_default(&self) -> bool {
+    pub const fn is_default(&self) -> bool {
         matches!(self, RouteMode::EveryMatch)
     }
 }
