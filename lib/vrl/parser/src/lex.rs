@@ -774,6 +774,21 @@ impl<'input> Lexer<'input> {
                         };
 
                         let ch = match &self.input[pos..] {
+                            s if s.starts_with('#') => {
+                                for (_, chr) in chars.by_ref() {
+                                    if chr == '\n' {
+                                        break;
+                                    }
+                                }
+                                match chars.peek().map(|(_, ch)| ch) {
+                                    Some(ch) => *ch,
+                                    None => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of comment.".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
                             s if s.starts_with('"') => {
                                 let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
@@ -1187,6 +1202,7 @@ mod test {
 
     use super::{StringLiteral, *};
     use crate::lex::Token::*;
+    use indoc::indoc;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
@@ -1900,6 +1916,28 @@ mod test {
                 ("    ~~~~~    ", L(S::Raw("¡"))),
                 ("          ~  ", Operator("*")),
                 ("            ~", Identifier("a")),
+            ],
+        );
+    }
+
+    #[test]
+    fn comment_in_block() {
+        test(
+            data(indoc!(
+                r#"if x {
+                      # It's an apostrophe.
+                      3
+                   }"#
+            )),
+            vec![
+                ("~~                                    ", If),
+                ("   ~                                  ", Identifier("x")),
+                ("     ~                                ", LBrace),
+                ("      ~                               ", Newline),
+                ("                               ~      ", Newline),
+                ("                                   ~  ", IntegerLiteral(3)),
+                ("                                    ~ ", Newline),
+                ("                                     ~", RBrace),
             ],
         );
     }
