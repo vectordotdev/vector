@@ -128,6 +128,17 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    let https = build_tls_connector(tls_settings)?;
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config
+        .configure(&mut proxy)
+        .context(MakeProxyConnectorSnafu)?;
+    Ok(proxy)
+}
+
+pub fn build_tls_connector(
+    tls_settings: MaybeTlsSettings,
+) -> Result<HttpsConnector<HttpConnector>, HttpError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
@@ -142,12 +153,7 @@ pub fn build_proxy_connector(
 
         Ok(())
     });
-
-    let mut proxy = ProxyConnector::new(https).unwrap();
-    proxy_config
-        .configure(&mut proxy)
-        .context(MakeProxyConnectorSnafu)?;
-    Ok(proxy)
+    Ok(https)
 }
 
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {

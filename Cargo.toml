@@ -188,7 +188,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.35", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -324,7 +324,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.119"
-pretty_assertions = "1.1.0"
+pretty_assertions = "1.2.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -647,7 +647,7 @@ sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
-sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
+sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []

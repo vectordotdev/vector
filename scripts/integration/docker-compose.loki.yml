@@ -1,9 +1,9 @@
-services:
+version: "3"
 
+services:
   loki:
     image: grafana/loki:${LOKI_VERSION:-2.4.1}
     command: -config.file=/etc/loki/local-config.yaml -auth.enabled=true
-
   runner:
     build:
       context: ${PWD}
@@ -28,15 +28,13 @@ services:
     environment:
       - LOKI_ADDRESS=http://loki:3100
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
 networks:
   backend: {}
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   postgres:
     image: postgres:13.1
@@ -9,7 +11,6 @@ services:
       - socket:/var/run/postgresql
       - ${PWD}/tests/data/postgres-init.sh:/postgres-init.sh:ro
       - ${PWD}/tests/data:/certs:ro
-
   runner:
     build:
       context: ${PWD}
@@ -35,14 +36,12 @@ services:
       - PG_SOCKET=/socket
       - PG_HOST=postgres
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
       - socket:/socket
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
   socket: {}
-

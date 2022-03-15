@@ -1,33 +1,39 @@
-use std::num::NonZeroUsize;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
-use tower::util::BoxService;
-use vector_core::{buffers::Acker, sink::StreamSink, stream::BatcherSettings};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+};
 
 use crate::{
     event::Event,
     sinks::{
-        aws_kinesis_firehose::{
-            request_builder::{KinesisRequest, KinesisRequestBuilder},
-            service::KinesisResponse,
-        },
+        aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder},
         util::SinkBuilderExt,
     },
-    Error,
 };
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
 
-pub struct KinesisSink {
+pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
-    pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
+    pub service: S,
     pub acker: Acker,
     pub request_builder: KinesisRequestBuilder,
 }
 
-impl KinesisSink {
+impl<S> KinesisSink<S>
+where
+    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -54,7 +60,13 @@ impl KinesisSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for KinesisSink {
+impl<S> StreamSink<Event> for KinesisSink<S>
+where
+    S: Service<Vec<KinesisRequest>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

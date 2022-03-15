@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   squid:
     image: babim/squid
@@ -6,21 +8,18 @@ services:
     networks:
       - public
       - proxy
-
   nginx:
     image: nginx:1.19.4
     networks:
       - public
     volumes:
       - ${PWD}/tests/data/nginx/:/etc/nginx:ro
-
   nginx-proxy:
     image: nginx:1.19.4
     networks:
       - proxy
     volumes:
       - ${PWD}/tests/data/nginx/:/etc/nginx:ro
-
   runner:
     build:
       context: ${PWD}
@@ -50,16 +49,14 @@ services:
     networks:
       - public
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
 networks:
   public: {}
   proxy: {}
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-
