@@ -86,7 +86,7 @@ impl Variant {
         };
 
         let (sender, receiver, _acker) = builder
-            .build(Span::none())
+            .build(String::from("benches"), Span::none())
             .await
             .expect("topology build should not fail");
 

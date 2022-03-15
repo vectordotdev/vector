@@ -40,6 +40,7 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::wrap,
     SourceSender,
@@ -153,6 +154,16 @@ pub async fn build_pieces(
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
 
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_id = %key.id(),
+            component_type = %source.inner.source_type(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
@@ -160,11 +171,6 @@ pub async fn build_pieces(
 
         for output in source_outputs {
             let mut rx = builder.add_output(output.clone());
-
-            let span = error_span!(
-                "source_pump",
-                component_id = %key.id(),
-            );
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
@@ -174,7 +180,7 @@ pub async fn build_pieces(
                 Ok(TaskOutput::Source)
             };
 
-            pumps.push(pump.instrument(span));
+            pumps.push(pump.instrument(span.clone()));
             controls.insert(
                 OutputId {
                     component: key.clone(),
@@ -193,7 +199,7 @@ pub async fn build_pieces(
         let pump = async move {
             let mut handles = Vec::new();
             for pump in pumps {
-                handles.push(tokio::spawn(pump));
+                handles.push(spawn_named(pump, task_name.as_ref()));
             }
             for handle in handles {
                 handle.await.expect("join error")?;
