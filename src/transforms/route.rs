@@ -16,6 +16,8 @@ use crate::{
 
 //------------------------------------------------------------------------------
 
+pub(crate) const ELSE_OUTPUT: &str = "_else";
+
 fn build_conditions(
     config: &RouteConfig,
     context: &TransformContext,
@@ -61,7 +63,7 @@ impl SyncTransform for EveryMatchRoute {
             }
         }
         if discarded.len() == self.conditions.len() {
-            output.push(event);
+            output.push_named(ELSE_OUTPUT, event);
         }
         if !discarded.is_empty() {
             emit!(&RouteEventDiscarded { outputs: discarded });
@@ -104,7 +106,7 @@ impl SyncTransform for FirstMatchRoute {
                     .map(|(name, _)| name.as_str())
                     .collect()
             });
-            output.push(event);
+            output.push_named(ELSE_OUTPUT, event);
         }
     }
 }
@@ -183,7 +185,7 @@ impl TransformConfig for RouteConfig {
             .keys()
             .map(|output_name| Output::from((output_name, DataType::all())))
             .collect();
-        result.push(Output::default(DataType::all()));
+        result.push(Output::from((ELSE_OUTPUT, DataType::all())));
         result
     }
 
