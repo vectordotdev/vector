@@ -238,7 +238,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
     type Error = ();
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
+        let mut this = self.project();
 
         // For whatever reason, the caller is calling `poll_ready` again after a successful previous
         // call.  Since we already know we're ready, and `start_send` has not yet been called, we
@@ -247,7 +247,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
             return Poll::Ready(Ok(()));
         }
 
-        let (result, next_state) = match this.base.poll_ready(cx) {
+        let (result, next_state) = match this.base.as_mut().poll_ready(cx) {
             Poll::Ready(result) => match result {
                 // We reserved a sending slot in the base channel.
                 Ok(()) => (Poll::Ready(Ok(())), SendState::BaseReady),
@@ -259,23 +259,24 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
                 // We need to block.  Nothing else to do, as the base sender will notify us when
                 // there's capacity to do the send.
                 WhenFull::Block => (Poll::Pending, SendState::Idle),
-                // We need to drop the next item.  We have to wait until the caller hands it over to
-                // us in order to drop it, though, so we pretend we're ready and mark ourselves to
-                // drop the next item when `start_send` is called.
-                //
-                // One "gotcha" here is that the base sender is still trying to reserve a sending
-                // slot for us, so technically it could complete between now and when we get to
-                // `start_send` and actually drop the item.
-                //
-                // Based on the current behavior of `PollSender<T>`, the best thing we can do here
-                // is to simply to drop the item and not abort the send, since that will leave
-                // `PollSender<T>` armed for the next time we call `poll_reserve`.  Since buffers
-                // are SPSC, there's no risk in trying up a sender slot.
-                //
-                // TODO: In the future, `PollSender<T>::start_send` may be tweaked to attempt a
-                // call to `Sender<T>::try_send` as a last ditch effort when `PollSender<T>` has not
-                // yet reserved the sending slot.  We could take advantage of this ourselves.
-                WhenFull::DropNewest => (Poll::Ready(Ok(())), SendState::DropNext),
+                WhenFull::DropNewest => {
+                    // If we tried to check for readiness, but got told that the base sender was not
+                    // yet ready, we need to also check to see if the base sender has capacity.  If
+                    // it does, then we've hit a situation where the Tokio cooperative scheduling
+                    // budget has been exceeded, and we're being asked to cooperatively yield to
+                    // allow other tasks to run.
+                    //
+                    // If we don't have capacity, though, then we should in fact drop this event.
+                    // One caveat here is that the disk buffers, aka the "opaque" senders, have no
+                    // concept of per-event capacity, so we'll always assume they are in fact at
+                    // their limit and we should drop.
+                    let has_capacity = this.base.capacity().map_or(false, |capacity| capacity > 0);
+                    if has_capacity {
+                        (Poll::Pending, SendState::Idle)
+                    } else {
+                        (Poll::Ready(Ok(())), SendState::DropNext)
+                    }
+                }
                 // We're supposed to overflow.  Quickly check to make sure we even have an overflow
                 // sender configured, and then figure out if the overflow sender can actually accept
                 // a send at the moment.
