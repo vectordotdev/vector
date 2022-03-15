@@ -6,6 +6,7 @@
 mod bytes;
 mod json;
 mod native;
+mod native_json;
 #[cfg(feature = "sources-syslog")]
 mod syslog;
 
@@ -14,6 +15,7 @@ pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
+pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
 
 use crate::event::Event;
 use ::bytes::Bytes;
