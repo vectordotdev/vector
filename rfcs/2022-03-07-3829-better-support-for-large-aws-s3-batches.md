@@ -96,12 +96,14 @@ parts of it are complete.
 The following upload behaviors are possible through the configuration
 described below:
 
-1. The sink operates as before, where batches are buffered in memory
-   and uploaded directly to objects. This will initially be the
-   default configuration to avoid breaking existing setups.
+1. The sink operates as before, where batches are buffered based only
+   on the existing batch settings and uploaded directly to individual
+   objects. This will initially be the default configuration to avoid
+   breaking existing setups.
 1. The sink buffers batches until it can generate a complete part, and
    assembles the parts into an object only at the end of an
-   interval. None of the intermediate parts are visible until
+   interval. None of the intermediate parts are visible until the
+   final object is assembled.
 1. The sink uploads batches into parts as required to ensure the data
    is persisted to S3, and assembles the parts into an object at the
    end of an interval _or_ when restarting the upload would
@@ -295,9 +297,11 @@ struct MultipartUploadData {
 
 ## Drawbacks
 
-- By increasing the time over which events are written to the sink, we
-  are increasing the chances of data loss due to crashes and network
-  interruptions.
+- By increasing the time during which events are not visible on the
+  destination store, this will increase the chances of data being
+  inaccessable due to crashes and other interruptions. This is not
+  strictly data loss, as the uploaded data is recoverable by other
+  means.
 
 ## Prior Art
 
