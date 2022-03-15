@@ -93,7 +93,7 @@ where
     T: Bufferable,
 {
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
-    pub async fn recv(&mut self) -> Option<T> {
+    pub async fn next(&mut self) -> Option<T> {
         loop {
             // Check for any pending acknowledgements which may make a read eligible to finally be
             // deleted from the buffer entirely.
@@ -101,6 +101,8 @@ where
 
             // If we have no buffered items, do a read from LevelDB.
             if self.buffer.is_empty() {
+                debug!("Internal buffer empty, trying to read more from LevelDB.");
+
                 let db = Arc::clone(&self.db);
                 let read_offset = self.read_offset;
                 let handle = tokio::task::spawn_blocking(move || {

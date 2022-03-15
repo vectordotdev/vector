@@ -47,8 +47,8 @@ where
 {
     pub async fn next(&mut self) -> Option<T> {
         match self {
-            ReceiverAdapter::InMemory(rx) => rx.recv().await,
-            ReceiverAdapter::DiskV1(reader) => reader.recv().await,
+            ReceiverAdapter::InMemory(rx) => rx.next().await,
+            ReceiverAdapter::DiskV1(reader) => reader.next().await,
             ReceiverAdapter::DiskV2(reader) => reader
                 .next()
                 .await
@@ -115,21 +115,33 @@ impl<T: Bufferable> BufferReceiver<T> {
         // occurred, and is over, and items are flowing through the base receiver.  If we waited to
         // entirely drain the overflow receiver, we might cause another small stall of the pipeline
         // attached to the base receiver.
-
         let overflow = self.overflow.as_mut().map(Pin::new);
 
-        select! {
-            Some(item) = overflow.unwrap().next(), if overflow.is_some() => Some(item),
-            Some(item) = self.base.next() => {
-                if let Some(handle) = self.instrumentation {
-                    handle.increment_sent_event_count_and_byte_size(
-                        item.event_count() as u64,
-                        item.size_of() as u64,
-                    );
-                }
-                Some(item)
+        let (item, from_base) = match overflow {
+            None => match self.base.next().await {
+                Some(item) => (item, true),
+                None => return None,
             },
-            else => None,
+            Some(mut overflow) => {
+                select! {
+                    Some(item) = overflow.next() => (item, false),
+                    Some(item) = self.base.next() => (item, true),
+                    else => return None,
+                }
+            }
+        };
+
+        // If instrumentation is enabled, and we got the item from the base receiver, then and only
+        // then do we track sending the event out.
+        if let Some(handle) = self.instrumentation.as_ref() {
+            if from_base {
+                handle.increment_sent_event_count_and_byte_size(
+                    item.event_count() as u64,
+                    item.size_of() as u64,
+                );
+            }
         }
+
+        Some(item)
     }
 }

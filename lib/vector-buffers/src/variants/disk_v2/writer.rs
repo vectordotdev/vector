@@ -598,7 +598,7 @@ where
     fn is_buffer_full(&self) -> bool {
         let total_buffer_size = self.ledger.get_total_buffer_size();
         let max_buffer_size = self.config.max_buffer_size;
-        total_buffer_size <= max_buffer_size
+        total_buffer_size >= max_buffer_size
     }
 
     /// Ensures this writer is ready to attempt writer the next record.

@@ -111,6 +111,36 @@ where
             }
         }
     }
+
+    pub async fn flush(&mut self) -> Result<(), ()> {
+        match self {
+            Self::InMemory(_) => Ok(()),
+            Self::DiskV1(writer) => {
+                writer.flush();
+                Ok(())
+            }
+            Self::DiskV2(writer) => {
+                let mut writer = writer.lock().await;
+
+                if let Err(e) = writer.flush().await {
+                    // Can't really do much except panic here. :sweat:
+                    panic!(
+                        "writer hit unrecoverable error during flush: {}",
+                        e.to_string()
+                    );
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    pub fn capacity(&self) -> Option<usize> {
+        match self {
+            Self::InMemory(tx) => Some(tx.available_capacity()),
+            Self::DiskV1(_) | Self::DiskV2(_) => None,
+        }
+    }
 }
 
 /// A buffer sender.
@@ -216,7 +246,6 @@ impl<T: Bufferable> BufferSender<T> {
                 }
                 base_sent
             }
-            _ => false,
         };
 
         if sent_to_base {
@@ -231,6 +260,16 @@ impl<T: Bufferable> BufferSender<T> {
                     item_size as u64,
                 );
             }
+        }
+
+        Ok(())
+    }
+
+    #[async_recursion]
+    pub async fn flush(&mut self) -> Result<(), ()> {
+        self.base.flush().await?;
+        if let Some(overflow) = self.overflow.as_mut() {
+            overflow.flush().await?;
         }
 
         Ok(())

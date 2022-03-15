@@ -78,6 +78,7 @@ impl<T> Writer<T>
 where
     T: Bufferable,
 {
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     pub async fn send(&mut self, mut item: T) {
         loop {
             match self.try_send(item) {
@@ -90,6 +91,7 @@ where
         }
     }
 
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
     pub fn try_send(&mut self, item: T) -> Option<T> {
         let event_len = item.event_count();
 
@@ -127,15 +129,15 @@ where
         None
     }
 
-    fn flush(&mut self) {
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
+    pub fn flush(&mut self) {
         // This doesn't write all the way through to disk and doesn't need to be
         // wrapped with `blocking`. (It does get written to a memory mapped
         // table that will be flushed even in the case of a process crash.)
-        if self.batch_size > 0 {
-            self.write_batch();
-        }
+        self.write_batch();
     }
 
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     fn write_batch(&mut self) {
         self.db
             .as_mut()

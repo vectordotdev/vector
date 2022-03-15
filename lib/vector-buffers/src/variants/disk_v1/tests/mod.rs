@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use futures::StreamExt;
 use tokio_test::{assert_pending, task::spawn};
 use tracing::{Metadata, Span};
 
@@ -67,7 +66,7 @@ async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
                 .build()
                 .with_name("flush")
                 .with_parent_name(parent_name)
-                .was_closed_at_least(2)
+                .was_closed()
                 .finalize()
         });
 

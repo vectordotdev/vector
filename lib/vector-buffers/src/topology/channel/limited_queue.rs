@@ -116,7 +116,7 @@ impl<T: Bufferable> LimitedReceiver<T> {
         self.inner.limiter.available_permits()
     }
 
-    pub async fn recv(&mut self) -> Option<T> {
+    pub async fn next(&mut self) -> Option<T> {
         loop {
             if let Some((_permit, item)) = self.inner.data.pop() {
                 return Some(item);

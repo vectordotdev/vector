@@ -3,7 +3,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{SinkExt, StreamExt};
 use tokio::{pin, sync::Barrier, time::sleep};
 
 use crate::{
