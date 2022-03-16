@@ -53,7 +53,7 @@ impl SyncTransform for EveryMatchRoute {
         event: Event,
         output: &mut vector_core::transform::TransformOutputsBuf,
     ) {
-        let mut discarded = Vec::with_capacity(self.conditions.len());
+        let mut discarded: Vec<&str> = Vec::with_capacity(self.conditions.len());
         for (output_name, condition) in &self.conditions {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
