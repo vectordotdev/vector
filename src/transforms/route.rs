@@ -9,7 +9,6 @@ use crate::{
         TransformDescription,
     },
     event::Event,
-    internal_events::RouteEventDiscarded,
     schema,
     transforms::Transform,
 };
@@ -65,9 +64,6 @@ impl SyncTransform for EveryMatchRoute {
         if discarded.len() == self.conditions.len() {
             output.push_named(ELSE_OUTPUT, event);
         }
-        if !discarded.is_empty() {
-            emit!(&RouteEventDiscarded { outputs: discarded });
-        }
     }
 }
 
@@ -99,13 +95,6 @@ impl SyncTransform for FirstMatchRoute {
         {
             output.push_named(output_name, event.clone());
         } else {
-            emit!(&RouteEventDiscarded {
-                outputs: self
-                    .conditions
-                    .iter()
-                    .map(|(name, _)| name.as_str())
-                    .collect()
-            });
             output.push_named(ELSE_OUTPUT, event);
         }
     }
