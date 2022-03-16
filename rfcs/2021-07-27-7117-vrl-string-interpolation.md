@@ -22,6 +22,10 @@ result in bugs.
 
 We will be loosely basing our format strings on Pythons [f-strings](https://peps.python.org/pep-0498/).
 
+`f-strings` allow for a combination of embedded expressions and include the ability
+to specify formatting options for the outputs. Plus, their use in a widespread language
+should mean a lot of users will already be familiar with the functionality.
+
 To format a string there will be a string type denoted with the prefix `f'`.
 
 Within that string, it is possible to embed VRL expressions by surrounding them
