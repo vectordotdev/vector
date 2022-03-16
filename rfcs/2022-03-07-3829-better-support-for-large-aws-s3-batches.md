@@ -7,6 +7,13 @@ This RFC discusses improving vector's support for sending large batches to AWS S
 - [Better support for large S3 batches, Issue
   #3829](https://github.com/vectordotdev/vector/issues/3829)
 
+## Terminology
+
+- Batch: A sequence of events collected within vector in preparation
+  for uploading to a storage sink.
+- Object: A completed upload stored on the destination sink's server(s).
+- Part: A completed partial upload that will be composed into an object.
+
 ## Scope
 
 ### In scope
@@ -17,13 +24,7 @@ This RFC discusses improving vector's support for sending large batches to AWS S
 
 - Support for large batches in the Azure Blob, Datadog Archive, and
   GCP Cloud Storage sinks.
-
-## Terminology
-
-- Batch: A sequence of events collected within vector in preparation
-  for uploading to a storage sink.
-- Object: A completed upload stored on the destination sink's server(s).
-- Part: A completed partial upload that will be composed into an object.
+- Changing the criteria controlling when an S3 object is created.
 
 ## Pain
 
@@ -87,26 +88,14 @@ the implementation decisions below:
 
 ### User Experience
 
-The enhanced sink will add support for a new time-based upload
-mode. This mode will create a new object in the destination bucket
-once every configured interval instead of creating an object when a
-batch is filled or times out. This new object will be uploaded
-incrementally, but will not be visible in the bucket until all the
-parts of it are complete.
-
-The following upload behaviors are possible through the configuration
-described below. In all cases, where possible, the sink will upload
-the batch in multiple parts to reduce the amount of data buffered
-locally.
-
-1. The sink operates as before, where objects are created based only
-   on the existing batch settings. This will initially be the default
-   configuration to avoid breaking existing setups but will be
-   deprecated.
-1. The sink buffers batches until it can generate a complete part, and
-   assembles the parts into an object only at the end of an
-   interval. None of the intermediate parts are visible until the
-   final object is assembled.
+From a user point of view, there is no visible change in the
+behavior. Objects are created as specified by the `batch`
+configuration, either when the maximum size or a timeout is
+reached. Internally, the sink will upload the objects in multiple
+parts when possible, but the resulting object will not be visible in
+the bucket until all the parts of it are complete. When possible, the
+sink will fall back to the `PutObject` path to reduce the number of
+AWS actions.
 
 This change will introduce the following new configuration items for
 this sink, which will all default to operating the same as the
@@ -115,17 +104,12 @@ existing sink.
 - `data_dir` (string): The path to the directory in which the state
   data is stored. If this is not set, it is derived from the global
   `data_dir` setting.
-- `batch.min_bytes` (integer): This specifies the target size a
+- `batch.min_part_bytes` (integer): This specifies the target size a
   locally-stored part must reach before it is uploaded. Due to the
   limitations of the S3 API, this has an minimum value of 5MB, which
-  is also the default value when `upload_interval` is set.
-- `upload_interval` (string): When should the sink
-  complete the upload process and initiate a new one. If this is
-  unset, the existing batch-based object creation mechanism is
-  used. the following values are permitted:
-  - `"hourly"`: Complete the upload at the end of the hour exactly.
-  - `"daily"`: Complete the upload at midnight local time each day.
-  - `"at TIME"`: Complete the upload at a specific time each day.
+  is also the default value when `upload_interval` is set. If this is
+  larger or equal to `batch.max_bytes`, the batches will always be
+  uploaded as single objects.
 
 ### Implementation
 
@@ -189,50 +173,45 @@ trait SinkBatchSettings {
 
 struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
     …
-    pub min_bytes: Option<usize>,
+    pub min_part_bytes: Option<usize>,
 }
 ```
 
 #### Modify the S3 sink to use multi-part upload by default
 
-As described above, the S3 sink will require additional configuration
-items to support the new upload mode:
+In addition to above, the S3 sink will require one additional
+configuration item to support the new upload mode:
 
 ```rust
-enum UploadInterval {
-    Hourly,
-    Daily,
-    DailyAt(LocalTime),
-}
-
 struct S3SinkConfig {
     …
     pub data_dir: Option<PathBuf>,
-    #[serde(deserialize_with = "upload_interval_or_duration")]
-    pub upload_interval: Option<UploadInterval>,
 }
 ```
 
-When `upload_interval` is `Some`, `S3SinkConfig::build_processor` will
-produce a sink result using all the above features; when `None`, it
-will use the existing code paths.
-
-In addition to saving and reloading buffers, this will require a
-upload state tracker to allow resuming multipart uploads across
-restarts. There will be one saved state for each output partition, and
-the identifiers must be deleted when the final object is created. The
-interface is a simplified form of what is used in the `file-source`
-library with the unused bits removed.
+The upload system will be modified to upload batches as parts and then
+assembled once the maximum size or timeout is reached.  This will
+require a upload state tracker to allow resuming multipart uploads
+across restarts. There will be one saved state for each output
+partition, and the identifiers must be deleted when the final object
+is created. The interface is a simplified form of what is used in the
+`file-source` library with the unused bits removed.
 
 ```rust
-pub struct Checkpointer<K, V> {
+struct Checkpointer<K, V> {
     tmp_file_path: PathBuf,
     stable_file_path: PathBuf,
     checkpoints: Arc<CheckpointsView>,
 }
 
-pub struct CheckpointsView {
+struct CheckpointsView {
     checkpoints: DashMap<MultipartUploadKey>,
+}
+
+struct MultipartUploadPart {
+    number: i64,
+    e_tag: String,
+    size: usize,
 }
 
 type MultipartUploadKey = String;
@@ -243,24 +222,26 @@ struct MultipartUploadData {
     upload_id: String,
     /// The time after which this batch will be completed.
     completion_time: DateTime<UTC>,
-    /// A list of uploaded parts e_tags. The part number is derived from the index.
-    parts: Vec<String>,
+    /// A list of uploaded parts.
+    parts: Vec<MultipartUploadPart>,
 }
 ```
 
 ## Drawbacks
 
-- By increasing the time during which events are not visible on the
-  destination store, this will increase the chances of data being
-  inaccessable due to crashes and other interruptions. This is not
-  strictly data loss, as the uploaded data is recoverable by other
-  means.
+- While this proposal does not change the timing of objects being
+  created in the bucket, it does increase the number of AWS actions
+  required to create an object. This may slightly increase costs for
+  users.
+- This multipart scheme raises the possibility of leaving unusable
+  data in the S3 bucket due to incomplete multipart uploads. This data
+  is technically recoverable, but not using the standard process.
 
 ## Prior Art
 
 The [S3 output plugin](https://docs.fluentd.org/output/s3) for fluentd
-creates one upload per hour by default. It uses a disk buffer to store
-the object before uploading.
+uses a disk buffer to store the object before uploading, but uses the
+standard `PutObject` action to upload the object.
 
 ## Alternatives
 
@@ -340,3 +321,9 @@ multi-state checkpointer systems (file server and S3 sink) along with
 at least one simpler checkpointer (journald source). Some
 consideration should be given to unifying these internal state
 mechanisms.
+
+This proposal makes no changes to timing of object creation. With the
+multipart upload mechanism, there is the opportunity to change the
+object creation time to an interval much larger than the current batch
+timeouts, such as on the hour or similar. This kind of enhancement
+would also be useful in the `file` sink.
