@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         util::encoding::{EncodingConfig, StandardEncodings},
         websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
@@ -52,6 +52,10 @@ impl SinkConfig for WebSocketSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "websocket"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
