@@ -96,8 +96,6 @@ impl<T: Bufferable> LimitedSender<T> {
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
         let permits_required = self.get_required_permits_for_item(&item);
-        info!("Trying to send item... ({} permits needed, {} available, {} max)",
-            permits_required, self.available_capacity(), self.inner.limit);
         let permits = match self
             .inner
             .limiter
@@ -108,8 +106,6 @@ impl<T: Bufferable> LimitedSender<T> {
             Ok(permits) => permits,
             Err(_) => return Err(SendError(item)),
         };
-
-        info!("Got the required {} permits, pushing items in.", permits_required);
 
         self.inner
             .data
@@ -184,7 +180,6 @@ impl<T: Send + 'static> LimitedReceiver<T> {
     pub async fn next(&mut self) -> Option<T> {
         loop {
             if let Some((_permit, item)) = self.inner.data.pop() {
-                info!("Received item!");
                 return Some(item);
             }
 
@@ -198,9 +193,7 @@ impl<T: Send + 'static> LimitedReceiver<T> {
             // progress.  This might end up being a spurious wakeup since `Notify` will
             // store up to one wakeup that gets consumed by the next call to `poll_notify`,
             // but alas.
-            info!("Need to wait for writer to make progress...");
             self.inner.read_waker.notified().await;
-            info!("Writer made progress. Looping.");
         }
     }
 
@@ -224,7 +217,6 @@ impl<T> Drop for LimitedReceiver<T> {
 }
 
 pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    info!("Created limited channel with capacity limit of {}.", limit);
     let inner = Inner {
         data: Arc::new(ArrayQueue::new(limit)),
         limit,
@@ -241,377 +233,380 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
     (sender, receiver)
 }
 
-/*#[cfg(test)]
-mod tests {
-    use futures::future::poll_fn;
-    use tokio_test::{assert_pending, assert_ready, task::spawn};
+// TODO: uncomment and fix these, probably using `tokio_test::task::spawn` to drive the actual
+// futures and still get per-poll control
 
-    use crate::{test::common::MultiEventRecord, topology::channel::limited_queue::SendError};
+// #[cfg(test)]
+// mod tests {
+//     use futures::future::poll_fn;
+//     use tokio_test::{assert_pending, assert_ready, task::spawn};
 
-    use super::limited;
+//     use crate::{test::common::MultiEventRecord, topology::channel::limited_queue::SendError};
 
-    #[test]
-    fn send_receive() {
-        let (mut tx, mut rx) = limited(2);
+//     use super::limited;
 
-        assert_eq!(2, tx.available_capacity());
+//     #[test]
+//     fn send_receive() {
+//         let (mut tx, mut rx) = limited(2);
 
-        // Create our send and receive futures.
-        let mut send = spawn(async {
-            let msg: u64 = 42;
+//         assert_eq!(2, tx.available_capacity());
 
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(msg)?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         // Create our send and receive futures.
+//         let mut send = spawn(async {
+//             let msg: u64 = 42;
 
-        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(msg)?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Nobody should be woken up.
-        assert!(!send.is_woken());
-        assert!(!recv.is_woken());
+//         let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // Try polling our receive, which should be pending because we haven't anything yet.
-        assert_pending!(recv.poll());
+//         // Nobody should be woken up.
+//         assert!(!send.is_woken());
+//         assert!(!recv.is_woken());
 
-        // We should immediately be able to complete a send as there is available capacity.
-        assert_eq!(Ok(()), assert_ready!(send.poll()));
+//         // Try polling our receive, which should be pending because we haven't anything yet.
+//         assert_pending!(recv.poll());
 
-        // Now our receive should have been woken up, and should immediately be ready.
-        assert!(recv.is_woken());
-        assert_eq!(Some(42), assert_ready!(recv.poll()));
-    }
+//         // We should immediately be able to complete a send as there is available capacity.
+//         assert_eq!(Ok(()), assert_ready!(send.poll()));
 
-    #[test]
-    fn sender_waits_for_more_capacity_when_none_available() {
-        let (mut tx, mut rx) = limited(1);
+//         // Now our receive should have been woken up, and should immediately be ready.
+//         assert!(recv.is_woken());
+//         assert_eq!(Some(42), assert_ready!(recv.poll()));
+//     }
 
-        assert_eq!(1, tx.available_capacity());
+//     #[test]
+//     fn sender_waits_for_more_capacity_when_none_available() {
+//         let (mut tx, mut rx) = limited(1);
 
-        // Create our send and receive futures.
-        let mut send1 = spawn(async {
-            let msg: u64 = 42;
+//         assert_eq!(1, tx.available_capacity());
 
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(msg)?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         // Create our send and receive futures.
+//         let mut send1 = spawn(async {
+//             let msg: u64 = 42;
 
-        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(msg)?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Nobody should be woken up.
-        assert!(!send1.is_woken());
-        assert!(!recv1.is_woken());
+//         let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // Try polling our receive, which should be pending because we haven't anything yet.
-        assert_pending!(recv1.poll());
+//         // Nobody should be woken up.
+//         assert!(!send1.is_woken());
+//         assert!(!recv1.is_woken());
 
-        // We should immediately be able to complete a send as there is available capacity.
-        assert_eq!(Ok(()), assert_ready!(send1.poll()));
-        drop(send1);
+//         // Try polling our receive, which should be pending because we haven't anything yet.
+//         assert_pending!(recv1.poll());
 
-        assert_eq!(0, tx.available_capacity());
+//         // We should immediately be able to complete a send as there is available capacity.
+//         assert_eq!(Ok(()), assert_ready!(send1.poll()));
+//         drop(send1);
 
-        // Now our receive should have been woken up, and should immediately be ready... but we
-        // aren't going to read the value just yet.
-        assert!(recv1.is_woken());
+//         assert_eq!(0, tx.available_capacity());
 
-        // Now trigger a second send, which should block as there's no available capacity.
-        let mut send2 = spawn(async {
-            let msg: u64 = 43;
+//         // Now our receive should have been woken up, and should immediately be ready... but we
+//         // aren't going to read the value just yet.
+//         assert!(recv1.is_woken());
 
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(msg)?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         // Now trigger a second send, which should block as there's no available capacity.
+//         let mut send2 = spawn(async {
+//             let msg: u64 = 43;
 
-        assert!(!send2.is_woken());
-        assert_pending!(send2.poll());
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(msg)?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Now if we receive the item, our second send should be woken up and be able to send in.
-        assert_eq!(Some(42), assert_ready!(recv1.poll()));
-        drop(recv1);
+//         assert!(!send2.is_woken());
+//         assert_pending!(send2.poll());
 
-        assert_eq!(1, rx.available_capacity());
+//         // Now if we receive the item, our second send should be woken up and be able to send in.
+//         assert_eq!(Some(42), assert_ready!(recv1.poll()));
+//         drop(recv1);
 
-        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv2.is_woken());
-        assert_pending!(recv2.poll());
+//         assert_eq!(1, rx.available_capacity());
 
-        assert!(send2.is_woken());
-        assert_eq!(Ok(()), assert_ready!(send2.poll()));
-        drop(send2);
+//         let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv2.is_woken());
+//         assert_pending!(recv2.poll());
 
-        assert_eq!(0, tx.available_capacity());
+//         assert!(send2.is_woken());
+//         assert_eq!(Ok(()), assert_ready!(send2.poll()));
+//         drop(send2);
 
-        // And the final receive to get our second send.
-        assert!(recv2.is_woken());
-        assert_eq!(Some(43), assert_ready!(recv2.poll()));
+//         assert_eq!(0, tx.available_capacity());
 
-        assert_eq!(1, tx.available_capacity());
-    }
+//         // And the final receive to get our second send.
+//         assert!(recv2.is_woken());
+//         assert_eq!(Some(43), assert_ready!(recv2.poll()));
 
-    #[test]
-    fn sender_waits_for_more_capacity_when_partial_available() {
-        let (mut tx, mut rx) = limited(7);
+//         assert_eq!(1, tx.available_capacity());
+//     }
 
-        assert_eq!(7, tx.available_capacity());
+//     #[test]
+//     fn sender_waits_for_more_capacity_when_partial_available() {
+//         let (mut tx, mut rx) = limited(7);
 
-        // Create our send and receive futures.
-        let mut small_sends = spawn(async {
-            let msgs = vec![
-                MultiEventRecord(1),
-                MultiEventRecord(2),
-                MultiEventRecord(3),
-            ];
+//         assert_eq!(7, tx.available_capacity());
 
-            for msg in msgs {
-                poll_fn(|cx| tx.poll_ready(cx)).await?;
-                tx.start_send(msg)?;
-                poll_fn(|cx| tx.poll_flush(cx)).await?;
-            }
+//         // Create our send and receive futures.
+//         let mut small_sends = spawn(async {
+//             let msgs = vec![
+//                 MultiEventRecord(1),
+//                 MultiEventRecord(2),
+//                 MultiEventRecord(3),
+//             ];
 
-            Ok::<_, SendError<MultiEventRecord>>(())
-        });
+//             for msg in msgs {
+//                 poll_fn(|cx| tx.poll_ready(cx)).await?;
+//                 tx.start_send(msg)?;
+//                 poll_fn(|cx| tx.poll_flush(cx)).await?;
+//             }
 
-        let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//             Ok::<_, SendError<MultiEventRecord>>(())
+//         });
 
-        // Nobody should be woken up.
-        assert!(!small_sends.is_woken());
-        assert!(!recv1.is_woken());
+//         let mut recv1 = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // Try polling our receive, which should be pending because we haven't anything yet.
-        assert_pending!(recv1.poll());
+//         // Nobody should be woken up.
+//         assert!(!small_sends.is_woken());
+//         assert!(!recv1.is_woken());
 
-        // We should immediately be able to complete our three event sends, which we have
-        // available capacity for, but will consume all but one of the available slots.
-        assert_eq!(Ok(()), assert_ready!(small_sends.poll()));
-        drop(small_sends);
+//         // Try polling our receive, which should be pending because we haven't anything yet.
+//         assert_pending!(recv1.poll());
 
-        assert_eq!(1, tx.available_capacity());
+//         // We should immediately be able to complete our three event sends, which we have
+//         // available capacity for, but will consume all but one of the available slots.
+//         assert_eq!(Ok(()), assert_ready!(small_sends.poll()));
+//         drop(small_sends);
 
-        // Now our receive should have been woken up, and should immediately be ready, but we won't
-        // receive just yet.
-        assert!(recv1.is_woken());
+//         assert_eq!(1, tx.available_capacity());
 
-        // Now trigger a second send that has four events, and needs to wait for two receives to happen.
-        let mut send2 = spawn(async {
-            let msg = MultiEventRecord(4);
+//         // Now our receive should have been woken up, and should immediately be ready, but we won't
+//         // receive just yet.
+//         assert!(recv1.is_woken());
 
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(msg)?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         // Now trigger a second send that has four events, and needs to wait for two receives to happen.
+//         let mut send2 = spawn(async {
+//             let msg = MultiEventRecord(4);
 
-        assert!(!send2.is_woken());
-        assert_pending!(send2.poll());
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(msg)?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Now if we receive the first item, our second send should be woken up but still not able
-        // to send.
-        assert_eq!(Some(MultiEventRecord(1)), assert_ready!(recv1.poll()));
-        drop(recv1);
+//         assert!(!send2.is_woken());
+//         assert_pending!(send2.poll());
 
-        // Callers waiting to acquire permits have the permits immediately transfer to them when one
-        // (or more) are released, so we expect this to be zero until we send and then read the
-        // third item.
-        assert_eq!(0, rx.available_capacity());
+//         // Now if we receive the first item, our second send should be woken up but still not able
+//         // to send.
+//         assert_eq!(Some(MultiEventRecord(1)), assert_ready!(recv1.poll()));
+//         drop(recv1);
 
-        // We don't get woken up until all permits have been acquired.
-        assert!(!send2.is_woken());
+//         // Callers waiting to acquire permits have the permits immediately transfer to them when one
+//         // (or more) are released, so we expect this to be zero until we send and then read the
+//         // third item.
+//         assert_eq!(0, rx.available_capacity());
 
-        // Our second read should unlock enough available capacity for the second send once complete.
-        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv2.is_woken());
-        assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv2.poll()));
-        drop(recv2);
+//         // We don't get woken up until all permits have been acquired.
+//         assert!(!send2.is_woken());
 
-        assert_eq!(0, rx.available_capacity());
+//         // Our second read should unlock enough available capacity for the second send once complete.
+//         let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv2.is_woken());
+//         assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv2.poll()));
+//         drop(recv2);
 
-        assert!(send2.is_woken());
-        assert_eq!(Ok(()), assert_ready!(send2.poll()));
+//         assert_eq!(0, rx.available_capacity());
 
-        // And just make sure we see those last two sends.
-        let mut recv3 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv3.is_woken());
-        assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv3.poll()));
-        drop(recv3);
+//         assert!(send2.is_woken());
+//         assert_eq!(Ok(()), assert_ready!(send2.poll()));
 
-        assert_eq!(3, rx.available_capacity());
+//         // And just make sure we see those last two sends.
+//         let mut recv3 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv3.is_woken());
+//         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv3.poll()));
+//         drop(recv3);
 
-        let mut recv4 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv4.is_woken());
-        assert_eq!(Some(MultiEventRecord(4)), assert_ready!(recv4.poll()));
-        drop(recv4);
+//         assert_eq!(3, rx.available_capacity());
 
-        assert_eq!(7, rx.available_capacity());
-    }
+//         let mut recv4 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv4.is_woken());
+//         assert_eq!(Some(MultiEventRecord(4)), assert_ready!(recv4.poll()));
+//         drop(recv4);
 
-    #[test]
-    fn empty_receiver_returns_none_when_last_sender_drops() {
-        let (mut tx, mut rx) = limited(1);
+//         assert_eq!(7, rx.available_capacity());
+//     }
 
-        assert_eq!(1, tx.available_capacity());
+//     #[test]
+//     fn empty_receiver_returns_none_when_last_sender_drops() {
+//         let (mut tx, mut rx) = limited(1);
 
-        let tx2 = tx.clone();
+//         assert_eq!(1, tx.available_capacity());
 
-        // Create our send and receive futures.
-        let mut send = spawn(async {
-            let msg: u64 = 42;
+//         let tx2 = tx.clone();
 
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(msg)?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         // Create our send and receive futures.
+//         let mut send = spawn(async {
+//             let msg: u64 = 42;
 
-        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(msg)?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Nobody should be woken up.
-        assert!(!send.is_woken());
-        assert!(!recv.is_woken());
+//         let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // Try polling our receive, which should be pending because we haven't anything yet.
-        assert_pending!(recv.poll());
+//         // Nobody should be woken up.
+//         assert!(!send.is_woken());
+//         assert!(!recv.is_woken());
 
-        // Now drop our second sender, which shouldn't do anything yet.
-        drop(tx2);
-        assert!(!recv.is_woken());
-        assert_pending!(recv.poll());
+//         // Try polling our receive, which should be pending because we haven't anything yet.
+//         assert_pending!(recv.poll());
 
-        // Now drop our second sender, but not before doing a send, which should trigger closing the
-        // semaphore which should let the receiver complete with no further waiting: one item and
-        // then `None`.
-        assert_eq!(Ok(()), assert_ready!(send.poll()));
-        drop(send);
-        drop(tx);
+//         // Now drop our second sender, which shouldn't do anything yet.
+//         drop(tx2);
+//         assert!(!recv.is_woken());
+//         assert_pending!(recv.poll());
 
-        assert!(recv.is_woken());
-        assert_eq!(Some(42), assert_ready!(recv.poll()));
-        drop(recv);
+//         // Now drop our second sender, but not before doing a send, which should trigger closing the
+//         // semaphore which should let the receiver complete with no further waiting: one item and
+//         // then `None`.
+//         assert_eq!(Ok(()), assert_ready!(send.poll()));
+//         drop(send);
+//         drop(tx);
 
-        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv2.is_woken());
-        assert_eq!(None, assert_ready!(recv2.poll()));
-    }
+//         assert!(recv.is_woken());
+//         assert_eq!(Some(42), assert_ready!(recv.poll()));
+//         drop(recv);
 
-    #[test]
-    fn receiver_returns_none_once_empty_when_last_sender_drops() {
-        let (tx, mut rx) = limited::<u64>(1);
+//         let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv2.is_woken());
+//         assert_eq!(None, assert_ready!(recv2.poll()));
+//     }
 
-        assert_eq!(1, tx.available_capacity());
+//     #[test]
+//     fn receiver_returns_none_once_empty_when_last_sender_drops() {
+//         let (tx, mut rx) = limited::<u64>(1);
 
-        let tx2 = tx.clone();
+//         assert_eq!(1, tx.available_capacity());
 
-        // Create our receive future.
-        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         let tx2 = tx.clone();
 
-        // Nobody should be woken up.
-        assert!(!recv.is_woken());
+//         // Create our receive future.
+//         let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // Try polling our receive, which should be pending because we haven't anything yet.
-        assert_pending!(recv.poll());
+//         // Nobody should be woken up.
+//         assert!(!recv.is_woken());
 
-        // Now drop our first sender, which shouldn't do anything yet.
-        drop(tx);
-        assert!(!recv.is_woken());
-        assert_pending!(recv.poll());
+//         // Try polling our receive, which should be pending because we haven't anything yet.
+//         assert_pending!(recv.poll());
 
-        // Now drop our second sender, which should trigger closing the semaphore which should let
-        // the receive complete as there are no items to read.
-        drop(tx2);
-        assert!(recv.is_woken());
-        assert_eq!(None, assert_ready!(recv.poll()));
-    }
+//         // Now drop our first sender, which shouldn't do anything yet.
+//         drop(tx);
+//         assert!(!recv.is_woken());
+//         assert_pending!(recv.poll());
 
-    #[test]
-    fn oversized_send_allowed_when_empty() {
-        let (mut tx, mut rx) = limited(1);
+//         // Now drop our second sender, which should trigger closing the semaphore which should let
+//         // the receive complete as there are no items to read.
+//         drop(tx2);
+//         assert!(recv.is_woken());
+//         assert_eq!(None, assert_ready!(recv.poll()));
+//     }
 
-        assert_eq!(1, tx.available_capacity());
+//     #[test]
+//     fn oversized_send_allowed_when_empty() {
+//         let (mut tx, mut rx) = limited(1);
 
-        // Create our send and receive futures.
-        let mut send = spawn(async {
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(MultiEventRecord(2))?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         assert_eq!(1, tx.available_capacity());
 
-        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         // Create our send and receive futures.
+//         let mut send = spawn(async {
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(MultiEventRecord(2))?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // Nobody should be woken up.
-        assert!(!send.is_woken());
-        assert!(!recv.is_woken());
+//         let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
 
-        // We should immediately be able to complete our send, which we don't have full
-        // available capacity for, but will consume all of the available slots.
-        assert_eq!(Ok(()), assert_ready!(send.poll()));
-        drop(send);
+//         // Nobody should be woken up.
+//         assert!(!send.is_woken());
+//         assert!(!recv.is_woken());
 
-        assert_eq!(0, tx.available_capacity());
+//         // We should immediately be able to complete our send, which we don't have full
+//         // available capacity for, but will consume all of the available slots.
+//         assert_eq!(Ok(()), assert_ready!(send.poll()));
+//         drop(send);
 
-        // Now we should be able to get back the oversized item, but our capacity should not be
-        // greater than what we started with.
-        assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv.poll()));
-        drop(recv);
+//         assert_eq!(0, tx.available_capacity());
 
-        assert_eq!(1, rx.available_capacity());
-    }
+//         // Now we should be able to get back the oversized item, but our capacity should not be
+//         // greater than what we started with.
+//         assert_eq!(Some(MultiEventRecord(2)), assert_ready!(recv.poll()));
+//         drop(recv);
 
-    #[test]
-    fn oversized_send_allowed_when_partial_capacity() {
-        let (mut tx, mut rx) = limited(2);
+//         assert_eq!(1, rx.available_capacity());
+//     }
 
-        assert_eq!(2, tx.available_capacity());
+//     #[test]
+//     fn oversized_send_allowed_when_partial_capacity() {
+//         let (mut tx, mut rx) = limited(2);
 
-        // Create our send future.
-        let mut send = spawn(async {
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(MultiEventRecord(1))?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         assert_eq!(2, tx.available_capacity());
 
-        // Nobody should be woken up.
-        assert!(!send.is_woken());
+//         // Create our send future.
+//         let mut send = spawn(async {
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(MultiEventRecord(1))?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        // We should immediately be able to complete our send, which will only use up a single slot.
-        assert_eq!(Ok(()), assert_ready!(send.poll()));
-        drop(send);
+//         // Nobody should be woken up.
+//         assert!(!send.is_woken());
 
-        assert_eq!(1, tx.available_capacity());
+//         // We should immediately be able to complete our send, which will only use up a single slot.
+//         assert_eq!(Ok(()), assert_ready!(send.poll()));
+//         drop(send);
 
-        // Now we'll trigger another send which has an oversized item.  It shouldn't be able to send
-        // until all permits are available.
-        let mut send2 = spawn(async {
-            poll_fn(|cx| tx.poll_ready(cx)).await?;
-            tx.start_send(MultiEventRecord(3))?;
-            poll_fn(|cx| tx.poll_flush(cx)).await
-        });
+//         assert_eq!(1, tx.available_capacity());
 
-        assert!(!send2.is_woken());
-        assert_pending!(send2.poll());
+//         // Now we'll trigger another send which has an oversized item.  It shouldn't be able to send
+//         // until all permits are available.
+//         let mut send2 = spawn(async {
+//             poll_fn(|cx| tx.poll_ready(cx)).await?;
+//             tx.start_send(MultiEventRecord(3))?;
+//             poll_fn(|cx| tx.poll_flush(cx)).await
+//         });
 
-        assert_eq!(0, rx.available_capacity());
+//         assert!(!send2.is_woken());
+//         assert_pending!(send2.poll());
 
-        // Now do a receive which should return the one consumed slot, essentially allowing all
-        // permits to be acquired by the blocked send.
-        let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert!(!recv.is_woken());
-        assert!(!send2.is_woken());
+//         assert_eq!(0, rx.available_capacity());
 
-        assert_eq!(Some(MultiEventRecord(1)), assert_ready!(recv.poll()));
-        drop(recv);
+//         // Now do a receive which should return the one consumed slot, essentially allowing all
+//         // permits to be acquired by the blocked send.
+//         let mut recv = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert!(!recv.is_woken());
+//         assert!(!send2.is_woken());
 
-        assert_eq!(0, rx.available_capacity());
+//         assert_eq!(Some(MultiEventRecord(1)), assert_ready!(recv.poll()));
+//         drop(recv);
 
-        // Now our blocked send should be able to proceed, and we should be able to read back the
-        // item.
-        assert_eq!(Ok(()), assert_ready!(send2.poll()));
-        drop(send2);
+//         assert_eq!(0, rx.available_capacity());
 
-        assert_eq!(0, tx.available_capacity());
+//         // Now our blocked send should be able to proceed, and we should be able to read back the
+//         // item.
+//         assert_eq!(Ok(()), assert_ready!(send2.poll()));
+//         drop(send2);
 
-        let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
-        assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv2.poll()));
+//         assert_eq!(0, tx.available_capacity());
 
-        assert_eq!(2, tx.available_capacity());
-    }
-}*/
+//         let mut recv2 = spawn(poll_fn(|cx| rx.poll_next(cx)));
+//         assert_eq!(Some(MultiEventRecord(3)), assert_ready!(recv2.poll()));
+
+//         assert_eq!(2, tx.available_capacity());
+//     }
+// }

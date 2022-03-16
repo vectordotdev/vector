@@ -162,6 +162,12 @@ where
 /// accept the event.  In "drop newest" mode, any event being sent when the channel is full will be
 /// dropped and proceed no further. In "overflow" mode, events will be sent to another buffer
 /// sender.  Callers can specify the overflow sender to use when constructing their buffers initially.
+///
+/// TODO: We should eventually rework `BufferSender`/`BufferReceiver` so that they contain a vector
+/// of the fields we already have here, but instead of cascading via calling into `overflow`, we'd
+/// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
+/// `SenderAdapter` instances instead... which would let us get rid of the boxing and
+/// `#[async_recursion]` stuff.
 #[derive(Clone, Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,

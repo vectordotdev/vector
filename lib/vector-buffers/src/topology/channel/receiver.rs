@@ -1,9 +1,13 @@
-use std::pin::Pin;
+use std::{
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use async_recursion::async_recursion;
-use async_stream::stream;
-use futures::Stream;
+use futures::{ready, Stream};
 use tokio::select;
+use tokio_util::sync::ReusableBoxFuture;
 
 use super::limited_queue::LimitedReceiver;
 use crate::{
@@ -153,12 +157,67 @@ impl<T: Bufferable> BufferReceiver<T> {
         Some(item)
     }
 
-    pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
-        let mut receiver = self;
-        Box::pin(stream! {
-            while let Some(item) = receiver.next().await {
-                yield item;
+    pub fn into_stream(self) -> BufferReceiverStream<T> {
+        info!("Converting receiver into stream.");
+        BufferReceiverStream::new(self)
+    }
+}
+
+enum StreamState<T: Bufferable> {
+    Idle(BufferReceiver<T>),
+    Polling,
+    Closed(BufferReceiver<T>),
+}
+pub struct BufferReceiverStream<T: Bufferable> {
+    state: StreamState<T>,
+    recv_fut: ReusableBoxFuture<'static, (Option<T>, BufferReceiver<T>)>,
+}
+
+impl<T: Bufferable> BufferReceiverStream<T> {
+    pub fn new(receiver: BufferReceiver<T>) -> Self {
+        Self {
+            state: StreamState::Idle(receiver),
+            recv_fut: ReusableBoxFuture::new(make_recv_future(None)),
+        }
+    }
+}
+
+impl<T: Bufferable> Stream for BufferReceiverStream<T> {
+    type Item = T;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        loop {
+            match mem::replace(&mut self.state, StreamState::Polling) {
+                s @ StreamState::Closed(_) => {
+                    self.state = s;
+                    return Poll::Ready(None);
+                }
+                StreamState::Idle(receiver) => {
+                    self.recv_fut.set(make_recv_future(Some(receiver)));
+                }
+                StreamState::Polling => {
+                    let (result, receiver) = ready!(self.recv_fut.poll(cx));
+                    self.state = if result.is_none() {
+                        StreamState::Closed(receiver)
+                    } else {
+                        StreamState::Idle(receiver)
+                    };
+
+                    return Poll::Ready(result);
+                }
             }
-        })
+        }
+    }
+}
+
+async fn make_recv_future<T: Bufferable>(
+    receiver: Option<BufferReceiver<T>>,
+) -> (Option<T>, BufferReceiver<T>) {
+    match receiver {
+        None => panic!("invalid to poll future in uninitialized state"),
+        Some(mut receiver) => {
+            let result = receiver.next().await;
+            (result, receiver)
+        }
     }
 }

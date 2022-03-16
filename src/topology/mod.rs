@@ -26,7 +26,7 @@ use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::{
-    topology::channel::{BufferReceiver, BufferSender},
+    topology::channel::{BufferReceiverStream, BufferSender},
     Acker,
 };
 
@@ -43,7 +43,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
     BufferSender<EventArray>,
-    Arc<Mutex<Option<BufferReceiver<EventArray>>>>,
+    Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>,
     Acker,
 );
 

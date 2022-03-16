@@ -40,7 +40,7 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::BufferUtilization,
+    utilization::wrap,
     SourceSender,
 };
 
@@ -160,11 +160,7 @@ pub async fn build_pieces(
 
             let span = error_span!(
                 "source_pump",
-                component_kind = "source",
                 component_id = %key.id(),
-                component_type = %source.inner.source_type(),
-                // maintained for compatibility
-                component_name = %key.id(),
             );
 
             let (mut fanout, control) = Fanout::new();
@@ -335,10 +331,7 @@ pub async fn build_pieces(
             };
             let buffer_span = error_span!(
                 "sink",
-                component_kind = "sink",
                 component_id = %key.id(),
-                component_type = typetag,
-                component_name = %key.id(),
                 buffer_type = buffer_type,
             );
             let buffer = sink
@@ -350,7 +343,7 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream()))), acker),
             }
         };
 
@@ -384,7 +377,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = BufferUtilization::from_receiver(rx);
+            let mut rx = wrap(rx);
 
             sink.run(
                 rx.by_ref()

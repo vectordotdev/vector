@@ -164,8 +164,6 @@ impl Fanout {
         // left unhandled.
         let mut control_channel_open = true;
 
-        info!("Driving send.");
-
         loop {
             tokio::select! {
                 // Semantically, it's not hugely important that this select is biased. It does,
@@ -197,7 +195,6 @@ impl Fanout {
                 }
 
                 () = send_group.drive() => {
-                    info!("All sends completed.");
                     // All in-flight sends have completed, so return sinks to the base collection.
                     // We extend instead of assign here because other sinks could have been added
                     // while the send was in-flight.
@@ -312,6 +309,7 @@ impl Sender {
             SendState::Idle(ref mut inner) => {
                 if let Some(input) = self.input.take() {
                     inner.send(input).await.expect("unit error");
+                    inner.flush().await.expect("unit error");
                 }
             }
         }
