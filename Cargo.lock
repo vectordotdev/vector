@@ -1892,9 +1892,9 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.1.0"
+version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0834a35a3fce649144119e18da2a4d8ed12ef3862f47183fd46f625d072d96c"
+checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
 dependencies = [
  "cfg-if 1.0.0",
  "num_cpus",
@@ -2469,7 +2469,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion",
- "dashmap 5.1.0",
+ "dashmap 5.2.0",
  "flate2",
  "futures 0.3.21",
  "glob",
@@ -2850,7 +2850,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19775995ee20209163239355bc3ad2f33f83da35d9ef72dea26e5af753552c87"
 dependencies = [
- "dashmap 5.1.0",
+ "dashmap 5.2.0",
  "futures 0.3.21",
  "futures-timer",
  "no-std-compat",
@@ -8024,7 +8024,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "criterion",
- "dashmap 5.1.0",
+ "dashmap 5.2.0",
  "mock_instant",
  "tracing 0.1.32",
  "tracing-core 0.1.23",
