@@ -138,7 +138,7 @@ impl DatadogLogsConfig {
             ));
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
             .encoding(self.encoding.clone())
-            .compression(self.compression.unwrap_or_default())
+            .compression(self.compression.unwrap_or(Compression::gzip_default()))
             .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
