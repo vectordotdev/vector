@@ -1,5 +1,4 @@
 use super::prelude::error_stage;
-use aws_types::region::Region;
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
@@ -96,7 +95,7 @@ impl InternalEvent for AwsBytesSent {
 #[cfg(feature = "aws-core")]
 pub struct AwsSdkBytesSent {
     pub byte_size: usize,
-    pub region: Option<Region>,
+    pub region: Option<aws_types::region::Region>,
 }
 
 #[cfg(feature = "aws-core")]
