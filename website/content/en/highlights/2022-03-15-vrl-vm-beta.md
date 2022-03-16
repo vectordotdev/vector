@@ -91,7 +91,7 @@ into contiguous memory which allows us to take advantage of CPU caching.
 
 The above program is compiled into the following set of instructions:
 
-```
+```json
  [
     "0000: GetPath",
     "0001: 0",
