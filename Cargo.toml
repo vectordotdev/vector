@@ -118,7 +118,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1.52"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.17.0", default-features = false, features = ["full"] }
@@ -188,8 +188,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
+async-graphql = { version = "3.0.35", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.35", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -254,7 +254,7 @@ memchr = { version = "2.4", default-features = false, optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
-nom = { version = "7.1.0", default-features = false, optional = true }
+nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
@@ -323,7 +323,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.119"
+libc = "0.2.120"
 pretty_assertions = "1.2.0"
 proptest = "1.0"
 quickcheck = "1.0.3"

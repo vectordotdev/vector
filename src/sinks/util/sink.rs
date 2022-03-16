@@ -467,7 +467,7 @@ where
                 // ignore for now.
                 let _ = tx.send((seqno, batch_size));
             })
-            .instrument(info_span!("request", %request_id))
+            .instrument(info_span!("request", %request_id).or_current())
             .boxed()
     }
 

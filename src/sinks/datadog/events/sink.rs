@@ -1,29 +1,33 @@
-use std::num::NonZeroUsize;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
-use tower::util::BoxService;
+use tower::Service;
 use vector_buffers::Acker;
+use vector_core::stream::DriverResponse;
 
 use crate::{
     config::log_schema,
     event::{Event, LogEvent},
     internal_events::ParserMissingFieldError,
     sinks::{
-        datadog::events::{
-            request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
-            service::DatadogEventsResponse,
-        },
+        datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
         util::{SinkBuilderExt, StreamSink},
     },
 };
 
-pub struct DatadogEventsSink {
-    pub(super) service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
+pub struct DatadogEventsSink<S> {
+    pub(super) service: S,
     pub acker: Acker,
 }
 
-impl DatadogEventsSink {
+impl<S> DatadogEventsSink<S>
+where
+    S: Service<DatadogEventsRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let concurrency_limit = NonZeroUsize::new(50);
 
@@ -88,7 +92,13 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
 }
 
 #[async_trait]
-impl StreamSink<Event> for DatadogEventsSink {
+impl<S> StreamSink<Event> for DatadogEventsSink<S>
+where
+    S: Service<DatadogEventsRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run(input).await
     }

@@ -87,7 +87,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                         byte_size: processed_bytes_total
                     });
                 })
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await?;
 
             Ok(KinesisResponse {

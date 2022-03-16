@@ -118,7 +118,7 @@ where
             });
             Ok(response)
         }
-        .instrument(span.clone());
+        .instrument(span.clone().or_current());
 
         Box::pin(fut)
     }

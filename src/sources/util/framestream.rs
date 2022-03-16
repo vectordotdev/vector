@@ -509,7 +509,7 @@ pub fn build_framestream_unix_source(
 
                     info!("Finished sending.");
                 };
-                tokio::spawn(handler.instrument(span));
+                tokio::spawn(handler.instrument(span.or_current()));
             } else {
                 let handler = async move {
                     frames
@@ -535,7 +535,7 @@ pub fn build_framestream_unix_source(
                         .await;
                     info!("Finished sending.");
                 };
-                tokio::spawn(handler.instrument(span));
+                tokio::spawn(handler.instrument(span.or_current()));
             }
         }
 
