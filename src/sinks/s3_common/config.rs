@@ -167,7 +167,7 @@ pub async fn create_service(
     let endpoint = region.endpoint()?;
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(&auth, region.clone(), endpoint, proxy, &None).await?;
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, &None).await?;
     Ok(S3Service::new(client, region))
 }
 

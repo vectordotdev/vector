@@ -13,12 +13,11 @@ mod integration_tests {
         ObjectLockRule,
     };
     use aws_sdk_s3::output::GetObjectOutput;
-    use aws_sdk_s3::{Client as S3Client, Region};
-    use bytes::{Buf, BytesMut};
+    use aws_sdk_s3::Client as S3Client;
+    use bytes::Buf;
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
-    use rusoto_s3::CreateBucketError;
     use tokio_stream::StreamExt;
     use vector_core::{
         config::proxy::ProxyConfig,
@@ -351,7 +350,6 @@ mod integration_tests {
             batch,
             request: TowerRequestConfig::default(),
             tls: Default::default(),
-            assume_role: None,
             auth: Default::default(),
             acknowledgements: Default::default(),
         }
@@ -382,7 +380,7 @@ mod integration_tests {
         {
             Ok(_) => {}
             Err(err) => match err {
-                SdkError::ServiceError { err, raw } => match err.kind {
+                SdkError::ServiceError { err, raw: _ } => match err.kind {
                     CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
                     err => panic!("Failed to create bucket: {:?}", err),
                 },
