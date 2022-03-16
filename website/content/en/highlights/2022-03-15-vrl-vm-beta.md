@@ -13,6 +13,30 @@ badges:
 As part of our performance improvements in Vector, we have developed a new Virtual Machine for
 running VRL programs.
 
+In our soak tests we are getting performance improvements of between 10-15% depending on
+the VRL that is being run.
+
+## Opting in
+
+You can give the VM a try by adding the `runtime` configuration option to your Remap transform:
+
+```toml
+[transforms.remap]
+type = "remap"
+inputs = [ "..." ]
+runtime = "vm"
+source = '''
+...
+'''
+```
+
+## Let us know what you think!
+
+We are excited about the performance improvements that using a Virtual Machine will bring to Vector.
+If you have any feedback for us let us know on [Discord] or on [Twitter].
+
+## Under the hood
+
 Currently VRL is run using a Tree Walking interpreter. A VRL program is compiled into a tree of
 program nodes. For example, given this simple VRL program:
 
@@ -52,7 +76,7 @@ reaches a node that has no further nodes to execute.
 There are a number of advantages to running a program this way. It is fast to develop and the
 code is easy to maintain and debug since each node manages it's own state. Also, especially
 since it is developed in Rust, the code is quite safe with little opportunity for undefined
-behviour to creep in.
+behaviour to creep in.
 
 However, when it comes to performance there are a number of issues. Each node can take up a
 significant amount of memory - especially with large VRL programs. This causes particular
@@ -94,17 +118,5 @@ The above program is compiled into the following set of instructions:
 
 The Virtual Machine steps through the list executing each instruction in turn.
 
-In our soak tests we are getting performance improvements of between 10-15% depending on
-the VRL that is being run. We hope to improve this even further in time.
-
-You can give the VM a try by adding the `runtime` configuration option to your Remap transform:
-
-```toml
-[transforms.remap]
-type = "remap"
-inputs = [ "..." ]
-runtime = "vm"
-source = '''
-...
-'''
-```
+[Discord]: https://discord.com/invite/dX3bdkF
+[Twitter]: https://twitter.com/vectordotdev
