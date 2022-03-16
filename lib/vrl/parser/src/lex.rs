@@ -774,6 +774,21 @@ impl<'input> Lexer<'input> {
                         };
 
                         let ch = match &self.input[pos..] {
+                            s if s.starts_with('#') => {
+                                for (_, chr) in chars.by_ref() {
+                                    if chr == '\n' {
+                                        break;
+                                    }
+                                }
+                                match chars.peek().map(|(_, ch)| ch) {
+                                    Some(ch) => *ch,
+                                    None => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of comment.".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
                             s if s.starts_with('"') => {
                                 let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
@@ -1900,6 +1915,23 @@ mod test {
                 ("    ~~~~~    ", L(S::Raw("¡"))),
                 ("          ~  ", Operator("*")),
                 ("            ~", Identifier("a")),
+            ],
+        );
+    }
+
+    #[test]
+    fn comment_in_block() {
+        test(
+            data("if x {\n   # It's an apostrophe.\n   3\n}"),
+            vec![
+                ("~~                                    ", If),
+                ("   ~                                  ", Identifier("x")),
+                ("     ~                                ", LBrace),
+                ("      ~                               ", Newline),
+                ("                               ~      ", Newline),
+                ("                                   ~  ", IntegerLiteral(3)),
+                ("                                    ~ ", Newline),
+                ("                                     ~", RBrace),
             ],
         );
     }
