@@ -640,6 +640,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-s3"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "986a15277ad7adf67c32059359d60584426b4fa0c30ef34d153bbe47a83cbad7"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-sigv4",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-eventstream",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "md5",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-sqs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -713,6 +738,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fa501148ae6b5e0de5eeb8c4cf87fa3403d9a00077e543ad64011da781f73a6"
 dependencies = [
  "aws-sigv4",
+ "aws-smithy-eventstream",
  "aws-smithy-http",
  "aws-types",
  "http",
@@ -726,7 +752,9 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51d371fb688d909e5b866ff1f297bbec4621eed4f9fcdac566fcc33541f0c6a6"
 dependencies = [
+ "aws-smithy-eventstream",
  "aws-smithy-http",
+ "bytes 1.1.0",
  "form_urlencoded",
  "hex",
  "http",
@@ -775,11 +803,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-smithy-eventstream"
+version = "0.38.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f972226c639e0dc1eca2cb0220c1b5799e2bfc62eda37845b662c5d0cb972371"
+dependencies = [
+ "aws-smithy-types",
+ "bytes 1.1.0",
+ "crc32fast",
+]
+
+[[package]]
 name = "aws-smithy-http"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12c787e24b757634453a60ff05948aa1b450f5b3a7a2094f22acff8a5022635b"
 dependencies = [
+ "aws-smithy-eventstream",
  "aws-smithy-types",
  "bytes 1.1.0",
  "bytes-utils",
@@ -8500,6 +8540,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
+ "aws-sdk-s3",
  "aws-sdk-sqs",
  "aws-smithy-client",
  "aws-smithy-http",

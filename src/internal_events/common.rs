@@ -1,4 +1,5 @@
 use super::prelude::error_stage;
+use aws_types::region::Region;
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
@@ -88,6 +89,27 @@ impl InternalEvent for AwsBytesSent {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
             "region" => self.region.name().to_owned(),
+        );
+    }
+}
+
+#[cfg(feature = "aws-core")]
+pub struct AwsSdkBytesSent {
+    pub byte_size: usize,
+    pub region: Option<Region>,
+}
+
+#[cfg(feature = "aws-core")]
+impl InternalEvent for AwsSdkBytesSent {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "https",
+            "region" => self.region.as_ref().map(|r|r.as_ref().to_string()).unwrap_or_default()
         );
     }
 }

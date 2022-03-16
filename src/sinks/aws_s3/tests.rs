@@ -6,12 +6,11 @@ mod integration_tests {
         time::Duration,
     };
 
+    use aws_sdk_s3::Client as S3Client;
     use bytes::{Buf, BytesMut};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
-    use rusoto_core::{region::Region, RusotoError};
-    use rusoto_s3::{S3Client, S3};
     use tokio_stream::StreamExt;
     use vector_core::{
         config::proxy::ProxyConfig,
@@ -19,7 +18,6 @@ mod integration_tests {
     };
 
     use crate::{
-        aws::rusoto::RegionOrEndpoint,
         config::SinkContext,
         sinks::{
             aws_s3::S3SinkConfig,
