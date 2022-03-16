@@ -109,11 +109,13 @@ impl<T: Bufferable> LimitedSender<T> {
             Err(_) => return Err(SendError(item)),
         };
 
+        info!("Got the required {} permits, pushing items in.", permits_required);
+
         self.inner
             .data
             .push((permits, item))
             .expect("acquired permits but channel reported being full");
-        self.inner.read_waker.notify_waiters();
+        self.inner.read_waker.notify_one();
 
         Ok(())
     }
@@ -141,7 +143,7 @@ impl<T: Bufferable> LimitedSender<T> {
             .data
             .push((permits, item))
             .expect("acquired permits but channel reported being full");
-        self.inner.read_waker.notify_waiters();
+        self.inner.read_waker.notify_one();
 
         Ok(())
     }
@@ -163,7 +165,7 @@ impl<T> Drop for LimitedSender<T> {
         // If we're the last sender to drop, close the semaphore on our way out the door.
         if self.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.inner.limiter.close();
-            self.inner.read_waker.notify_waiters();
+            self.inner.read_waker.notify_one();
         }
     }
 }
@@ -196,8 +198,9 @@ impl<T: Send + 'static> LimitedReceiver<T> {
             // progress.  This might end up being a spurious wakeup since `Notify` will
             // store up to one wakeup that gets consumed by the next call to `poll_notify`,
             // but alas.
+            info!("Need to wait for writer to make progress...");
             self.inner.read_waker.notified().await;
-            info!("Writer made progress, trying again...");
+            info!("Writer made progress. Looping.");
         }
     }
 
