@@ -53,26 +53,39 @@ f'The time is {ts : %v %R}'
 
 ### Errors
 
-The question arises about what we should do if an error occurs.
-
-I would argue that we do not want an f string to be fallible as this would
-cumbersome to the experience of using VRL. If an error occurs the error text is
-output. For example:
+We do not want an f string to be fallible as this would cumbersome to the experience of using VRL.
+If an error occurs the error text is output. For example:
 
 ```coffee
 f'This is some json { parse_json(.thing) }'
 # This is some json function call error for "parse_json" at (0:18): unable to parse json: expected ident at line 1 column 2
 ```
 
+Errors could still be handled to provide alternative text if needed:
+
+```coffee
+f'This is some json { parse_json(.thing) ?? "oops" }'
+# This is some json oops
+```
+
 Another source of error would be if the format string is specified for a different
 type - for example using date format strings when the type is an integer.
 
-If this occurs, we just ignore the format string and display the unformatted value.
+If format strings are provided, we need to lean on VRLs type system to ensure that the format
+strings are valid for the given type. The user must ensure the types are coerced if
+necessary.
+
+For example this will not compile:
 
 ```coffee
 thing = 2
 f'The date is {thing: %v %R}.'
-# The date is 2.
+```
+
+If needed the user will be expected to coerce the type:
+
+```coffee
+f'The date is {timestamp!(thing): %v %R}.'
 ```
 
 ## Implementation
@@ -159,13 +172,6 @@ F-strings could be fallible and their use could require any errors to be handled
 ```coffee
 f'The date is { .date: %v %R }' ?? "invalid date"
 ```
-
-Or
-
-```coffee
-f'The date is { timestamp!(.date): %v %R }'
-```
-
 
 ## Outstanding Questions
 
