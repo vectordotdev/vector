@@ -274,15 +274,15 @@ impl StringCollector {
     ) {
         match (tags, extra) {
             (None, None) => Ok(()),
-            (None, Some(tag)) => write!(result, "{{{}}}", format_tag(tag.0, &tag.1)),
+            (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
                     .iter()
-                    .map(|(key, value)| format_tag(key, value))
+                    .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
                 if let Some((key, value)) = tag {
-                    parts.push(format_tag(key, value))
+                    parts.push(Self::format_tag(key, value))
                 }
 
                 parts.sort();
@@ -299,22 +299,22 @@ impl StringCollector {
             fullname, name, fullname, r#type
         )
     }
-}
 
-fn format_tag(key: &str, mut value: &str) -> String {
-    let mut result = String::with_capacity(key.len() + value.len() + 4);
-    result.push_str(key);
-    result.push_str("=\"");
-    while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
-        result.push_str(&value[..i]);
-        result.push('\\');
-        // Ugly but works because we know the character at `i` is ASCII
-        result.push(value.as_bytes()[i] as char);
-        value = &value[i + 1..];
+    fn format_tag(key: &str, mut value: &str) -> String {
+        let mut result = String::with_capacity(key.len() + value.len() + 4);
+        result.push_str(key);
+        result.push_str("=\"");
+        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+            result.push_str(&value[..i]);
+            result.push('\\');
+            // Ugly but works because we know the character at `i` is ASCII
+            result.push(value.as_bytes()[i] as char);
+            value = &value[i + 1..];
+        }
+        result.push_str(value);
+        result.push('"');
+        result
     }
-    result.push_str(value);
-    result.push('"');
-    result
 }
 
 type Labels = Vec<proto::Label>;
