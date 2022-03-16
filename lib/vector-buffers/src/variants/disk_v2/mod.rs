@@ -138,6 +138,7 @@
 use std::{
     error::Error,
     marker::PhantomData,
+    num::NonZeroU64,
     path::PathBuf,
     pin::Pin,
     sync::Arc,
@@ -271,11 +272,11 @@ where
 pub struct DiskV2Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: u64,
+    max_size: NonZeroU64,
 }
 
 impl DiskV2Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         Self {
             id,
             data_dir,
@@ -298,12 +299,12 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
-        usage_handle.set_buffer_limits(Some(self.max_size), None);
+        usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
         let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
         let config = DiskBufferConfigBuilder::from_path(buffer_path)
-            .max_buffer_size(self.max_size as u64)
+            .max_buffer_size(self.max_size.get())
             .build()?;
         let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
 

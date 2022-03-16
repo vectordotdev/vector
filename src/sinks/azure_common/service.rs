@@ -69,7 +69,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                         byte_size
                     })
                 })
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await;
 
             result.map(|inner| AzureBlobResponse {

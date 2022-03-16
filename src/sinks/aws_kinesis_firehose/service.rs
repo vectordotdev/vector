@@ -71,7 +71,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         Box::pin(async move {
             client
                 .put_record_batch(request)
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await?;
 
             emit!(&AwsBytesSent {

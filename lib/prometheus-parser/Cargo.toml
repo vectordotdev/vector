@@ -10,7 +10,7 @@ license = "MPL-2.0"
 
 [dependencies]
 indexmap = "~1.8.0"
-nom = "7.1.0"
+nom = "7.1.1"
 num_enum = "0.5.7"
 prost = "0.9"
 prost-types = "0.9"
