@@ -202,7 +202,7 @@ async fn writer_waits_when_buffer_is_full() {
     });
 
     let parent = trace_span!("writer_waits_when_buffer_is_full");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
