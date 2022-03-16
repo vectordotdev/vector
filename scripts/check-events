@@ -9,7 +9,7 @@ BYTE_SIZE_COUNT = ['byte_size', 'count']
 # SUFFIX => [MESSAGE, COUNTERS, ADDITIONAL_TAGS]
 EVENT_CLASSES = {
   'BytesReceived' => [
-    'Bytes received.', ['received_bytes'], ['byte_size']
+    'Bytes received.', ['received_bytes'], ['byte_size', 'protocol']
   ],
   'EventsReceived' => [
     'Events received.', ['received_events', 'received_event_bytes'], ['count', 'byte_size']
@@ -18,7 +18,7 @@ EVENT_CLASSES = {
     'Events sent.', ['sent_events', 'sent_event_bytes'], ['count', 'byte_size']
   ],
   'BytesSent' => [
-    'Bytes sent.', ['sent_bytes'], ['byte_size']
+    'Bytes sent.', ['sent_bytes'], ['byte_size', 'protocol']
   ],
 }
 

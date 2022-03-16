@@ -80,7 +80,12 @@ pub struct AwsBytesSent {
 #[cfg(feature = "rusoto")]
 impl InternalEvent for AwsBytesSent {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+        trace!(
+            message = "Bytes sent.",
+            protocol = "https",
+            byte_size = %self.byte_size,
+            region = ?self.region,
+        );
     }
 
     fn emit_metrics(&self) {

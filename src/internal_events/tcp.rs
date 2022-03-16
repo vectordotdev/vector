@@ -195,7 +195,12 @@ pub struct TcpBytesReceived {
 
 impl InternalEvent for TcpBytesReceived {
     fn emit_logs(&self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, peer_addr = %self.peer_addr);
+        trace!(
+            message = "Bytes received.",
+            protocol = "tcp",
+            byte_size = %self.byte_size,
+            peer_addr = %self.peer_addr,
+        );
     }
 
     fn emit_metrics(&self) {
