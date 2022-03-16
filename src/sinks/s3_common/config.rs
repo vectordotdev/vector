@@ -1,12 +1,11 @@
 use aws_sdk_cloudwatch::types::SdkError;
-use std::{collections::BTreeMap, convert::TryInto, time::Duration};
+use std::collections::BTreeMap;
 
-use aws_sdk_s3::error::{HeadBucketError, HeadBucketErrorKind, PutObjectError};
+use aws_sdk_s3::error::PutObjectError;
 use aws_sdk_s3::model::{ObjectCannedAcl, ServerSideEncryption, StorageClass};
 use aws_sdk_s3::Client as S3Client;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::client;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
@@ -145,7 +144,7 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError { err, raw } => match raw.http().status() {
+                SdkError::ServiceError { err: _, raw } => match raw.http().status() {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
                     status => HealthcheckError::UnknownStatus { status }.into(),
@@ -161,7 +160,6 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
 pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
-    assume_role: Option<String>,
     proxy: &ProxyConfig,
 ) -> crate::Result<S3Service> {
     //TODO: add TLS options

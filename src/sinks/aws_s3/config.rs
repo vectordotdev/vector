@@ -51,8 +51,6 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -78,7 +76,6 @@ impl GenerateConfig for S3SinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: Some(TlsOptions::default()),
-            assume_role: None,
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
         })
@@ -164,8 +161,7 @@ impl S3SinkConfig {
     }
 
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
-            .await
+        s3_common::config::create_service(&self.region, &self.auth, proxy).await
     }
 }
 

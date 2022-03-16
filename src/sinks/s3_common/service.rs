@@ -126,7 +126,7 @@ impl Service<S3Request> for S3Service {
 
         let region = self.region.clone();
         Box::pin(async move {
-            client
+            let result = client
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
@@ -145,17 +145,18 @@ impl Service<S3Request> for S3Service {
                 .content_md5(content_md5)
                 .send()
                 .in_current_span()
-                .await
-                .map(|_inner| {
-                    emit!(&AwsSdkBytesSent {
-                        byte_size: request_size,
-                        region,
-                    });
-                    S3Response {
-                        count,
-                        events_byte_size,
-                    }
-                })
+                .await;
+            println!("Result: {:?}", result);
+            result.map(|_inner| {
+                emit!(&AwsSdkBytesSent {
+                    byte_size: request_size,
+                    region,
+                });
+                S3Response {
+                    count,
+                    events_byte_size,
+                }
+            })
         })
     }
 }
