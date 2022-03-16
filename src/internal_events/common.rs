@@ -86,7 +86,7 @@ impl InternalEvent for AwsBytesSent {
     fn emit_metrics(&self) {
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
-            "protocol" => "https",
+            "protocol" => "http(s)",
             "region" => self.region.name().to_owned(),
         );
     }

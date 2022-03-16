@@ -161,7 +161,7 @@ impl S3SinkConfig {
     }
 
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, proxy).await
+        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
     }
 }
 

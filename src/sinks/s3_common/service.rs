@@ -146,7 +146,7 @@ impl Service<S3Request> for S3Service {
                 .send()
                 .in_current_span()
                 .await;
-            println!("Result: {:?}", result);
+
             result.map(|_inner| {
                 emit!(&AwsSdkBytesSent {
                     byte_size: request_size,
