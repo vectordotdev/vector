@@ -9,4 +9,4 @@ publish = false
 datadog-search-syntax = { path = "../search-syntax" }
 
 regex = "1"
-dyn-clone = { version = "1.0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
