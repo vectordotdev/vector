@@ -211,6 +211,7 @@ impl Sink<Event> for Fanout {
 mod tests {
     use std::{
         mem,
+        num::NonZeroUsize,
         pin::Pin,
         task::{Context, Poll},
     };
@@ -230,7 +231,11 @@ mod tests {
     use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
 
     async fn build_sender_pair(capacity: usize) -> (BufferSender<Event>, BufferReceiver<Event>) {
-        TopologyBuilder::standalone_memory(capacity, WhenFull::Block).await
+        TopologyBuilder::standalone_memory(
+            NonZeroUsize::new(capacity).expect("nonzero capacity"),
+            WhenFull::Block,
+        )
+        .await
     }
 
     async fn build_sender_pairs(
@@ -633,7 +638,11 @@ mod tests {
                 let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
                 BufferSender::new(tx, WhenFull::Block)
             } else {
-                let (tx, rx) = TopologyBuilder::standalone_memory(1, WhenFull::Block).await;
+                let (tx, rx) = TopologyBuilder::standalone_memory(
+                    NonZeroUsize::new(1).expect("static capacity"),
+                    WhenFull::Block,
+                )
+                .await;
                 receivers.push(rx);
                 tx
             };

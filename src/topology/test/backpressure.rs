@@ -24,7 +24,7 @@ async fn serial_backpressure() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -62,7 +62,7 @@ async fn default_fan_out() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -109,7 +109,7 @@ async fn buffer_drop_fan_out() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
         + SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
@@ -161,7 +161,7 @@ async fn multiple_inputs_backpressure() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
         + SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
