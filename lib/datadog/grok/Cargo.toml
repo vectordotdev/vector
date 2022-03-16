@@ -11,7 +11,7 @@ chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false }
 itertools = { version = "0.10.3", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
-nom = { version = "7.1.0", default-features = false }
+nom = { version = "7.1.1", default-features = false }
 nom-regex = { version = "0.2.0", default-features = false }
 once_cell = { version = "1.10", default-features = false, features = ["std", "parking_lot"] }
 onig = { version = "6.3", default-features = false }
@@ -22,7 +22,7 @@ serde = { version = "1.0.136", default-features = false  }
 serde_json = { version = "1.0.79", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 thiserror = { version = "1", default-features = false }
-tracing = { version = "0.1.31", default-features = false }
+tracing = { version = "0.1.32", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }

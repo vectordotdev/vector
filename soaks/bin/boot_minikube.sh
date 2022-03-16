@@ -43,4 +43,10 @@ done
 
 minikube stop || true
 minikube delete || true
-minikube start --cpus="${SOAK_CPUS}" --memory="${SOAK_MEMORY}" --driver=docker
+minikube start \
+  --feature-gates="CPUManager=true" `# enable CPU management flags` \
+  --extra-config="kubelet.cpu-manager-policy=static" `# use static policy to let "Guaranteed" pods (those with limits=requests) and integer CPU requests have CPU affinity` \
+  --extra-config "kubelet.kube-reserved=cpu=1" `# reserve 1 CPU for kube` \
+  --cpus="${SOAK_CPUS}" `# ensure this is higher than the number of CPUs requested by all soak pods or you will see throttling by CFS via the docker driver` \
+  --memory="${SOAK_MEMORY}" `# ensure this is higher than the amount of memory requested by all soak pods or you will see OOMs` \
+  --driver=docker

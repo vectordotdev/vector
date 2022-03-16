@@ -1,8 +1,9 @@
 use std::task::{Context, Poll};
 
+use aws_sdk_sqs::error::SendMessageError;
+use aws_sdk_sqs::types::SdkError;
+use aws_sdk_sqs::Client as SqsClient;
 use futures::{future::BoxFuture, TryFutureExt};
-use rusoto_core::RusotoError;
-use rusoto_sqs::{SendMessageError, SendMessageRequest, Sqs, SqsClient};
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::event::EventStatus;
@@ -25,7 +26,7 @@ impl SqsService {
 
 impl Service<SendMessageEntry> for SqsService {
     type Response = SendMessageResponse;
-    type Error = RusotoError<SendMessageError>;
+    type Error = SdkError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -34,21 +35,18 @@ impl Service<SendMessageEntry> for SqsService {
 
     fn call(&mut self, entry: SendMessageEntry) -> Self::Future {
         let byte_size = entry.size_of();
-
         let client = self.client.clone();
-        let request = SendMessageRequest {
-            message_body: entry.message_body,
-            message_group_id: entry.message_group_id,
-            message_deduplication_id: entry.message_deduplication_id,
-            queue_url: entry.queue_url,
-            ..Default::default()
-        };
 
         Box::pin(async move {
             client
-                .send_message(request)
+                .send_message()
+                .message_body(entry.message_body)
+                .set_message_group_id(entry.message_group_id)
+                .set_message_deduplication_id(entry.message_deduplication_id)
+                .queue_url(entry.queue_url)
+                .send()
                 .map_ok(|_| SendMessageResponse { byte_size })
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await
         })
     }

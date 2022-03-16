@@ -10,12 +10,12 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     // Create a duplex stream that's more than big enough to ship a record through.
     let (writer_io, reader_io) = tokio::io::duplex(4096);
 
-    let mut record_writer = RecordWriter::new(writer_io, 0, u64::MAX, 2048);
+    let mut record_writer = RecordWriter::new(writer_io, 0, 16_384, u64::MAX, 2048);
     let mut record_reader = RecordReader::new(reader_io);
 
     let record = SizedRecord(73);
 
-    let bytes_written = record_writer
+    let (bytes_written, flush_result) = record_writer
         .write_record(314, record.clone())
         .await
         .expect("write should not fail");
@@ -29,6 +29,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
 
     let read_token = read_token.unwrap();
     assert_eq!(bytes_written, read_token.record_bytes());
+    assert_eq!(flush_result, None);
     assert_eq!(314, read_token.record_id());
 
     let roundtrip_record = record_reader

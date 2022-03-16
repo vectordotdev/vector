@@ -9,13 +9,14 @@ publish = false
 serde = { version = "1.0.136", default-features = false, features = ["derive", "alloc"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 snafu = { version = "0.7", default-features = false }
-regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
 lalrpop-util = { version = "0.19.7", features = ["lexer"] }
 once_cell = { version = "1.9" }
 quickcheck = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 serde_json = { version = "1.0.79", features = ["raw_value"] }
 quickcheck = { version = "1.0.3" }
 
@@ -24,3 +25,10 @@ lalrpop = "0.19.7"
 
 [features]
 arbitrary = ["quickcheck"]
+
+[[bench]]
+name = "lookup"
+path = "benches/lookup.rs"
+harness = false
+test = false
+required-features = []

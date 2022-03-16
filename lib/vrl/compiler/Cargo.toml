@@ -35,7 +35,6 @@ vector_common = { path = "../../vector-common", default-features = false, featur
 [[bench]]
 name = "kind"
 harness = false
-test = true
 
 [features]
 test = []

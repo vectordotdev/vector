@@ -81,7 +81,7 @@ impl VectorConfig {
         let service = VectorService::new(client, uri);
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.into_batcher_settings()?;
-        //
+
         let service = ServiceBuilder::new()
             .settings(request_settings, VectorGrpcRetryLogic)
             .service(service);

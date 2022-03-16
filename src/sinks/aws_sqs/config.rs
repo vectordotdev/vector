@@ -1,17 +1,18 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
+use aws_sdk_sqs::Client as SqsClient;
 use futures::FutureExt;
-use rusoto_core::RusotoError;
-use rusoto_sqs::{GetQueueAttributesRequest, SendMessageError, SendMessageResult, Sqs, SqsClient};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint},
+    aws::aws_sdk::create_client,
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    common::sqs::SqsClientBuilder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
-    sinks::util::{encoding::EncodingConfig, retries::RetryLogic, TowerRequestConfig},
+    sinks::util::{encoding::EncodingConfig, TowerRequestConfig},
     template::{Template, TemplateParseError},
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsOptions,
 };
 
 #[derive(Debug, Snafu)]
@@ -75,7 +76,7 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = super::sink::SqsSink::new(self.clone(), cx, client)?;
         Ok((
@@ -100,24 +101,23 @@ impl SinkConfig for SqsSinkConfig {
 impl SqsSinkConfig {
     pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
         client
-            .get_queue_attributes(GetQueueAttributesRequest {
-                attribute_names: None,
-                queue_url: self.queue_url.clone(),
-            })
+            .get_queue_attributes()
+            .queue_url(self.queue_url.clone())
+            .send()
             .await
             .map(|_| ())
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
-        let region = (&self.region).try_into()?;
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        Ok(SqsClient::new_with(client, creds, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
+        create_client::<SqsClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+            &self.tls,
+        )
+        .await
     }
 
     pub fn message_group_id(&self) -> crate::Result<Option<Template>> {
@@ -138,17 +138,5 @@ impl SqsSinkConfig {
             .clone()
             .map(Template::try_from)
             .transpose()?)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct SqsRetryLogic;
-
-impl RetryLogic for SqsRetryLogic {
-    type Error = RusotoError<SendMessageError>;
-    type Response = SendMessageResult;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        rusoto::is_retriable_error(error)
     }
 }

@@ -99,8 +99,16 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        let remap = Remap::new(self.clone(), context)?;
-        Ok(Transform::synchronous(remap))
+        match self.runtime {
+            VrlRuntime::Ast => {
+                let remap = Remap::new_ast(self.clone(), context)?;
+                Ok(Transform::synchronous(remap))
+            }
+            VrlRuntime::Vm => {
+                let remap = Remap::new_vm(self.clone(), context)?;
+                Ok(Transform::synchronous(remap))
+            }
+        }
     }
 
     fn input(&self) -> Input {
@@ -160,34 +168,125 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug)]
-pub struct Remap {
+#[derive(Debug, Clone)]
+pub struct Remap<Runner>
+where
+    Runner: VrlRunner,
+{
     component_key: Option<ComponentKey>,
     program: Program,
-    runtime: Runtime,
-    vm: Option<Arc<Vm>>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
+    runner: Runner,
 }
 
-impl Remap {
-    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
+pub trait VrlRunner {
+    fn run(
+        &mut self,
+        target: &mut VrlTarget,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> std::result::Result<vrl::Value, Terminate>;
+}
+
+#[derive(Debug)]
+pub struct VmRunner {
+    runtime: Runtime,
+    vm: Arc<Vm>,
+}
+
+impl Clone for VmRunner {
+    fn clone(&self) -> Self {
+        Self {
+            runtime: Runtime::default(),
+            vm: Arc::clone(&self.vm),
+        }
+    }
+}
+
+impl VrlRunner for VmRunner {
+    fn run(
+        &mut self,
+        target: &mut VrlTarget,
+        _: &Program,
+        timezone: &TimeZone,
+    ) -> std::result::Result<vrl::Value, Terminate> {
+        self.runtime.run_vm(&self.vm, target, timezone)
+    }
+}
+
+#[derive(Debug)]
+pub struct AstRunner {
+    pub runtime: Runtime,
+}
+
+impl Clone for AstRunner {
+    fn clone(&self) -> Self {
+        Self {
+            runtime: Runtime::default(),
+        }
+    }
+}
+
+impl VrlRunner for AstRunner {
+    fn run(
+        &mut self,
+        target: &mut VrlTarget,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> std::result::Result<vrl::Value, Terminate> {
+        let result = self.runtime.resolve(target, program, timezone);
+        self.runtime.clear();
+        result
+    }
+}
+
+impl Remap<VmRunner> {
+    pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
         let (program, functions, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
         let runtime = Runtime::default();
-
-        let vm = match config.runtime {
-            VrlRuntime::Vm => Some(Arc::new(runtime.compile(functions, &program)?)),
-            VrlRuntime::Ast => None,
+        let vm = runtime.compile(functions, &program)?;
+        let runner = VmRunner {
+            runtime,
+            vm: Arc::new(vm),
         };
 
+        Self::new(config, context, program, runner)
+    }
+}
+
+impl Remap<AstRunner> {
+    pub fn new_ast(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
+        let (program, _, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
+
+        let runtime = Runtime::default();
+        let runner = AstRunner { runtime };
+
+        Self::new(config, context, program, runner)
+    }
+}
+
+impl<Runner> Remap<Runner>
+where
+    Runner: VrlRunner,
+{
+    fn new(
+        config: RemapConfig,
+        context: &TransformContext,
+        program: Program,
+        runner: Runner,
+    ) -> crate::Result<Self> {
         let default_schema_definition = context
             .schema_definitions
             .get(&None)
@@ -204,20 +303,19 @@ impl Remap {
         Ok(Remap {
             component_key: context.key.clone(),
             program,
-            runtime,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
-            vm,
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
+            runner,
         })
     }
 
     #[cfg(test)]
-    const fn runtime(&self) -> &Runtime {
-        &self.runtime
+    fn runner(&self) -> &Runner {
+        &self.runner
     }
 
     fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
@@ -270,35 +368,14 @@ impl Remap {
     }
 
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
-        match &self.vm {
-            Some(vm) => self.runtime.run_vm(vm, target, &self.timezone),
-            None => {
-                let result = self.runtime.resolve(target, &self.program, &self.timezone);
-                self.runtime.clear();
-                result
-            }
-        }
+        self.runner.run(target, &self.program, &self.timezone)
     }
 }
 
-impl Clone for Remap {
-    fn clone(&self) -> Self {
-        Self {
-            component_key: self.component_key.clone(),
-            program: self.program.clone(),
-            runtime: Runtime::default(),
-            timezone: self.timezone,
-            drop_on_error: self.drop_on_error,
-            drop_on_abort: self.drop_on_abort,
-            reroute_dropped: self.reroute_dropped,
-            vm: self.vm.clone(),
-            default_schema_definition: Arc::clone(&self.default_schema_definition),
-            dropped_schema_definition: Arc::clone(&self.dropped_schema_definition),
-        }
-    }
-}
-
-impl SyncTransform for Remap {
+impl<Runner> SyncTransform for Remap<Runner>
+where
+    Runner: VrlRunner + Clone + Send + Sync,
+{
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the
@@ -436,13 +513,13 @@ mod tests {
         )
     }
 
-    fn remap(config: RemapConfig) -> Result<Remap> {
+    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         let schema_definitions = HashMap::from([
             (None, test_default_schema_definition()),
             (Some(DROPPED.to_owned()), test_dropped_schema_definition()),
         ]);
 
-        Remap::new(config, &TransformContext::new_test(schema_definitions))
+        Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
     }
 
     #[test]
@@ -495,7 +572,7 @@ mod tests {
             ..Default::default()
         };
         let mut tform = remap(conf).unwrap();
-        assert!(tform.runtime().is_empty());
+        assert!(tform.runner().runtime.is_empty());
 
         let event1 = {
             let mut event1 = LogEvent::from("event1");
@@ -509,7 +586,7 @@ mod tests {
             result1.metadata().schema_definition(),
             &test_default_schema_definition()
         );
-        assert!(tform.runtime().is_empty());
+        assert!(tform.runner().runtime.is_empty());
 
         let event2 = {
             let event2 = LogEvent::from("event2");
@@ -522,7 +599,7 @@ mod tests {
             result2.metadata().schema_definition(),
             &test_default_schema_definition()
         );
-        assert!(tform.runtime().is_empty());
+        assert!(tform.runner().runtime.is_empty());
     }
 
     #[test]
@@ -858,7 +935,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap();
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -991,7 +1068,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap();
 
         let output =
             transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
@@ -1050,7 +1127,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap();
 
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
@@ -1117,7 +1194,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap();
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();

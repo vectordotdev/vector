@@ -11,7 +11,7 @@ import pathlib
 
 np.seterr(all='raise')
 
-parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser = argparse.ArgumentParser(description='Plot throughput results from soak run')
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--output-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')

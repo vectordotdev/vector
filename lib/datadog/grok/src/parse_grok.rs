@@ -421,7 +421,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(
-            format!("{}", err),
+            err.to_string(),
             "Circular dependency found in the alias 'pattern1'"
         );
     }

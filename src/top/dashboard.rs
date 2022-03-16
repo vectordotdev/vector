@@ -152,7 +152,7 @@ impl<'a> Widgets<'a> {
                 Style::default().fg(Color::Gray),
             ),
             Span::from(" | "),
-            Span::styled(format!("{}", connection_status), connection_status.style()),
+            Span::styled(connection_status.to_string(), connection_status.style()),
         ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(

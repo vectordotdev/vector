@@ -586,7 +586,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -603,7 +603,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -620,7 +620,7 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone().or_current());
         let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -630,7 +630,8 @@ impl RunningTopology {
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
+        let source_task =
+            handle_errors(source_task, self.abort_tx.clone()).instrument(span.or_current());
         self.source_tasks
             .insert(key.clone(), tokio::spawn(source_task));
     }
@@ -670,10 +671,7 @@ impl RunningTopology {
                     // Sink may have been removed with the new config so it may not
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
-                        let _ = output.send(ControlMessage::Add(
-                            sink_key.clone(),
-                            Box::pin(input.clone()),
-                        ));
+                        let _ = output.send(ControlMessage::Add(sink_key.clone(), input.clone()));
                     }
                 }
             }
@@ -682,10 +680,8 @@ impl RunningTopology {
                     // Transform may have been removed with the new config so it may
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
-                        let _ = output.send(ControlMessage::Add(
-                            transform_key.clone(),
-                            Box::pin(input.clone()),
-                        ));
+                        let _ =
+                            output.send(ControlMessage::Add(transform_key.clone(), input.clone()));
                     }
                 }
             }
@@ -703,7 +699,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
+                .send(ControlMessage::Add(key.clone(), tx.clone()));
         }
 
         self.inputs.insert(key.clone(), tx);
@@ -743,7 +739,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
+                .send(ControlMessage::Add(key.clone(), tx.clone()));
         }
 
         for &input in inputs_to_replace {
@@ -752,10 +748,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(
-                    key.clone(),
-                    Some(Box::pin(tx.clone())),
-                ));
+                .send(ControlMessage::Replace(key.clone(), Some(tx.clone())));
         }
 
         self.inputs.insert(key.clone(), tx);

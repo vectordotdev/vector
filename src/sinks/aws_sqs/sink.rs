@@ -1,8 +1,8 @@
 use std::num::{NonZeroU64, NonZeroUsize};
 
+use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
-use rusoto_sqs::SqsClient;
 use vector_core::buffers::Acker;
 use vector_core::sink::StreamSink;
 

@@ -1,5 +1,6 @@
-use crate::http::build_proxy_connector;
-use crate::tls::MaybeTlsSettings;
+use crate::aws::aws_sdk::create_client;
+use crate::common::sqs::SqsClientBuilder;
+use crate::tls::TlsOptions;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
@@ -7,6 +8,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
+
 use serde::{Deserialize, Serialize};
 use std::cmp;
 
@@ -38,6 +40,8 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
+
+    pub tls: Option<TlsOptions>,
 }
 
 #[async_trait::async_trait]
@@ -76,26 +80,14 @@ impl SourceConfig for AwsSqsConfig {
 
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
-        let mut config_builder = aws_sdk_sqs::config::Builder::new()
-            .credentials_provider(self.auth.credentials_provider().await?);
-
-        if let Some(endpoint_override) = self.region.endpoint()? {
-            config_builder = config_builder.endpoint_resolver(endpoint_override);
-        }
-        if let Some(region) = self.region.region() {
-            config_builder = config_builder.region(region);
-        }
-
-        if cx.proxy.enabled {
-            let tls_settings = MaybeTlsSettings::enable_client()?;
-            let proxy = build_proxy_connector(tls_settings, &cx.proxy)?;
-            let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-            let connector = aws_smithy_client::erase::DynConnector::new(hyper_client);
-            let client = aws_sdk_sqs::Client::from_conf_conn(config_builder.build(), connector);
-            Ok(client)
-        } else {
-            Ok(aws_sdk_sqs::Client::from_conf(config_builder.build()))
-        }
+        create_client::<SqsClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            &cx.proxy,
+            &self.tls,
+        )
+        .await
     }
 }
 

@@ -280,7 +280,7 @@ fn parse<'a>(
             // Create a descriptive error message if possible.
             nom::error::convert_error(input, e)
         }
-        _ => format!("{}", e),
+        _ => e.to_string(),
     })?;
 
     if rest.trim().is_empty() {

@@ -131,7 +131,6 @@ scopes:
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
-  - generator source # Anything `generator` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
@@ -146,6 +145,7 @@ scopes:
   - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
+  - redis source # Anything `redis` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
   - statsd source # Anything `statsd` source related
