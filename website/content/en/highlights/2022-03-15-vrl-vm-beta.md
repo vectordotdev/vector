@@ -50,23 +50,23 @@ if .flag == 42 {
 
 VRL compiles that into the nodes similar to this:
 
-```asciiart
-          +----------+       +-------------+
-    +-----|    IF    | ----> |  PREDICATE  |
-    |     +----------+       +-------------+
-    |              |                |
-    v              v                v
-  +-------+     +--------+       +-------+
-  | THEN  |     |  ELSE  |       |  ==   |
-  +-------+     +--------+       +-------+
-     |             |              |     |
-     v             v              v     v
-+----------+    +---------+     .flag  42
-|  ASSIGN  |    |  ASSIGN |
-+----------+    +---------+
-     |   |         |    |
-     v   v         v    v
- .field  32    .field   15
+```mermaid
+graph TD
+    IF -->PREDICATE
+    PREDICATE -->Equals[==]
+    Equals -->Flag[.flag]
+    Equals -->42
+
+    IF -->THEN
+    THEN -->ASSIGN1[ASSIGN]
+    ASSIGN1 -->Field1[.field]
+    ASSIGN1 -->32
+
+    IF -->ELSE
+    ELSE -->ASSIGN2[ASSIGN]
+    ASSIGN2 -->Field2[.field]
+    ASSIGN2 -->15
+
 ```
 
 As the VRL program is run each node is interpreted which decides what actions need to be
