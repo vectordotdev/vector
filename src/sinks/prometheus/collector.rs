@@ -301,7 +301,8 @@ impl StringCollector {
     }
 
     fn format_tag(key: &str, mut value: &str) -> String {
-        let mut result = String::with_capacity(key.len() + value.len() + 4);
+        // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
+        let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
         while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
