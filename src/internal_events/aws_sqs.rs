@@ -1,3 +1,5 @@
+#[cfg(feature = "sources-aws_sqs")]
+use aws_sdk_sqs::{error::DeleteMessageBatchError, types::SdkError};
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 use rusoto_core::RusotoError;
@@ -58,6 +60,65 @@ impl InternalEvent for SqsS3EventsReceived {
     }
 }
 
+#[derive(Debug)]
+pub struct SqsMessageReceiveSucceeded {
+    pub count: usize,
+}
+
+impl InternalEvent for SqsMessageReceiveSucceeded {
+    fn emit(self) {
+        trace!(message = "Received SQS messages.", count = %self.count);
+        counter!("sqs_message_receive_succeeded_total", 1);
+        counter!("sqs_message_received_messages_total", self.count as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct SqsMessageProcessingSucceeded<'a> {
+    pub message_id: &'a str,
+}
+
+impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
+    fn emit(self) {
+        trace!(message = "Processed SQS message succeededly.", message_id = %self.message_id);
+        counter!("sqs_message_processing_succeeded_total", 1);
+    }
+}
+
+// AWS sqs source
+
+#[cfg(feature = "sources-aws_sqs")]
+#[derive(Debug)]
+pub struct AwsSqsBytesReceived {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AwsSqsBytesReceived {
+    fn emit(self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = "http",
+        );
+        counter!("component_received_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[cfg(feature = "sources-aws_sqs")]
+#[derive(Debug)]
+pub struct SqsMessageDeleteError<'a> {
+    pub error: &'a SdkError<DeleteMessageBatchError>,
+}
+
+impl<'a> InternalEvent for SqsMessageDeleteError<'a> {
+    fn emit(self) {
+        error!(message = "Failed to delete SQS events.", error = %self.error);
+        counter!("sqs_message_delete_failed_total", 1);
+    }
+}
+
+// AWS s3 source
+
 #[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageReceiveError<'a> {
@@ -84,32 +145,6 @@ impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
         counter!("sqs_message_receive_failed_total", 1);
     }
 }
-
-#[derive(Debug)]
-pub struct SqsMessageReceiveSucceeded {
-    pub count: usize,
-}
-
-impl InternalEvent for SqsMessageReceiveSucceeded {
-    fn emit(self) {
-        trace!(message = "Received SQS messages.", count = %self.count);
-        counter!("sqs_message_receive_succeeded_total", 1);
-        counter!("sqs_message_received_messages_total", self.count as u64);
-    }
-}
-
-#[derive(Debug)]
-pub struct SqsMessageProcessingSucceeded<'a> {
-    pub message_id: &'a str,
-}
-
-impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
-    fn emit(self) {
-        trace!(message = "Processed SQS message succeededly.", message_id = %self.message_id);
-        counter!("sqs_message_processing_succeeded_total", 1);
-    }
-}
-
 #[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
 pub struct SqsMessageProcessingError<'a> {

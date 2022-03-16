@@ -13,11 +13,11 @@ use tokio_util::codec::FramedRead;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{self, internal_event::EventsReceived};
 
-use super::events::*;
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, BatchStatus, Event},
+    internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     SourceSender,
