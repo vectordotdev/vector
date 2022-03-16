@@ -36,11 +36,10 @@ where
 
 #[cfg(any(test, feature = "test"))]
 pub fn emit(event: impl InternalEvent) {
-    if let Some(name) = event.name() {
-        event.emit();
+    let name = event.name();
+    event.emit();
+    if let Some(name) = name {
         super::event_test_util::record_internal_event(name);
-    } else {
-        event.emit();
     }
 }
 
