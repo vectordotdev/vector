@@ -1,6 +1,8 @@
 use std::pin::Pin;
 
 use async_recursion::async_recursion;
+use async_stream::stream;
+use futures::Stream;
 use tokio::select;
 
 use super::limited_queue::LimitedReceiver;
@@ -72,6 +74,7 @@ where
 pub struct BufferReceiver<T: Bufferable> {
     base: ReceiverAdapter<T>,
     overflow: Option<Box<BufferReceiver<T>>>,
+    //strategy: PollStrategy,
     instrumentation: Option<BufferUsageHandle>,
 }
 
@@ -81,6 +84,7 @@ impl<T: Bufferable> BufferReceiver<T> {
         Self {
             base,
             overflow: None,
+            //strategy: PollStrategy::default(),
             instrumentation: None,
         }
     }
@@ -90,6 +94,7 @@ impl<T: Bufferable> BufferReceiver<T> {
         Self {
             base,
             overflow: Some(Box::new(overflow)),
+            //strategy: PollStrategy::default(),
             instrumentation: None,
         }
     }
@@ -146,5 +151,14 @@ impl<T: Bufferable> BufferReceiver<T> {
         }
 
         Some(item)
+    }
+
+    pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = T> + Send>> {
+        let mut receiver = self;
+        Box::pin(stream! {
+            while let Some(item) = receiver.next().await {
+                yield item;
+            }
+        })
     }
 }

@@ -1,13 +1,7 @@
-use futures::{task::AtomicWaker, Sink, Stream, StreamExt};
+use futures::{Stream, StreamExt};
+use futures_util::{pending, stream::FuturesUnordered};
 use indexmap::IndexMap;
-use pin_project::pin_project;
-use std::{
-    fmt,
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::fmt;
 use tokio::sync::mpsc;
 
 use crate::{config::ComponentKey, event::EventArray};
@@ -37,7 +31,6 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     senders: IndexMap<ComponentKey, Sender>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
-    waker: Arc<AtomicWaker>,
 }
 
 impl Fanout {
@@ -47,7 +40,6 @@ impl Fanout {
         let fanout = Self {
             senders: Default::default(),
             control_channel: control_rx,
-            waker: Arc::new(AtomicWaker::new()),
         };
 
         (fanout, control_tx)
@@ -63,8 +55,7 @@ impl Fanout {
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders
-            .insert(id, Sender::idle(sink, Arc::clone(&self.waker)));
+        self.senders.insert(id, Sender::idle(sink));
     }
 
     /// Remove an existing sink as an output.
@@ -92,7 +83,6 @@ impl Fanout {
         if let Some(existing) = self.senders.get_mut(id) {
             if let Some(sink) = sink {
                 existing.replace(sink);
-                self.waker.wake();
             } else {
                 existing.pause();
             }
@@ -164,7 +154,7 @@ impl Fanout {
         }
         self.senders.first_mut().unwrap().1.input = Some(events);
 
-        let mut send_group = SendGroup::new(&mut self.senders, Arc::clone(&self.waker));
+        let mut send_group = SendGroup::new(&mut self.senders);
 
         // Keep track of whether the control channel has returned `Ready(None)`, and stop polling
         // it once it has. If we don't do this check, it will continue to return `Ready(None)` any
@@ -204,7 +194,7 @@ impl Fanout {
                     }
                 }
 
-                () = &mut send_group => {
+                () = send_group.drive() => {
                     // All in-flight sends have completed, so return sinks to the base collection.
                     // We extend instead of assign here because other sinks could have been added
                     // while the send was in-flight.
@@ -217,12 +207,11 @@ impl Fanout {
 
 struct SendGroup<'a> {
     sends: &'a mut IndexMap<ComponentKey, Sender>,
-    waker: Arc<AtomicWaker>,
 }
 
 impl<'a> SendGroup<'a> {
-    fn new(sends: &'a mut IndexMap<ComponentKey, Sender>, waker: Arc<AtomicWaker>) -> Self {
-        Self { sends, waker }
+    fn new(sends: &'a mut IndexMap<ComponentKey, Sender>) -> Self {
+        Self { sends }
     }
 
     fn contains(&mut self, id: &ComponentKey) -> bool {
@@ -234,8 +223,7 @@ impl<'a> SendGroup<'a> {
             !self.contains(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.sends
-            .insert(id, Sender::idle(sink, Arc::clone(&self.waker)));
+        self.sends.insert(id, Sender::idle(sink));
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -248,8 +236,6 @@ impl<'a> SendGroup<'a> {
     fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
         if let Some(send) = self.sends.get_mut(id) {
             send.replace(sink);
-            // This may have unpaused a send operation, so make sure it is woken up.
-            self.waker.wake();
         } else {
             panic!("Replacing non-existent sink from fanout: {id}");
         }
@@ -262,52 +248,46 @@ impl<'a> SendGroup<'a> {
             panic!("Replacing non-existent sink from fanout: {id}");
         }
     }
-}
 
-impl<'a> Future for SendGroup<'a> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut pending = false;
-        for send in self.sends.values_mut() {
-            let send = Pin::new(send);
-            if send.poll(cx).is_pending() {
-                pending = true;
-            }
+    async fn drive(&mut self) {
+        // We're all done when all the senders are done sending their current item.
+        if self.sends.iter().all(|(_, sender)| sender.is_idle()) {
+            return;
         }
 
-        if pending {
-            Poll::Pending
-        } else {
-            Poll::Ready(())
+        // We need to generate a flush future from each sender and try to drive it to completion
+        // here.  We use `FuturesUnordered` for this because it's simple, but there might be
+        // something better already, or in the future.
+        let mut send_ops = FuturesUnordered::new();
+        for sender in self.sends.values_mut() {
+            send_ops.push(sender.flush());
+        }
+
+        while !send_ops.is_empty() {
+            send_ops.next().await;
         }
     }
 }
 
-#[pin_project]
 struct Sender {
-    #[pin]
     state: SendState<BufferSender<EventArray>>,
     input: Option<EventArray>,
-    waker: Arc<AtomicWaker>,
 }
 
-#[pin_project(project = SendStateProj)]
 enum SendState<T> {
-    Active(#[pin] T),
+    Idle(T),
     Paused,
 }
 
 impl Sender {
-    fn idle(sink: BufferSender<EventArray>, waker: Arc<AtomicWaker>) -> Self {
+    fn idle(inner: BufferSender<EventArray>) -> Self {
         Self {
-            state: SendState::Active(sink),
+            state: SendState::Idle(inner),
             input: None,
-            waker,
         }
     }
-    fn replace(&mut self, sink: BufferSender<EventArray>) {
-        self.state = SendState::Active(sink);
+    fn replace(&mut self, inner: BufferSender<EventArray>) {
+        self.state = SendState::Idle(inner);
     }
 
     fn pause(&mut self) {
@@ -319,48 +299,15 @@ impl Sender {
     }
 
     fn is_idle(&self) -> bool {
-        matches!((&self.state, &self.input), (SendState::Active(_), None))
+        matches!((&self.state, &self.input), (SendState::Idle(_), None))
     }
-}
 
-impl Future for Sender {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-        loop {
-            match this.state.as_mut().project() {
-                SendStateProj::Active(mut sink) => {
-                    if let Some(event_array) = this.input.take() {
-                        match sink.as_mut().poll_ready(cx) {
-                            Poll::Ready(Ok(())) => {
-                                sink.start_send(event_array).expect("unit error");
-                            }
-                            Poll::Ready(Err(())) => {
-                                panic!("unit error");
-                            }
-                            Poll::Pending => {
-                                *this.input = Some(event_array);
-                                return Poll::Pending;
-                            }
-                        }
-                    } else {
-                        return match sink.as_mut().poll_flush(cx) {
-                            Poll::Ready(Ok(())) => Poll::Ready(()),
-                            Poll::Ready(Err(())) => panic!("unit error"),
-                            Poll::Pending => Poll::Pending,
-                        };
-                    }
-                }
-                SendStateProj::Paused => {
-                    // This likely isn't strictly necessary given how this future is used right now
-                    // (i.e. only a single task, gets polled in the same select loop that wakes
-                    // it), but it would be a bit of a footgun to leave out this part of the
-                    // `Future` contract. Basically, this ensure that even if the future is spawned
-                    // some other way, we'll get woken up to make progress when the sink is added
-                    // back.
-                    this.waker.register(cx.waker());
-                    return Poll::Pending;
+    async fn flush(&mut self) {
+        match self.state {
+            SendState::Paused => pending!(),
+            SendState::Idle(ref mut inner) => {
+                if let Some(input) = self.input.take() {
+                    inner.send(input).await.expect("unit error");
                 }
             }
         }
@@ -371,7 +318,7 @@ impl Future for Sender {
 mod tests {
     use std::mem;
 
-    use futures::{poll, StreamExt};
+    use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_buffers::{
@@ -502,7 +449,7 @@ mod tests {
         fanout.send(clones).await;
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver), &[events.clone()]);
+            assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
         }
     }
 
@@ -552,14 +499,18 @@ mod tests {
 
         // Make sure the first two senders got all three events, but the third sender only got the
         // last event:
-        assert_eq!(collect_ready_events(&mut receivers[0]), &events[..]);
-        assert_eq!(collect_ready_events(&mut receivers[1]), &events[..]);
-        assert_eq!(collect_ready_events(&mut receivers[2]), &events[2..]);
+        let expected_events = [&events, &events, &events[2..]];
+        for (i, receiver) in receivers.into_iter().enumerate() {
+            assert_eq!(
+                collect_ready_events(receiver.into_stream()),
+                expected_events[i]
+            );
+        }
     }
 
     #[tokio::test]
     async fn fanout_shrink() {
-        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, control, receivers) = fanout_from_senders(&[4, 4]).await;
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
@@ -574,8 +525,11 @@ mod tests {
 
         // Make sure the first sender got all three events, but the second sender only got the first two:
         let expected_events = [&events, &events[..2]];
-        for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready_events(receiver), expected_events[i]);
+        for (i, receiver) in receivers.into_iter().enumerate() {
+            assert_eq!(
+                collect_ready_events(receiver.into_stream()),
+                expected_events[i]
+            );
         }
     }
 
@@ -660,12 +614,18 @@ mod tests {
         // Now make sure that the new "first" sender only got the third event, but that the second and
         // third sender got all three events:
         let expected_events = [&events[2..], &events, &events];
-        for (i, receiver) in receivers.iter_mut().enumerate() {
-            assert_eq!(collect_ready_events(receiver), expected_events[i]);
+        for (i, receiver) in receivers.into_iter().enumerate() {
+            assert_eq!(
+                collect_ready_events(receiver.into_stream()),
+                expected_events[i]
+            );
         }
 
         // And make sure our original "first" sender got the first two events:
-        assert_eq!(collect_ready_events(old_first_receiver), &events[..2]);
+        assert_eq!(
+            collect_ready_events(old_first_receiver.into_stream()),
+            &events[..2]
+        );
     }
 
     #[tokio::test]
@@ -697,9 +657,18 @@ mod tests {
 
         // Make sure the original first sender got the first two events, the new first sender got
         // the last event, and the second sender got all three:
-        assert_eq!(collect_ready_events(old_first_receiver), &events[0..2]);
-        assert_eq!(collect_ready_events(&mut receivers[0]), &events[2..]);
-        assert_eq!(collect_ready_events(&mut receivers[1]), &events[..]);
+        assert_eq!(
+            collect_ready_events(old_first_receiver.into_stream()),
+            &events[0..2]
+        );
+
+        let expected_events = [&events[2..], &events];
+        for (i, receiver) in receivers.into_iter().enumerate() {
+            assert_eq!(
+                collect_ready_events(receiver.into_stream()),
+                expected_events[i]
+            );
+        }
     }
 
     fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {

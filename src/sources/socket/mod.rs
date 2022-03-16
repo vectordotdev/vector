@@ -225,6 +225,7 @@ mod test {
         task::JoinHandle,
         time::{Duration, Instant},
     };
+    use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
@@ -244,11 +245,11 @@ mod test {
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
-        event::{into_event_stream, Event},
+        event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
-            collect_n,
+            collect_n, collect_n_limited,
             components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
@@ -502,7 +503,6 @@ mod test {
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
         let (tx, rx) = SourceSender::new_with_buffer(10_000);
-        let rx = rx.flat_map(into_event_stream);
         let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
@@ -538,7 +538,11 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let events = collect_n(rx, 100).await;
+        let events = collect_n_limited(rx, 100)
+            .await
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<Vec<_>>();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(

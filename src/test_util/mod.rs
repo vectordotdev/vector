@@ -35,6 +35,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_buffers::topology::channel::LimitedReceiver;
 use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
 
 use crate::{
@@ -333,6 +334,25 @@ where
             Poll::Ready(None) | Poll::Pending => return vec,
         }
     }
+}
+
+pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> Vec<T> {
+    let mut items = Vec::new();
+    while let Some(item) = rx.next().await {
+        items.push(item);
+    }
+    items
+}
+
+pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
+    let mut items = Vec::new();
+    while items.len() < n {
+        match rx.next().await {
+            Some(item) => items.push(item),
+            None => break,
+        }
+    }
+    items
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {

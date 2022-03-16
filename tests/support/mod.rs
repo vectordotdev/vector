@@ -16,12 +16,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{
-    future,
-    stream::{self, BoxStream},
-    task::Poll,
-    FutureExt, Stream, StreamExt,
-};
+use futures::{future, stream::BoxStream, FutureExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::{error, info};
@@ -47,7 +42,7 @@ use vector_buffers::{topology::channel::LimitedReceiver, Acker};
 pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
-    (rx, sink)
+    (rx.into_stream(), sink)
 }
 
 pub fn sink_with_data(
@@ -56,7 +51,7 @@ pub fn sink_with_data(
 ) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new_with_data(tx, true, data);
-    (rx, sink)
+    (rx.into_stream(), sink)
 }
 
 pub fn sink_failing_healthcheck(
@@ -64,7 +59,7 @@ pub fn sink_failing_healthcheck(
 ) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
-    (rx, sink)
+    (rx.into_stream(), sink)
 }
 
 pub fn sink_dead() -> MockSinkConfig {
@@ -175,31 +170,19 @@ impl SourceConfig for MockSourceConfig {
     async fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
-        let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(cx.shutdown);
-        let mut _token = None;
+        let recv = wrapped.lock().unwrap().take().unwrap();
+        let shutdown = cx.shutdown;
         let mut out = cx.out;
         Ok(Box::pin(async move {
-            let mut stream = stream::poll_fn(move |cx| {
-                if let Some(until) = shutdown.as_mut() {
-                    match until.poll_unpin(cx) {
-                        Poll::Ready(res) => {
-                            _token = Some(res);
-                            shutdown.take();
-                            // recv.close();
-                        }
-                        Poll::Pending => {}
+            let mut stream = recv
+                .into_stream()
+                .take_until(shutdown)
+                .inspect(move |array| {
+                    if let Some(counter) = &event_counter {
+                        counter.fetch_add(array.len(), Ordering::Relaxed);
                     }
-                }
-
-                recv.poll_next_unpin(cx)
-            })
-            .inspect(move |array| {
-                if let Some(counter) = &event_counter {
-                    counter.fetch_add(array.len(), Ordering::Relaxed);
-                }
-            })
-            .flat_map(into_event_stream);
+                })
+                .flat_map(into_event_stream);
 
             match out.send_event_stream(&mut stream).await {
                 Ok(()) => {

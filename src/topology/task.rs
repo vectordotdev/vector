@@ -7,19 +7,16 @@ use std::{
 
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
-use vector_core::{
-    buffers::{topology::channel::BufferReceiver, Acker},
-    event::EventArray,
-};
+use vector_core::buffers::Acker;
 
-use crate::{config::ComponentKey, utilization::Utilization};
+use crate::{config::ComponentKey, utilization::BufferUtilization};
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Utilization<BufferReceiver<EventArray>>, Acker),
+    Sink(BufferUtilization, Acker),
     Healthcheck,
 }
 

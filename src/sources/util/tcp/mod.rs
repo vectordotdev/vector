@@ -159,6 +159,7 @@ where
                 .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
                 .for_each(move |(connection, tcp_connection_permit)| {
+                    info!("got new tcp conn");
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
@@ -315,6 +316,8 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
+                        info!("Got {} events at source!", count);
+
                         emit!(&SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.size_of(),
@@ -337,6 +340,7 @@ async fn handle_stream<T>(
                         source.handle_events(&mut events, host.clone());
                         match out.send_batch(events).await {
                             Ok(_) => {
+                                info!("Sent events, waiting on acknowledgements if configured...");
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,
                                     Some(receiver) =>
@@ -354,6 +358,7 @@ async fn handle_stream<T>(
                                             }
                                         }
                                 };
+                                info!("Got acknowledgement response (or no-op)!");
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {

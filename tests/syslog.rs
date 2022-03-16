@@ -13,6 +13,7 @@ use sinks::{
 #[cfg(unix)]
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::BytesCodec;
+use tracing::info;
 use vector::{
     config, sinks,
     sources::syslog::{Mode, SyslogConfig},
@@ -45,8 +46,12 @@ async fn test_tcp_syslog() {
     let output_lines = CountReceiver::receive_lines(out_addr);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+info!("topology running");
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
+
+    info!("accepting traffic");
 
     let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
         .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
@@ -56,11 +61,17 @@ async fn test_tcp_syslog() {
 
     send_lines(in_addr, input_lines).await.unwrap();
 
+    info!("sent lines");
+
     // Shut down server
     topology.stop().await;
 
+    info!("topology stopped");
+
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
+
+    info!("got output lines");
 
     let output_messages: Vec<SyslogMessageRfc5424> = output_lines
         .iter()
@@ -164,8 +175,12 @@ async fn test_octet_counting_syslog() {
     let output_lines = CountReceiver::receive_lines(out_addr);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    info!("Topology running.");
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
+
+    info!("Source listening for traffic.");
 
     let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
         .map(|i| {
@@ -187,11 +202,17 @@ async fn test_octet_counting_syslog() {
 
     send_encodable(in_addr, codec, input_lines).await.unwrap();
 
+    info!("Sent {} messages.", num_messages);
+
     // Shut down server
     topology.stop().await;
 
+    info!("Topology stopped.");
+
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
+
+    info!("Got {} output lines.", output_lines.len());
 
     let output_messages: Vec<SyslogMessageRfc5424> = output_lines
         .iter()

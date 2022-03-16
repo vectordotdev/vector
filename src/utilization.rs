@@ -1,4 +1,5 @@
 use std::{
+    future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::{Duration, Instant},
@@ -10,6 +11,8 @@ use metrics::gauge;
 use pin_project::pin_project;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
+use vector_buffers::topology::channel::BufferReceiver;
+use vector_core::event::EventArray;
 
 use crate::stats;
 
@@ -59,6 +62,66 @@ where
                 Poll::Pending => {
                     let result = ready!(this.inner.poll_next_unpin(cx));
                     this.timer.stop_wait();
+                    return Poll::Ready(result);
+                }
+            }
+        }
+    }
+}
+
+pub(crate) struct BufferUtilization {
+    timer: Timer,
+    intervals: IntervalStream,
+    inner: BufferReceiver<EventArray>,
+}
+
+impl BufferUtilization {
+    pub(crate) fn from_receiver(inner: BufferReceiver<EventArray>) -> Self {
+        Self {
+            timer: Timer::new(),
+            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
+            inner,
+        }
+    }
+
+    /// Consumes this wrapper and returns the inner stream.
+    ///
+    /// This can't be constant because destructors can't be run in a const context, and we're
+    /// discarding `IntervalStream`/`Timer` when we call this.
+    #[allow(clippy::missing_const_for_fn)]
+    pub(crate) fn into_inner(self) -> BufferReceiver<EventArray> {
+        self.inner
+    }
+}
+
+impl Stream for BufferUtilization {
+    type Item = EventArray;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // The goal of this function is to measure the time between when the
+        // caller requests the next Event from the stream and before one is
+        // ready, with the side-effect of reporting every so often about how
+        // long the wait gap is.
+        //
+        // To achieve this we poll the `intervals` stream and if a new interval
+        // is ready we hit `Timer::report` and loop back around again to poll
+        // for a new `Event`. Calls to `Timer::start_wait` will only have an
+        // effect if `stop_wait` has been called, so the structure of this loop
+        // avoids double-measures.
+        loop {
+            self.timer.start_wait();
+            match self.intervals.poll_next_unpin(cx) {
+                Poll::Ready(_) => {
+                    self.timer.report();
+                    continue;
+                }
+                Poll::Pending => {
+                    let result = {
+                        let read = async { self.inner.next().await };
+                        tokio::pin!(read);
+                        ready!(read.poll(cx))
+                    };
+                    self.timer.stop_wait();
                     return Poll::Ready(result);
                 }
             }

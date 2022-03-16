@@ -8716,6 +8716,7 @@ name = "vector_buffers"
 version = "0.1.0"
 dependencies = [
  "async-recursion",
+ "async-stream",
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",

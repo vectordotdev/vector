@@ -50,10 +50,7 @@ where
 {
     pub async fn send(&mut self, item: T) -> Result<(), ()> {
         match self {
-            Self::InMemory(tx) => {
-                tx.send(item).await;
-                Ok(())
-            }
+            Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
             Self::DiskV1(writer) => {
                 writer.send(item).await;
                 Ok(())
@@ -84,7 +81,10 @@ where
 
     pub async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
         match self {
-            Self::InMemory(tx) => Ok(tx.try_send(item)),
+            Self::InMemory(tx) => tx
+                .try_send(item)
+                .map(|()| None)
+                .or_else(|e| Ok(Some(e.into_inner()))),
             Self::DiskV1(writer) => Ok(writer.try_send(item)),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;

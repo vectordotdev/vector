@@ -40,6 +40,7 @@ use crate::{
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    utilization::BufferUtilization,
     SourceSender,
 };
 
@@ -157,6 +158,15 @@ pub async fn build_pieces(
         for output in source_outputs {
             let mut rx = builder.add_output(output.clone());
 
+            let span = error_span!(
+                "source_pump",
+                component_kind = "source",
+                component_id = %key.id(),
+                component_type = %source.inner.source_type(),
+                // maintained for compatibility
+                component_name = %key.id(),
+            );
+
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
                 while let Some(array) = rx.next().await {
@@ -165,7 +175,7 @@ pub async fn build_pieces(
                 Ok(TaskOutput::Source)
             };
 
-            pumps.push(pump);
+            pumps.push(pump.instrument(span));
             controls.insert(
                 OutputId {
                     component: key.clone(),
@@ -374,7 +384,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = crate::utilization::wrap(rx);
+            let mut rx = BufferUtilization::from_receiver(rx);
 
             sink.run(
                 rx.by_ref()
@@ -592,6 +602,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
@@ -610,6 +621,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
@@ -672,7 +684,7 @@ fn build_task_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    let input_rx = crate::utilization::wrap(input_rx);
+    let input_rx = crate::utilization::wrap(input_rx.into_stream());
 
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
