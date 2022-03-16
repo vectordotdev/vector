@@ -305,10 +305,12 @@ fn format_tag(key: &str, mut value: &str) -> String {
     let mut result = String::with_capacity(key.len() + value.len() + 4);
     result.push_str(key);
     result.push_str("=\"");
-    while let Some(quote) = value.find('"') {
-        result.push_str(&value[..quote]);
-        result.push_str("\\\"");
-        value = &value[quote + 1..];
+    while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+        result.push_str(&value[..i]);
+        result.push('\\');
+        // Ugly but works because we know the character at `i` is ASCII
+        result.push(value.as_bytes()[i] as char);
+        value = &value[i + 1..];
     }
     result.push_str(value);
     result.push('"');
@@ -919,10 +921,14 @@ mod tests {
 
     #[test]
     fn escapes_tags_text() {
-        let tags: BTreeMap<String, String> = [("code", "200"), ("quoted", r#"host"1""#)]
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
+        let tags: BTreeMap<String, String> = [
+            ("code", "200"),
+            ("quoted", r#"host"1""#),
+            ("path", r#"c:\Windows"#),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
         let metric = Metric::new(
             "something".to_owned(),
             MetricKind::Absolute,
@@ -935,7 +941,7 @@ mod tests {
             indoc! {r#"
                 # HELP something something
                 # TYPE something counter
-                something{code="200",quoted="host\"1\""} 1
+                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
             "#}
         );
     }
