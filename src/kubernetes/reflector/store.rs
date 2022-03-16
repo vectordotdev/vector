@@ -4,7 +4,7 @@ use derivative::Derivative;
 use kube::api::Resource;
 use kube::runtime::watcher;
 use parking_lot::RwLock;
-use std::{fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash, sync::Arc, time::Duration};
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -18,8 +18,9 @@ pub struct Writer<K: 'static + Resource>
 where
     K::DynamicType: Eq + Hash,
 {
-    store: Cache<K>,
-    dyntype: K::DynamicType,
+    pub store: Cache<K>,
+    pub dyntype: K::DynamicType,
+    pub ttl: Duration,
 }
 
 impl<K: 'static + Resource + Clone> Writer<K>
@@ -30,10 +31,11 @@ where
     ///
     /// If the dynamic type is default-able (for example when writer is used with
     /// `k8s_openapi` types) you can use `Default` instead.
-    pub fn new(dyntype: K::DynamicType) -> Self {
+    pub fn new(dyntype: K::DynamicType, ttl: Duration) -> Self {
         Writer {
             store: Default::default(),
             dyntype,
+            ttl,
         }
     }
 

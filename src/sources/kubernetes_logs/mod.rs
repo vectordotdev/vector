@@ -312,7 +312,10 @@ impl Source {
                 ..Default::default()
             },
         );
-        let pod_store_w = reflector::store::Writer::default();
+        let pod_store_w = reflector::store::Writer {
+            ttl: delay_deletion,
+            ..Default::default()
+        };
         let pod_state = pod_store_w.as_reader();
 
         let pod_reflector = reflector(pod_store_w, pod_watcher);
@@ -327,7 +330,10 @@ impl Source {
 
         let namespaces = Api::<Namespace>::all(client);
         let ns_watcher = watcher(namespaces, ListParams::default());
-        let ns_store_w = reflector::store::Writer::default();
+        let ns_store_w = reflector::store::Writer {
+            ttl: delay_deletion,
+            ..Default::default()
+        };
         let ns_state = ns_store_w.as_reader();
 
         let ns_reflector = reflector(ns_store_w, ns_watcher);
