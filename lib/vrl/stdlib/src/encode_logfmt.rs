@@ -66,6 +66,7 @@ impl Function for EncodeLogfmt {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
+        let fields = args.optional("fields_ordering");
 
         let key_value_delimiter = Value::from("=");
         let field_delimiter = Value::from(" ");
