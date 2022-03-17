@@ -3,8 +3,6 @@
 
 use std::sync::Arc;
 
-use rusoto_core::Region;
-use rusoto_kinesis::{Kinesis, KinesisClient};
 use tokio::time::{sleep, Duration};
 
 use super::*;
