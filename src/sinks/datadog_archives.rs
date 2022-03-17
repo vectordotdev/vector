@@ -26,7 +26,6 @@ use vector_core::{
 };
 
 use super::util::{
-    batch::BatchError,
     encoding::{Encoder, StandardEncodings},
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
@@ -94,8 +93,6 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
     tls: Option<TlsOptions>,
-    #[serde(default, skip_serializing)]
-    batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -156,7 +153,6 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             gcp_cloud_storage: None,
             tls: None,
             azure_blob: None,
-            batch: BatchConfig::default(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -169,8 +165,6 @@ enum ConfigError {
     UnsupportedService { service: String },
     #[snafu(display("Unsupported storage class: {}", storage_class))]
     UnsupportedStorageClass { storage_class: String },
-    #[snafu(display("Invalid batch configuration: {}", source))]
-    InvalidBatchConfiguration { source: BatchError },
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
@@ -261,10 +255,9 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
@@ -290,10 +283,9 @@ impl DatadogArchivesSinkConfig {
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -347,10 +339,9 @@ impl DatadogArchivesSinkConfig {
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
         let request_builder = DatadogAzureRequestBuilder {
@@ -968,7 +959,6 @@ mod tests {
                 azure_blob: None,
                 gcp_cloud_storage: None,
                 tls: None,
-                batch: BatchConfig::default(),
                 acknowledgements: Default::default(),
             };
 
