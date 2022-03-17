@@ -173,7 +173,14 @@ impl Vm {
     /// If the constant already exists, the position of that element is returned without adding
     /// the value again.
     pub fn add_constant(&mut self, object: Value) -> usize {
-        match self.values.iter().position(|value| value == &object) {
+        // We need to do a specific match for types with `Float`s since the default
+        // implementation for `Eq` on Value type truncates the float values in the comparison.
+        // `lossy_eq` doesn't work either since that allows you to compare `Integer` against
+        // `Float`, which wouldn't work here.
+        match self.values.iter().position(|value| match (value, &object) {
+            (Value::Float(lhs), Value::Float(rhs)) => lhs == rhs,
+            (lhs, rhs) => lhs == rhs,
+        }) {
             None => {
                 self.values.push(object);
                 self.values.len() - 1
