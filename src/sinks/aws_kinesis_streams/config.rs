@@ -30,6 +30,7 @@ use crate::{
     tls::TlsOptions,
 };
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeStream failed: {}", source))]
@@ -126,7 +127,7 @@ impl KinesisSinkConfig {
             Ok(resp) => {
                 let name = resp
                     .stream_description
-                    .and_then(|x| x.stream_name.clone())
+                    .and_then(|x| x.stream_name)
                     .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
