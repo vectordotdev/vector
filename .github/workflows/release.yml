@@ -17,7 +17,7 @@ env:
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -34,7 +34,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
   build-x86_64-unknown-linux-gnu-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -59,7 +59,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
 
   build-aarch64-unknown-linux-musl-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -77,7 +77,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
 
   build-aarch64-unknown-linux-gnu-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -103,7 +103,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-armv7-unknown-linux-gnueabihf-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -128,7 +128,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
   build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
