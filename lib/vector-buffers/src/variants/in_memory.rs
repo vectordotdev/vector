@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, num::NonZeroUsize};
 
 use async_trait::async_trait;
 
@@ -12,11 +12,11 @@ use crate::{
 };
 
 pub struct MemoryBuffer {
-    capacity: usize,
+    capacity: NonZeroUsize,
 }
 
 impl MemoryBuffer {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: NonZeroUsize) -> Self {
         MemoryBuffer { capacity }
     }
 }
@@ -31,9 +31,9 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
-        usage_handle.set_buffer_limits(None, Some(self.capacity));
+        usage_handle.set_buffer_limits(None, Some(self.capacity.get()));
 
-        let (tx, rx) = limited(self.capacity);
+        let (tx, rx) = limited(self.capacity.get());
         Ok((
             SenderAdapter::channel(tx),
             ReceiverAdapter::channel(rx),

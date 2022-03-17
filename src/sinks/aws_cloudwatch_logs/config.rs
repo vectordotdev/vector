@@ -1,11 +1,13 @@
 use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use std::num::NonZeroU64;
+use tower::ServiceBuilder;
 
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
 use crate::aws::aws_sdk::{create_client, ClientBuilder};
+use crate::sinks::util::ServiceBuilderExt;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
@@ -105,12 +107,14 @@ impl CloudwatchLogsSinkConfig {
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let client = self.create_client(cx.proxy()).await?;
-        let svc = request.service(
-            CloudwatchRetryLogic::new(),
-            CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),
-        );
+        let svc = ServiceBuilder::new()
+            .settings(request_settings, CloudwatchRetryLogic::new())
+            .service(CloudwatchLogsPartitionSvc::new(
+                self.clone(),
+                client.clone(),
+            ));
         let encoding = self.encoding.clone();
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {

@@ -190,7 +190,7 @@ where
                             })
                             .boxed();
 
-                        span.in_scope(|| {
+                        span.clone().in_scope(|| {
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
@@ -214,7 +214,7 @@ where
                                     drop(open_token);
                                     drop(tcp_connection_permit);
                                 })
-                                .instrument(span.clone()),
+                                .instrument(span.or_current()),
                             );
                         });
                     }

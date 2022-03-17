@@ -125,7 +125,7 @@ pub fn build_unix_stream_source(
                         error!(message = "Failed shutting down socket.", %error);
                     }
                 }
-                .instrument(span),
+                .instrument(span.or_current()),
             );
         }
 

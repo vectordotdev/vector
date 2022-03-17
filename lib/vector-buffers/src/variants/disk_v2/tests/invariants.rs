@@ -75,7 +75,7 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
     });
 
     let parent = trace_span!("pending_read_returns_none_when_writer_closed_with_unflushed_write");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -118,7 +118,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
 
     let parent =
         trace_span!("last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stopped");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -319,7 +319,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
     });
 
     let parent = trace_span!("writer_stops_when_hitting_file_that_reader_is_still_on");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -574,7 +574,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
     });
 
     let parent = trace_span!("reader_deletes_data_file_around_record_id_wraparound");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -737,7 +737,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
     let parent = trace_span!(
         "writer_waits_for_reader_after_validate_last_write_fails_and_data_file_skip_triggered"
     );
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]

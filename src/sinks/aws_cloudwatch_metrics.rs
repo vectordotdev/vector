@@ -32,8 +32,7 @@ use crate::{
         batch::BatchConfig,
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig,
+        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
     tls::TlsOptions,
 };
@@ -185,20 +184,24 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
+        let request_settings = config.request.unwrap_with(&TowerRequestConfig {
             timeout_secs: Some(30),
             rate_limit_num: Some(150),
             ..Default::default()
         });
 
-        let cloudwatch_metrics = CloudWatchMetricsSvc { client };
-
-        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
-
+        let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
-        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+        let sink = request_settings
+            .partition_sink(
+                CloudWatchMetricsRetryLogic,
+                service,
+                buffer,
+                batch.timeout,
+                cx.acker(),
+            )
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
