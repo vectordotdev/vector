@@ -1,11 +1,9 @@
+use aws_sdk_firehose::error::PutRecordBatchError;
+use aws_sdk_firehose::types::SdkError;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
 use hyper::service::Service;
-use rusoto_core::{Region, RusotoError};
-use rusoto_firehose::{
-    KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput,
-};
 use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
@@ -13,6 +11,7 @@ use crate::{
     event::EventStatus, internal_events::AwsBytesSent,
     sinks::aws_kinesis_firehose::request_builder::KinesisRequest,
 };
+use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -42,7 +41,7 @@ impl DriverResponse for KinesisResponse {
 
 impl Service<Vec<KinesisRequest>> for KinesisService {
     type Response = KinesisResponse;
-    type Error = RusotoError<PutRecordBatchError>;
+    type Error = SdkError<PutRecordBatchError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -70,7 +69,10 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
 
         Box::pin(async move {
             client
-                .put_record_batch(request)
+                .put_record_batch()
+                .set_records(Some(records))
+                .delivery_stream_name(self.stream_name.clone())
+                .send()
                 .instrument(info_span!("request").or_current())
                 .await?;
 

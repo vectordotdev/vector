@@ -1,17 +1,19 @@
+use aws_sdk_cloudwatch::{Endpoint, Region};
+use aws_sdk_firehose::error::{DescribeDeliveryStreamError, PutRecordBatchError};
+use aws_sdk_firehose::types::SdkError;
 use std::num::NonZeroU64;
 
+use aws_sdk_firehose::Client as KinesisFirehoseClient;
+use aws_smithy_client::erase::DynConnector;
+use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
-use rusoto_core::RusotoError;
-use rusoto_firehose::{
-    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
-    KinesisFirehoseClient, PutRecordBatchError,
-};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 
+use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
-    aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_firehose::{
@@ -87,7 +89,7 @@ pub enum BuildError {
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: RusotoError<DescribeDeliveryStreamError>,
+        source: SdkError<DescribeDeliveryStreamError>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -101,6 +103,37 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
             encoding.codec = "json""#,
         )
         .unwrap()
+    }
+}
+
+pub struct KinesisFirehoseClientBuilder;
+
+impl ClientBuilder for KinesisFirehoseClientBuilder {
+    type ConfigBuilder = aws_sdk_firehose::config::Builder;
+    type Client = aws_sdk_firehose::Client;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder {
+        Self::ConfigBuilder::new().credentials_provider(credentials_provider)
+    }
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder {
+        builder.endpoint_resolver(endpoint)
+    }
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
+        builder.region(region)
+    }
+
+    fn client_from_conf_conn(
+        builder: Self::ConfigBuilder,
+        connector: DynConnector,
+    ) -> Self::Client {
+        Self::Client::from_conf_conn(builder.build(), connector)
     }
 }
 
@@ -160,13 +193,15 @@ impl KinesisFirehoseSinkConfig {
     async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
-        let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
-            delivery_stream_name: stream_name.clone(),
-            exclusive_start_destination_id: None,
-            limit: Some(1),
-        });
+        let result = client
+            .describe_delivery_stream()
+            .delivery_stream_name(stream_name.clone())
+            .set_exclusive_start_destination_id(None)
+            .limit(1)
+            .send()
+            .await;
 
-        match req.await {
+        match result {
             Ok(resp) => {
                 let name = resp.delivery_stream_description.delivery_stream_name;
                 if name == stream_name {
@@ -179,15 +214,15 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
-        let region = (&self.region).try_into()?;
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(KinesisFirehoseClient::new_with_client(client, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
+        create_client::<KinesisFirehoseClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+            &self.tls,
+        )
+        .await
     }
 }
 
@@ -195,13 +230,10 @@ impl KinesisFirehoseSinkConfig {
 pub struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = RusotoError<PutRecordBatchError>;
+    type Error = SdkError<PutRecordBatchError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::Service(PutRecordBatchError::ServiceUnavailable(_)) => true,
-            error => rusoto::is_retriable_error(error),
-        }
+        is_retriable_error(error)
     }
 }

@@ -1,7 +1,7 @@
+use aws_sdk_firehose::model::Record;
 use std::io;
 
 use bytes::Bytes;
-use rusoto_firehose::Record;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{

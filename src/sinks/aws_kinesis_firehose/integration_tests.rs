@@ -2,12 +2,6 @@
 #![cfg(test)]
 
 use futures::{StreamExt, TryFutureExt};
-use rusoto_core::Region;
-use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
-use rusoto_firehose::{
-    CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
-    KinesisFirehoseClient,
-};
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 

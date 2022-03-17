@@ -640,6 +640,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-firehose"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eae0907a74b83b82d35f242fae54e07385f78a2469df59594d4913d41f667e1d"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-kinesis"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8522,6 +8543,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
+ "aws-sdk-firehose",
  "aws-sdk-kinesis",
  "aws-sdk-sqs",
  "aws-smithy-client",
