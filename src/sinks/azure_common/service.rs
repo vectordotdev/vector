@@ -12,7 +12,7 @@ use tracing_futures::Instrument;
 
 use crate::{
     internal_events::azure_blob::{
-        AzureBlobErrorResponse, AzureBlobEventsSent, AzureBlobHttpError,
+        AzureBlobEventsSent, AzureBlobHttpError, AzureBlobResponseError,
     },
     sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
 };
@@ -56,7 +56,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
                         Some(HttpError::StatusCode { status, .. }) => {
-                            emit!(&AzureBlobErrorResponse { code: *status })
+                            emit!(&AzureBlobResponseError::from(*status))
                         }
                         _ => emit!(&AzureBlobHttpError {
                             error: reason.to_string()
