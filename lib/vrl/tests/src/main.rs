@@ -334,7 +334,9 @@ fn run_vrl(
 ) -> Result<Value, Terminate> {
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, &program).unwrap();
+            let vm = runtime
+                .compile(functions, &program, Default::default())
+                .unwrap();
             runtime.run_vm(&vm, &mut test.object, &timezone)
         }
         VrlRuntime::Ast => runtime.resolve(&mut test.object, &program, &timezone),

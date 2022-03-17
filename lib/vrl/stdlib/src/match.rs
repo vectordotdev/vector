@@ -1,5 +1,11 @@
 use vrl::prelude::*;
 
+fn match_(value: Value, pattern: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let pattern = pattern.try_regex()?;
+    Ok(pattern.is_match(&string).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Match;
 
@@ -49,6 +55,13 @@ impl Function for Match {
 
         Ok(Box::new(MatchFn { value, pattern }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let pattern = args.required("pattern");
+
+        match_(value, pattern)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,11 +73,9 @@ pub(crate) struct MatchFn {
 impl Expression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
-
-        Ok(pattern.is_match(&string).into())
+        match_(value, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

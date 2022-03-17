@@ -1,7 +1,7 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_int(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_int(value: Value) -> Resolved {
     use Value::*;
 
     match value {

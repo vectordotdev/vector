@@ -1,5 +1,26 @@
 use vrl::prelude::*;
 
+fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+    let substring = {
+        let bytes = substring.try_bytes()?;
+        let string = String::from_utf8_lossy(&bytes);
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    let value = {
+        let string = value.try_bytes_utf8_lossy()?;
+
+        match case_sensitive {
+            true => string.into_owned(),
+            false => string.to_lowercase(),
+        }
+    };
+    Ok(value.ends_with(&substring).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct EndsWith;
 
@@ -64,6 +85,18 @@ impl Function for EndsWith {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let substring = args.required("substring");
+        let case_sensitive = args
+            .optional("case_sensitive")
+            .map(|value| value.try_boolean())
+            .transpose()?
+            .unwrap_or(true);
+
+        ends_with(value, substring, case_sensitive)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -75,29 +108,12 @@ struct EndsWithFn {
 
 impl Expression for EndsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
+        let case_sensitive = self.case_sensitive.resolve(ctx)?;
+        let case_sensitive = case_sensitive.try_boolean()?;
+        let substring = self.substring.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-        let substring = {
-            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
-            let string = String::from_utf8_lossy(&bytes);
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        let value = {
-            let value = self.value.resolve(ctx)?;
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        Ok(value.ends_with(&substring).into())
+        ends_with(value, substring, case_sensitive)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

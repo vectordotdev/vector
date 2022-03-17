@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn push(list: Value, item: Value) -> std::result::Result<Value, ExpressionError> {
+fn push(list: Value, item: Value) -> Resolved {
     let mut list = list.try_array()?;
     list.push(item);
     Ok(list.into())
