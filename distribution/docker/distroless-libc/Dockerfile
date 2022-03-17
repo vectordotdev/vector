@@ -1,7 +1,7 @@
 FROM debian:bullseye-slim AS builder
 
-COPY vector-*.deb ./
-RUN dpkg -i vector-*-$(dpkg --print-architecture).deb
+COPY vector_*.deb ./
+RUN dpkg -i vector_*_$(dpkg --print-architecture).deb
 
 FROM gcr.io/distroless/cc-debian10
 
