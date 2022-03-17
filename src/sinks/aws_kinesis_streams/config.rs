@@ -1,9 +1,8 @@
-use aws_sdk_cloudwatch::{Endpoint, Region};
 use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError};
 use aws_sdk_kinesis::types::SdkError;
 use std::num::NonZeroU64;
 
-use aws_sdk_kinesis::Client as KinesisClient;
+use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
