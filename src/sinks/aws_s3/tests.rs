@@ -1,7 +1,6 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use aws_sdk_cloudwatch::types::SdkError;
     use std::{
         io::{BufRead, BufReader},
         time::Duration,
@@ -13,6 +12,7 @@ mod integration_tests {
         ObjectLockRule,
     };
     use aws_sdk_s3::output::GetObjectOutput;
+    use aws_sdk_s3::types::SdkError;
     use aws_sdk_s3::Client as S3Client;
     use bytes::Buf;
     use flate2::read::MultiGzDecoder;
