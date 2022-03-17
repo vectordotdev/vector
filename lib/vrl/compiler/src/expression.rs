@@ -139,7 +139,26 @@ impl Expr {
         keyword: &'static str,
         variants: Vec<Value>,
     ) -> Result<Value, super::function::Error> {
-        match self.as_value() {
+        let literal = match self {
+            Expr::Literal(literal) => Ok(literal.clone()),
+            Expr::Variable(var) if var.value().is_some() => {
+                match var.value().unwrap().clone().into() {
+                    Expr::Literal(literal) => Ok(literal),
+                    expr => Err(super::function::Error::UnexpectedExpression {
+                        keyword,
+                        expected: "literal",
+                        expr,
+                    }),
+                }
+            }
+            expr => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: expr.clone(),
+            }),
+        }?;
+
+        match literal.as_value() {
             Some(value) => variants.iter().find(|v| **v == value).cloned().ok_or(
                 super::function::Error::InvalidEnumVariant {
                     keyword,
