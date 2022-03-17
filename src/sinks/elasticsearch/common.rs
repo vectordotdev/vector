@@ -1,9 +1,10 @@
+use aws_types::region::Region;
 use std::{collections::HashMap, convert::TryFrom};
 
 use http::{StatusCode, Uri};
 use hyper::Body;
-use rusoto_core::Region;
-use rusoto_signature::SignedRequest;
+// use rusoto_core::Region;
+// use rusoto_signature::SignedRequest;
 use snafu::ResultExt;
 
 use super::{InvalidHostSnafu, Request};

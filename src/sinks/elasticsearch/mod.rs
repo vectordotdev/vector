@@ -23,13 +23,14 @@ use http::{
     uri::InvalidUri,
     Request,
 };
-use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
-use rusoto_signature::SignedRequest;
+// use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
+// use rusoto_signature::SignedRequest;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
+use crate::aws::AwsAuthentication;
 use crate::{
-    aws::rusoto::{self, AwsAuthentication},
+    // aws::rusoto::{self, AwsAuthentication},
     config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
