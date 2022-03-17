@@ -20,7 +20,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
 PROJECT_ROOT="$(pwd)"
 PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
-ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
+ARCHIVE_NAME="vector-${PACKAGE_VERSION}-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"
 
@@ -71,14 +71,12 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this stop should follow a build
 
-cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --variant "$TARGET" --no-build --no-strip
+cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip
 
-# Rename the resulting .deb file to remove TARGET from name and use - instead of
-# _ since this is consistent with our package naming scheme.
+# Rename the resulting .deb file to remove TARGET from name.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//-${TARGET}/}
-  nbase=${nbase//_/-}
   mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 
