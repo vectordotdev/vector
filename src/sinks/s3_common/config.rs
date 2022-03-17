@@ -1,9 +1,9 @@
-use aws_sdk_cloudwatch::types::SdkError;
 use std::collections::BTreeMap;
 
 use aws_sdk_s3::error::PutObjectError;
 use aws_sdk_s3::model::{ObjectCannedAcl, ServerSideEncryption, StorageClass};
 use aws_sdk_s3::Client as S3Client;
+use aws_smithy_client::SdkError;
 use futures::FutureExt;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
