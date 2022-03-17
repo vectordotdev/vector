@@ -338,7 +338,7 @@ fn run_vrl(
     match vrl_runtime {
         VrlRuntime::Vm => {
             let vm = runtime.compile(functions, &program, state).unwrap();
-            test_enrichment.finish_load();
+
             runtime.run_vm(&vm, &mut test.object, &timezone)
         }
         VrlRuntime::Ast => {
