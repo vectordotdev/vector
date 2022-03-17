@@ -15,7 +15,7 @@ use crate::{
 
 //------------------------------------------------------------------------------
 
-pub(crate) const ELSE_ROUTE: &str = "_else";
+pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 
 #[derive(Clone)]
 pub struct Route {
@@ -48,7 +48,7 @@ impl SyncTransform for Route {
             }
         }
         if passed == self.conditions.len() {
-            output.push_named(ELSE_ROUTE, event);
+            output.push_named(UNMATCHED_ROUTE, event);
         }
     }
 }
@@ -98,7 +98,7 @@ impl TransformConfig for RouteConfig {
             .keys()
             .map(|output_name| Output::from((output_name, DataType::all())))
             .collect();
-        result.push(Output::from((ELSE_ROUTE, DataType::all())));
+        result.push(Output::from((UNMATCHED_ROUTE, DataType::all())));
         result
     }
 
@@ -199,7 +199,7 @@ mod test {
 
     #[test]
     fn route_pass_all_route_conditions() {
-        let output_names = vec!["first", "second", "third", ELSE_ROUTE];
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
         let event = Event::try_from(
             serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
         )
@@ -230,7 +230,7 @@ mod test {
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
-            if output_name == ELSE_ROUTE {
+            if output_name == UNMATCHED_ROUTE {
                 assert!(events.is_empty());
             } else {
                 assert_eq!(events.len(), 1);
@@ -241,7 +241,7 @@ mod test {
 
     #[test]
     fn route_pass_one_route_condition() {
-        let output_names = vec!["first", "second", "third", ELSE_ROUTE];
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
         let event = Event::try_from(serde_json::json!({"message": "hello world"})).unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
@@ -279,7 +279,7 @@ mod test {
 
     #[test]
     fn route_pass_no_route_condition() {
-        let output_names = vec!["first", "second", "third", ELSE_ROUTE];
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
         let event = Event::try_from(serde_json::json!({"message": "NOPE"})).unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
@@ -307,7 +307,7 @@ mod test {
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
-            if output_name == ELSE_ROUTE {
+            if output_name == UNMATCHED_ROUTE {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
             }

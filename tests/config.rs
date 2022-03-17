@@ -818,7 +818,7 @@ async fn route() {
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys._else"]
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys._unmatched"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
