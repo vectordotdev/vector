@@ -79,18 +79,23 @@ the implementation decisions below:
    restarts (due to reloads, restarts, or crashes). Since the uploads
    require the presence of a unique identifier for both the multipart
    upload itself as well as each of the uploaded parts, Vector will
-   need to store these identifiers with the partition that initiated
+   need to track these identifiers with the partition that initiated
    the upload.
 2. The upload parts (except for the final part) have a _minimum_ size
    limit of 5MB. Since the sink may need to be restarted before a
-   batch reaches this minimum size, it will also need to buffer the
-   batch to disk before uploading the part.
+   batch reaches this minimum size, vector will need to complete the
+   multipart object when shutting down.
+
+In the case of an interruption in the shutdown process or a crash, the
+destination bucket will be left with incomplete multipart uploads and
+parts. To recover from this, Vector will optionally scan for such
+parts at startup and assemble them to their original object names.
 
 ### User Experience
 
-From a user point of view, there is no visible change in the
-behavior. Objects are created as specified by the `batch`
-configuration, either when the maximum size or a timeout is
+From a user point of view, there is no visible change in the behavior
+under normal conditions. Objects are created as specified by the
+`batch` configuration, either when the maximum size or a timeout is
 reached. Internally, the sink will upload the objects in multiple
 parts when possible, but the resulting object will not be visible in
 the bucket until all the parts of it are complete. When possible, the
@@ -101,15 +106,15 @@ This change will introduce the following new configuration items for
 this sink, which will all default to operating the same as the
 existing sink.
 
-- `data_dir` (string): The path to the directory in which the state
-  data is stored. If this is not set, it is derived from the global
-  `data_dir` setting.
 - `batch.min_part_bytes` (integer): This specifies the target size a
   locally-stored part must reach before it is uploaded. Due to the
   limitations of the S3 API, this has an minimum value of 5MB, which
   is also the default value when `upload_interval` is set. If this is
   larger or equal to `batch.max_bytes`, the batches will always be
   uploaded as single objects.
+- `recover_partials` (bool): When set, vector will scan for unfinished
+  objects at startup and reassemble them. These are multipart uploads
+  that are interrupted by a crash.
 
 ### Implementation
 
@@ -185,45 +190,35 @@ configuration item to support the new upload mode:
 ```rust
 struct S3SinkConfig {
     …
-    pub data_dir: Option<PathBuf>,
+    pub recover_partials: bool,
 }
 ```
 
 The upload system will be modified to upload batches as parts and then
 assembled once the maximum size or timeout is reached.  This will
-require a upload state tracker to allow resuming multipart uploads
-across restarts. There will be one saved state for each output
-partition, and the identifiers must be deleted when the final object
-is created. The interface is a simplified form of what is used in the
-`file-source` library with the unused bits removed.
+require a upload state tracker to contain the data required to
+assemble the parts when the object is completed. There will be one
+saved state for each output partition, and the identifiers must be
+deleted when the final object is created.
 
 ```rust
-struct Checkpointer<K, V> {
-    tmp_file_path: PathBuf,
-    stable_file_path: PathBuf,
-    checkpoints: Arc<CheckpointsView>,
+struct MultipartUploads {
+    uploads: DashMap<String, MultipartUpload>,
 }
-
-struct CheckpointsView {
-    checkpoints: DashMap<MultipartUploadKey>,
-}
-
-struct MultipartUploadPart {
-    number: i64,
-    e_tag: String,
-    size: usize,
-}
-
-type MultipartUploadKey = String;
 
 /// Multipart upload state data
-struct MultipartUploadData {
+struct MultipartUpload {
     /// The identifier for the upload process.
     upload_id: String,
     /// The time after which this batch will be completed.
     completion_time: DateTime<UTC>,
     /// A list of uploaded parts.
     parts: Vec<MultipartUploadPart>,
+}
+
+struct UploadPart {
+    number: i64,
+    e_tag: String,
 }
 ```
 
@@ -235,7 +230,7 @@ struct MultipartUploadData {
   users.
 - This multipart scheme raises the possibility of leaving unusable
   data in the S3 bucket due to incomplete multipart uploads. This data
-  is technically recoverable, but not using the standard process.
+  is recoverable, but only with an extra processing step.
 
 ## Prior Art
 
@@ -294,9 +289,9 @@ visible multiple times.
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
 - [ ] Set up the new partitioned batcher.
-- [ ] Initial MVP implementation in S3 with only the simplest upload
-      interval and no persistent buffers.
-- [ ] Add support for all upload interval types.
+- [ ] Initial support for multi-part upload in the S3 sink.
+- [ ] Add support for optimizing single-part objects.
+- [ ] Add support for partial upload recovery.
 
 ## Future Improvements
 
@@ -316,14 +311,14 @@ multipart scheme. It is likely that adding support for multipart
 upload to these sinks would be able to use some of the infrastructure
 described here.
 
-With this implementation, Vector will now have two independent
-multi-state checkpointer systems (file server and S3 sink) along with
-at least one simpler checkpointer (journald source). Some
-consideration should be given to unifying these internal state
-mechanisms.
-
 This proposal makes no changes to timing of object creation. With the
 multipart upload mechanism, there is the opportunity to change the
 object creation time to an interval much larger than the current batch
 timeouts, such as on the hour or similar. This kind of enhancement
 would also be useful in the `file` sink.
+
+There is also the opportunity to allow for object creation to span a
+single run of vector. That is, the final object would not necessarily
+be created at shutdown but would be tracked and completed during the
+next run. This would require the use of a disk-based buffer, either a
+specialized batch buffer in the sink or disk buffer before the sink.
