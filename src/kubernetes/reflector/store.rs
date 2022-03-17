@@ -1,10 +1,17 @@
 use super::ObjectRef;
 use ahash::AHashMap;
 use derivative::Derivative;
+use futures::ready;
 use kube::api::Resource;
 use kube::runtime::watcher;
 use parking_lot::RwLock;
-use std::{fmt::Debug, hash::Hash, sync::Arc, time::Duration};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
@@ -20,6 +27,7 @@ where
 {
     pub store: Cache<K>,
     pub dyntype: K::DynamicType,
+    pub expirations: tokio_util::time::DelayQueue<ObjectRef<K>>,
     pub ttl: Duration,
 }
 
@@ -35,6 +43,7 @@ where
         Writer {
             store: Default::default(),
             dyntype,
+            expirations: tokio_util::time::DelayQueue::new(),
             ttl,
         }
     }
@@ -60,7 +69,7 @@ where
             }
             watcher::Event::Deleted(obj) => {
                 let key = ObjectRef::from_obj_with(obj, self.dyntype.clone());
-                self.store.write().remove(&key);
+                self.expirations.insert(key.clone(), self.ttl);
             }
             watcher::Event::Restarted(new_objs) => {
                 let new_objs = new_objs
@@ -73,8 +82,18 @@ where
                     })
                     .collect::<AHashMap<_, _>>();
                 *self.store.write() = new_objs;
+                self.expirations.clear();
             }
         }
+    }
+
+    pub fn poll_purge(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        while let Some(Ok(entry)) = ready!(self.expirations.poll_expired(cx)) {
+            self.expirations.remove(&entry.key());
+            self.store.write().remove(&entry.into_inner());
+        }
+
+        Poll::Ready(())
     }
 }
 
