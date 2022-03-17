@@ -352,7 +352,7 @@ impl Vm {
                     // If the value at the top of the stack is true, jump by the given amount.
                     // Used by OR operations.
                     let jump = state.next_primitive()?;
-                    if state.error.is_some() || is_truthy(state.peek_stack()?) {
+                    if is_truthy(state.peek_stack()?) {
                         state.instruction_pointer += jump;
                     }
                 }
@@ -360,10 +360,7 @@ impl Vm {
                     // If the value at the top of the stack is true, jump by the given amount.
                     // Used by AND operations.
                     let jump = state.next_primitive()?;
-                    if state.error.is_some() {
-                        // Break out if we are in an error.
-                        state.instruction_pointer += jump;
-                    } else if !is_truthy(state.peek_stack()?) {
+                    if !is_truthy(state.peek_stack()?) {
                         state.pop_stack()?;
                         state.push_stack(Value::Boolean(false));
                         state.instruction_pointer += jump;
@@ -588,6 +585,9 @@ where
             Ok(value) => state.stack.push(value),
             Err(err) => state.error = Some(err.into()),
         }
+    } else {
+        // If we are in error, we need
+        state.pop_stack()?;
     }
 
     Ok(())

@@ -276,6 +276,14 @@ impl Expression for Op {
     ) -> Result<(), String> {
         self.lhs.compile_to_vm(vm, state)?;
 
+        let err_jump = if self.opcode != ast::Opcode::Err {
+            // For all Ops other than the Err op, we want to jump to the end of
+            // the statement if the lhs results in an error.
+            Some(vm.emit_jump(OpCode::JumpIfErr))
+        } else {
+            None
+        };
+
         // Note, not all opcodes want the RHS evaluated straight away, so we
         // only compile the rhs in each branch as necessary.
         match self.opcode {
@@ -351,6 +359,10 @@ impl Expression for Op {
                 vm.write_opcode(OpCode::Merge);
             }
         };
+
+        if let Some(err_jump) = err_jump {
+            vm.patch_jump(err_jump);
+        }
         Ok(())
     }
 }
