@@ -350,13 +350,15 @@ impl Vm {
                 }
                 OpCode::JumpIfTruthy => {
                     // If the value at the top of the stack is true, jump by the given amount.
+                    // Used by OR operations.
                     let jump = state.next_primitive()?;
-                    if is_truthy(state.peek_stack()?) {
+                    if state.error.is_some() || is_truthy(state.peek_stack()?) {
                         state.instruction_pointer += jump;
                     }
                 }
                 OpCode::JumpAndSwapIfFalsey => {
                     // If the value at the top of the stack is true, jump by the given amount.
+                    // Used by AND operations.
                     let jump = state.next_primitive()?;
                     if state.error.is_some() {
                         // Break out if we are in an error.
