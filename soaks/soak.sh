@@ -81,7 +81,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-pushd "${__dir}"
+pushd "${__dir}" > /dev/null
 
 capture_dir=$(mktemp -d /tmp/soak-captures.XXXXXX)
 echo "Captures will be recorded into ${capture_dir}"
@@ -96,64 +96,26 @@ for SOAK_NAME in ${SOAKS}; do
     echo "########    ${SOAK_NAME}"
     echo "########"
     echo "########"
-    capture_dir_replica_one="${capture_dir}/1"
-    capture_dir_replica_two="${capture_dir}/2"
-    capture_dir_replica_three="${capture_dir}/3"
-    # shellcheck disable=SC2015
     ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
+                      --replicas 3 \
                       --variant "baseline" \
                       --tag "${BASELINE}" \
-                      --capture-dir "${capture_dir_replica_one}" \
+                      --capture-dir "${capture_dir}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
     ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
                       --soak "${SOAK_NAME}" \
-                      --variant "baseline" \
-                      --tag "${BASELINE}" \
-                      --capture-dir "${capture_dir_replica_two}" \
-                      --cpus "${SOAK_CPUS}" \
-                      --memory "${SOAK_MEMORY}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" \
-                      --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
-                      --soak "${SOAK_NAME}" \
-                      --variant "baseline" \
-                      --tag "${BASELINE}" \
-                      --capture-dir "${capture_dir_replica_three}" \
-                      --cpus "${SOAK_CPUS}" \
-                      --memory "${SOAK_MEMORY}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" \
-                      --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
-                      --soak "${SOAK_NAME}" \
+                      --replicas 3 \
                       --variant "comparison" \
                       --tag "${COMPARISON}" \
-                      --capture-dir "${capture_dir_replica_one}" \
+                      --capture-dir "${capture_dir}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
-                      --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
-                      --soak "${SOAK_NAME}" \
-                      --variant "comparison" \
-                      --tag "${COMPARISON}" \
-                      --capture-dir "${capture_dir_replica_two}" \
-                      --cpus "${SOAK_CPUS}" \
-                      --memory "${SOAK_MEMORY}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" \
-                      --vector-cpus "${VECTOR_CPUS}" && \
-    ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
-                      --soak "${SOAK_NAME}" \
-                      --variant "comparison" \
-                      --tag "${COMPARISON}" \
-                      --capture-dir "${capture_dir_replica_three}" \
-                      --cpus "${SOAK_CPUS}" \
-                      --memory "${SOAK_MEMORY}" \
-                      --warmup-seconds "${WARMUP_SECONDS}" \
-                      --vector-cpus "${VECTOR_CPUS}" || true
+                      --vector-cpus "${VECTOR_CPUS}"
 done
 
 # Aggregate all captures and analyze them.
@@ -164,4 +126,4 @@ done
                          --warmup-seconds "${WARMUP_SECONDS}" \
                          --p-value 0.05 # 95% confidence
 
-popd
+popd > /dev/null
