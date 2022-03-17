@@ -28,7 +28,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsOptions,
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -141,7 +141,7 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let batch_settings = self
@@ -153,7 +153,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
-        let region = self.region.clone().try_into()?;
+        let region = self.region.region();
         let service = ServiceBuilder::new()
             .settings(request_limits, KinesisRetryLogic)
             .service(KinesisService {
@@ -203,7 +203,10 @@ impl KinesisFirehoseSinkConfig {
 
         match result {
             Ok(resp) => {
-                let name = resp.delivery_stream_description.delivery_stream_name;
+                let name = resp
+                    .delivery_stream_description
+                    .and_then(|x| x.delivery_stream_name)
+                    .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
                 } else {
