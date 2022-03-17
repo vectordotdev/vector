@@ -101,7 +101,7 @@ fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn Diag
         })
 }
 
-/// Takes a function argument (expected to be a static boolean) and returns a Case.
+/// Takes a function argument (expected to be a static boolean) and returns a `Case`.
 fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn DiagnosticError>> {
     if arg_to_bool(arg)? {
         Ok(Case::Sensitive)

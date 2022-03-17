@@ -146,7 +146,10 @@ impl Function for ParseGrok {
             ("pattern", Some(expr)) => {
                 let pattern = expr
                     .as_value()
-                    .unwrap() // TODO is this unwrap really bad
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "pattern",
+                        expr: expr.clone(),
+                    })?
                     .try_bytes_utf8_lossy()
                     .expect("grok pattern not bytes")
                     .into_owned();

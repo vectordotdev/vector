@@ -3,7 +3,7 @@ use std::result::Result;
 use vector_common::encode_key_value;
 use vrl::prelude::*;
 
-/// Also used by encode_logfmt
+/// Also used by `encode_logfmt`.
 pub(crate) fn encode_key_value(
     fields: Option<Value>,
     value: Value,

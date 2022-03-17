@@ -154,7 +154,7 @@ impl Function for GetEnrichmentTableRecord {
                 let table = expr
                     .as_enum("table", tables)?
                     .try_bytes_utf8_lossy()
-                    .expect("table is not valid utf8")
+                    .expect("table is not bytes")
                     .into_owned();
 
                 let record = index_from_args(table, registry, args)?;
