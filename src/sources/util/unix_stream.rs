@@ -86,8 +86,7 @@ pub fn build_unix_stream_source(
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token =
-                        connection_open.open(|count| emit!(ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
 
                     while let Some(result) = stream.next().await {
                         match result {
