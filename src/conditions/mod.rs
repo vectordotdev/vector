@@ -165,7 +165,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true" })"#,
+            r#"Map(VrlConfig { source: ".nork == true", "runtime": "ast" })"#,
             format!("{:?}", conf.condition)
         )
     }
