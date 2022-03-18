@@ -58,14 +58,9 @@ f'The time is {ts : %v %R}'
 ### Errors
 
 We do not want an f string to be fallible as this would cumbersome to the experience of using VRL.
-If an error occurs the error text is output. For example:
 
-```coffee
-f'This is some json { parse_json(.thing) }'
-# This is some json function call error for "parse_json" at (0:18): unable to parse json: expected ident at line 1 column 2
-```
-
-Errors could still be handled to provide alternative text if needed:
+Each template segment must be infallible in order for the string to compile. Errors must be
+handled to provide alternative text if needed:
 
 ```coffee
 f'This is some json { parse_json(.thing) ?? "oops" }'
@@ -176,6 +171,16 @@ F-strings could be fallible and their use could require any errors to be handled
 ```coffee
 f'The date is { .date: %v %R }' ?? "invalid date"
 ```
+
+### Output error text
+
+Rather than forcing the user to handle errors, if an error occurs the error text is output. For example:
+
+```coffee
+f'This is some json { parse_json(.thing) }'
+# This is some json function call error for "parse_json" at (0:18): unable to parse json: expected ident at line 1 column 2
+```
+
 
 ## Outstanding Questions
 
