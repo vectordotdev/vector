@@ -85,6 +85,7 @@ pub enum BuildError {
     BatchMaxEvents,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
