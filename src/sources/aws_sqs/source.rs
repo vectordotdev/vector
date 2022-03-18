@@ -1,13 +1,12 @@
 use std::{collections::HashMap, iter, panic, str::FromStr};
 
-use async_stream::stream;
 use aws_sdk_sqs::{
     model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, Stream, StreamExt};
+use futures::FutureExt;
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
@@ -100,15 +99,14 @@ impl SqsSource {
                         byte_size: body.len()
                     });
                     let timestamp = get_timestamp(&message.attributes);
-                    let stream = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
-                    pin!(stream);
+                    let events = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
                     let send_result = if acknowledgements {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
+                        let events = events.map(|event| event.with_batch_notifier(&batch));
                         batch_receiver = Some(receiver);
-                        out.send_event_stream(&mut stream).await
+                        out.send_batch(events).await
                     } else {
-                        out.send_event_stream(&mut stream).await
+                        out.send_batch(events).await
                     };
 
                     match send_result {
@@ -170,44 +168,47 @@ fn decode_message(
     mut decoder: Decoder,
     message: &[u8],
     sent_time: Option<DateTime<Utc>>,
-) -> impl Stream<Item = Event> {
+) -> impl Iterator<Item = Event> {
     let schema = log_schema();
 
     let mut buffer = BytesMut::with_capacity(message.len());
     buffer.extend_from_slice(message);
 
-    stream! {
-        loop {
-            match decoder.decode_eof(&mut buffer) {
-                Ok(Some((events, _))) => {
-                    let count = events.len();
-                    let mut total_events_size = 0;
-                    for mut event in events {
-                        if let Event::Log(ref mut log) = event {
-                            log.try_insert(schema.source_type_key(), Bytes::from("aws_sqs"));
-                            if let Some(sent_time) = sent_time {
-                                log.try_insert(schema.timestamp_key(), sent_time);
+    iter::from_fn(move || loop {
+        break match decoder.decode_eof(&mut buffer) {
+            Ok(Some((events, _))) => {
+                let count = events.len();
+                Some(
+                    events
+                        .into_iter()
+                        .map(move |mut event| {
+                            if let Event::Log(ref mut log) = event {
+                                log.try_insert(schema.source_type_key(), Bytes::from("aws_sqs"));
+                                if let Some(sent_time) = sent_time {
+                                    log.try_insert(schema.timestamp_key(), sent_time);
+                                }
                             }
-                        }
-                        total_events_size += event.size_of();
-                        yield event;
-                    }
-                    emit!(&EventsReceived {
-                        byte_size: total_events_size,
-                        count
-                    });
-                },
-                Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further handling
-                    // is needed here.
-                    if !error.can_continue() {
-                        break;
-                    }
-                }
-                Ok(None) => break,
+                            event
+                        })
+                        .fold_finally(
+                            0,
+                            |size, event: &Event| size + event.size_of(),
+                            move |byte_size| emit!(&EventsReceived { byte_size, count }),
+                        ),
+                )
             }
-        }
-    }
+            Err(error) => {
+                // Error is logged by `crate::codecs::Decoder`, no further handling
+                // is needed here.
+                if error.can_continue() {
+                    continue;
+                }
+                None
+            }
+            Ok(None) => None,
+        };
+    })
+    .flatten()
 }
 
 trait FoldFinallyExt: Sized {
@@ -274,8 +275,7 @@ mod tests {
     async fn test_decode() {
         let message = "test";
         let now = Utc::now();
-        let stream = decode_message(Decoder::default(), b"test", Some(now));
-        let events: Vec<_> = stream.collect().await;
+        let events: Vec<_> = decode_message(Decoder::default(), b"test", Some(now)).collect();
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0]
