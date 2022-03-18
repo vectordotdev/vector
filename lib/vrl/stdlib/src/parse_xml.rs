@@ -468,9 +468,16 @@ mod tests {
             tdef: type_def(),
         }
 
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_multiple_children {
+            args: func_args![ value: r#"<root><node attr="value"><message>bar</message></node><node attr="value"><message>baz</message></node></root>"#],
+            want: Ok(value!({"root":{ "node":[ { "@attr": "value", "message": "bar" }, { "@attr": "value", "message": "baz" } ] } })),
+            tdef: type_def(),
+        }
+
         nested_object {
-            args: func_args![ value: r#"<a><b>one</b><c>two</c></a>"# ],
-            want: Ok(value!({ "a": { "b": "one", "c": "two" } })),
+            args: func_args![ value: r#"<a attr="value"><b>one</b><c>two</c></a>"# ],
+            want: Ok(value!({ "a": { "@attr": "value", "b": "one", "c": "two" } })),
             tdef: type_def(),
         }
 
