@@ -77,7 +77,10 @@ cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TA
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//-${TARGET}/}
-  mv "${file}" target/"${TARGET}"/debian/"${nbase}";
+  # the file won't have TARGET in its name if not a "variant"
+  if [[ "${file}" != target/"${TARGET}"/debian/"${nbase}" ]] ; then
+    mv "${file}" target/"${TARGET}"/debian/"${nbase}"
+  fi
 done
 
 #
