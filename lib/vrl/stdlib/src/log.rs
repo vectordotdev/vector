@@ -6,7 +6,7 @@ fn log(
     level: &Bytes,
     value: Value,
     span: vrl::diagnostic::Span,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
     match level.as_ref() {
         b"trace" => {
@@ -114,7 +114,7 @@ impl Function for Log {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &FunctionCompileContext,
+        ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {

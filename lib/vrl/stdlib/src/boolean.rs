@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn boolean(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn boolean(value: Value) -> Resolved {
     match value {
         v @ Value::Boolean(_) => Ok(v),
         v => Err(format!("expected boolean, got {}", v.kind()).into()),
@@ -51,11 +51,7 @@ impl Function for Boolean {
         Ok(Box::new(BooleanFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         boolean(value)
     }

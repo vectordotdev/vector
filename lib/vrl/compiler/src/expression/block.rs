@@ -47,7 +47,11 @@ impl Expression for Block {
         type_def.with_fallibility(fallible)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         let mut jumps = Vec::new();
 
         // An empty block should resolve to Null.
@@ -61,7 +65,7 @@ impl Expression for Block {
 
         while let Some(expr) = expressions.next() {
             // Write each of the inner expressions
-            expr.compile_to_vm(vm)?;
+            expr.compile_to_vm(vm, state)?;
 
             if expressions.peek().is_some() {
                 // At the end of each statement (apart from the last one) we need to clean up

@@ -5,6 +5,25 @@ use vrl::{
     prelude::*,
 };
 
+fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Resolved {
+    let bytes = value.try_bytes_utf8_lossy()?;
+    let remove_empty = remove_empty.try_boolean()?;
+    match pattern.match_against(&bytes) {
+        Some(matches) => {
+            let mut result = BTreeMap::new();
+
+            for (name, value) in matches.iter() {
+                if !remove_empty || !value.is_empty() {
+                    result.insert(name.to_string(), Value::from(value));
+                }
+            }
+
+            Ok(Value::from(result))
+        }
+        None => Err("unable to parse input with grok pattern".into()),
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum Error {
     InvalidGrokPattern(grok::Error),
@@ -115,6 +134,50 @@ impl Function for ParseGrok {
             remove_empty,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("pattern", Some(expr)) => {
+                let pattern = expr
+                    .as_value()
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "pattern",
+                        expr: expr.clone(),
+                    })?
+                    .try_bytes_utf8_lossy()
+                    .expect("grok pattern not bytes")
+                    .into_owned();
+
+                let mut grok = grok::Grok::with_patterns();
+                let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
+                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                })?);
+
+                Ok(Some(Box::new(pattern) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let remove_empty = args
+            .optional("remove_empty")
+            .unwrap_or(Value::Boolean(false));
+        let pattern = args
+            .required_any("pattern")
+            .downcast_ref::<Arc<grok::Pattern>>()
+            .unwrap()
+            .clone();
+
+        parse_grok(value, remove_empty, pattern)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -129,23 +192,10 @@ struct ParseGrokFn {
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let bytes = value.try_bytes_utf8_lossy()?;
-        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
+        let remove_empty = self.remove_empty.resolve(ctx)?;
+        let pattern = self.pattern.clone();
 
-        match self.pattern.match_against(&bytes) {
-            Some(matches) => {
-                let mut result = BTreeMap::new();
-
-                for (name, value) in matches.iter() {
-                    if !remove_empty || !value.is_empty() {
-                        result.insert(name.to_string(), Value::from(value));
-                    }
-                }
-
-                Ok(Value::from(result))
-            }
-            None => Err("unable to parse input with grok pattern".into()),
-        }
+        parse_grok(value, remove_empty, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

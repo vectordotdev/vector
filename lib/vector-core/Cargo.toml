@@ -14,7 +14,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
-dyn-clone = { version = "1.0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.3", default-features = false }
 float_eq = { version = "0.7", default-features = false }

@@ -1,12 +1,7 @@
-#[cfg(feature = "sources-aws_sqs")]
-use aws_sdk_sqs::{error::DeleteMessageBatchError, types::SdkError};
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
-use rusoto_core::RusotoError;
-#[cfg(feature = "sources-aws_s3")]
 use rusoto_sqs::{
-    BatchResultErrorEntry, DeleteMessageBatchError, DeleteMessageBatchRequestEntry,
-    DeleteMessageBatchResultEntry, ReceiveMessageError,
+    BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
 };
 use vector_core::internal_event::InternalEvent;
 
@@ -106,11 +101,11 @@ impl InternalEvent for AwsSqsBytesReceived {
 
 #[cfg(feature = "sources-aws_sqs")]
 #[derive(Debug)]
-pub struct SqsMessageDeleteError<'a> {
-    pub error: &'a SdkError<DeleteMessageBatchError>,
+pub struct SqsMessageDeleteError<'a, E> {
+    pub error: &'a E,
 }
 
-impl<'a> InternalEvent for SqsMessageDeleteError<'a> {
+impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
     fn emit(self) {
         error!(message = "Failed to delete SQS events.", error = %self.error);
         counter!("sqs_message_delete_failed_total", 1);
@@ -121,12 +116,12 @@ impl<'a> InternalEvent for SqsMessageDeleteError<'a> {
 
 #[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
-pub struct SqsMessageReceiveError<'a> {
-    pub error: &'a RusotoError<ReceiveMessageError>,
+pub struct SqsMessageReceiveError<'a, E> {
+    pub error: &'a E,
 }
 
 #[cfg(feature = "sources-aws_s3")]
-impl<'a> InternalEvent for SqsMessageReceiveError<'a> {
+impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
     fn emit(self) {
         error!(
             message = "Failed to fetch SQS events.",
@@ -227,13 +222,13 @@ impl InternalEvent for SqsMessageDeletePartialError {
 
 #[cfg(feature = "sources-aws_s3")]
 #[derive(Debug)]
-pub struct SqsMessageDeleteBatchError {
+pub struct SqsMessageDeleteBatchError<E> {
     pub entries: Vec<DeleteMessageBatchRequestEntry>,
-    pub error: RusotoError<DeleteMessageBatchError>,
+    pub error: E,
 }
 
 #[cfg(feature = "sources-aws_s3")]
-impl InternalEvent for SqsMessageDeleteBatchError {
+impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteBatchError<E> {
     fn emit(self) {
         error!(
             message = "Deletion of SQS message(s) failed.",

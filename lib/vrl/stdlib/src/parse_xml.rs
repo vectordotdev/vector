@@ -8,6 +8,69 @@ use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
 
+/// Used to keep Clippy's too_many_argument check happy.
+#[derive(Debug)]
+struct ParseOptions {
+    trim: Option<Value>,
+    include_attr: Option<Value>,
+    attr_prefix: Option<Value>,
+    text_key: Option<Value>,
+    always_use_text_key: Option<Value>,
+    parse_bool: Option<Value>,
+    parse_null: Option<Value>,
+    parse_number: Option<Value>,
+}
+
+fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let trim = match options.trim {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let include_attr = match options.include_attr {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let attr_prefix = match options.attr_prefix {
+        Some(value) => Cow::from(value.try_bytes_utf8_lossy()?.into_owned()),
+        None => Cow::from("@"),
+    };
+    let text_key = match options.text_key {
+        Some(value) => Cow::from(value.try_bytes_utf8_lossy()?.into_owned()),
+        None => Cow::from("text"),
+    };
+    let always_use_text_key = match options.always_use_text_key {
+        Some(value) => value.try_boolean()?,
+        None => false,
+    };
+    let parse_bool = match options.parse_bool {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let parse_null = match options.parse_null {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let parse_number = match options.parse_number {
+        Some(value) => value.try_boolean()?,
+        None => true,
+    };
+    let config = ParseXmlConfig {
+        include_attr,
+        attr_prefix,
+        text_key,
+        always_use_text_key,
+        parse_bool,
+        parse_null,
+        parse_number,
+    };
+    // Trim whitespace around XML elements, if applicable.
+    let parse = if trim { trim_xml(&string) } else { string };
+    let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
+    let value = process_node(doc.root(), &config);
+    Ok(value)
+}
+
 struct ParseXmlConfig<'a> {
     /// Include XML attributes. Default: true,
     include_attr: bool,
@@ -126,6 +189,23 @@ impl Function for ParseXml {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+
+        let options = ParseOptions {
+            trim: args.optional("trim"),
+            include_attr: args.optional("include_attr"),
+            attr_prefix: args.optional("attr_prefix"),
+            text_key: args.optional("text_key"),
+            always_use_text_key: args.optional("always_use_text_key"),
+            parse_bool: args.optional("parse_bool"),
+            parse_null: args.optional("parse_null"),
+            parse_number: args.optional("parse_number"),
+        };
+
+        parse_xml(value, options)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -145,65 +225,58 @@ struct ParseXmlFn {
 impl Expression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
 
-        let trim = match &self.trim {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
+        let options = ParseOptions {
+            trim: self
+                .trim
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            include_attr: self
+                .include_attr
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            attr_prefix: self
+                .attr_prefix
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            text_key: self
+                .text_key
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            always_use_text_key: self
+                .always_use_text_key
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_bool: self
+                .parse_bool
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_null: self
+                .parse_null
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
+
+            parse_number: self
+                .parse_number
+                .as_ref()
+                .map(|expr| expr.resolve(ctx))
+                .transpose()?,
         };
 
-        let include_attr = match &self.include_attr {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let attr_prefix = match &self.attr_prefix {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
-            None => Cow::from("@"),
-        };
-
-        let text_key = match &self.text_key {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
-            None => Cow::from("text"),
-        };
-
-        let always_use_text_key = match &self.always_use_text_key {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
-        };
-
-        let parse_bool = match &self.parse_bool {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let parse_null = match &self.parse_null {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let parse_number = match &self.parse_number {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => true,
-        };
-
-        let config = ParseXmlConfig {
-            include_attr,
-            attr_prefix,
-            text_key,
-            always_use_text_key,
-            parse_bool,
-            parse_null,
-            parse_number,
-        };
-
-        // Trim whitespace around XML elements, if applicable.
-        let parse = if trim { trim_xml(&string) } else { string };
-
-        let doc = Document::parse(&parse).map_err(|e| format!("unable to parse xml: {}", e))?;
-        let value = process_node(doc.root(), &config);
-
-        Ok(value)
+        parse_xml(value, options)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
