@@ -88,6 +88,7 @@ pub struct AwsSqsBytesReceived {
     pub byte_size: usize,
 }
 
+#[cfg(feature = "sources-aws_sqs")]
 impl InternalEvent for AwsSqsBytesReceived {
     fn emit(self) {
         trace!(
@@ -105,6 +106,7 @@ pub struct SqsMessageDeleteError<'a, E> {
     pub error: &'a E,
 }
 
+#[cfg(feature = "sources-aws_sqs")]
 impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
     fn emit(self) {
         error!(message = "Failed to delete SQS events.", error = %self.error);
