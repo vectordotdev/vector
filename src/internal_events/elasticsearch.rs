@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::{error_stage, error_type};
 use http::Response;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -21,13 +21,20 @@ impl InternalEvent for ElasticsearchEventEncoded {
 
 #[derive(Debug)]
 pub struct ElasticsearchResponseError<'a> {
-    pub response: &'a Response<bytes::Bytes>,
-    pub message: &'static str,
+    response: &'a Response<bytes::Bytes>,
+    message: &'static str,
+    error_code: String,
 }
 
+#[cfg(feature = "sinks-elasticsearch")]
 impl<'a> ElasticsearchResponseError<'a> {
-    fn error_code(&self) -> String {
-        http_error_code(self.response.status().as_u16())
+    pub fn new(message: &'static str, response: &'a Response<bytes::Bytes>) -> Self {
+        let error_code = super::prelude::http_error_code(response.status().as_u16());
+        Self {
+            message,
+            response,
+            error_code,
+        }
     }
 }
 
@@ -35,7 +42,7 @@ impl<'a> InternalEvent for ElasticsearchResponseError<'a> {
     fn emit_logs(&self) {
         error!(
             message = %self.message,
-            error_code = %self.error_code(),
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
             response = ?self.response,
@@ -45,7 +52,7 @@ impl<'a> InternalEvent for ElasticsearchResponseError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code(),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );

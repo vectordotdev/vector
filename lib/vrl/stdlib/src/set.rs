@@ -1,6 +1,43 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
+fn set(path: Value, mut value: Value, data: Value) -> Resolved {
+    let path = match path {
+        Value::Array(segments) => {
+            let mut insert = LookupBuf::root();
+
+            for segment in segments {
+                let segment = match segment {
+                    Value::Bytes(path) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&path).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                insert.push_back(segment)
+            }
+
+            insert
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()) | Kind::bytes(),
+            }
+            .into())
+        }
+    };
+    value.target_insert(&path, data)?;
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Set;
 
@@ -94,6 +131,14 @@ impl Function for Set {
 
         Ok(Box::new(SetFn { value, path, data }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let path = args.required("path");
+        let data = args.required("data");
+
+        set(path, value, data)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -105,43 +150,11 @@ pub(crate) struct SetFn {
 
 impl Expression for SetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(segments) => {
-                let mut insert = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
+        let data = self.data.resolve(ctx)?;
 
-                for segment in segments {
-                    let segment = match segment {
-                        Value::Bytes(path) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&path).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either string or integer, not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    insert.push_back(segment)
-                }
-
-                insert
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::array(Collection::any()) | Kind::bytes(),
-                }
-                .into())
-            }
-        };
-
-        let mut value = self.value.resolve(ctx)?;
-        value.target_insert(&path, self.data.resolve(ctx)?)?;
-
-        Ok(value)
+        set(path, value, data)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

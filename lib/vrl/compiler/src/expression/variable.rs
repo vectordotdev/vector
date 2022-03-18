@@ -62,7 +62,11 @@ impl Expression for Variable {
             .unwrap_or_else(|| TypeDef::null().infallible())
     }
 
-    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         vm.write_opcode(OpCode::GetPath);
 
         // Store the required path in the targets list, write its index to the vm.

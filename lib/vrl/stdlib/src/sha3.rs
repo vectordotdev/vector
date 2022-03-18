@@ -1,6 +1,27 @@
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 use vrl::prelude::*;
 
+fn sha3(value: Value, variant: &Bytes) -> Resolved {
+    let value = value.try_bytes()?;
+    let hash = match variant.as_ref() {
+        b"SHA3-224" => encode::<Sha3_224>(&value),
+        b"SHA3-256" => encode::<Sha3_256>(&value),
+        b"SHA3-384" => encode::<Sha3_384>(&value),
+        b"SHA3-512" => encode::<Sha3_512>(&value),
+        _ => unreachable!("enum invariant"),
+    };
+    Ok(hash.into())
+}
+
+fn variants() -> Vec<Value> {
+    vec![
+        value!("SHA3-224"),
+        value!("SHA3-256"),
+        value!("SHA3-384"),
+        value!("SHA3-512"),
+    ]
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Sha3;
 
@@ -45,21 +66,45 @@ impl Function for Sha3 {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let variants = vec![
-            value!("SHA3-224"),
-            value!("SHA3-256"),
-            value!("SHA3-384"),
-            value!("SHA3-512"),
-        ];
-
         let value = arguments.required("value");
         let variant = arguments
-            .optional_enum("variant", &variants)?
+            .optional_enum("variant", &variants())?
             .unwrap_or_else(|| value!("SHA3-512"))
             .try_bytes()
             .expect("variant not bytes");
 
         Ok(Box::new(Sha3Fn { value, variant }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("variant", Some(expr)) => {
+                let variant = expr
+                    .as_enum("variant", variants())?
+                    .try_bytes()
+                    .expect("variant not bytes");
+
+                Ok(Some(Box::new(variant) as _))
+            }
+            ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA3-512")) as _)),
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let variant = args
+            .required_any("variant")
+            .downcast_ref::<Bytes>()
+            .unwrap();
+
+        sha3(value, variant)
     }
 }
 
@@ -71,17 +116,10 @@ struct Sha3Fn {
 
 impl Expression for Sha3Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let variant = &self.variant;
 
-        let hash = match self.variant.as_ref() {
-            b"SHA3-224" => encode::<Sha3_224>(&value),
-            b"SHA3-256" => encode::<Sha3_256>(&value),
-            b"SHA3-384" => encode::<Sha3_384>(&value),
-            b"SHA3-512" => encode::<Sha3_512>(&value),
-            _ => unreachable!("enum invariant"),
-        };
-
-        Ok(hash.into())
+        sha3(value, variant)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

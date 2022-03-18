@@ -12,6 +12,7 @@ use std::{
     fmt::Debug,
     io,
     marker::PhantomData,
+    num::NonZeroU64,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, AtomicUsize},
@@ -68,11 +69,11 @@ pub enum DataDirError {
 pub struct DiskV1Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: u64,
+    max_size: NonZeroU64,
 }
 
 impl DiskV1Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         DiskV1Buffer {
             id,
             data_dir,
@@ -95,7 +96,7 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
-        usage_handle.set_buffer_limits(Some(self.max_size), None);
+        usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
         let (writer, reader, acker) = open(&self.data_dir, &self.id, self.max_size, usage_handle)?;
@@ -117,7 +118,7 @@ where
 pub(self) fn open<T>(
     data_dir: &Path,
     name: &str,
-    max_size: u64,
+    max_size: NonZeroU64,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError>
 where
@@ -340,13 +341,13 @@ where
 #[allow(clippy::cast_precision_loss)]
 pub fn build<T: Bufferable>(
     path: &Path,
-    max_size: u64,
+    max_size: NonZeroU64,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
     // The rest is used as a buffer which when filled triggers compaction.
-    let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
-    let max_size = max_size - max_uncompacted_size;
+    let max_uncompacted_size = max_size.get() / MAX_UNCOMPACTED_DENOMINATOR;
+    let max_size = max_size.get() - max_uncompacted_size;
 
     let initial_state = db_initial_state::<T>(path)?;
     usage_handle.increment_received_event_count_and_byte_size(

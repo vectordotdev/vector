@@ -136,7 +136,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     });
 
     let parent = trace_span!("reader_exits_cleanly_when_writer_done_and_in_flight_acks");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
