@@ -95,7 +95,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
 
     # Build docker image.
-    docker build --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
+    docker build --build-arg RUST_VERSION=${RUST_VERSION} --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
