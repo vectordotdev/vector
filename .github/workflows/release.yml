@@ -51,8 +51,8 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
@@ -95,7 +95,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
       - uses: actions/upload-artifact@v1
         with:
@@ -120,8 +120,8 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
@@ -267,15 +267,15 @@ jobs:
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - name: First install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
       - name: Second install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
 
   rpm-verify:
@@ -381,15 +381,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7"
@@ -439,15 +439,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -521,11 +521,11 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -553,7 +553,7 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -588,15 +588,15 @@ jobs:
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -622,7 +622,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - name: Push arm64 deb
         id: push-deb-arm64
         uses: cloudsmith-io/action@master
@@ -635,7 +635,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - name: Push armhf deb
         id: push-deb-armhf
         uses: cloudsmith-io/action@master
@@ -648,7 +648,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - name: Push x86_64 RPM
         id: push-rpm-x86_64
         uses: cloudsmith-io/action@master

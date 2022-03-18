@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
@@ -80,7 +80,12 @@ pub struct AwsBytesSent {
 #[cfg(feature = "rusoto")]
 impl InternalEvent for AwsBytesSent {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+        trace!(
+            message = "Bytes sent.",
+            protocol = "https",
+            byte_size = %self.byte_size,
+            region = ?self.region,
+        );
     }
 
     fn emit_metrics(&self) {
@@ -101,14 +106,24 @@ pub struct AwsSdkBytesSent {
 #[cfg(feature = "aws-core")]
 impl InternalEvent for AwsSdkBytesSent {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+        trace!(
+            message = "Bytes sent.",
+            protocol = "https",
+            byte_size = %self.byte_size,
+            region = ?self.region,
+        );
     }
 
     fn emit_metrics(&self) {
+        let region = self
+            .region
+            .as_ref()
+            .map(|r| r.as_ref().to_string())
+            .unwrap_or_default();
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
-            "region" => self.region.as_ref().map(|r|r.as_ref().to_string()).unwrap_or_default()
+            "region" => region,
         );
     }
 }
@@ -125,8 +140,8 @@ impl InternalEvent for StreamClosedError {
     fn emit_logs(&self) {
         error!(
             message = "Failed to forward event(s), downstream is closed.",
-            error = %self.error,
-            error_type = STREAM_CLOSED,
+            error_code = STREAM_CLOSED,
+            error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             count = %self.count,
         );
@@ -135,14 +150,14 @@ impl InternalEvent for StreamClosedError {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => STREAM_CLOSED,
+            "error_code" => STREAM_CLOSED,
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
         counter!(
             "component_discarded_events_total", self.count as u64,
-            "error" => self.error.to_string(),
-            "error_type" => STREAM_CLOSED,
+            "error_code" => STREAM_CLOSED,
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
     }

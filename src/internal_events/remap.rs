@@ -29,10 +29,12 @@ impl InternalEvent for RemapMappingError {
 
     fn emit_metrics(&self) {
         counter!(
-            "processing_errors_total", 1,
+            "component_errors_total", 1,
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+        // deprecated
+        counter!("processing_errors_total", 1);
     }
 }
 

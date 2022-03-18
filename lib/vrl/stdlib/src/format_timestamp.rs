@@ -4,6 +4,14 @@ use chrono::{
 };
 use vrl::prelude::*;
 
+fn format_timestamp(bytes: Value, ts: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let format = String::from_utf8_lossy(&bytes);
+    let ts = ts.try_timestamp()?;
+
+    try_format(&ts, &format).map(Into::into)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct FormatTimestamp;
 
@@ -46,6 +54,13 @@ impl Function for FormatTimestamp {
             result: Ok("10 February 2021 23:32"),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.required("format");
+
+        format_timestamp(format, value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -56,11 +71,10 @@ struct FormatTimestampFn {
 
 impl Expression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.format.resolve(ctx)?.try_bytes()?;
-        let format = String::from_utf8_lossy(&bytes);
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let bytes = self.format.resolve(ctx)?;
+        let ts = self.value.resolve(ctx)?;
 
-        try_format(&ts, &format).map(Into::into)
+        format_timestamp(bytes, ts)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

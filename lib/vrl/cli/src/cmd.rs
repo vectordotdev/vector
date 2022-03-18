@@ -169,7 +169,9 @@ fn execute(
 ) -> Result<Value, Error> {
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, program).unwrap();
+            let vm = runtime
+                .compile(functions, program, Default::default())
+                .unwrap();
             runtime
                 .run_vm(&vm, object, timezone)
                 .map_err(Error::Runtime)

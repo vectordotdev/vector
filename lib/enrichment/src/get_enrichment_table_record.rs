@@ -3,9 +3,40 @@ use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
+
+fn get_enrichment_table_record(
+    select: Option<Value>,
+    enrichment_tables: &TableSearch,
+    table: &str,
+    case_sensitive: Case,
+    condition: &[Condition],
+    index: Option<IndexHandle>,
+) -> Resolved {
+    let select = select
+        .map(|array| match array {
+            Value::Array(arr) => arr
+                .iter()
+                .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
+                .collect::<std::result::Result<Vec<_>, _>>(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }),
+        })
+        .transpose()?;
+    let data = enrichment_tables.find_table_row(
+        table,
+        case_sensitive,
+        condition,
+        select.as_ref().map(|select| select.as_ref()),
+        index,
+    )?;
+
+    Ok(Value::Object(data))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -100,6 +131,65 @@ impl Function for GetEnrichmentTableRecord {
             enrichment_tables: registry.as_readonly(),
         }))
     }
+
+    fn compile_argument(
+        &self,
+        args: &[(&'static str, Option<FunctionArgument>)],
+        ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("table", Some(expr)) => {
+                let registry = ctx
+                    .get_external_context_mut::<TableRegistry>()
+                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+
+                let tables = registry
+                    .table_ids()
+                    .into_iter()
+                    .map(Value::from)
+                    .collect::<Vec<_>>();
+
+                let table = expr
+                    .as_enum("table", tables)?
+                    .try_bytes_utf8_lossy()
+                    .expect("table is not bytes")
+                    .into_owned();
+
+                let record = index_from_args(table, registry, args)?;
+
+                Ok(Some(Box::new(record) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let condition = args.required("condition");
+        let condition = condition
+            .into_object()
+            .expect("condition should be an object");
+        let condition = condition
+            .iter()
+            .map(|(key, value)| evaluate_condition(key, value.clone()))
+            .collect::<Result<Vec<Condition>>>()?;
+
+        let record = args
+            .required_any("table")
+            .downcast_ref::<EnrichmentTableRecord>()
+            .unwrap();
+        let select = args.optional("select");
+
+        get_enrichment_table_record(
+            select,
+            &record.enrichment_tables,
+            &record.table,
+            record.case_sensitive,
+            &condition,
+            record.index,
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,33 +207,31 @@ impl Expression for GetEnrichmentTableRecordFn {
         let condition = self
             .condition
             .iter()
-            .map(|(key, value)| evaluate_condition(ctx, key, value))
+            .map(|(key, value)| {
+                let value = value.resolve(ctx)?;
+                evaluate_condition(key, value)
+            })
             .collect::<Result<Vec<Condition>>>()?;
 
         let select = self
             .select
             .as_ref()
-            .map(|array| match array.resolve(ctx)? {
-                Value::Array(arr) => arr
-                    .iter()
-                    .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
-                    .collect::<std::result::Result<Vec<_>, _>>(),
-                value => Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::array(Collection::any()),
-                }),
-            })
+            .map(|array| array.resolve(ctx))
             .transpose()?;
 
-        let data = self.enrichment_tables.find_table_row(
-            &self.table,
-            self.case_sensitive,
-            &condition,
-            select.as_ref().map(|select| select.as_ref()),
-            self.index,
-        )?;
+        let table = &self.table;
+        let case_sensitive = self.case_sensitive;
+        let index = self.index;
+        let enrichment_tables = &self.enrichment_tables;
 
-        Ok(Value::Object(data))
+        get_enrichment_table_record(
+            select,
+            enrichment_tables,
+            table,
+            case_sensitive,
+            &condition,
+            index,
+        )
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

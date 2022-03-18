@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn to_string(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
     use Value::*;
     let value = match value {
