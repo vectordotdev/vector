@@ -317,6 +317,8 @@ impl Vm {
                         let rhs = state.pop_stack()?;
                         let lhs = state.pop_stack()?;
                         state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    } else {
+                        state.pop_stack()?;
                     }
                 }
                 OpCode::Equal => {
@@ -324,6 +326,8 @@ impl Vm {
                         let rhs = state.pop_stack()?;
                         let lhs = state.pop_stack()?;
                         state.stack.push(lhs.eq_lossy(&rhs).into());
+                    } else {
+                        state.pop_stack()?;
                     }
                 }
                 OpCode::Pop => {
@@ -586,7 +590,10 @@ where
             Err(err) => state.error = Some(err.into()),
         }
     } else {
-        // If we are in error, we need
+        // If we are in error, we need to pop the stack to remove the lhs
+        // value from the stack.
+        // (If the lhs had errored, a Jump will have already been evoked to jump
+        // past the binary op.)
         state.pop_stack()?;
     }
 
