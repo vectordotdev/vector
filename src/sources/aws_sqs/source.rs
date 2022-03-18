@@ -1,4 +1,4 @@
-use std::{collections::HashMap, panic, str::FromStr};
+use std::{collections::HashMap, iter, panic, str::FromStr};
 
 use async_stream::stream;
 use aws_sdk_sqs::{
@@ -205,6 +205,60 @@ fn decode_message(
                     }
                 }
                 Ok(None) => break,
+            }
+        }
+    }
+}
+
+trait FoldFinallyExt: Sized {
+    fn fold_finally<A, Fo, Fi>(
+        self,
+        initial: A,
+        folder: Fo,
+        finally: Fi,
+    ) -> FoldFinally<Self, A, Fo, Fi>;
+}
+
+impl<I: Iterator + Sized> FoldFinallyExt for I {
+    fn fold_finally<A, Fo, Fi>(
+        self,
+        initial: A,
+        folder: Fo,
+        finally: Fi,
+    ) -> FoldFinally<Self, A, Fo, Fi> {
+        FoldFinally {
+            inner: self,
+            accumulator: initial,
+            folder,
+            finally,
+        }
+    }
+}
+
+struct FoldFinally<I, A, Fo, Fi> {
+    inner: I,
+    accumulator: A,
+    folder: Fo,
+    finally: Fi,
+}
+
+impl<I, A, Fo, Fi> Iterator for FoldFinally<I, A, Fo, Fi>
+where
+    I: Iterator,
+    A: Copy,
+    Fo: FnMut(A, &I::Item) -> A,
+    Fi: Fn(A),
+{
+    type Item = I::Item;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner.next() {
+            Some(item) => {
+                self.accumulator = (self.folder)(self.accumulator, &item);
+                Some(item)
+            }
+            None => {
+                (self.finally)(self.accumulator);
+                None
             }
         }
     }
