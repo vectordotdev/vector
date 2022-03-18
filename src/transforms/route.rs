@@ -39,15 +39,15 @@ impl SyncTransform for Route {
         event: Event,
         output: &mut vector_core::transform::TransformOutputsBuf,
     ) {
-        let mut passed: usize = 0;
+        let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
-                passed += 1;
+                check_failed += 1;
             }
         }
-        if passed == self.conditions.len() {
+        if check_failed == self.conditions.len() {
             output.push_named(UNMATCHED_ROUTE, event);
         }
     }
