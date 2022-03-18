@@ -640,6 +640,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-kinesis"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dc8b61f005b3feb772f94ffe8cd8370762aa6ba7ecbe86b79c6ab9fbcc94c6d"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-s3"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8267,7 +8289,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -8540,6 +8562,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
+ "aws-sdk-kinesis",
  "aws-sdk-s3",
  "aws-sdk-sqs",
  "aws-smithy-client",

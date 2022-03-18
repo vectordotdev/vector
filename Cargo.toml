@@ -157,6 +157,7 @@ aws-sdk-s3 = { version = "0.8.0", optional = true }
 aws-sdk-sqs = { version = "0.8.0", optional = true }
 aws-sdk-cloudwatch = { version = "0.8.0", optional = true }
 aws-sdk-cloudwatchlogs = { version = "0.8.0", optional = true }
+aws-sdk-kinesis = { version = "0.8.0", optional = true }
 aws-smithy-client = { version = "0.38.0", optional = true }
 aws-smithy-http = { version = "0.38.0", optional = true }
 
@@ -646,7 +647,7 @@ sinks-metrics = [
 sinks-aws_cloudwatch_logs = ["aws-core", "aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
+sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
