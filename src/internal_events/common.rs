@@ -105,10 +105,15 @@ impl InternalEvent for AwsSdkBytesSent {
     }
 
     fn emit_metrics(&self) {
+        let region = self
+            .region
+            .as_ref()
+            .map(|r| r.as_ref().to_string())
+            .unwrap_or_default();
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
-            "region" => self.region.as_ref().map(|r|r.as_ref().to_string()).unwrap_or_default()
+            "region" => region
         );
     }
 }
