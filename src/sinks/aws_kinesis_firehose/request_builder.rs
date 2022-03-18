@@ -1,5 +1,5 @@
 use aws_sdk_firehose::model::Record;
-use aws_sdk_sqs::types::Blob;
+use aws_sdk_firehose::types::Blob;
 use std::io;
 
 use bytes::Bytes;
