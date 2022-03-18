@@ -8,11 +8,10 @@ use tokio::time::{sleep, Duration};
 
 use super::*;
 use crate::aws::aws_sdk::create_client;
-use crate::aws::AwsAuthentication;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::ProxyConfig;
 use crate::sinks::aws_kinesis_streams::config::KinesisClientBuilder;
 use crate::{
-    aws::rusoto::RegionOrEndpoint,
     config::{SinkConfig, SinkContext},
     sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
     test_util::{components, random_lines_with_stream, random_string},

@@ -1,6 +1,6 @@
 use super::handle_line;
 use crate::{
-    codecs, internal_events::RedisReceiveEventFailed, shutdown::ShutdownSignal, sources::Source,
+    codecs, internal_events::RedisReceiveEventError, shutdown::ShutdownSignal, sources::Source,
     SourceSender,
 };
 use futures_util::StreamExt;
@@ -47,7 +47,7 @@ pub async fn subscribe(
                         break;
                     }
                 }
-                Err(error) => emit!(&RedisReceiveEventFailed { error }),
+                Err(error) => emit!(&RedisReceiveEventError::from(error)),
             }
         }
         Ok(())

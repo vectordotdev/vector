@@ -2,6 +2,20 @@ use std::net::IpAddr;
 
 use vrl::prelude::*;
 
+fn ipv6_to_ipv4(value: Value) -> Resolved {
+    let ip = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+    match ip {
+        IpAddr::V4(addr) => Ok(addr.to_string().into()),
+        IpAddr::V6(addr) => match addr.to_ipv4() {
+            Some(addr) => Ok(addr.to_string().into()),
+            None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
+        },
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Ipv6ToIpV4;
 
@@ -33,8 +47,12 @@ impl Function for Ipv6ToIpV4 {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        ipv6_to_ipv4(value)
     }
 }
 
@@ -45,20 +63,8 @@ struct Ipv6ToIpV4Fn {
 
 impl Expression for Ipv6ToIpV4Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
-        match ip {
-            IpAddr::V4(addr) => Ok(addr.to_string().into()),
-            IpAddr::V6(addr) => match addr.to_ipv4() {
-                Some(addr) => Ok(addr.to_string().into()),
-                None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
-            },
-        }
+        let value = self.value.resolve(ctx)?;
+        ipv6_to_ipv4(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

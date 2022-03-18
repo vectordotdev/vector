@@ -39,10 +39,14 @@ impl Expression for Unary {
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut Vm) -> std::result::Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut Vm,
+        state: &mut crate::state::Compiler,
+    ) -> std::result::Result<(), String> {
         match &self.variant {
             Variant::Not(v) => {
-                v.compile_to_vm(vm)?;
+                v.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Not);
             }
         }

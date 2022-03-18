@@ -1,5 +1,28 @@
 use vrl::prelude::*;
 
+fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {
+    let mut value = value.try_bytes_utf8_lossy()?.into_owned();
+    let limit = limit.try_integer()?;
+    let limit = if limit < 0 { 0 } else { limit as usize };
+    let ellipsis = ellipsis.try_boolean()?;
+    let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
+        // char_indices gives us the starting position of the character at limit,
+        // we want the end position.
+        pos + chr.len_utf8()
+    } else {
+        // We have an empty string
+        0
+    };
+    if value.len() > pos {
+        value.truncate(pos);
+
+        if ellipsis {
+            value.push_str("...");
+        }
+    }
+    Ok(value.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Truncate;
 
@@ -64,6 +87,14 @@ impl Function for Truncate {
             ellipsis,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let limit = args.required("limit");
+        let ellipsis = args.optional("ellipsis").unwrap_or(value!(false));
+
+        truncate(value, limit, ellipsis)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,31 +107,10 @@ struct TruncateFn {
 impl Expression for TruncateFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let mut value = value.try_bytes_utf8_lossy()?.into_owned();
+        let limit = self.limit.resolve(ctx)?;
+        let ellipsis = self.ellipsis.resolve(ctx)?;
 
-        let limit = self.limit.resolve(ctx)?.try_integer()?;
-        let limit = if limit < 0 { 0 } else { limit as usize };
-
-        let ellipsis = self.ellipsis.resolve(ctx)?.try_boolean()?;
-
-        let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
-            // char_indices gives us the starting position of the character at limit,
-            // we want the end position.
-            pos + chr.len_utf8()
-        } else {
-            // We have an empty string
-            0
-        };
-
-        if value.len() > pos {
-            value.truncate(pos);
-
-            if ellipsis {
-                value.push_str("...");
-            }
-        }
-
-        Ok(value.into())
+        truncate(value, limit, ellipsis)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
