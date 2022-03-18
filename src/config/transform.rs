@@ -81,46 +81,6 @@ impl TransformOuter<String> {
                 children.push(inner_name.clone());
                 transforms.insert(inner_name, child);
             }
-
-            /*
-            for (name, content) in expanded {
-                let full_name = key.join(name);
-
-                let child = TransformOuter {
-                    inputs,
-                    inner: content,
-                };
-                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
-                children.push(full_name.clone());
-
-                inputs = match expand_type {
-                    ExpandType::Parallel { .. } => self.inputs.clone(),
-                    ExpandType::Serial { .. } => vec![full_name.to_string()],
-                }
-            }
-
-            if matches!(expand_type, ExpandType::Parallel { aggregates: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs: children.iter().map(ToString::to_string).collect(),
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            } else if matches!(expand_type, ExpandType::Serial { alias: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            }
-            expansions.insert(key.clone(), children);
-
-            */
         } else {
             transforms.insert(key, self);
         }
