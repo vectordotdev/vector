@@ -177,7 +177,9 @@ impl DatadogArchivesSinkConfig {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let service = create_service(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let service =
+                    create_service(&s3_config.region, &s3_config.auth, &cx.proxy, &self.tls)
+                        .await?;
                 let client = service.client();
                 let svc = self
                     .build_s3_sink(&s3_config.options, service, cx)

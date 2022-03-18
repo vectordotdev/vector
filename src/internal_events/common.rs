@@ -97,6 +97,37 @@ impl InternalEvent for AwsBytesSent {
     }
 }
 
+#[cfg(feature = "aws-core")]
+pub struct AwsSdkBytesSent {
+    pub byte_size: usize,
+    pub region: Option<aws_types::region::Region>,
+}
+
+#[cfg(feature = "aws-core")]
+impl InternalEvent for AwsSdkBytesSent {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes sent.",
+            protocol = "https",
+            byte_size = %self.byte_size,
+            region = ?self.region,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        let region = self
+            .region
+            .as_ref()
+            .map(|r| r.as_ref().to_string())
+            .unwrap_or_default();
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "https",
+            "region" => region,
+        );
+    }
+}
+
 const STREAM_CLOSED: &str = "stream_closed";
 
 #[derive(Debug)]
