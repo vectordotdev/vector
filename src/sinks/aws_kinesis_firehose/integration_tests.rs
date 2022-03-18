@@ -59,7 +59,6 @@ async fn firehose_put_records() {
             ..Default::default()
         },
         tls: None,
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
