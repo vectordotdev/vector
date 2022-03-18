@@ -300,12 +300,21 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();
 
+        // Expand attributes, if required.
+        if config.include_attr {
+            for attr in node.attributes() {
+                map.insert(
+                    format!("{}{}", config.attr_prefix, attr.name()),
+                    attr.value().into(),
+                );
+            }
+        }
+
         for n in node.children().into_iter().filter(|n| !n.is_comment()) {
-            // Use the default tag name if blank.
-            let name = if n.tag_name().name() == "" {
-                config.text_key.to_string()
-            } else {
-                n.tag_name().name().to_string()
+            let name = match n.node_type() {
+                NodeType::Element => n.tag_name().name().to_string(),
+                NodeType::Text => config.text_key.to_string(),
+                _ => unreachable!("shouldn't be other XML nodes"),
             };
 
             // Transform the node into a VRL `Value`.
@@ -340,24 +349,9 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            let mut map = BTreeMap::new();
-
-            // Expand attributes, if required.
-            if config.include_attr {
-                for attr in node.attributes() {
-                    map.insert(
-                        format!("{}{}", config.attr_prefix, attr.name()),
-                        attr.value().into(),
-                    );
-                }
-            }
-
-            match (config.always_use_text_key, map.is_empty()) {
-                // If the map isn't empty, *always* recurse to expand default keys.
-                (_, false) => {
-                    map.extend(recurse(node));
-                    Value::Object(map)
-                }
+            match (config.always_use_text_key, node.attributes().is_empty()) {
+                // If the the node has attributes, *always* recurse to expand default keys.
+                (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),
                 // Otherwise, check the node count to determine what to do.
@@ -374,6 +368,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                         // If the node is an element, treat it as an object.
                         if node.is_element() {
                             let mut map = BTreeMap::new();
+
                             map.insert(
                                 node.tag_name().name().to_string(),
                                 Value::Object(recurse(node)),
@@ -463,6 +458,13 @@ mod tests {
         custom_text_key {
             args: func_args![ value: r#"<b>test</b>"#, text_key: "node", always_use_text_key: true ],
             want: Ok(value!({ "b": { "node": "test" } })),
+            tdef: type_def(),
+        }
+
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_if_single_node {
+            args: func_args![ value: r#"<root><node attr="value"><message>foo</message></node></root>"# ],
+            want: Ok(value!({ "root": { "node": { "@attr": "value", "message": "foo" } } })),
             tdef: type_def(),
         }
 
