@@ -1,15 +1,15 @@
-use std::{collections::HashMap, io::Cursor, panic, str::FromStr};
+use std::{collections::HashMap, panic, str::FromStr};
 
 use async_stream::stream;
 use aws_sdk_sqs::{
     model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::{pin, select, time::Duration};
-use tokio_util::codec::FramedRead;
+use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{self, internal_event::EventsReceived};
 
@@ -100,7 +100,7 @@ impl SqsSource {
                         byte_size: body.len()
                     });
                     let timestamp = get_timestamp(&message.attributes);
-                    let stream = decode_message(self.decoder.clone(), &body, timestamp);
+                    let stream = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
                     pin!(stream);
                     let send_result = if acknowledgements {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -167,19 +167,19 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
 }
 
 fn decode_message(
-    decoder: Decoder,
-    message: &str,
+    mut decoder: Decoder,
+    message: &[u8],
     sent_time: Option<DateTime<Utc>>,
 ) -> impl Stream<Item = Event> {
     let schema = log_schema();
 
-    let payload = Cursor::new(Bytes::copy_from_slice(message.as_bytes()));
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut buffer = BytesMut::with_capacity(message.len());
+    buffer.extend_from_slice(message);
 
     stream! {
         loop {
-            match stream.next().await {
-                Some(Ok((events, _))) => {
+            match decoder.decode_eof(&mut buffer) {
+                Ok(Some((events, _))) => {
                     let count = events.len();
                     let mut total_events_size = 0;
                     for mut event in events {
@@ -197,14 +197,14 @@ fn decode_message(
                         count
                     });
                 },
-                Some(Err(error)) => {
+                Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further handling
                     // is needed here.
                     if !error.can_continue() {
                         break;
                     }
                 }
-                None => break,
+                Ok(None) => break,
             }
         }
     }
@@ -220,7 +220,7 @@ mod tests {
     async fn test_decode() {
         let message = "test";
         let now = Utc::now();
-        let stream = decode_message(Decoder::default(), "test", Some(now));
+        let stream = decode_message(Decoder::default(), b"test", Some(now));
         let events: Vec<_> = stream.collect().await;
         assert_eq!(events.len(), 1);
         assert_eq!(
