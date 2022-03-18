@@ -16,26 +16,21 @@ where
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
     stream.inspect_ok(move |event| {
-        dbg!(">>>>>> entered shim");
         match event {
             watcher::Event::Applied(_) => {
                 // Immediately apply event
-                dbg!(">>>>>> Event::Applied received");
                 store.apply_watcher_event(event);
             }
             watcher::Event::Deleted(_) => {
                 // Delay reconciling any `Deleted` events
-                dbg!(">>>>>> Event::Deleted received");
                 delayer.queue.insert(event.to_owned(), delayer.ttl);
             }
             watcher::Event::Restarted(_) => {
                 // Clear all delayed events when the cache is refreshed
-                dbg!(">>>>>> Event::Restarted received");
                 delayer.queue.clear();
                 store.apply_watcher_event(event);
             }
         } // Check if any events are ready to delete
-        dbg!(">>>>>> polling delayer");
         while let std::task::Poll::Ready(Some(Ok(expired))) =
             delayer
                 .queue
@@ -43,10 +38,11 @@ where
                     &futures::task::noop_waker(),
                 ))
         {
-            let event = delayer.queue.remove(expired);
+            // Remove expired event from the queue and then pass the event
+            // down into the cache to apply
+            let event = delayer.queue.remove(&expired.key());
             store.apply_watcher_event(&event.into_inner());
         }
-        dbg!(">>>>>> exited shim");
     })
 }
 
