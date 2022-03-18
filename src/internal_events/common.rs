@@ -106,7 +106,12 @@ pub struct AwsSdkBytesSent {
 #[cfg(feature = "aws-core")]
 impl InternalEvent for AwsSdkBytesSent {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+        trace!(
+            message = "Bytes sent.",
+            protocol = "https",
+            byte_size = %self.byte_size,
+            region = ?self.region,
+        );
     }
 
     fn emit_metrics(&self) {
@@ -118,7 +123,7 @@ impl InternalEvent for AwsSdkBytesSent {
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
-            "region" => region
+            "region" => region,
         );
     }
 }
