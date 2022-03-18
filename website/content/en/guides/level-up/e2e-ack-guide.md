@@ -44,7 +44,7 @@ forever for an ack before responding.
 
 But you can enable acknowledgements at each sink level if you want more granular
 control over how acknowledgements for specific cases (e.g. you're buffering your
-data). When you enable `acknowledgement` for a supported sink, all associated sources
+data). When you enable `acknowledgements` for a supported sink, all sources connected
 to that sink will wait for delivery. You can set acknowledgements at the sink level by
 doing the following:
 
