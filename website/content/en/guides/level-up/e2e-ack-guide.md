@@ -57,16 +57,22 @@ doing the following:
 ## Edge cases
 
 Unsurprisingly, there are a few exceptions and edge cases for the end-to-end
-acknowledgement feature. First, as alluded to earlier, not all sources and sinks
-are supported because some sources and sinks are unable to provide acknowledgements
-at the protocol level. Sinks and sources that don't support acknowledgements will
-output a warning message to let you know if you try to enable acknowledgements. You
-can find which components support acknowledgements on each of their documentation
-pages by looking for the acknowledgments badge.
+acknowledgement feature. 
 
-Second, when buffering your observability data, the behavior of end-to-end
-acknowledgement is a little different. When an event is persisted in a buffer, the
-event will be marked as acknowledged to the source.
+First, as alluded to earlier, not all sources and sinks are supported. We are, of
+course, working to add support for more sources and sinks, but support for some
+sources and sinks will always be unable because they cannot provide acknowledgements
+at the protocol level. 
+
+Sources that don't support acknowledgements will output a
+warning message to let you know if you try to enable acknowledgements, while sinks
+that don't support acknowledgements will trigger a fatal error and prevent the
+configuration from loading. You can find which components support acknowledgements
+on each of their documentation pages by looking for the acknowledgments badge.
+
+Second, when buffering your observability data in a disk, the behavior of end-to-end
+acknowledgement is a little different. When an event is persisted in a disk buffer,
+the event will be marked as acknowledged to the source.
 
 Third, the final edge case is if you are using any user-space transforms, such
 as Lua. Because user-space transforms can drop, combine, split, or create events
@@ -77,9 +83,9 @@ behavior will be put in the hands of script writers.
 ## Parting thoughts
 
 This guide intended to serve as a basic guide on how you can start
-leveraging Vector's end-to-end acknowledgement feature. If you have any feedback regarding this feature,
-please let us know on our [Discord chat] or [Twitter], along with
-any feedback or request for additional support you have for the Vector team!
+leveraging Vector's end-to-end acknowledgement feature. If you have any feedback
+regarding this feature, please let us know on our [Discord chat] or [Twitter], along
+with any feedback or request for additional support you have for the Vector team!
 
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev
