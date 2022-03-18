@@ -89,7 +89,19 @@ the implementation decisions below:
 In the case of an interruption in the shutdown process or a crash, the
 destination bucket will be left with incomplete multipart uploads and
 parts. To recover from this, Vector will optionally scan for such
-parts at startup and assemble them to their original object names.
+parts at startup and assemble them to their original object
+names. That process works as follows:
+
+1. The existing incomplete uploads are listed with the
+   `ListMultipartUploads` action.
+2. Included in the listing are the object names the uploads would be
+   written to. The `key_prefix` in the configuration is translated
+   into a pattern, and these object names are filtered to match only
+   those that could have come from the current configuration.
+3. For each resulting multipart upload, the parts that compose it are
+   listed with one or more `ListParts` actions.
+4. The upload assembled to the final object with the
+   `CompleteMultipartUpload` action as above.
 
 ### User Experience
 
