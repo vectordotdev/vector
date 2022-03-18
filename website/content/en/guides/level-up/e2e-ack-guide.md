@@ -38,8 +38,14 @@ acknowledgements.enabled = true
 ```
 
 Even if you have a relatively complex topology and sending data from one source to
-multiple sinks, by enabling this global config, all sources with acknowledgement support will wait before responding for
-acknowledgement from all the sinks that its events flow through.
+multiple sinks, by enabling this global config, all sources with acknowledgement
+support will wait before responding for acknowledgement from all the sinks that
+its events flow through.
+
+If any sink rejects a message, that failure marks the batch that the message is
+part of as failed, and the source will respond accordingly. For example, HTTP sources
+will produce some 400 error code, while sources like Kafka that don't handle
+rejection behaves similarly to a positive acknowledgement.
 
 But you can enable acknowledgements individually for each sink if you want more granular
 control over how acknowledgements for specific cases (e.g. you're buffering your
