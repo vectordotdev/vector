@@ -92,6 +92,16 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
+    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+        if self.route.contains_key(UNMATCHED_ROUTE) {
+            Err(vec![format!(
+                "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
+            )])
+        } else {
+            Ok(())
+        }
+    }
+
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         let mut result: Vec<Output> = self
             .route
