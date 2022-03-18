@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn int(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn int(value: Value) -> Resolved {
     match value {
         v @ Value::Integer(_) => Ok(v),
         v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
@@ -51,11 +51,7 @@ impl Function for Integer {
         Ok(Box::new(IntegerFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         int(value)
     }

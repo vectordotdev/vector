@@ -9,12 +9,14 @@ pub struct StatsdInvalidRecordError<'a> {
     pub bytes: Bytes,
 }
 
+const INVALID_PACKET: &str = "invalid_packet";
+
 impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Invalid packet from statsd, discarding.",
             error = %self.error,
-            error_code = "invalid_packet",
+            error_code = INVALID_PACKET,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
@@ -25,7 +27,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "invalid_packet",
+            "error_code" => INVALID_PACKET,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

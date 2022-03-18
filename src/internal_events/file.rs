@@ -27,7 +27,12 @@ pub struct FileBytesSent<'a> {
 
 impl InternalEvent for FileBytesSent<'_> {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = "file", file = %self.file);
+        trace!(
+            message = "Bytes sent.",
+            byte_size = %self.byte_size,
+            protocol = "file",
+            file = %self.file,
+        );
     }
 
     fn emit_metrics(&self) {
@@ -139,7 +144,7 @@ mod source {
     impl InternalEvent for FileEventsReceived<'_> {
         fn emit_logs(&self) {
             trace!(
-                message = "Received events.",
+                message = "Events received.",
                 count = %self.count,
                 byte_size = %self.byte_size,
                 file = %self.file
