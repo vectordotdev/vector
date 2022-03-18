@@ -212,6 +212,11 @@ fn decode_message(
 }
 
 trait FoldFinallyExt: Sized {
+    /// This adapter applies the `folder` function to every element in
+    /// the iterator, much as `Iterator::fold` does. However, instead
+    /// of returning the resulting folded value, it calls the
+    /// `funally` function after the last element. This function
+    /// returns an iterator over the original values.
     fn fold_finally<A, Fo, Fi>(
         self,
         initial: A,
