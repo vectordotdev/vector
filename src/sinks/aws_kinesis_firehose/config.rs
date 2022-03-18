@@ -1,9 +1,8 @@
-use aws_sdk_cloudwatch::{Endpoint, Region};
 use aws_sdk_firehose::error::{DescribeDeliveryStreamError, PutRecordBatchError};
 use aws_sdk_firehose::types::SdkError;
 use std::num::NonZeroU64;
 
-use aws_sdk_firehose::Client as KinesisFirehoseClient;
+use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
