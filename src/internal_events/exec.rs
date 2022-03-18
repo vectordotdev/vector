@@ -157,3 +157,68 @@ impl InternalEvent for ExecCommandExecuted<'_> {
         );
     }
 }
+
+pub enum ExecFailedToSignalChildError {
+    SignalError(nix::errno::Errno),
+    FailedToMarshalPid(std::num::TryFromIntError),
+    NoPid,
+}
+
+impl ExecFailedToSignalChildError {
+    fn to_error_code(&self) -> String {
+        use ExecFailedToSignalChildError::*;
+
+        match self {
+            SignalError(err) => format!("errno_{}", err),
+            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            NoPid => String::from("no_pid"),
+        }
+    }
+}
+
+impl std::fmt::Display for ExecFailedToSignalChildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use ExecFailedToSignalChildError::*;
+
+        match self {
+            SignalError(err) => write!(f, "errno: {}", err),
+            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {}", err),
+            NoPid => write!(f, "child had no pid"),
+        }
+    }
+}
+
+pub struct ExecFailedToSignalChild<'a> {
+    pub command: &'a tokio::process::Command,
+    pub error: ExecFailedToSignalChildError,
+}
+
+impl InternalEvent for ExecFailedToSignalChild<'_> {
+    fn emit_logs(&self) {
+        error!(
+            message = %format!("Failed to send SIGTERM to child, aborting early: {}", self.error),
+            command = ?self.command.as_std(),
+            error_code = %self.error.to_error_code(),
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "command" => format!("{:?}", self.command.as_std()),
+            "error_code" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "command_code" => format!("{:?}", self.command.as_std()),
+            "error" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}
