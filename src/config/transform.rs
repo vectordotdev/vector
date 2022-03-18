@@ -118,9 +118,9 @@ impl TransformOuter<String> {
                 );
                 children.push(key.clone());
             }
+            expansions.insert(key.clone(), children);
 
             */
-            expansions.insert(key.clone(), children);
         } else {
             transforms.insert(key, self);
         }

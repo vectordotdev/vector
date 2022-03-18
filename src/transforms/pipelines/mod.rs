@@ -131,7 +131,7 @@ impl TransformConfig for PipelinesConfig {
         };
         let mut conditions = IndexMap::new();
         if !self.logs.is_empty() {
-            let logs_route = name.join("metrics");
+            let logs_route = name.join("logs");
             conditions.insert(
                 "logs".to_string(),
                 AnyCondition::Map(Box::new(IsLogConfig {})),
@@ -248,7 +248,7 @@ mod tests {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
         let outer = TransformOuter {
-            inputs: Vec::<String>::new(),
+            inputs: vec!["source".to_string()],
             inner: Box::new(config),
         };
         let name = ComponentKey::from("foo");
@@ -258,18 +258,52 @@ mod tests {
         outer
             .expand(name, &parents, &mut transforms, &mut expansions)
             .unwrap();
+        let routes = transforms
+            .iter()
+            .map(|(key, transform)| (key.to_string(), transform.inputs.clone()))
+            .collect::<IndexMap<String, Vec<String>>>();
+        let expansions: IndexMap<String, Vec<String>> = expansions
+            .into_iter()
+            .map(|(key, others)| {
+                (
+                    key.to_string(),
+                    others.iter().map(ToString::to_string).collect(),
+                )
+            })
+            .collect();
         assert_eq!(
             transforms
                 .keys()
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
             vec![
-                "foo.metrics.foo.filter",
-                "foo.metrics.foo.0",
-                "foo.metrics.foo.1",
-                "foo.metrics.bar.0",
+                "foo.logs.foo.filter",
+                "foo.logs.foo.0",
+                "foo.logs.foo.1",
+                "foo.logs.bar.0",
                 "foo.type_router",
             ],
+        );
+        assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
+        assert_eq!(
+            routes["foo.logs.foo.filter"],
+            vec!["foo.type_router.logs".to_string()]
+        );
+        assert_eq!(
+            routes["foo.logs.foo.0"],
+            vec!["foo.logs.foo.filter.success".to_string()]
+        );
+        assert_eq!(routes["foo.logs.foo.1"], vec!["foo.logs.foo.0".to_string()]);
+        assert_eq!(
+            routes["foo.logs.bar.0"],
+            vec![
+                "foo.logs.foo.1".to_string(),
+                "foo.logs.foo.filter._unmatched".to_string(),
+            ],
+        );
+        assert_eq!(
+            expansions["foo"],
+            vec!["foo.type_router._unmatched", "foo.logs.bar.0"]
         );
     }
 }
