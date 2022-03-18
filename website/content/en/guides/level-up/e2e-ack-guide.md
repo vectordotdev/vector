@@ -38,9 +38,8 @@ acknowledgements.enabled = true
 ```
 
 Even if you have a relatively complex topology and sending data from one source to
-multiple sinks, by enabling this global config, all supported sources will wait for
-acknowledgement from all the sinks. A source that does acknowledgements will wait
-forever for an ack before responding.
+multiple sinks, by enabling this global config, all sources with acknowledgement support will wait before responding for
+acknowledgement from all the sinks that its events flow through.
 
 But you can enable acknowledgements individually for each sink if you want more granular
 control over how acknowledgements for specific cases (e.g. you're buffering your
