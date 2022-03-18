@@ -34,7 +34,7 @@ easy as flipping on a switch. As you would expect from a global configuration, t
 configuration below turns end-to-end acknowledgement on for every source:
 
 ```toml
-acknowledgement = true
+acknowledgements.enabled = true
 ```
 
 Even if you have a relatively complex topology and sending data from one source to
