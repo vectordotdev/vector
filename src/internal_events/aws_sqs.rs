@@ -96,7 +96,10 @@ impl InternalEvent for AwsSqsBytesReceived {
             byte_size = %self.byte_size,
             protocol = "http",
         );
-        counter!("component_received_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "http",
+        );
     }
 }
 
@@ -109,7 +112,18 @@ pub struct SqsMessageDeleteError<'a, E> {
 #[cfg(feature = "sources-aws_sqs")]
 impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
     fn emit(self) {
-        error!(message = "Failed to delete SQS events.", error = %self.error);
+        error!(
+            message = "Failed to delete SQS events.",
+            error = %self.error,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_type::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("sqs_message_delete_failed_total", 1);
     }
 }
