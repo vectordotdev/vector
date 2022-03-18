@@ -7,7 +7,7 @@
 
 #![cfg(feature = "kubernetes")]
 
+pub mod delayed_reflector;
 pub mod pod_manager_logic;
-pub mod reflector;
 
-pub use reflector::reflector;
+pub use delayed_reflector::reflector_shim;

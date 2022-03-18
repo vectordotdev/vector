@@ -3,10 +3,10 @@
 #![deny(missing_docs)]
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use kube::runtime::reflector::{store::Store, ObjectRef};
 use serde::{Deserialize, Serialize};
 
 use crate::event::{Event, LogEvent};
-use crate::kubernetes::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::{parse_path, OwnedSegment};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

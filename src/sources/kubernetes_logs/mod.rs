@@ -18,7 +18,7 @@ use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
-    runtime::watcher,
+    runtime::{reflector, watcher},
     Client, Config as ClientConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -37,7 +37,8 @@ use crate::{
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
-    kubernetes::reflector,
+    kubernetes::delayed_reflector::Delayer,
+    kubernetes::reflector_shim,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer, TaskTransform},
@@ -312,13 +313,10 @@ impl Source {
                 ..Default::default()
             },
         );
-        let pod_store_w = reflector::store::Writer {
-            ttl: delay_deletion,
-            ..Default::default()
-        };
+        let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
-        let pod_reflector = reflector(pod_store_w, pod_watcher);
+        let pod_reflector = reflector_shim(pod_store_w, pod_watcher, Delayer::new(delay_deletion));
         tokio::spawn(async move {
             pin!(pod_reflector);
             while let Some(_event) = pod_reflector.next().await {
@@ -330,13 +328,10 @@ impl Source {
 
         let namespaces = Api::<Namespace>::all(client);
         let ns_watcher = watcher(namespaces, ListParams::default());
-        let ns_store_w = reflector::store::Writer {
-            ttl: delay_deletion,
-            ..Default::default()
-        };
+        let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
-        let ns_reflector = reflector(ns_store_w, ns_watcher);
+        let ns_reflector = reflector_shim(ns_store_w, ns_watcher, Delayer::new(delay_deletion));
         tokio::spawn(async move {
             pin!(ns_reflector);
             while let Some(_event) = ns_reflector.next().await {

@@ -6,12 +6,10 @@ use std::path::PathBuf;
 
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
+use kube::runtime::reflector::{store::Store, ObjectRef};
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes::{
-    pod_manager_logic::extract_static_pod_config_hashsum,
-    reflector::{store::Store, ObjectRef},
-};
+use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
