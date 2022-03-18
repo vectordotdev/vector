@@ -126,7 +126,7 @@ components: sources: redis: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "redis_key"
+				default: null
 				examples: ["redis_key"]
 				syntax: "literal"
 			}
@@ -142,7 +142,11 @@ components: sources: redis: {
 			redis_key: {
 				description: "The Redis key the event came from"
 				required:    false
-				type: string: {}
+				common:      false
+				type: string: {
+					examples: ["some_key"]
+					default: null
+				}
 			}
 		}
 	}

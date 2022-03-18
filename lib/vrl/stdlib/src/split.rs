@@ -1,5 +1,29 @@
 use vrl::prelude::*;
 
+fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let limit = limit.try_integer()? as usize;
+    match pattern {
+        Value::Regex(pattern) => Ok(pattern
+            .splitn(string.as_ref(), limit as usize)
+            .collect::<Vec<_>>()
+            .into()),
+        Value::Bytes(bytes) => {
+            let pattern = String::from_utf8_lossy(&bytes);
+
+            Ok(string
+                .splitn(limit, pattern.as_ref())
+                .collect::<Vec<_>>()
+                .into())
+        }
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::regex() | Kind::bytes(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Split;
 
@@ -64,6 +88,14 @@ impl Function for Split {
             limit,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let pattern = args.required("pattern");
+        let limit = args.optional("limit").unwrap_or(value!(999999999));
+
+        split(value, limit, pattern)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,28 +108,10 @@ pub(crate) struct SplitFn {
 impl Expression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
-        let limit = self.limit.resolve(ctx)?.try_integer()? as usize;
+        let limit = self.limit.resolve(ctx)?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        self.pattern.resolve(ctx).and_then(|pattern| match pattern {
-            Value::Regex(pattern) => Ok(pattern
-                .splitn(string.as_ref(), limit as usize)
-                .collect::<Vec<_>>()
-                .into()),
-            Value::Bytes(bytes) => {
-                let pattern = String::from_utf8_lossy(&bytes);
-
-                Ok(string
-                    .splitn(limit, pattern.as_ref())
-                    .collect::<Vec<_>>()
-                    .into())
-            }
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::regex() | Kind::bytes(),
-            }
-            .into()),
-        })
+        split(value, limit, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

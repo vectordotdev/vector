@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   dnstap:
     build:
@@ -8,7 +10,6 @@ services:
       - ${PWD}/tests/data/dnstap/socket:/bind1/etc/bind/socket
       - ${PWD}/tests/data/dnstap/socket:/bind2/etc/bind/socket
       - ${PWD}/tests/data/dnstap/socket:/bind3/etc/bind/socket
-
   runner:
     build:
       context: ${PWD}
@@ -33,18 +34,16 @@ services:
     environment:
       - BIND_SOCKET=/run/bind/socket
     volumes:
+      - ${PWD}:/code
+      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
       - /var/run/docker.sock:/var/run/docker.sock
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
-      - ${PWD}:/code
 
 networks:
   public: {}
   proxy: {}
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

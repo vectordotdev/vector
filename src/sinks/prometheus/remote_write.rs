@@ -6,7 +6,6 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
@@ -21,8 +20,8 @@ use crate::{
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            SinkBatchSettings, TowerRequestConfig,
+            EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+            TowerRequestConfig,
         },
     },
     template::Template,
@@ -85,7 +84,7 @@ impl SinkConfig for RemoteWriteConfig {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let batch = self.batch.into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 
@@ -104,12 +103,11 @@ impl SinkConfig for RemoteWriteConfig {
         };
 
         let sink = {
-            let service = request.service(HttpRetryLogic, service);
-            let service = ServiceBuilder::new().service(service);
             let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
-            PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
+            request_settings
+                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
                     stream::iter(normalizer.apply(event.into_metric()).map(|event| {

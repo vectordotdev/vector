@@ -118,7 +118,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1.52"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.17.0", default-features = false, features = ["full"] }
@@ -188,12 +188,12 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
+async-graphql = { version = "3.0.35", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.35", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.23.0", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.23.1", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.17.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -224,7 +224,7 @@ colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
 encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
@@ -254,7 +254,7 @@ memchr = { version = "2.4", default-features = false, optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
-nom = { version = "7.1.0", default-features = false, optional = true }
+nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
@@ -323,8 +323,8 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.119"
-pretty_assertions = "1.1.0"
+libc = "0.2.120"
+pretty_assertions = "1.2.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -647,7 +647,7 @@ sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
-sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
+sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []

@@ -1,5 +1,6 @@
-services:
+version: "3"
 
+services:
   mongodb-primary:
     image: bitnami/mongodb:${MONGO_VERSION:-4.2.10}
     environment:
@@ -9,7 +10,6 @@ services:
       - MONGODB_REPLICA_SET_KEY=vector
     networks:
       - backend
-
   mongodb-secondary:
     image: bitnami/mongodb:${MONGO_VERSION:-4.2.10}
     depends_on:
@@ -23,7 +23,6 @@ services:
       - MONGODB_REPLICA_SET_KEY=vector
     networks:
       - backend
-
   mongodb-arbiter:
     image: bitnami/mongodb:${MONGO_VERSION:-4.2.10}
     depends_on:
@@ -37,7 +36,6 @@ services:
       - MONGODB_REPLICA_SET_KEY=vector
     networks:
       - backend
-
   runner:
     build:
       context: ${PWD}
@@ -67,15 +65,13 @@ services:
     networks:
       - backend
     volumes:
+      - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
 networks:
   backend: {}
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-
