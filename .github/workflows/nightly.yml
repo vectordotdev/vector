@@ -293,11 +293,11 @@ jobs:
           path: target/artifacts
       - name: First install of DEB package.
         run: |
-          dpkg _i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
       - name: Second install of DEB package.
         run: |
-          dpkg _i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
 
   rpm-verify:
