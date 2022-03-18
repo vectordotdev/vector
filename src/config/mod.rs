@@ -29,6 +29,7 @@ mod id;
 mod loading;
 pub mod provider;
 mod schema;
+mod secret;
 mod sink;
 mod source;
 mod transform;
