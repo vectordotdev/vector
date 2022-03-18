@@ -116,7 +116,7 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
             message = "Failed to delete SQS events.",
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
-            stage = error_type::PROCESSING,
+            stage = error_stage::PROCESSING,
         );
         counter!(
             "component_errors_total", 1,
