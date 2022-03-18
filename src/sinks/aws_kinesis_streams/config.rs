@@ -1,4 +1,4 @@
-use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError};
+use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
 use aws_sdk_kinesis::types::SdkError;
 use std::num::NonZeroU64;
 
@@ -217,6 +217,11 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if let SdkError::ServiceError { err, raw } = error {
+            if PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
+                return true;
+            }
+        }
         is_retriable_error(error)
     }
 }
