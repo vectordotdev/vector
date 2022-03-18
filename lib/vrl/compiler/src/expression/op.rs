@@ -269,79 +269,85 @@ impl Expression for Op {
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        self.lhs.compile_to_vm(vm)?;
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        self.lhs.compile_to_vm(vm, state)?;
 
         // Note, not all opcodes want the RHS evaluated straight away, so we
         // only compile the rhs in each branch as necessary.
         match self.opcode {
             ast::Opcode::Mul => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Multiply);
             }
             ast::Opcode::Div => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Divide);
             }
             ast::Opcode::Add => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Add);
             }
             ast::Opcode::Sub => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Subtract);
             }
             ast::Opcode::Rem => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Rem);
             }
             ast::Opcode::Or => {
                 // Or is rewritten as an if statement to allow short circuiting.
                 let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
                 vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::And => {
                 // And is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-                vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm)?;
+                // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
+                // replace it with False
+                let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
+                self.rhs.compile_to_vm(vm, state)?;
+                vm.write_opcode(OpCode::And);
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Err => {
                 // Err is rewritten as an if statement to allow short circuiting
                 let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
                 vm.write_opcode(OpCode::ClearError);
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Ne => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::NotEqual);
             }
             ast::Opcode::Eq => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Equal);
             }
             ast::Opcode::Ge => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::GreaterEqual);
             }
             ast::Opcode::Gt => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Greater);
             }
             ast::Opcode::Le => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::LessEqual);
             }
             ast::Opcode::Lt => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Less);
             }
             ast::Opcode::Merge => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Merge);
             }
         };

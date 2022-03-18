@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn get_env_var(value: Value) -> Resolved {
+    let name = value.try_bytes_utf8_lossy()?;
+    std::env::var(name.as_ref())
+        .map(Into::into)
+        .map_err(|e| e.to_string().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnvVar;
 
@@ -34,6 +41,11 @@ impl Function for GetEnvVar {
 
         Ok(Box::new(GetEnvVarFn { name }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let name = args.required("name");
+        get_env_var(name)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,11 +56,7 @@ struct GetEnvVarFn {
 impl Expression for GetEnvVarFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.name.resolve(ctx)?;
-        let name = value.try_bytes_utf8_lossy()?;
-
-        std::env::var(name.as_ref())
-            .map(Into::into)
-            .map_err(|e| e.to_string().into())
+        get_env_var(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

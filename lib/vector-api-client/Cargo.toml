@@ -16,7 +16,7 @@ serde_json = { version = "1.0.79", features = ["raw_value"] }
 anyhow = "1.0.56"
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "1.17.0", features = ["full"] }
@@ -26,7 +26,7 @@ tokio-stream = { version = "0.1.8", features = ["sync"] }
 graphql_client = "0.10.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.9", features = ["json"] }
+reqwest = { version = "0.11.10", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs

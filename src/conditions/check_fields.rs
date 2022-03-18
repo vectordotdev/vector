@@ -80,7 +80,7 @@ impl EqualsPredicate {
 impl CheckFieldsPredicate for EqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => self.check_field(l.get(&self.target)),
+            Event::Log(l) => self.check_field(l.get(self.target.as_str())),
             Event::Metric(m) => m
                 .tags()
                 .and_then(|t| t.get(&self.target))
@@ -123,7 +123,7 @@ impl ContainsPredicate {
 impl CheckFieldsPredicate for ContainsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
                 let v = v.to_string_lossy();
                 self.arg.iter().any(|s| v.contains(s))
             }),
@@ -164,7 +164,7 @@ impl StartsWithPredicate {
 impl CheckFieldsPredicate for StartsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
                 let v = v.to_string_lossy();
                 self.arg.iter().any(|s| v.starts_with(s))
             }),
@@ -203,7 +203,7 @@ impl EndsWithPredicate {
 impl CheckFieldsPredicate for EndsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
                 let v = v.to_string_lossy();
                 self.arg.iter().any(|s| v.ends_with(s))
             }),
@@ -230,9 +230,9 @@ impl NotEqualsPredicate {
             arg: match arg {
                 CheckFieldsPredicateArg::String(s) => vec![s.clone()],
                 CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
-                CheckFieldsPredicateArg::Integer(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Float(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Boolean(a) => vec![format!("{}", a)],
+                CheckFieldsPredicateArg::Integer(a) => vec![a.to_string()],
+                CheckFieldsPredicateArg::Float(a) => vec![a.to_string()],
+                CheckFieldsPredicateArg::Boolean(a) => vec![a.to_string()],
             },
         }))
     }
@@ -242,7 +242,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l
-                .get(&self.target)
+                .get(self.target.as_str())
                 .map(|f| f.coerce_to_bytes())
                 .map_or(false, |b| {
                     //false if any match, else true
@@ -293,7 +293,7 @@ impl CheckFieldsPredicate for RegexPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(log) => log
-                .get(&self.target)
+                .get(self.target.as_str())
                 .map(|field| field.to_string_lossy())
                 .map_or(false, |field| self.regex.is_match(&field)),
             Event::Metric(metric) => metric
@@ -331,7 +331,7 @@ impl ExistsPredicate {
 impl CheckFieldsPredicate for ExistsPredicate {
     fn check(&self, event: &Event) -> bool {
         (match event {
-            Event::Log(l) => l.get(&self.target).is_some(),
+            Event::Log(l) => l.get(self.target.as_str()).is_some(),
             Event::Metric(m) => m.tags().map_or(false, |t| t.contains_key(&self.target)),
             Event::Trace(t) => t.get(&self.target).is_some(),
         }) == self.arg
@@ -372,7 +372,7 @@ impl IpCidrPredicate {
 impl CheckFieldsPredicate for IpCidrPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
                 let v = v.to_string_lossy();
                 IpAddr::from_str(&v).map_or(false, |ip_addr| {
                     self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
@@ -436,7 +436,7 @@ impl LengthEqualsPredicate {
 impl CheckFieldsPredicate for LengthEqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
-            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
                 let len = match v {
                     Value::Bytes(value) => value.len(),
                     Value::Array(value) => value.len(),

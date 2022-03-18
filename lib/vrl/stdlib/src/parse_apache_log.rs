@@ -4,6 +4,33 @@ use vrl::prelude::*;
 
 use crate::log_util;
 
+fn parse_apache_log(
+    bytes: Value,
+    timestamp_format: Option<Value>,
+    format: &Bytes,
+    ctx: &Context,
+) -> Resolved {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => "%d/%b/%Y:%T %z".to_owned(),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let regex = match format.as_ref() {
+        b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
+        b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
+        b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
+        _ => unreachable!(),
+    };
+    let captures = regex
+        .captures(&message)
+        .ok_or("failed parsing common log line")?;
+    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+}
+
+fn variants() -> Vec<Value> {
+    vec![value!("common"), value!("combined"), value!("error")]
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
 
@@ -38,11 +65,9 @@ impl Function for ParseApacheLog {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let variants = vec![value!("common"), value!("combined"), value!("error")];
-
         let value = arguments.required("value");
         let format = arguments
-            .required_enum("format", &variants)?
+            .required_enum("format", &variants())?
             .try_bytes()
             .expect("format not bytes");
 
@@ -53,6 +78,25 @@ impl Function for ParseApacheLog {
             format,
             timestamp_format,
         }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("format", Some(expr)) => {
+                let format = expr
+                    .as_enum("format", variants())?
+                    .try_bytes()
+                    .expect("format not bytes");
+                Ok(Some(Box::new(format) as _))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -80,6 +124,14 @@ impl Function for ParseApacheLog {
             },
         ]
     }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
+        let timestamp_format = args.optional("timestamp_format");
+
+        parse_apache_log(value, timestamp_format, format, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -92,28 +144,13 @@ struct ParseApacheLogFn {
 impl Expression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let regex = match self.format.as_ref() {
-            b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
-            b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
-            b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
-            _ => unreachable!(),
-        };
-
-        let captures = regex
-            .captures(&message)
-            .ok_or("failed parsing common log line")?;
-
-        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
-            .map_err(Into::into)
+        parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

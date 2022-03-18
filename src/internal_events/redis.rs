@@ -23,16 +23,27 @@ impl InternalEvent for RedisEventsSent {
 }
 
 #[derive(Debug)]
-pub struct RedisSendEventError<E> {
-    pub error: E,
+pub struct RedisSendEventError<'a> {
+    error: &'a redis::RedisError,
+    error_code: String,
 }
 
-impl<E: std::fmt::Display> InternalEvent for RedisSendEventError<E> {
+#[cfg(feature = "sinks-redis")]
+impl<'a> RedisSendEventError<'a> {
+    pub fn new(error: &'a redis::RedisError) -> Self {
+        Self {
+            error,
+            error_code: error.code().unwrap_or_default().to_string(),
+        }
+    }
+}
+
+impl<'a> InternalEvent for RedisSendEventError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to send message.",
             error = %self.error,
-            error_code = "redis_sending",
+            error_code = %self.error_code,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
@@ -42,11 +53,46 @@ impl<E: std::fmt::Display> InternalEvent for RedisSendEventError<E> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "redis_sending",
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("send_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct RedisReceiveEventError {
+    error: redis::RedisError,
+    error_code: String,
+}
+
+impl From<redis::RedisError> for RedisReceiveEventError {
+    fn from(error: redis::RedisError) -> Self {
+        let error_code = error.code().unwrap_or_default().to_string();
+        Self { error, error_code }
+    }
+}
+
+impl InternalEvent for RedisReceiveEventError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to read message.",
+            error = %self.error,
+            error_code = %self.error_code,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::SENDING,
+            rate_limit_secs = 10,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error_code.clone(),
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
     }
 }

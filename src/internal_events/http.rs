@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -14,7 +14,7 @@ pub struct HttpBytesReceived<'a> {
 impl InternalEvent for HttpBytesReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received bytes.",
+            message = "Bytes received.",
             byte_size = %self.byte_size,
             http_path = %self.http_path,
             protocol = %self.protocol
@@ -41,7 +41,7 @@ pub struct HttpEventsReceived<'a> {
 impl InternalEvent for HttpEventsReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
             http_path = %self.http_path,
@@ -68,13 +68,19 @@ impl InternalEvent for HttpEventsReceived<'_> {
 
 #[derive(Debug)]
 pub struct HttpBadRequest<'a> {
-    pub code: u16,
-    pub message: &'a str,
+    code: u16,
+    error_code: String,
+    message: &'a str,
 }
 
+#[cfg(feature = "sources-utils-http")]
 impl<'a> HttpBadRequest<'a> {
-    fn error_code(&self) -> String {
-        http_error_code(self.code)
+    pub fn new(code: u16, message: &'a str) -> Self {
+        Self {
+            code,
+            error_code: super::prelude::http_error_code(code),
+            message,
+        }
     }
 }
 
@@ -83,7 +89,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         warn!(
             message = "Received bad request.",
             error = %self.message,
-            error_code = %self.error_code(),
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
@@ -94,44 +100,12 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code(),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("http_bad_requests_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct HttpEventMissingMessageError;
-
-impl InternalEvent for HttpEventMissingMessageError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Event missing the message key; dropping event.",
-            error_code = "missing_event_key",
-            error_type = error_type::ENCODER_FAILED,
-            error_stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "missing_event_key",
-            "error_type" => error_type::ENCODER_FAILED,
-            "error_stage" => error_stage::PROCESSING,
-        );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => "missing_event_key",
-            "error_type" => error_type::ENCODER_FAILED,
-            "error_stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("events_discarded_total", 1);
     }
 }
 

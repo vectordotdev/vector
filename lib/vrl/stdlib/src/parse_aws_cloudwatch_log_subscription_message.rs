@@ -3,6 +3,25 @@ use std::collections::BTreeMap;
 use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 
+fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
+        .map_err(|e| format!("unable to parse: {}", e))?;
+    Ok(map![
+        "owner": message.owner,
+        "message_type": message.message_type.as_str(),
+        "log_group": message.log_group,
+        "log_stream": message.log_stream,
+        "subscription_filters": message.subscription_filters,
+        "log_events": message.log_events.into_iter().map(|event| map![
+            "id": event.id,
+            "timestamp": event.timestamp,
+            "message": event.message,
+        ]).collect::<Vec<_>>(),
+    ]
+    .into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;
 
@@ -67,6 +86,11 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_aws_cloudwatch_log_subscription_message(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,24 +100,8 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
 
 impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
-            .map_err(|e| format!("unable to parse: {}", e))?;
-
-        Ok(map![
-            "owner": message.owner,
-            "message_type": message.message_type.as_str(),
-            "log_group": message.log_group,
-            "log_stream": message.log_stream,
-            "subscription_filters": message.subscription_filters,
-            "log_events": message.log_events.into_iter().map(|event| map![
-                "id": event.id,
-                "timestamp": event.timestamp,
-                "message": event.message,
-            ]).collect::<Vec<_>>(),
-        ]
-        .into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_cloudwatch_log_subscription_message(bytes)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

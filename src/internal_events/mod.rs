@@ -22,7 +22,7 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(feature = "sources-aws_s3")]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
@@ -112,7 +112,7 @@ mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 mod pulsar;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -183,7 +183,7 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(feature = "sources-aws_s3")]
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sinks-blackhole")]
 pub(crate) use self::blackhole::*;
@@ -279,7 +279,7 @@ pub(crate) use self::postgresql_metrics::*;
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;

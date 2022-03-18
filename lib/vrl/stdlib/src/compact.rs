@@ -4,6 +4,58 @@ use vrl::prelude::*;
 
 use crate::util;
 
+fn compact(
+    recursive: Option<Value>,
+    null: Option<Value>,
+    string: Option<Value>,
+    object: Option<Value>,
+    array: Option<Value>,
+    nullish: Option<Value>,
+    value: Value,
+) -> Resolved {
+    let options = CompactOptions {
+        recursive: match recursive {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        null: match null {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        string: match string {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        object: match object {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        array: match array {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        nullish: match nullish {
+            Some(expr) => expr.try_boolean()?,
+            None => false,
+        },
+    };
+
+    match value {
+        Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
+        Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
 
@@ -91,6 +143,18 @@ impl Function for Compact {
             nullish,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let recursive = args.optional("recursive");
+        let null = args.optional("null");
+        let string = args.optional("string");
+        let object = args.optional("object");
+        let array = args.optional("array");
+        let nullish = args.optional("nullish");
+
+        compact(recursive, null, string, object, array, nullish, value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -146,47 +210,39 @@ impl CompactOptions {
 
 impl Expression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let options = CompactOptions {
-            recursive: match &self.recursive {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
+        let recursive = self
+            .recursive
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let null = self
+            .null
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let string = self
+            .string
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let object = self
+            .object
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let array = self
+            .array
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let nullish = self
+            .nullish
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let value = self.value.resolve(ctx)?;
 
-            null: match &self.null {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            string: match &self.string {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            object: match &self.object {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            array: match &self.array {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            nullish: match &self.nullish {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => false,
-            },
-        };
-
-        match self.value.resolve(ctx)? {
-            Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
-            Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
-            }
-            .into()),
-        }
+        compact(recursive, null, string, object, array, nullish, value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

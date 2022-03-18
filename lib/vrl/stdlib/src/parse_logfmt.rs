@@ -56,4 +56,28 @@ impl Function for ParseLogFmt {
             standalone_key,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let bytes = args.required("value");
+        let key_value_delimiter = args
+            .optional("key_value_delimiter")
+            .unwrap_or_else(|| value!("="));
+        let field_delimiter = args
+            .optional("field_delimiter")
+            .unwrap_or_else(|| value!(" "));
+
+        let whitespace = Whitespace::Lenient;
+
+        let standalone_key = args
+            .optional("accept_standalone_key")
+            .unwrap_or_else(|| value!(true));
+
+        super::parse_key_value::parse_key_value(
+            bytes,
+            key_value_delimiter,
+            field_delimiter,
+            standalone_key,
+            whitespace,
+        )
+    }
 }

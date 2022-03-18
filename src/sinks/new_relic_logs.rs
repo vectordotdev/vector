@@ -166,7 +166,9 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
+            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone())
+                .into_encoding()
+                .into(),
             batch: batch_settings.into(),
             request,
             tls: None,
@@ -186,12 +188,10 @@ mod tests {
 
     use super::*;
     use crate::{
+        codecs::encoding::Serializer,
         config::SinkConfig,
         event::Event,
-        sinks::util::{
-            encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
-            test::build_test_server, Concurrency,
-        },
+        sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
         test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
 
@@ -221,11 +221,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(http_config.request.tower.concurrency, Concurrency::None);
         assert_eq!(
@@ -252,11 +255,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
             http_config.request.tower.concurrency,
@@ -290,11 +296,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));
         assert_eq!(
             http_config.request.tower.concurrency,

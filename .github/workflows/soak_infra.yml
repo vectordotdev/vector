@@ -63,7 +63,7 @@ jobs:
             org.opencontainers.image.url=https://github.com/vectordotdev/vector/tree/master/lib/soak
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v2.9.0
+        uses: docker/build-push-action@v2.10.0
         with:
           context: .
           file: lib/soak/Dockerfile
@@ -108,7 +108,7 @@ jobs:
             org.opencontainers.image.title=Soak Builder
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v2.9.0
+        uses: docker/build-push-action@v2.10.0
         with:
           context: .
           file: soaks/Dockerfile.builder

@@ -665,7 +665,7 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{}", i), format!("value{}", i));
+            event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.insert("timestamp", timestamp);
@@ -715,7 +715,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
+        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
     }
 
     fn create_sink(

@@ -30,10 +30,7 @@ pub struct TcpSocketConnectionError<E> {
     pub error: E,
 }
 
-impl<E> InternalEvent for TcpSocketConnectionError<E>
-where
-    E: std::error::Error,
-{
+impl<E: std::error::Error> InternalEvent for TcpSocketConnectionError<E> {
     fn emit_logs(&self) {
         error!(
             message = "Unable to connect.",
@@ -106,10 +103,15 @@ impl InternalEvent for TcpSocketTlsConnectionError {
 
     fn emit_metrics(&self) {
         counter!(
-            "connection_errors_total", 1,
+            "component_errors_total", 1,
             "error_code" => "connection_failed",
-            "error_type" => "writer_failed",
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
+            "mode" => "tcp",
+        );
+        // deprecated
+        counter!(
+            "connection_errors_total", 1,
             "mode" => "tcp",
         );
     }
@@ -134,10 +136,15 @@ impl InternalEvent for TcpSocketError {
 
     fn emit_metrics(&self) {
         counter!(
-            "connection_errors_total", 1,
+            "component_errors_total", 1,
             "error_code" => "socket_failed",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
+            "mode" => "tcp",
+        );
+        // deprecated
+        counter!(
+            "connection_errors_total", 1,
             "mode" => "tcp",
         );
     }
@@ -162,13 +169,17 @@ impl InternalEvent for TcpSendAckError {
 
     fn emit_metrics(&self) {
         counter!(
-            "connection_errors_total", 1,
+            "component_errors_total", 1,
             "error_code" => "ack_failed",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
             "mode" => "tcp",
         );
         // deprecated
+        counter!(
+            "connection_errors_total", 1,
+            "mode" => "tcp",
+        );
         counter!(
             "connection_send_ack_errors_total", 1,
             "mode" => "tcp",
@@ -184,7 +195,12 @@ pub struct TcpBytesReceived {
 
 impl InternalEvent for TcpBytesReceived {
     fn emit_logs(&self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, peer_addr = %self.peer_addr);
+        trace!(
+            message = "Bytes received.",
+            protocol = "tcp",
+            byte_size = %self.byte_size,
+            peer_addr = %self.peer_addr,
+        );
     }
 
     fn emit_metrics(&self) {

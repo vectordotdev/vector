@@ -15,10 +15,10 @@ pub struct ExecEventsReceived<'a> {
 impl InternalEvent for ExecEventsReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = self.count,
-            command = %self.command,
             byte_size = self.byte_size,
+            command = %self.command,
         );
     }
 

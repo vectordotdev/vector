@@ -41,7 +41,7 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 fn into_message(event: Event) -> String {
     event
         .as_log()
-        .get(&vector::config::log_schema().message_key())
+        .get(vector::config::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
 }
@@ -664,7 +664,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
     );
     sink1_outer.buffer = BufferConfig {
         stages: vec![BufferType::DiskV1 {
-            max_size: 1024,
+            max_size: std::num::NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::DropNewest,
         }],
     };
