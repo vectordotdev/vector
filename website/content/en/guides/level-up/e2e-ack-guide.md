@@ -52,7 +52,7 @@ doing the following:
 [sinks.very_cool_id]
    # Enable or disable waiting for acknowledgements for this sink.
    # Defaults to the global value of `acknowledgements`
-   acknowledgement = true
+   acknowledgements.enabled = true
 ```
 
 ## Edge cases
