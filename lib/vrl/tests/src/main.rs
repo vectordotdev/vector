@@ -325,6 +325,7 @@ fn main() {
     print_result(failed_count)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_vrl(
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
