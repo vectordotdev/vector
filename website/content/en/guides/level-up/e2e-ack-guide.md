@@ -43,7 +43,7 @@ support will wait before responding for acknowledgement from all the sinks that
 its events flow through.
 
 If any sink rejects a message, that failure marks the batch that the message is
-part of as failed, and the source will respond accordingly. For example, HTTP sources
+part of as _failed_, and the source will respond accordingly. For example, HTTP sources
 will produce some 400 error code, while sources like Kafka that don't handle
 rejection behaves similarly to a positive acknowledgement.
 
@@ -63,12 +63,12 @@ doing the following:
 ## Edge cases
 
 Unsurprisingly, there are a few exceptions and edge cases for the end-to-end
-acknowledgement feature. 
+acknowledgement feature.
 
 First, as alluded to earlier, not all sources and sinks are supported. We are, of
 course, working to add support for more sources and sinks, but support for some
 sources and sinks will always be unable because they cannot provide acknowledgements
-at the protocol level. 
+at the protocol level.
 
 Sources that don't support acknowledgements will output a
 warning message to let you know if you try to enable acknowledgements, while sinks
