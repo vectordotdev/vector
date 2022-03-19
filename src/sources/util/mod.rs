@@ -17,6 +17,8 @@ pub mod framestream;
     feature = "sources-utils-http-query"
 ))]
 mod http;
+#[cfg(feature = "sources-aws_sqs")]
+mod message_decoding;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
@@ -54,3 +56,5 @@ pub use self::http::ErrorMessage;
 pub use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
 pub use self::http::HttpSourceAuthConfig;
+#[cfg(feature = "sources-aws_sqs")]
+pub use self::message_decoding::decode_message;
