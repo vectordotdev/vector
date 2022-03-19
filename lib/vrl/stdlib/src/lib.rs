@@ -75,6 +75,8 @@ mod ip_aton;
 mod ip_cidr_contains;
 #[cfg(feature = "ip_ntoa")]
 mod ip_ntoa;
+#[cfg(feature = "ip_pton")]
+mod ip_pton;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -330,6 +332,8 @@ pub use ip_aton::IpAton;
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_ntoa")]
 pub use ip_ntoa::IpNtoa;
+#[cfg(feature = "ip_pton")]
+pub use ip_pton::IpPton;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -571,6 +575,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IpCidrContains),
         #[cfg(feature = "ip_ntoa")]
         Box::new(IpNtoa),
+        #[cfg(feature = "ip_pton")]
+        Box::new(IpPton),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]
