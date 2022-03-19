@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,

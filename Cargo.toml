@@ -412,6 +412,8 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["tonic-build", "prost-build"]
 
+gcp = ["goauth", "smpl_jwt"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
@@ -463,13 +465,13 @@ sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "codecs"
 sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "codecs", "async-compression", "sources-aws_sqs"]
 sources-aws_sqs = ["aws-core", "aws-sdk-sqs", "codecs"]
 sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "codecs", "value"]
+sources-demo_logs = ["fakedata", "codecs"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-demo_logs = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -656,7 +658,7 @@ sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-elasticsearch = ["aws-core", "aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
-sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
+sinks-gcp = ["base64", "gcp", "gouth"]
 sinks-honeycomb = []
 sinks-http = ["codecs"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
