@@ -18,6 +18,137 @@ const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tag
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
+#[derive(Debug, Clone)]
+pub enum VrlImmutableTarget<'a> {
+    LogEvent(&'a LogEvent),
+    Metric(&'a Metric),
+    Trace(&'a TraceEvent),
+}
+
+impl<'a> VrlImmutableTarget<'a> {
+    pub fn new(event: &'a Event) -> Self {
+        match event {
+            Event::Log(event) => VrlImmutableTarget::LogEvent(event),
+            Event::Metric(event) => VrlImmutableTarget::Metric(event),
+            Event::Trace(event) => VrlImmutableTarget::Trace(event),
+        }
+    }
+}
+
+impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
+    fn target_insert(&mut self, _path: &LookupBuf, _value: vrl_lib::Value) -> Result<(), String> {
+        Err("cannot mutate".to_string())
+    }
+
+    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
+    fn target_get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_lib::Value>, String> {
+        match self {
+            VrlImmutableTarget::LogEvent(log) => Ok(log.lookup(path).map(|val| val.clone())),
+
+            VrlImmutableTarget::Trace(log) => Ok(log.lookup(path).map(|val| val.clone())),
+
+            VrlImmutableTarget::Metric(metric) => {
+                if path.is_root() {
+                    let mut map = BTreeMap::<String, vrl_lib::Value>::new();
+                    map.insert("name".to_string(), metric.series.name.name.clone().into());
+                    if let Some(ref namespace) = metric.series.name.namespace {
+                        map.insert("namespace".to_string(), namespace.clone().into());
+                    }
+                    if let Some(timestamp) = metric.data.timestamp {
+                        map.insert("timestamp".to_string(), timestamp.into());
+                    }
+                    map.insert("kind".to_string(), metric.data.kind.into());
+                    if let Some(tags) = metric.tags() {
+                        map.insert(
+                            "tags".to_string(),
+                            tags.iter()
+                                .map(|(tag, value)| (tag.clone(), value.clone().into()))
+                                .collect::<BTreeMap<_, _>>()
+                                .into(),
+                        );
+                    }
+                    map.insert("type".to_string(), metric.data.value.clone().into());
+
+                    return Ok(Some(map.into()));
+                }
+
+                for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+                    match paths.as_slice() {
+                        ["name"] => return Ok(Some(metric.name().to_string().into())),
+                        ["namespace"] => match &metric.series.name.namespace {
+                            Some(namespace) => return Ok(Some(namespace.clone().into())),
+                            None => continue,
+                        },
+                        ["timestamp"] => match metric.data.timestamp {
+                            Some(timestamp) => return Ok(Some(timestamp.into())),
+                            None => continue,
+                        },
+                        ["kind"] => return Ok(Some(metric.data.kind.into())),
+                        ["tags"] => {
+                            return Ok(metric.tags().map(|map| {
+                                map.iter()
+                                    .map(|(k, v)| (k.clone(), v.clone().into()))
+                                    .collect::<vrl_lib::Value>()
+                            }))
+                        }
+                        ["tags", field] => match metric.tag_value(field) {
+                            Some(value) => return Ok(Some(value.into())),
+                            None => continue,
+                        },
+                        ["type"] => return Ok(Some(metric.data.value.clone().into())),
+                        _ => {
+                            return Err(MetricPathError::InvalidPath {
+                                path: &path.to_string(),
+                                expected: VALID_METRIC_PATHS_GET,
+                            }
+                            .to_string())
+                        }
+                    }
+                }
+                // We only reach this point if we have requested a tag that doesn't exist or an empty
+                // field.
+                Ok(None)
+            }
+        }
+    }
+
+    fn target_remove(
+        &mut self,
+        _path: &LookupBuf,
+        _compact: bool,
+    ) -> Result<Option<vrl_lib::Value>, String> {
+        Err("cannot mutate".to_string())
+    }
+
+    fn get_metadata(&self, key: &str) -> Result<Option<vrl_lib::Value>, String> {
+        let metadata = match self {
+            VrlImmutableTarget::LogEvent(event) => event.metadata(),
+            VrlImmutableTarget::Trace(event) => event.metadata(),
+            VrlImmutableTarget::Metric(metric) => metric.metadata(),
+        };
+
+        match key {
+            "datadog_api_key" => Ok(metadata
+                .datadog_api_key()
+                .as_ref()
+                .map(|api_key| vrl_lib::Value::from(api_key.to_string()))),
+            "splunk_hec_token" => Ok(metadata
+                .splunk_hec_token()
+                .as_ref()
+                .map(|token| vrl_lib::Value::from(token.to_string()))),
+            _ => Err(format!("key {} not available", key)),
+        }
+    }
+
+    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
+        Err("cannot mutate".to_string())
+    }
+
+    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+        Err("cannot mutate".to_string())
+    }
+}
+
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
