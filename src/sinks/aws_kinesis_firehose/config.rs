@@ -237,7 +237,7 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError { err, raw } = error {
+        if let SdkError::ServiceError { err, raw: _ } = error {
             if let PutRecordBatchErrorKind::ServiceUnavailableException(_) = err.kind {
                 return true;
             }

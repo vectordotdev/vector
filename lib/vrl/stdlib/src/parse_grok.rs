@@ -145,11 +145,7 @@ impl Function for ParseGrok {
         match (name, expr) {
             ("pattern", Some(expr)) => {
                 let pattern = expr
-                    .as_value()
-                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "pattern",
-                        expr: expr.clone(),
-                    })?
+                    .as_literal("pattern")?
                     .try_bytes_utf8_lossy()
                     .expect("grok pattern not bytes")
                     .into_owned();
