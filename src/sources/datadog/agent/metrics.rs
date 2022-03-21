@@ -142,7 +142,7 @@ fn series_v2_service() -> BoxedFilter<(Response,)> {
         // but the route exists in the agent codebase
         .and(path!("api" / "v2" / "series" / ..))
         .and_then(|| {
-            error!(message = "/api/v2/series route is not supported.");
+            error!(message = "The route /api/v2/series is not supported.");
             let response: Result<Response, Rejection> =
                 Err(warp::reject::custom(ErrorMessage::new(
                     StatusCode::UNPROCESSABLE_ENTITY,

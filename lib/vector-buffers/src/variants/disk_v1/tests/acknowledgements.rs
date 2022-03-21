@@ -316,7 +316,7 @@ async fn acking_when_undecodable_records_present() {
         });
 
         let parent = trace_span!("acking_when_undecodable_records_present");
-        fut.instrument(parent).await;
+        fut.instrument(parent.or_current()).await;
 
         tokio::time::resume();
     }

@@ -229,8 +229,8 @@ where
 {
     let data_dir = PathBuf::from("/tmp/vector");
     let id = format!("{}-buffer-perf-testing", buffer_type);
-    let max_size_events = 500;
-    let max_size_bytes = 32 * 1024 * 1024 * 1024;
+    let max_size_events = std::num::NonZeroUsize::new(500).unwrap();
+    let max_size_bytes = std::num::NonZeroU64::new(32 * 1024 * 1024 * 1024).unwrap();
     let when_full = WhenFull::Block;
 
     let mut builder = TopologyBuilder::default();

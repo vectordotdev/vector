@@ -112,11 +112,16 @@ impl Runtime {
         Ok(values.pop().unwrap_or(Value::Null))
     }
 
-    pub fn compile(&self, fns: Vec<Box<dyn Function>>, program: &Program) -> Result<Vm, String> {
+    pub fn compile(
+        &self,
+        fns: Vec<Box<dyn Function>>,
+        program: &Program,
+        mut state: state::Compiler,
+    ) -> Result<Vm, String> {
         let mut vm = Vm::new(fns);
 
         for expr in program.iter() {
-            expr.compile_to_vm(&mut vm)?;
+            expr.compile_to_vm(&mut vm, &mut state)?;
         }
 
         vm.write_opcode(OpCode::Return);

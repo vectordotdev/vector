@@ -294,7 +294,7 @@ where
                                 };
                                 (seq_num, ack_size)
                             })
-                            .instrument(info_span!("request", request_id));
+                            .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
                     }

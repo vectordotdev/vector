@@ -664,7 +664,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
     );
     sink1_outer.buffer = BufferConfig {
         stages: vec![BufferType::DiskV1 {
-            max_size: 1024,
+            max_size: std::num::NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::DropNewest,
         }],
     };

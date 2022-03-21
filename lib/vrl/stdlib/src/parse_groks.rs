@@ -105,7 +105,7 @@ impl Function for ParseGroks {
     fn compile_argument(
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -119,10 +119,18 @@ impl Function for ParseGroks {
                     }
                 });
 
-                let patterns = expr.as_value().unwrap();
+                let patterns = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    }
+                })?;
                 let patterns = patterns
                     .try_array()
-                    .unwrap()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    })?
                     .into_iter()
                     .map(|value| {
                         let pattern = value
@@ -164,11 +172,7 @@ impl Function for ParseGroks {
         }
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let bytes = value.try_bytes_utf8_lossy()?;
 

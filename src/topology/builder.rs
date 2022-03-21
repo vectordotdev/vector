@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     future::ready,
+    num::NonZeroUsize,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -47,6 +48,8 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
 pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+
+pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -293,7 +296,8 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) =
+            TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 

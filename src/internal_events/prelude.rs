@@ -34,6 +34,8 @@ pub mod error_type {
     pub const READER_FAILED: &str = "reader_failed";
     // When the component was unable to perform a request or the request failed.
     pub const REQUEST_FAILED: &str = "request_failed";
+    // When the component depends on a script that failed
+    pub const SCRIPT_FAILED: &str = "script_failed";
     // When the component was unable to build a template or interpolate it.
     pub const TEMPLATE_FAILED: &str = "template_failed";
     // When an execution took longer than expected and failed.
@@ -42,6 +44,12 @@ pub mod error_type {
     pub const WRITER_FAILED: &str = "writer_failed";
 }
 
+#[cfg(any(
+    feature = "sinks-azure_blob",
+    feature = "sinks-elasticsearch",
+    feature = "sources-aws_kinesis_firehose",
+    feature = "sources-utils-http",
+))]
 pub(crate) fn http_error_code(code: u16) -> String {
     format!("http_response_{}", code)
 }

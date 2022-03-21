@@ -1,5 +1,22 @@
 use vrl::prelude::*;
 
+fn to_syslog_severity(level: Value) -> Resolved {
+    let level = level.try_bytes_utf8_lossy()?;
+    // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
+    let severity = match &level[..] {
+        "emerg" | "panic" => 0,
+        "alert" => 1,
+        "crit" => 2,
+        "err" | "error" => 3,
+        "warning" | "warn" => 4,
+        "notice" => 5,
+        "info" => 6,
+        "debug" => 7,
+        _ => return Err(format!("syslog level {} not valid", level).into()),
+    };
+    Ok(severity.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToSyslogSeverity;
 
@@ -43,6 +60,11 @@ impl Function for ToSyslogSeverity {
 
         Ok(Box::new(ToSyslogSeverityFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        to_syslog_severity(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,22 +75,7 @@ struct ToSyslogSeverityFn {
 impl Expression for ToSyslogSeverityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let level = self.value.resolve(ctx)?;
-        let level = level.try_bytes_utf8_lossy()?;
-
-        // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
-        let severity = match &level[..] {
-            "emerg" | "panic" => 0,
-            "alert" => 1,
-            "crit" => 2,
-            "err" | "error" => 3,
-            "warning" | "warn" => 4,
-            "notice" => 5,
-            "info" => 6,
-            "debug" => 7,
-            _ => return Err(format!("syslog level {} not valid", level).into()),
-        };
-
-        Ok(severity.into())
+        to_syslog_severity(level)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

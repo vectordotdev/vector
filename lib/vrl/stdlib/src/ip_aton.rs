@@ -2,6 +2,14 @@ use std::net::Ipv4Addr;
 
 use vrl::prelude::*;
 
+fn ip_aton(value: Value) -> Resolved {
+    let ip: Ipv4Addr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
+    Ok(u32::from(ip).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct IpAton;
 
@@ -36,6 +44,11 @@ impl Function for IpAton {
 
         Ok(Box::new(IpAtonFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        ip_aton(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -45,14 +58,8 @@ struct IpAtonFn {
 
 impl Expression for IpAtonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: Ipv4Addr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
-
-        Ok(u32::from(ip).into())
+        let value = self.value.resolve(ctx)?;
+        ip_aton(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
