@@ -10,13 +10,13 @@ use futures::FutureExt;
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{self, internal_event::EventsReceived};
 
 use super::events::*;
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, BatchStatus, Event},
+    internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     SourceSender,
@@ -114,8 +114,9 @@ impl SqsSource {
             }
             drop(batch);
             emit!(&AwsSqsBytesReceived { byte_size });
-            if let Err(err) = out.send_batch(events).await {
-                error!(message = "Error sending to sink.", error = %err);
+            let count = events.len();
+            if let Err(error) = out.send_batch(events).await {
+                emit!(&StreamClosedError { error, count });
             }
 
             if let Some(receiver) = batch_receiver {
