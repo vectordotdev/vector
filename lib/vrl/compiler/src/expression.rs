@@ -134,25 +134,49 @@ impl Expr {
         }
     }
 
+    pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
+        let literal = match self {
+            Expr::Literal(literal) => Ok(literal.clone()),
+            Expr::Variable(var) if var.value().is_some() => {
+                match var.value().unwrap().clone().into() {
+                    Expr::Literal(literal) => Ok(literal),
+                    expr => Err(super::function::Error::UnexpectedExpression {
+                        keyword,
+                        expected: "literal",
+                        expr,
+                    }),
+                }
+            }
+            expr => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: expr.clone(),
+            }),
+        }?;
+
+        match literal.as_value() {
+            Some(value) => Ok(value),
+            None => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: self.clone(),
+            }),
+        }
+    }
+
     pub fn as_enum(
         &self,
         keyword: &'static str,
         variants: Vec<Value>,
     ) -> Result<Value, super::function::Error> {
-        match self.as_value() {
-            Some(value) => variants.iter().find(|v| **v == value).cloned().ok_or(
-                super::function::Error::InvalidEnumVariant {
-                    keyword,
-                    value,
-                    variants,
-                },
-            ),
-            None => Err(super::function::Error::InvalidEnumVariant {
+        let value = self.as_literal(keyword)?;
+        variants.iter().find(|v| **v == value).cloned().ok_or(
+            super::function::Error::InvalidEnumVariant {
                 keyword,
-                value: Value::Null,
+                value,
                 variants,
-            }),
-        }
+            },
+        )
     }
 }
 

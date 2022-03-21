@@ -92,7 +92,7 @@ impl SqsSource {
         if let Some(messages) = receive_message_output.messages {
             let mut receipts_to_ack = vec![];
 
-            let mut batch_receiver = None;
+            let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
             for message in messages {
                 if let Some(body) = message.body {
                     emit!(&AwsSqsBytesReceived {
@@ -100,10 +100,8 @@ impl SqsSource {
                     });
                     let timestamp = get_timestamp(&message.attributes);
                     let events = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
-                    let send_result = if acknowledgements {
-                        let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let events = events.map(|event| event.with_batch_notifier(&batch));
-                        batch_receiver = Some(receiver);
+                    let send_result = if let Some(batch) = batch.as_ref() {
+                        let mut events = events.map(|event| event.with_batch_notifier(batch));
                         out.send_batch(events).await
                     } else {
                         out.send_batch(events).await
@@ -120,6 +118,7 @@ impl SqsSource {
                     }
                 }
             }
+            drop(batch);
 
             if let Some(receiver) = batch_receiver {
                 let client = self.client.clone();
