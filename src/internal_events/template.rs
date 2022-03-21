@@ -31,7 +31,6 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::TEMPLATE_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -41,7 +40,6 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         if self.drop_event {
             counter!(
                 "component_discarded_events_total", 1,
-                "error" => self.error.to_string(),
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
             );

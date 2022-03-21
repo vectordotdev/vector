@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn object(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn object(value: Value) -> Resolved {
     match value {
         v @ Value::Object(_) => Ok(v),
         v => Err(format!("expected object, got {}", v.kind()).into()),
@@ -51,11 +51,7 @@ impl Function for Object {
         Ok(Box::new(ObjectFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         object(value)
     }

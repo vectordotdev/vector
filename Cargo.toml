@@ -151,13 +151,15 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = { version = "0.8.0", optional = true }
-aws-types = { version = "0.8.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-sqs = { version = "0.8.0", optional = true }
-aws-sdk-cloudwatch = { version = "0.8.0", optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.8.0", optional = true }
-aws-smithy-client = { version = "0.38.0", optional = true }
-aws-smithy-http = { version = "0.38.0", optional = true }
+aws-config = { version = "0.9.0", optional = true }
+aws-types = { version = "0.9.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-s3 = { version = "0.9.0", optional = true }
+aws-sdk-sqs = { version = "0.9.0", optional = true }
+aws-sdk-cloudwatch = { version = "0.9.0", optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true }
+aws-sdk-kinesis = { version = "0.9.0", optional = true }
+aws-smithy-client = { version = "0.39.0", optional = true }
+aws-smithy-http = { version = "0.39.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -645,8 +647,8 @@ sinks-metrics = [
 sinks-aws_cloudwatch_logs = ["aws-core", "aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
+sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
+sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []

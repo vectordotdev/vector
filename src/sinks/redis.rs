@@ -353,7 +353,7 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventError { error }),
+                Err(error) => emit!(&RedisSendEventError::new(error)),
             };
             result
         })

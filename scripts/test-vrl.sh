@@ -10,6 +10,5 @@ set -euo pipefail
 (
   cd "$(dirname "${BASH_SOURCE[0]}")/../lib/vrl/tests"
 
-  cargo run
+  cargo run -- --runtime=ast && cargo run -- --runtime=vm
 )
-

@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn parse_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_json(value: Value) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = serde_json::from_slice::<'_, Value>(&bytes)
         .map_err(|e| format!("unable to parse json: {}", e))?;
@@ -89,11 +89,7 @@ impl Function for ParseJson {
         Ok(Box::new(ParseJsonFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         parse_json(value)
     }

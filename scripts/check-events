@@ -6,10 +6,30 @@ require 'find'
 # These members/tags are common to multiple events
 BYTE_SIZE_COUNT = ['byte_size', 'count']
 
+# SUFFIX => [MESSAGE, COUNTERS, ADDITIONAL_TAGS]
+EVENT_CLASSES = {
+  'BytesReceived' => [
+    'Bytes received.', ['received_bytes'], ['byte_size', 'protocol']
+  ],
+  'EventsReceived' => [
+    'Events received.', ['received_events', 'received_event_bytes'], ['count', 'byte_size']
+  ],
+  'EventsSent' => [
+    'Events sent.', ['sent_events', 'sent_event_bytes'], ['count', 'byte_size']
+  ],
+  'BytesSent' => [
+    'Bytes sent.', ['sent_bytes'], ['byte_size', 'protocol']
+  ],
+}
+
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
   arr.append(item)
   hash[key] = arr
+end
+
+def is_constant?(name)
+  name.start_with? '"' and name.end_with? '"' or name.match? /^(.+::)[A-Z0-9_]$/
 end
 
 # A class to hold error reports and common functionality
@@ -38,30 +58,26 @@ class Event
   def valid?
     @reports.clear
 
-    # Check BytesReceived events (for sources)
-    if @name.end_with? 'BytesReceived'
-      members_must_include(['byte_size'])
-      counters_must_include('component_received_bytes_total', ['protocol'] + @members - ['byte_size'])
-    end
-
-    # Check EventsReceived events (common)
-    if @name.end_with? 'EventsReceived'
-      members_must_include(BYTE_SIZE_COUNT)
-      counters_must_include('component_received_events_total', @members - BYTE_SIZE_COUNT)
-      counters_must_include('component_received_event_bytes_total', @members - BYTE_SIZE_COUNT)
-    end
-
-    # Check EventsSent events (common)
-    if @name.end_with? 'EventsSent'
-      members_must_include(BYTE_SIZE_COUNT)
-      counters_must_include('component_sent_events_total', @members - BYTE_SIZE_COUNT)
-      counters_must_include('component_sent_event_bytes_total', @members - BYTE_SIZE_COUNT)
-    end
-
-    # Check BytesSent events (for sinks)
-    if @name.end_with? 'BytesSent'
-      members_must_include(['byte_size'])
-      counters_must_include('component_sent_bytes_total', ['protocol'] + @members - ['byte_size'])
+    EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
+      if @name.end_with? suffix
+        @logs.each do |type, message, parameters|
+          if type != 'trace'
+            @reports.append('Log type MUST be \"trace!\".')
+          end
+          if message != required_message
+            @reports.append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
+          end
+          additional_tags.each do |tag_name|
+            unless parameters.include? tag_name
+              @reports.append("Log MUST contain tag \"#{tag_name}\"")
+            end
+          end
+        end
+        counters.each do |counter|
+          counter = "component_#{counter}_total"
+          counters_must_include(counter, additional_tags - BYTE_SIZE_COUNT)
+        end
+      end
     end
 
     has_errors = @logs.one? { |type, _, _| type == 'error' }
@@ -69,15 +85,43 @@ class Event
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
-      counters_must_include('component_errors_total', ['error_type', 'stage'] + @members - ['body', 'error', 'text'])
+      counters_must_include('component_errors_total', ['error_type', 'stage'])
     end
 
     # Make sure error events contain the right parameters
     @logs.each do |type, message, parameters|
       if type == 'error'
-        ['error', 'stage'].each do |parameter|
+        ['error_type', 'stage'].each do |parameter|
           unless parameters.include? parameter
             @reports.append("Error log MUST include parameter \"#{parameter}\".")
+          end
+        end
+
+        ['component_errors_total', 'component_discarded_events_total'].each do |event_name|
+          if @counters[event_name]
+            ['error_code', 'error_type', 'stage'].each do |parameter|
+              if parameters.include? parameter and !@counters[event_name].include? parameter
+                @reports.append("Counter \"#{event_name}\" must include \"#{parameter}\" to match error log.")
+              end
+            end
+          end
+        end
+      end
+    end
+
+    @counters.each do |name, tags|
+      # Only component_errors_total and component_discarded_events_total metrics are considered
+      if ['component_errors_total', 'component_discarded_events_total'].include? name
+        # Make sure defined tags to counters are constants
+        tags.each do |tag, value|
+          if tag == 'stage'
+            if !value.start_with? 'error_stage::'
+              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
+            end
+          elsif tag == 'error_type'
+            if !value.start_with? 'error_type::'
+              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
+            end
           end
         end
       end
@@ -92,14 +136,6 @@ class Event
       @reports.append(report)
     end
 
-    def generic_must_contain(array, names, prefix, suffix)
-      names.each do |name|
-        unless array.include? name
-          @reports.append("#{prefix} MUST #{suffix} \"#{name}\".")
-        end
-      end
-    end
-
     def counters_must_include(name, required_tags)
       unless @counters.include? name
         @reports.append("This event MUST increment counter \"#{name}\".")
@@ -112,10 +148,6 @@ class Event
         end
       end
     end
-
-    def members_must_include(names)
-      generic_must_contain(@members, names, 'This event', 'have a member named')
-    end
 end
 
 $all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
@@ -124,12 +156,16 @@ error_count = 0
 
 # Scan sources and build internal structures
 Find.find('.') do |path|
+  if path.start_with? './'
+    path = path[2..]
+  end
+
   if path.end_with? '.rs'
     text = File.read(path)
 
     # Check log message texts for correct formatting. See below for the
     # full regex
-    if (path.start_with? 'src/')
+    if path.start_with? 'src/'
       text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) do
         |type, has_message_prefix, message|
         reports = []
@@ -143,7 +179,7 @@ Find.find('.') do |path|
       end
     end
 
-    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match?(/## skip check-events ##/i)
+    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match? /## skip check-events ##/i
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
@@ -157,7 +193,7 @@ Find.find('.') do |path|
       text.scan(/^(\s*)impl(?:<.+?>)? InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) do |_space, event_name, block|
         # Scan for counter names and tags
         block.scan(/ counter!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |name, tags|
-          tags = tags.scan(/"([^"]+)" => /).map { |tag,| tag }
+          tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
           $all_events[event_name].add_counter(name, tags)
         end
 
