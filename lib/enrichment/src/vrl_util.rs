@@ -126,9 +126,7 @@ pub(crate) fn index_from_args(
 ) -> std::result::Result<EnrichmentTableRecord, Box<dyn DiagnosticError>> {
     let case_sensitive = args
         .iter()
-        .find(|(name, _)| *name == "case_sensitive")
-        .map(|(_, arg)| arg.as_ref())
-        .flatten()
+        .find(|(name, _)| *name == "case_sensitive").and_then(|(_, arg)| arg.as_ref())
         .map(arg_to_case)
         .transpose()?
         .unwrap_or(Case::Sensitive);

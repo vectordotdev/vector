@@ -60,8 +60,7 @@ impl GlobalOptions {
         &self,
         local_data_dir: Option<&PathBuf>,
     ) -> crate::Result<PathBuf> {
-        let data_dir = local_data_dir
-            .or_else(|| self.data_dir.as_ref())
+        let data_dir = local_data_dir.or(self.data_dir.as_ref())
             .ok_or(DataDirError::MissingDataDir)
             .map_err(Box::new)?
             .clone();
