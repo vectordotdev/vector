@@ -277,7 +277,7 @@ jobs:
 
   check-component-features:
     name: Component Features - Linux
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -289,7 +289,7 @@ jobs:
       - run: make check-component-features
 
   check-msrv:
-    name: Check MSRV
+    name: Check minimum supported Rust version
     runs-on: [linux, test-runner]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
