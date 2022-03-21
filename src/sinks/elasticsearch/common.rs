@@ -8,13 +8,13 @@ use hyper::Body;
 use snafu::ResultExt;
 
 use super::{InvalidHostSnafu, Request};
+use crate::aws::AwsAuthentication;
 use crate::{
-    aws::{rusoto, rusoto::region_from_endpoint},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            encoder::ElasticsearchEncoder, finish_signer, ElasticsearchAuth,
-            ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
+            encoder::ElasticsearchEncoder, ElasticsearchAuth, ElasticsearchCommonMode,
+            ElasticsearchConfig, ParseError,
         },
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
@@ -30,15 +30,15 @@ use crate::{
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
-    pub authorization: Option<Auth>,
-    pub credentials: Option<rusoto::AwsCredentialsProvider>,
+    pub http_auth: Option<Auth>,
+    pub aws_auth: Option<AwsAuthentication>,
     pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
     pub mode: ElasticsearchCommonMode,
     pub doc_type: String,
     pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
     pub compression: Compression,
-    pub region: Region,
+    pub region: Option<Region>,
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
@@ -66,17 +66,17 @@ impl ElasticsearchCommon {
             _ => None,
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
-        let authorization = authorization.choose_one(&uri.auth)?;
+        let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
         let region = match &config.aws {
-            Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&base_url)?,
+            Some(region) => region.region(),
+            None => None,
         };
 
-        let credentials = match &config.auth {
+        let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
-            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
+            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.clone()),
         };
 
         let compression = config.compression;
@@ -117,11 +117,11 @@ impl ElasticsearchCommon {
         );
 
         Ok(Self {
-            authorization,
+            http_auth,
             base_url,
             bulk_uri,
             compression,
-            credentials,
+            aws_auth,
             doc_type,
             suppress_type_name: config.suppress_type_name,
             encoding: config.encoding,
@@ -134,37 +134,38 @@ impl ElasticsearchCommon {
         })
     }
 
-    pub fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
-        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
-        request.set_hostname(uri.host().map(|host| host.into()));
-        if use_params {
-            for (key, value) in &self.query_params {
-                request.add_param(key, value);
-            }
-        }
-        request
-    }
+    // pub fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+    //     let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+    //     request.set_hostname(uri.host().map(|host| host.into()));
+    //     if use_params {
+    //         for (key, value) in &self.query_params {
+    //             request.add_param(key, value);
+    //         }
+    //     }
+    //     request
+    // }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
-
-        match &self.credentials {
-            None => {
-                if let Some(authorization) = &self.authorization {
-                    builder = authorization.apply_builder(builder);
-                }
-            }
-            Some(credentials_provider) => {
-                let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
-                builder = finish_signer(&mut signer, credentials_provider, builder).await?;
-            }
-        }
-        let request = builder.body(Body::empty())?;
-        let response = client.send(request).await?;
-
-        match response.status() {
-            StatusCode::OK => Ok(()),
-            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-        }
+        // let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
+        //
+        // match &self.credentials {
+        //     None => {
+        //         if let Some(authorization) = &self.authorization {
+        //             builder = authorization.apply_builder(builder);
+        //         }
+        //     }
+        //     Some(credentials_provider) => {
+        //         let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
+        //         builder = finish_signer(&mut signer, credentials_provider, builder).await?;
+        //     }
+        // }
+        // let request = builder.body(Body::empty())?;
+        // let response = client.send(request).await?;
+        //
+        // match response.status() {
+        //     StatusCode::OK => Ok(()),
+        //     status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        // }
+        Ok(())
     }
 }

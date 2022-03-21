@@ -88,7 +88,7 @@ impl ElasticsearchService {
 pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub query_params: HashMap<String, String>,
-    pub region: Region,
+    pub region: Option<Region>,
     pub compression: Compression,
     pub http_request_config: RequestConfig,
     pub http_auth: Option<Auth>,

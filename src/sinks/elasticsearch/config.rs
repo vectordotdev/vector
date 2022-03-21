@@ -323,7 +323,7 @@ impl SinkConfig for ElasticsearchConfig {
             query_params: common.query_params,
             region: common.region,
             compression: self.compression,
-            credentials_provider: common.credentials,
+            credentials_provider: common.aws_auth,
         };
 
         let service = ServiceBuilder::new()

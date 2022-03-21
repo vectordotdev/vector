@@ -13,6 +13,7 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
+use aws_types::credentials::SharedCredentialsProvider;
 use std::convert::TryFrom;
 
 pub use common::*;
@@ -36,6 +37,7 @@ use crate::{
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
 };
+// use crate::aws::rusoto::AwsCredentialsProvider;
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -166,36 +168,36 @@ pub enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not generate AWS credentials: {:?}", source))]
-    AwsCredentialsGenerateFailed { source: CredentialsError },
+    // #[snafu(display("Could not generate AWS credentials: {:?}", source))]
+    // AwsCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateParseError },
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
 }
 
-async fn finish_signer(
-    signer: &mut SignedRequest,
-    credentials_provider: &rusoto::AwsCredentialsProvider,
-    mut builder: http::request::Builder,
-) -> crate::Result<http::request::Builder> {
-    let credentials = credentials_provider
-        .credentials()
-        .await
-        .context(AwsCredentialsGenerateFailedSnafu)?;
-
-    signer.sign(&credentials);
-
-    for (name, values) in signer.headers() {
-        let header_name = name
-            .parse::<HeaderName>()
-            .expect("Could not parse header name.");
-        for value in values {
-            let header_value =
-                HeaderValue::from_bytes(value).expect("Could not parse header value.");
-            builder = builder.header(&header_name, header_value);
-        }
-    }
-
-    Ok(builder)
-}
+// async fn finish_signer(
+//     signer: &mut SignedRequest,
+//     credentials_provider: &SharedCredentialsProvider,
+//     mut builder: http::request::Builder,
+// ) -> crate::Result<http::request::Builder> {
+//     let credentials = credentials_provider
+//         .credentials()
+//         .await
+//         .context(AwsCredentialsGenerateFailedSnafu)?;
+//
+//     signer.sign(&credentials);
+//
+//     for (name, values) in signer.headers() {
+//         let header_name = name
+//             .parse::<HeaderName>()
+//             .expect("Could not parse header name.");
+//         for value in values {
+//             let header_value =
+//                 HeaderValue::from_bytes(value).expect("Could not parse header value.");
+//             builder = builder.header(&header_name, header_value);
+//         }
+//     }
+//
+//     Ok(builder)
+// }
