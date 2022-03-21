@@ -14,17 +14,17 @@ remap: functions: ip_ntop: {
 			However, the results from functions such as `decode_base64` or
 			`decode_percent` can still be used correctly.
 			""",
-]
+	]
 
 	arguments: [
 		{
-			name:        "value"
+			name: "value"
 			description: """
 				The binary data to convert from.
 				For IPv4 addresses, it must be 4 bytes (32 bits) long.
 				For IPv6 addresses, it must be 16 bytes (128 bits) long.
 				"""
-			required:    true
+			required: true
 			type: ["string"]
 		},
 	]
@@ -47,6 +47,6 @@ remap: functions: ip_ntop: {
 				ip_ntop!(decode_base64!("IAENuIWjAAAAAIouA3BzNA=="))
 				"""#
 			return: "2001:db8:85a3::8a2e:370:7334"
-		}
+		},
 	]
 }

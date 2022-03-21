@@ -17,7 +17,7 @@ remap: functions: ip_pton: {
 			However, functions such as `encode_base64` or `encode_percent` can
 			still process it correctly.
 			""",
-]
+	]
 
 	arguments: [
 		{
@@ -46,6 +46,6 @@ remap: functions: ip_pton: {
 				encode_base64(ip_pton!("2001:db8:85a3::8a2e:370:7334"))
 				"""#
 			return: "IAENuIWjAAAAAIouA3BzNA=="
-		}
+		},
 	]
 }
