@@ -31,7 +31,7 @@ pub struct SocketEventsReceived {
 impl InternalEvent for SocketEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
             mode = self.mode.as_str()
@@ -60,6 +60,9 @@ impl InternalEvent for SocketEventsSent {
     }
 
     fn emit_metrics(&self) {
+        counter!("component_sent_events_total", self.count as u64, "mode" => self.mode.as_str());
+        counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
+        // deprecated
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }

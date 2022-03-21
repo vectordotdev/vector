@@ -452,14 +452,7 @@ async fn bad_s3_region() {
     .await
     .unwrap_err();
 
-    assert_eq!(
-        err,
-        vec![
-            "Sink \"out1\": Must set either 'region' or 'endpoint'",
-            "Sink \"out2\": Failed to parse region: Not a valid AWS region: moonbase-alpha",
-            "Sink \"out3\": Failed to parse custom endpoint as URI: invalid uri character"
-        ]
-    )
+    assert_eq!(err, vec!["Sink \"out3\": invalid uri character"])
 }
 
 #[cfg(all(

@@ -213,7 +213,7 @@ async fn kafka_source(
 
                 let msg_key = msg
                     .key()
-                    .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
+                    .map(|key| Value::from(Bytes::from(key.to_owned())))
                     .unwrap_or(Value::Null);
 
                 let mut headers_map = BTreeMap::new();

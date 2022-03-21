@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn downcase(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn downcase(value: Value) -> Resolved {
     Ok(value.try_bytes_utf8_lossy()?.to_lowercase().into())
 }
 

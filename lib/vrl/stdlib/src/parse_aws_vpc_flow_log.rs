@@ -2,6 +2,18 @@ use std::collections::BTreeMap;
 
 use vrl::prelude::*;
 
+fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let input = String::from_utf8_lossy(&bytes);
+    if let Some(expr) = format {
+        let bytes = expr.try_bytes()?;
+        parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
+    } else {
+        parse_log(&input, None)
+    }
+    .map_err(Into::into)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
 
@@ -73,6 +85,13 @@ impl Function for ParseAwsVpcFlowLog {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.optional("format");
+
+        parse_aws_vpc_flow_log(value, format)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -89,16 +108,14 @@ impl ParseAwsVpcFlowLogFn {
 
 impl Expression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let input = String::from_utf8_lossy(&bytes);
+        let value = self.value.resolve(ctx)?;
+        let format = self
+            .format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.try_bytes()?;
-            parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
-        } else {
-            parse_log(&input, None)
-        }
-        .map_err(Into::into)
+        parse_aws_vpc_flow_log(value, format)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

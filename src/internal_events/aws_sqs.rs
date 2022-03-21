@@ -22,7 +22,12 @@ pub struct AwsSqsEventsSent<'a> {
 
 impl InternalEvent for AwsSqsEventsSent<'_> {
     fn emit_logs(&self) {
-        trace!(message = "Events sent.", message_id = ?self.message_id);
+        trace!(
+            message = "Events sent.",
+            message_id = ?self.message_id,
+            count = 1,
+            byte_size = %self.byte_size,
+        );
     }
 
     fn emit_metrics(&self) {

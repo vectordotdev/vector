@@ -18,7 +18,11 @@ impl Expression for Noop {
         TypeDef::null().infallible()
     }
 
-    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         // Noop just adds a Null to the stack.
         let constant = vm.add_constant(Value::Null);
         vm.write_opcode(OpCode::Constant);

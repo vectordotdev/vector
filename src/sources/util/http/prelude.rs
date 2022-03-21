@@ -172,10 +172,7 @@ async fn handle_request(
                 .await
         }
         Err(error) => {
-            emit!(&HttpBadRequest {
-                code: error.code(),
-                message: error.message(),
-            });
+            emit!(&HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

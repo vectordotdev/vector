@@ -1,6 +1,24 @@
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 
+fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let ascii_set = match ascii_set.as_ref() {
+        b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,
+        b"CONTROLS" => percent_encoding::CONTROLS,
+        b"FRAGMENT" => FRAGMENT,
+        b"QUERY" => QUERY,
+        b"SPECIAL" => SPECIAL,
+        b"PATH" => PATH,
+        b"USERINFO" => USERINFO,
+        b"COMPONENT" => COMPONENT,
+        b"WWW_FORM_URLENCODED" => WWW_FORM_URLENCODED,
+        _ => unreachable!("enum invariant"),
+    };
+
+    Ok(utf8_percent_encode(&string, ascii_set).to_string().into())
+}
+
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &percent_encoding::CONTROLS
     .add(b' ')
@@ -46,6 +64,20 @@ const WWW_FORM_URLENCODED: &AsciiSet =
 #[derive(Clone, Copy, Debug)]
 pub struct EncodePercent;
 
+fn ascii_sets() -> Vec<Value> {
+    vec![
+        value!("NON_ALPHANUMERIC"),
+        value!("CONTROLS"),
+        value!("FRAGMENT"),
+        value!("QUERY"),
+        value!("SPECIAL"),
+        value!("PATH"),
+        value!("USERINFO"),
+        value!("COMPONENT"),
+        value!("WWW_FORM_URLENCODED"),
+    ]
+}
+
 impl Function for EncodePercent {
     fn identifier(&self) -> &'static str {
         "encode_percent"
@@ -72,20 +104,9 @@ impl Function for EncodePercent {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let ascii_sets = vec![
-            value!("NON_ALPHANUMERIC"),
-            value!("CONTROLS"),
-            value!("FRAGMENT"),
-            value!("QUERY"),
-            value!("SPECIAL"),
-            value!("PATH"),
-            value!("USERINFO"),
-            value!("COMPONENT"),
-            value!("WWW_FORM_URLENCODED"),
-        ];
         let value = arguments.required("value");
         let ascii_set = arguments
-            .optional_enum("ascii_set", &ascii_sets)?
+            .optional_enum("ascii_set", &ascii_sets())?
             .unwrap_or_else(|| value!("NON_ALPHANUMERIC"))
             .try_bytes()
             .expect("ascii_set not bytes");
@@ -107,6 +128,36 @@ impl Function for EncodePercent {
             },
         ]
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("ascii_set", Some(expr)) => {
+                let set = expr
+                    .as_enum("ascii_set", ascii_sets())?
+                    .try_bytes()
+                    .expect("ascii set not bytes");
+                Ok(Some(Box::new(set) as _))
+            }
+            ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let ascii_set = args
+            .required_any("ascii_set")
+            .downcast_ref::<Bytes>()
+            .expect("should be AsciiSet");
+
+        encode_percent(value, ascii_set)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -118,23 +169,7 @@ struct EncodePercentFn {
 impl Expression for EncodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        let string = value.try_bytes_utf8_lossy()?;
-
-        let ascii_set = match self.ascii_set.as_ref() {
-            b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,
-            b"CONTROLS" => percent_encoding::CONTROLS,
-            b"FRAGMENT" => FRAGMENT,
-            b"QUERY" => QUERY,
-            b"SPECIAL" => SPECIAL,
-            b"PATH" => PATH,
-            b"USERINFO" => USERINFO,
-            b"COMPONENT" => COMPONENT,
-            b"WWW_FORM_URLENCODED" => WWW_FORM_URLENCODED,
-            _ => unreachable!("enum invariant"),
-        };
-
-        Ok(utf8_percent_encode(&string, ascii_set).to_string().into())
+        encode_percent(value, &self.ascii_set)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

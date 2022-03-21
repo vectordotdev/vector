@@ -1,18 +1,26 @@
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AzureBlobErrorResponse {
-    pub code: hyper::StatusCode,
+pub struct AzureBlobResponseError {
+    error_code: String,
 }
 
-impl InternalEvent for AzureBlobErrorResponse {
+impl From<hyper::StatusCode> for AzureBlobResponseError {
+    fn from(code: hyper::StatusCode) -> Self {
+        Self {
+            error_code: super::prelude::http_error_code(code.as_u16()),
+        }
+    }
+}
+
+impl InternalEvent for AzureBlobResponseError {
     fn emit_logs(&self) {
         error!(
-            message = "HTTP error response",
-            error_code = %http_error_code(self.code.as_u16()),
+            message = "HTTP error response.",
+            error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
         );
@@ -21,7 +29,7 @@ impl InternalEvent for AzureBlobErrorResponse {
     fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => http_error_code(self.code.as_u16()),
+            "error_code" => self.error_code.clone(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
@@ -64,7 +72,7 @@ pub struct AzureBlobEventsSent {
 
 impl InternalEvent for AzureBlobEventsSent {
     fn emit_logs(&self) {
-        trace!(message = "Events sent.", request_id = %self.request_id);
+        trace!(message = "Events sent.", request_id = %self.request_id, count = 1, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

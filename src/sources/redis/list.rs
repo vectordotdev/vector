@@ -1,6 +1,6 @@
 use super::{handle_line, Method};
 use crate::{
-    codecs, internal_events::RedisReceiveEventFailed, shutdown::ShutdownSignal, sources::Source,
+    codecs, internal_events::RedisReceiveEventError, shutdown::ShutdownSignal, sources::Source,
     SourceSender,
 };
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
@@ -42,7 +42,7 @@ pub async fn watch(
             };
 
             match res {
-                Err(error) => emit!(&RedisReceiveEventFailed { error }),
+                Err(error) => emit!(&RedisReceiveEventError::from(error)),
                 Ok(line) => {
                     if let Err(()) =
                         handle_line(line, &key, redis_key.as_deref(), decoder.clone(), &mut out)

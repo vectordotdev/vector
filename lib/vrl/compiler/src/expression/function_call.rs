@@ -385,14 +385,24 @@ impl Expression for FunctionCall {
         type_def
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         // Resolve the arguments so they are in the order defined in the function.
         let args = match vm.function(self.function_id) {
             Some(fun) => self.resolve_arguments(fun)?,
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        let compile_ctx = FunctionCompileContext::new(self.span);
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = state.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(self.span).with_external_context(external_context);
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
@@ -401,7 +411,7 @@ impl Expression for FunctionCall {
             // Call `compile_argument` for functions that need to perform any compile time processing
             // on the argument.
             match fun
-                .compile_argument(&args, &compile_ctx, keyword, argument)
+                .compile_argument(&args, &mut compile_ctx, keyword, argument)
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
@@ -414,7 +424,7 @@ impl Expression for FunctionCall {
                     Some(argument) => {
                         // Compile the argument, `MoveParameter` will move the result of the expression onto the
                         // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm)?;
+                        argument.compile_to_vm(vm, state)?;
                         vm.write_opcode(OpCode::MoveParameter);
                     }
                     None => {
@@ -425,6 +435,9 @@ impl Expression for FunctionCall {
                 },
             }
         }
+
+        // Re-insert the external context into the compiler state.
+        let _ = state.swap_external_context(compile_ctx.into_external_context());
 
         // Call the function with the given id.
         vm.write_opcode(OpCode::Call);
@@ -865,6 +878,14 @@ mod tests {
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
+        }
+
+        fn call_by_vm(
+            &self,
+            _ctx: &mut Context,
+            _args: &mut crate::vm::VmArgumentList,
+        ) -> Result<value::Value, ExpressionError> {
+            unimplemented!()
         }
     }
 

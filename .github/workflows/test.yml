@@ -302,7 +302,7 @@ jobs:
       - run: make check-component-features
 
   check-msrv:
-    name: Check MSRV
+    name: Check minimum supported Rust version
     runs-on: [linux, test-runner]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
