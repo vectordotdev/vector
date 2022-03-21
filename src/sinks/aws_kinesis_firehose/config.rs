@@ -1,4 +1,6 @@
-use aws_sdk_firehose::error::{DescribeDeliveryStreamError, PutRecordBatchError};
+use aws_sdk_firehose::error::{
+    DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
+};
 use aws_sdk_firehose::types::SdkError;
 use std::num::NonZeroU64;
 
@@ -235,6 +237,11 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if let SdkError::ServiceError { err, raw } = error {
+            if let PutRecordBatchErrorKind::ServiceUnavailableException(_) = err.kind {
+                return true;
+            }
+        }
         is_retriable_error(error)
     }
 }
