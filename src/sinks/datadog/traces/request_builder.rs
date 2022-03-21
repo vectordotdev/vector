@@ -307,8 +307,7 @@ impl DatadogTracesEncoder {
 
         let meta = span
             .get("meta")
-            .map(|m| m.as_object())
-            .flatten()
+            .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| (k.clone(), v.to_string_lossy()))
@@ -318,8 +317,7 @@ impl DatadogTracesEncoder {
 
         let metrics = span
             .get("metrics")
-            .map(|m| m.as_object())
-            .flatten()
+            .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
                     .filter_map(|(k, v)| {
