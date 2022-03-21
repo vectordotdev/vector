@@ -49,28 +49,31 @@ impl StreamSink<EventArray> for BlackholeSink {
         // the printing.
         let total_events = Arc::clone(&self.total_events);
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
-        let interval_dur = Duration::from_secs(self.config.print_interval_secs);
         let (shutdown, mut tripwire) = watch::channel(());
 
-        tokio::spawn(async move {
-            let mut print_interval = interval(interval_dur);
-            loop {
-                select! {
-                    _ = print_interval.tick() => {
-                        info!({
-                            events = total_events.load(Ordering::Relaxed),
-                            raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                        }, "Total events collected");
-                    },
-                    _ = tripwire.changed() => break,
+        if self.config.print_interval_secs > 0 {
+            let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+            tokio::spawn(async move {
+                let mut print_interval = interval(interval_dur);
+                loop {
+                    select! {
+                        _ = print_interval.tick() => {
+                            info!({
+                                events = total_events.load(Ordering::Relaxed),
+                                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                            }, "Total events collected");
+                        },
+                        _ = tripwire.changed() => break,
+                    }
                 }
-            }
 
-            info!({
-                events = total_events.load(Ordering::Relaxed),
-                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
-            }, "Total events collected");
-        });
+                info!({
+                    events = total_events.load(Ordering::Relaxed),
+                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
+                }, "Total events collected");
+            });
+        }
+
         while let Some(events) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;
