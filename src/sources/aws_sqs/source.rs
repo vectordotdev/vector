@@ -112,7 +112,7 @@ impl SqsSource {
                     }
                 }
             }
-            drop(batch);
+            drop(batch); // Drop last reference to batch acknowledgement finalizer
             emit!(&AwsSqsBytesReceived { byte_size });
             let count = events.len();
             if let Err(error) = out.send_batch(events).await {
