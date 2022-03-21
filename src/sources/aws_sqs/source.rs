@@ -101,7 +101,7 @@ impl SqsSource {
                     let timestamp = get_timestamp(&message.attributes);
                     let events = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
                     let send_result = if let Some(batch) = batch.as_ref() {
-                        let mut events = events.map(|event| event.with_batch_notifier(batch));
+                        let events = events.map(|event| event.with_batch_notifier(batch));
                         out.send_batch(events).await
                     } else {
                         out.send_batch(events).await
