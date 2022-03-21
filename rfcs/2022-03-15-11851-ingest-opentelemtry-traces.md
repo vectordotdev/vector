@@ -60,7 +60,7 @@ single payload in both OpenTelemetry and Datadog wire format. Enabling clear pro
 clear constraint that should be enforced by all future traces sources : **a single Vector event shall not hold data
 relative to more that one trace**.
 
-A completely different use case is traces sampling, but it cover two major variation:
+A completely different usecase is traces sampling, but it cover two major variations:
 
 - Simple sampling: either cap/pace the trace flow at a given rate or sample 1 trace per 10/100/1000/etc. traces, and
   this is already available thanks to the `sample` and `throttle` transforms
@@ -92,7 +92,12 @@ representation, there is two major possible approach:
      dedicated structs representing traces and spans with common properties and generic key/value store(s) to allow a
      certain degree of flexibility.
 
-The second option would have to provide a way to store, at least, all fields from both Opentelemetry and Datadog Traces:
+The second option would have to provide a way to store, at least, all fields from both Opentelemetry and Datadog Traces.
+If we consider the protobuf definiton for both Datadog and OpenTelemetry, it is clear that the OpenTelemetry from come
+with extra structured fields that are not present in Datadog traces. However having a generic key/value container in
+virtually all traces formats can be used to store data that do not have a dedicated field in some format. As a reflexion
+basis the Datadog and OpenTelemetry are provided belown, there is no hard semantic differences.
+
 Datadog [newer trace format][otlp-trace-proto-def] (condensed):
 
 ```protobuf
