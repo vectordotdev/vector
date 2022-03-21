@@ -91,7 +91,7 @@ impl SqsSource {
 
         if let Some(messages) = receive_message_output.messages {
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
-            let mut events = Vec::new();
+            let mut events = Vec::with_capacity(messages.len());
             let mut byte_size = 0;
 
             let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
