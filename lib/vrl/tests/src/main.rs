@@ -152,7 +152,6 @@ fn main() {
         state.set_external_context(test_enrichment.clone());
 
         let program = vrl::compile_with_state(&test.source, &functions, &mut state);
-        test_enrichment.finish_load();
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
@@ -166,6 +165,8 @@ fn main() {
                     &mut test,
                     timezone,
                     cmd.runtime,
+                    state,
+                    test_enrichment,
                 );
 
                 match result {
@@ -324,6 +325,7 @@ fn main() {
     print_result(failed_count)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_vrl(
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
@@ -331,15 +333,19 @@ fn run_vrl(
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
+    state: vrl::state::Compiler,
+    test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime
-                .compile(functions, &program, Default::default())
-                .unwrap();
+            let vm = runtime.compile(functions, &program, state).unwrap();
+            test_enrichment.finish_load();
             runtime.run_vm(&vm, &mut test.object, &timezone)
         }
-        VrlRuntime::Ast => runtime.resolve(&mut test.object, &program, &timezone),
+        VrlRuntime::Ast => {
+            test_enrichment.finish_load();
+            runtime.resolve(&mut test.object, &program, &timezone)
+        }
     }
 }
 

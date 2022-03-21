@@ -1,15 +1,17 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use std::sync::Arc;
+use aws_sdk_kinesis::model::{Record, ShardIteratorType};
+use aws_sdk_kinesis::types::DateTime;
 
-use rusoto_core::Region;
-use rusoto_kinesis::{Kinesis, KinesisClient};
 use tokio::time::{sleep, Duration};
 
 use super::*;
+use crate::aws::aws_sdk::create_client;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::config::ProxyConfig;
+use crate::sinks::aws_kinesis_streams::config::KinesisClientBuilder;
 use crate::{
-    aws::rusoto::RegionOrEndpoint,
     config::{SinkConfig, SinkContext},
     sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
     test_util::{components, random_lines_with_stream, random_string},
@@ -23,12 +25,7 @@ fn kinesis_address() -> String {
 async fn kinesis_put_records() {
     let stream = gen_stream();
 
-    let region = Region::Custom {
-        name: "localstack".into(),
-        endpoint: kinesis_address(),
-    };
-
-    ensure_stream(region.clone(), stream.clone()).await;
+    ensure_stream(stream.clone()).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
@@ -36,13 +33,12 @@ async fn kinesis_put_records() {
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint(kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
         tls: Default::default(),
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
@@ -60,12 +56,11 @@ async fn kinesis_put_records() {
     sleep(Duration::from_secs(1)).await;
     components::SINK_TESTS.assert(&["region"]);
 
-    let timestamp = timestamp as f64 / 1000.0;
-    let records = fetch_records(stream, timestamp, region).await.unwrap();
+    let records = fetch_records(stream, timestamp).await.unwrap();
 
     let mut output_lines = records
         .into_iter()
-        .map(|e| String::from_utf8(e.data.to_vec()).unwrap())
+        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
@@ -73,53 +68,68 @@ async fn kinesis_put_records() {
     assert_eq!(output_lines, input_lines)
 }
 
-async fn fetch_records(
-    stream_name: String,
-    timestamp: f64,
-    region: Region,
-) -> crate::Result<Vec<rusoto_kinesis::Record>> {
-    let client = Arc::new(KinesisClient::new(region));
+async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec<Record>> {
+    let client = client().await;
 
-    let req = rusoto_kinesis::DescribeStreamInput {
-        stream_name: stream_name.clone(),
-        ..Default::default()
-    };
-    let resp = client.describe_stream(req).await?;
+    let resp = client
+        .describe_stream()
+        .stream_name(stream_name.clone())
+        .send()
+        .await?;
+
     let shard = resp
         .stream_description
+        .unwrap()
         .shards
+        .unwrap()
         .into_iter()
         .next()
         .expect("No shards");
 
-    let req = rusoto_kinesis::GetShardIteratorInput {
-        stream_name,
-        shard_id: shard.shard_id,
-        shard_iterator_type: "AT_TIMESTAMP".into(),
-        timestamp: Some(timestamp),
-        ..Default::default()
-    };
-    let resp = client.get_shard_iterator(req).await?;
+    let resp = client
+        .get_shard_iterator()
+        .stream_name(stream_name)
+        .shard_id(shard.shard_id.unwrap())
+        .shard_iterator_type(ShardIteratorType::AtTimestamp)
+        .timestamp(DateTime::from_millis(timestamp))
+        .send()
+        .await?;
     let shard_iterator = resp.shard_iterator.expect("No iterator age produced");
 
-    let req = rusoto_kinesis::GetRecordsInput {
-        shard_iterator,
-        // limit: Some(limit),
-        limit: None,
-    };
-    let resp = client.get_records(req).await?;
-    Ok(resp.records)
+    let resp = client
+        .get_records()
+        .shard_iterator(shard_iterator)
+        .set_limit(None)
+        .send()
+        .await?;
+    Ok(resp.records.unwrap_or_default())
 }
 
-async fn ensure_stream(region: Region, stream_name: String) {
-    let client = KinesisClient::new(region);
+async fn client() -> aws_sdk_kinesis::Client {
+    let auth = AwsAuthentication::test_auth();
+    let proxy = ProxyConfig::default();
+    let region = RegionOrEndpoint::with_both("localstack", kinesis_address());
+    create_client::<KinesisClientBuilder>(
+        &auth,
+        region.region(),
+        region.endpoint().unwrap(),
+        &proxy,
+        &None,
+    )
+    .await
+    .unwrap()
+}
 
-    let req = rusoto_kinesis::CreateStreamInput {
-        stream_name,
-        shard_count: 1,
-    };
+async fn ensure_stream(stream_name: String) {
+    let client = client().await;
 
-    match client.create_stream(req).await {
+    match client
+        .create_stream()
+        .stream_name(stream_name)
+        .shard_count(1)
+        .send()
+        .await
+    {
         Ok(_) => (),
         Err(error) => panic!("Unable to check the stream {:?}", error),
     };

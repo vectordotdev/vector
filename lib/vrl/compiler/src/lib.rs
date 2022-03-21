@@ -33,7 +33,7 @@ pub use type_def::TypeDef;
 pub type Result = std::result::Result<Program, compiler::Errors>;
 
 /// The choice of available runtimes.
-#[derive(Deserialize, Serialize, Debug, Copy, Clone)]
+#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
     Ast,

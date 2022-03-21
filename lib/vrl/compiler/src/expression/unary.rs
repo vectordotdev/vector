@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{
     expression::{Not, Resolved},
-    vm::{OpCode, Vm},
+    vm::Vm,
     Context, Expression, State, TypeDef,
 };
 
@@ -47,7 +47,6 @@ impl Expression for Unary {
         match &self.variant {
             Variant::Not(v) => {
                 v.compile_to_vm(vm, state)?;
-                vm.write_opcode(OpCode::Not);
             }
         }
 
