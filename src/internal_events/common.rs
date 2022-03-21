@@ -93,16 +93,13 @@ pub struct AwsSdkBytesSent {
 
 #[cfg(feature = "aws-core")]
 impl InternalEvent for AwsSdkBytesSent {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes sent.",
             protocol = "https",
             byte_size = %self.byte_size,
             region = ?self.region,
         );
-    }
-
-    fn emit_metrics(&self) {
         let region = self
             .region
             .as_ref()

@@ -86,7 +86,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .stream_name(stream_name)
                 .send()
                 .inspect_ok(|_| {
-                    emit!(AwsBytesSent {
+                    emit!(AwsSdkBytesSent {
                         byte_size: processed_bytes_total,
                         region,
                     });
