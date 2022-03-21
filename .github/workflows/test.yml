@@ -93,7 +93,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -123,7 +123,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -151,7 +151,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -190,7 +190,7 @@ jobs:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -233,7 +233,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -324,7 +324,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.7
+      - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
           path: |
