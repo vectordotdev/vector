@@ -1,7 +1,7 @@
 use std::env;
 
 use http::Request;
-use hyper::Body;
+use hyper::{Body, StatusCode};
 use serde::{Deserialize, Serialize};
 use vector_core::config::proxy::ProxyConfig;
 
@@ -37,7 +37,7 @@ pub struct Options {
     #[serde(default)]
     pub api_key: Option<String>,
 
-    pub app_key: String,
+    pub application_key: String,
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
@@ -63,7 +63,7 @@ impl Default for Options {
             exit_on_fatal_error: default_exit_on_fatal_error(),
             site: None,
             api_key: None,
-            app_key: "".to_owned(),
+            application_key: "".to_owned(),
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
@@ -82,7 +82,7 @@ pub enum PipelinesError {
 /// Holds data required to authorize a request to the Datadog Pipelines reporting endpoint.
 struct PipelinesAuth<'a> {
     api_key: &'a str,
-    app_key: &'a str,
+    application_key: &'a str,
 }
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
@@ -108,6 +108,22 @@ struct PipelinesAttributes<'a> {
     config_hash: &'a str,
     vector_version: &'a str,
     config: &'a toml::value::Table,
+}
+
+enum ReportingError {
+    Http(HttpError),
+    StatusCode(StatusCode),
+}
+
+impl ReportingError {
+    fn to_error_string(&self) -> String {
+        match self {
+            Self::Http(err) => err.to_string(),
+            Self::StatusCode(status) => {
+                format!("Request was unsuccessful: {}", status)
+            }
+        }
+    }
 }
 
 impl<'a> PipelinesVersionPayload<'a> {
@@ -183,7 +199,7 @@ pub async fn try_attach(
     // access in tandem with RBAC on the Datadog side.
     let auth = PipelinesAuth {
         api_key: &api_key,
-        app_key: &datadog.app_key,
+        application_key: &datadog.application_key,
     };
 
     // Create a HTTP client for posting a Vector version to Datadog Pipelines. This will
@@ -213,25 +229,16 @@ pub async fn try_attach(
                 );
                 break;
             }
-            Err(err) => match err {
-                // Only a timeout error can be retried.
-                HttpError::CallRequest { source } if source.is_timeout() => {
-                    warn!("Reporting to Datadog Observability Pipelines timed out. Will retry.");
-                    continue;
-                }
-                // All other errors should be deemed fatal.
-                _ => {
-                    error!(
-                        message =
-                            "Could not report Vector config to Datadog Observability Pipelines",
-                        err = ?err
-                    );
+            Err(err) => {
+                error!(
+                    message = "Could not report Vector config to Datadog Observability Pipelines",
+                    err = ?err.to_error_string()
+                );
 
-                    if datadog.exit_on_fatal_error {
-                        return Err(PipelinesError::FatalCouldNotReportConfig);
-                    }
+                if datadog.exit_on_fatal_error {
+                    return Err(PipelinesError::FatalCouldNotReportConfig);
                 }
-            },
+            }
         }
     }
 
@@ -316,7 +323,7 @@ fn build_request<'a>(
 ) -> Request<Body> {
     Request::post(endpoint)
         .header("DD-API-KEY", auth.api_key)
-        .header("DD-APPLICATION-KEY", auth.app_key)
+        .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
         .expect("couldn't create Datadog Pipelines HTTP request. Please report")
 }
@@ -325,7 +332,18 @@ fn build_request<'a>(
 async fn report_serialized_config_to_datadog(
     client: &HttpClient,
     request: Request<Body>,
-) -> Result<(), HttpError> {
+) -> Result<(), ReportingError> {
     info!("Attempting to report configuration to Datadog Pipelines");
-    client.send(request).await.map(|_| ())
+    let response = client
+        .send(request)
+        .await
+        .map_err(|err| ReportingError::Http(err))?;
+
+    let status = response.status();
+
+    if status.is_success() {
+        Ok(())
+    } else {
+        Err(ReportingError::StatusCode(status))
+    }
 }
