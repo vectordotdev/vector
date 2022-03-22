@@ -8,6 +8,8 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+#[cfg(feature = "datadog-pipelines")]
+use crate::config::datadog::PipelinesError;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
@@ -194,7 +196,11 @@ impl Application {
 
                 #[cfg(feature = "datadog-pipelines")]
                 // Augment config to enable observability within Datadog, if applicable.
-                config::datadog::try_attach(&mut config, &config_paths);
+                if let Err(PipelinesError::FatalCouldNotReportConfig) =
+                    config::datadog::try_attach(&mut config, &config_paths).await
+                {
+                    return Err(exitcode::UNAVAILABLE);
+                }
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -278,7 +284,11 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "datadog-pipelines")]
-                                        config::datadog::try_attach(&mut new_config, &config_paths);
+                                        if let Err(PipelinesError::FatalCouldNotReportConfig) =
+                                            config::datadog::try_attach(&mut new_config, &config_paths).await
+                                        {
+                                            break SignalTo::Shutdown;
+                                        }
 
                                         match topology
                                             .reload_config_and_respawn(new_config)
@@ -321,7 +331,12 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "datadog-pipelines")]
-                                    config::datadog::try_attach(&mut new_config, &config_paths);
+                                    // Augment config to enable observability within Datadog, if applicable.
+                                    if let Err(PipelinesError::FatalCouldNotReportConfig) =
+                                        config::datadog::try_attach(&mut new_config, &config_paths).await
+                                    {
+                                        break SignalTo::Shutdown;
+                                    }
 
                                     match topology
                                         .reload_config_and_respawn(new_config)

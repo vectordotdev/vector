@@ -1,5 +1,6 @@
 use std::env;
 
+use http::Request;
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use vector_core::config::proxy::ProxyConfig;
@@ -9,7 +10,8 @@ use super::{
     SourceOuter,
 };
 use crate::{
-    http::HttpClient,
+    common::datadog::get_api_base_endpoint,
+    http::{HttpClient, HttpError},
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
@@ -17,6 +19,8 @@ use crate::{
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
+
+static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
@@ -26,6 +30,9 @@ pub struct Options {
 
     #[serde(default = "default_exit_on_fatal_error")]
     pub exit_on_fatal_error: bool,
+
+    #[serde(default)]
+    site: Option<String>,
 
     #[serde(default)]
     pub api_key: Option<String>,
@@ -49,65 +56,12 @@ pub struct Options {
     proxy: ProxyConfig,
 }
 
-/// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
-struct PipelinesFields<'a> {
-    config: &'a toml::value::Table,
-    api_key: &'a str,
-    app_key: &'a str,
-    configuration_key: &'a str,
-    config_version: &'a str,
-    vector_version: &'a str,
-}
-
-#[derive(Debug, Serialize)]
-struct PipelinesAttributes<'a> {
-    config_hash: &'a str,
-    vector_version: &'a str,
-    config: &'a toml::value::Table,
-}
-
-#[derive(Debug, Serialize)]
-struct PipelinesData<'a> {
-    attributes: PipelinesAttributes<'a>,
-    r#type: &'a str,
-}
-
-#[derive(Debug, Serialize)]
-struct PipelinesVersionPayload<'a> {
-    data: PipelinesData<'a>,
-}
-
-impl<'a> PipelinesVersionPayload<'a> {
-    fn from_fields(fields: &'a PipelinesFields) -> Self {
-        Self {
-            data: PipelinesData {
-                attributes: PipelinesAttributes {
-                    config_hash: fields.config_version,
-                    vector_version: fields.vector_version,
-                    config: fields.config,
-                },
-                r#type: "pipelines_configuration_version",
-            },
-        }
-    }
-
-    fn json_string(&self) -> String {
-        serde_json::to_string(self)
-            .expect("couldn't serialize Pipelines fields to JSON. Please report")
-    }
-}
-
-/// Error conditions that indicate how reporting a configuration to Datadog Observability Pipelines
-/// failed. Callers can then determine whether reattempt(s) are relevant.
-enum PipelinesError {
-    Unauthorized,
-}
-
 impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
             exit_on_fatal_error: default_exit_on_fatal_error(),
+            site: None,
             api_key: None,
             app_key: "".to_owned(),
             configuration_key: "".to_owned(),
@@ -119,38 +73,75 @@ impl Default for Options {
     }
 }
 
-/// By default, the Datadog feature is enabled.
-const fn default_enabled() -> bool {
-    true
+pub enum PipelinesError {
+    Disabled,
+    MissingApiKey,
+    FatalCouldNotReportConfig,
 }
 
-/// By default, Vector should exit when a fatal reporting error is encountered.
-const fn default_exit_on_fatal_error() -> bool {
-    true
+/// Holds data required to authorize a request to the Datadog Pipelines reporting endpoint.
+struct PipelinesAuth<'a> {
+    api_key: &'a str,
+    app_key: &'a str,
 }
 
-/// By default, report to Datadog every 5 seconds.
-const fn default_reporting_interval_secs() -> f64 {
-    5.0
+/// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
+struct PipelinesStrFields<'a> {
+    config_version: &'a str,
+    vector_version: &'a str,
 }
 
-/// By default, keep retrying (recoverable) failed reporting (infinitely, for practical purposes.)
-const fn default_max_retries() -> u32 {
-    u32::MAX
+/// Top-level struct representing the field structure for reporting a config to Datadog Pipelines.
+#[derive(Debug, Serialize)]
+struct PipelinesVersionPayload<'a> {
+    data: PipelinesData<'a>,
 }
 
-/// By default, retry (recoverable) failed reporting every 5 seconds.
-const fn default_retry_interval_secs() -> u32 {
-    5
+#[derive(Debug, Serialize)]
+struct PipelinesData<'a> {
+    attributes: PipelinesAttributes<'a>,
+    r#type: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct PipelinesAttributes<'a> {
+    config_hash: &'a str,
+    vector_version: &'a str,
+    config: &'a toml::value::Table,
+}
+
+impl<'a> PipelinesVersionPayload<'a> {
+    /// Create a new Pipelines reporting payload from a config and string fields.
+    fn new(config: &'a toml::value::Table, fields: &PipelinesStrFields<'a>) -> Self {
+        Self {
+            data: PipelinesData {
+                attributes: PipelinesAttributes {
+                    config_hash: fields.config_version,
+                    vector_version: fields.vector_version,
+                    config,
+                },
+                r#type: "pipelines_configuration_version",
+            },
+        }
+    }
+
+    /// Helper method to serialize payload as a JSON string.
+    fn json_string(&self) -> String {
+        serde_json::to_string(self)
+            .expect("couldn't serialize Pipelines fields to JSON. Please report")
+    }
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
+pub async fn try_attach(
+    config: &mut Config,
+    config_paths: &[ConfigPath],
+) -> Result<(), PipelinesError> {
     // Only valid if a [datadog] section is present in config.
     let datadog = match config.datadog.as_ref() {
         Some(datadog) => datadog,
-        _ => return false,
+        _ => return Err(PipelinesError::Disabled),
     };
 
     // Return early if an API key is missing, or the feature isn't enabled.
@@ -160,9 +151,9 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
         // No API key; attempt to get it from the environment.
         (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
             Ok(api_key) => api_key,
-            _ => return false,
+            _ => return Err(PipelinesError::MissingApiKey),
         },
-        _ => return false,
+        _ => return Err(PipelinesError::MissingApiKey),
     };
 
     info!("Datadog API key provided. Integration with Datadog Observability Pipelines is enabled.");
@@ -170,7 +161,7 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
     // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
     let config_version = config.version.as_ref().expect("Config should be versioned");
 
-    // Get the Vector version. This is reported to Pipelines along with a config hash version.
+    // Get the Vector version. This is reported to Pipelines along with a config hash.
     let vector_version = crate::get_version();
 
     // Report the internal configuration to Datadog Observability Pipelines.
@@ -183,16 +174,66 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
 
     // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
     // exploding as func arguments to avoid confusion with multiple &str fields.
-    let fields = PipelinesFields {
-        config: &table,
+    let fields = PipelinesStrFields {
         config_version: &config_version,
-        api_key: &api_key,
-        app_key: &datadog.app_key,
-        configuration_key: &datadog.configuration_key,
         vector_version: &vector_version,
     };
 
-    report_serialized_config_to_datadog(fields, &datadog.proxy);
+    // Set the Datadog authorization fields. There's an API and app key, to allow read/write
+    // access in tandem with RBAC on the Datadog side.
+    let auth = PipelinesAuth {
+        api_key: &api_key,
+        app_key: &datadog.app_key,
+    };
+
+    // Create a HTTP client for posting a Vector version to Datadog Pipelines. This will
+    // respect any proxy settings provided in top-level config.
+    let client = HttpClient::new(None, &datadog.proxy)
+        .expect("couldn't instrument Datadog HTTP client. Please report");
+
+    // Endpoint to report a config to Datadog Pipelines.
+    let endpoint = get_reporting_endpoint(datadog.site.as_ref(), &datadog.configuration_key);
+
+    // Datadog uses a JSON:API, so we'll serialize the config to a JSON
+    let payload = PipelinesVersionPayload::new(&table, &fields);
+
+    // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
+    // of `max_retries`.
+    for _ in 0..datadog.max_retries {
+        match report_serialized_config_to_datadog(
+            &client,
+            build_request(&endpoint, &auth, &payload),
+        )
+        .await
+        {
+            Ok(()) => {
+                info!(
+                    "Vector config {} successfully reported to Datadog Observability Pipelines",
+                    &config_version
+                );
+                break;
+            }
+            Err(err) => match err {
+                // Only a timeout error can be retried.
+                HttpError::CallRequest { source } if source.is_timeout() => {
+                    warn!("Reporting to Datadog Observability Pipelines timed out. Will retry.");
+                    continue;
+                }
+                // All other errors should be deemed fatal.
+                _ => {
+                    error!(
+                        message =
+                            "Could not report Vector config to Datadog Observability Pipelines",
+                        err = ?err
+                    );
+
+                    if datadog.exit_on_fatal_error {
+                        return Err(PipelinesError::FatalCouldNotReportConfig);
+                    }
+                }
+            },
+        }
+    }
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
@@ -229,16 +270,62 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
         ),
     );
 
+    Ok(())
+}
+
+/// By default, the Datadog feature is enabled.
+const fn default_enabled() -> bool {
     true
 }
 
-/// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
-fn report_serialized_config_to_datadog(
-    fields: PipelinesFields,
-    proxy: &ProxyConfig,
-) -> Result<(), PipelinesError> {
-    let client = HttpClient::<Body>::new(None, proxy)
-        .expect("couldn't instrument Datadog HTTP client. Please report");
+/// By default, Vector should exit when a fatal reporting error is encountered.
+const fn default_exit_on_fatal_error() -> bool {
+    true
+}
 
-    Ok(())
+/// By default, report to Datadog every 5 seconds.
+const fn default_reporting_interval_secs() -> f64 {
+    5.0
+}
+
+/// By default, keep retrying (recoverable) failed reporting (infinitely, for practical purposes.)
+const fn default_max_retries() -> u32 {
+    u32::MAX
+}
+
+/// By default, retry (recoverable) failed reporting every 5 seconds.
+const fn default_retry_interval_secs() -> u32 {
+    5
+}
+
+/// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
+fn get_reporting_endpoint(site: Option<&String>, configuration_key: &str) -> String {
+    format!(
+        "{}{}/{}/versions",
+        get_api_base_endpoint(None, site, None),
+        DATADOG_REPORTING_PATH_STUB,
+        configuration_key
+    )
+}
+
+/// Build a POST request for reporting a Vector config to Datadog Pipelines.
+fn build_request<'a>(
+    endpoint: &'a str,
+    auth: &'a PipelinesAuth,
+    payload: &'a PipelinesVersionPayload,
+) -> Request<Body> {
+    Request::post(endpoint)
+        .header("DD-API-KEY", auth.api_key)
+        .header("DD-APPLICATION-KEY", auth.app_key)
+        .body(Body::from(payload.json_string()))
+        .expect("couldn't create Datadog Pipelines HTTP request. Please report")
+}
+
+/// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
+async fn report_serialized_config_to_datadog(
+    client: &HttpClient,
+    request: Request<Body>,
+) -> Result<(), HttpError> {
+    info!("Attempting to report configuration to Datadog Pipelines");
+    client.send(request).await.map(|_| ())
 }
