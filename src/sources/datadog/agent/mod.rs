@@ -411,7 +411,10 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    #[serde(deserialize_with = "ts_milliseconds::deserialize")]
+    #[serde(
+        deserialize_with = "ts_milliseconds::deserialize",
+        serialize_with = "ts_milliseconds::serialize"
+    )]
     pub timestamp: DateTime<Utc>,
     pub hostname: Bytes,
     pub service: Bytes,

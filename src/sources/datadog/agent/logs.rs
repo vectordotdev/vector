@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use chrono::{serde::ts_milliseconds, DateTime, Utc};
+use chrono::Utc;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
@@ -12,7 +11,7 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
         util::{ErrorMessage, StreamDecodingError},
     },
     SourceSender,
@@ -144,17 +143,4 @@ pub(crate) fn decode_log_body(
     });
 
     Ok(decoded)
-}
-
-// https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize, Clone, Serialize, Debug)]
-pub(crate) struct LogMsg {
-    pub message: Bytes,
-    pub status: Bytes,
-    #[serde(deserialize_with = "ts_milliseconds::deserialize")]
-    pub timestamp: DateTime<Utc>,
-    pub hostname: Bytes,
-    pub service: Bytes,
-    pub ddsource: Bytes,
-    pub ddtags: Bytes,
 }
