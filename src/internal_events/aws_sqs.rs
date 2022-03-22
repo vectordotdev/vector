@@ -5,7 +5,7 @@ use rusoto_sqs::{
 };
 use vector_core::internal_event::InternalEvent;
 
-#[cfg(feature = "sources-aws_s3")]
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use crate::internal_events::prelude::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
