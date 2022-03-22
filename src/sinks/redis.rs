@@ -239,7 +239,7 @@ fn encode_event(
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingError {
+            emit!(TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,
@@ -348,12 +348,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(&RedisEventsSent { count, byte_size });
+                        emit!(RedisEventsSent { count, byte_size });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventError::new(error)),
+                Err(error) => emit!(RedisSendEventError::new(error)),
             };
             result
         })

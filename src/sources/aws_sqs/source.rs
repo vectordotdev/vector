@@ -11,12 +11,13 @@ use tokio::{pin, select, time::Duration};
 use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
 
-use super::events::*;
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, BatchStatus, Event},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{
+        AwsSqsBytesReceived, EventsReceived, SqsMessageDeleteError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     SourceSender,
@@ -113,10 +114,10 @@ impl SqsSource {
                 }
             }
             drop(batch); // Drop last reference to batch acknowledgement finalizer
-            emit!(&AwsSqsBytesReceived { byte_size });
+            emit!(AwsSqsBytesReceived { byte_size });
             let count = events.len();
             if let Err(error) = out.send_batch(events).await {
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
             }
 
             if let Some(receiver) = batch_receiver {
@@ -157,7 +158,7 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(&SqsMessageDeleteError { error: &err });
+            emit!(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -191,7 +192,7 @@ fn decode_message(
                         .fold_finally(
                             0,
                             |size, event: &Event| size + event.size_of(),
-                            move |byte_size| emit!(&EventsReceived { byte_size, count }),
+                            move |byte_size| emit!(EventsReceived { byte_size, count }),
                         ),
                 )
             }

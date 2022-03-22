@@ -115,7 +115,7 @@ impl Conditional for Vrl {
                 _ => false,
             })
             .unwrap_or_else(|err| {
-                emit!(&VrlConditionExecutionError {
+                emit!(VrlConditionExecutionError {
                     error: err.to_string().as_ref()
                 });
                 false
@@ -194,7 +194,7 @@ impl Conditional for VrlVm {
                 _ => false,
             })
             .unwrap_or_else(|err| {
-                emit!(&VrlConditionExecutionError {
+                emit!(VrlConditionExecutionError {
                     error: err.to_string().as_ref()
                 });
                 false

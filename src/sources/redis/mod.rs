@@ -169,7 +169,7 @@ async fn handle_line(
 ) -> Result<(), ()> {
     let now = Utc::now();
 
-    emit!(&BytesReceived {
+    emit!(BytesReceived {
         byte_size: line.len(),
         protocol: "tcp",
     });
@@ -178,7 +178,7 @@ async fn handle_line(
         match next {
             Ok((events, _byte_size)) => {
                 let count = events.len();
-                emit!(&EventsReceived {
+                emit!(EventsReceived {
                     byte_size: events.size_of(),
                     count,
                 });
@@ -195,7 +195,7 @@ async fn handle_line(
                 });
 
                 if let Err(error) = out.send_batch(events).await {
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                     return Err(());
                 }
             }

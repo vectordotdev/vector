@@ -74,7 +74,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .instrument(info_span!("request").or_current())
                 .await?;
 
-            emit!(&AwsBytesSent {
+            emit!(AwsBytesSent {
                 byte_size: processed_bytes_total,
                 region
             });

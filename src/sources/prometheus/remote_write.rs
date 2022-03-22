@@ -87,7 +87,7 @@ struct RemoteWriteSource;
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(&PrometheusRemoteWriteParseError {
+            emit!(PrometheusRemoteWriteParseError {
                 error: error.clone()
             });
             ErrorMessage::new(

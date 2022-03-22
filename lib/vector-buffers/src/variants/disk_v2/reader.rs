@@ -619,7 +619,7 @@ where
                 //
                 // We don't update it unless there's a received/sent event emitted, which these
                 // events naturally will not be part of as they don't flow out of the buffer.
-                emit(&EventsCorrupted {
+                emit(EventsCorrupted {
                     count: events_skipped,
                 });
             }
