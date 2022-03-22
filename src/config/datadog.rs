@@ -1,12 +1,15 @@
 use std::env;
 
+use hyper::Body;
 use serde::{Deserialize, Serialize};
+use vector_core::config::proxy::ProxyConfig;
 
 use super::{
     load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
     SourceOuter,
 };
 use crate::{
+    http::HttpClient,
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
@@ -38,14 +41,60 @@ pub struct Options {
 
     #[serde(default = "default_retry_interval_secs")]
     pub retry_interval_secs: u32,
+
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    proxy: ProxyConfig,
 }
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
 struct PipelinesFields<'a> {
-    config: &'a str,
+    config: &'a toml::value::Table,
     api_key: &'a str,
     app_key: &'a str,
     configuration_key: &'a str,
+    config_version: &'a str,
+    vector_version: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct PipelinesAttributes<'a> {
+    config_hash: &'a str,
+    vector_version: &'a str,
+    config: &'a toml::value::Table,
+}
+
+#[derive(Debug, Serialize)]
+struct PipelinesData<'a> {
+    attributes: PipelinesAttributes<'a>,
+    r#type: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct PipelinesVersionPayload<'a> {
+    data: PipelinesData<'a>,
+}
+
+impl<'a> PipelinesVersionPayload<'a> {
+    fn from_fields(fields: &'a PipelinesFields) -> Self {
+        Self {
+            data: PipelinesData {
+                attributes: PipelinesAttributes {
+                    config_hash: fields.config_version,
+                    vector_version: fields.vector_version,
+                    config: fields.config,
+                },
+                r#type: "pipelines_configuration_version",
+            },
+        }
+    }
+
+    fn json_string(&self) -> String {
+        serde_json::to_string(self)
+            .expect("couldn't serialize Pipelines fields to JSON. Please report")
+    }
 }
 
 /// Error conditions that indicate how reporting a configuration to Datadog Observability Pipelines
@@ -65,6 +114,7 @@ impl Default for Options {
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             retry_interval_secs: default_retry_interval_secs(),
+            proxy: ProxyConfig::default(),
         }
     }
 }
@@ -117,7 +167,11 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
 
     info!("Datadog API key provided. Integration with Datadog Observability Pipelines is enabled.");
 
-    let version = config.version.as_ref().expect("Config should be versioned");
+    // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
+    let config_version = config.version.as_ref().expect("Config should be versioned");
+
+    // Get the Vector version. This is reported to Pipelines along with a config hash version.
+    let vector_version = crate::get_version();
 
     // Report the internal configuration to Datadog Observability Pipelines.
     // First, we need to create a JSON representation of config, based on the original files
@@ -127,20 +181,18 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
         .flatten()
         .expect("Couldn't load source from config paths. Please report.");
 
-    // Serializing a TOML table as JSON should always succeed.
-    let config_json =
-        serde_json::to_string(&table).expect("Couldn't serialise config as JSON. Please report.");
-
     // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
     // exploding as func arguments to avoid confusion with multiple &str fields.
     let fields = PipelinesFields {
-        config: &config_json,
+        config: &table,
+        config_version: &config_version,
         api_key: &api_key,
         app_key: &datadog.app_key,
         configuration_key: &datadog.configuration_key,
+        vector_version: &vector_version,
     };
 
-    report_serialized_config_to_datadog(fields);
+    report_serialized_config_to_datadog(fields, &datadog.proxy);
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
@@ -148,9 +200,10 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
-    let mut host_metrics = HostMetricsConfig::enterprise(version, &datadog.configuration_key);
+    let mut host_metrics =
+        HostMetricsConfig::enterprise(config_version, &datadog.configuration_key);
     let mut internal_metrics =
-        InternalMetricsConfig::enterprise(version, &datadog.configuration_key);
+        InternalMetricsConfig::enterprise(config_version, &datadog.configuration_key);
 
     // Override default scrape intervals.
     host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
@@ -180,68 +233,12 @@ pub fn try_attach(config: &mut Config, config_paths: &[ConfigPath]) -> bool {
 }
 
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
-fn report_serialized_config_to_datadog(fields: PipelinesFields) -> Result<(), PipelinesError> {
+fn report_serialized_config_to_datadog(
+    fields: PipelinesFields,
+    proxy: &ProxyConfig,
+) -> Result<(), PipelinesError> {
+    let client = HttpClient::<Body>::new(None, proxy)
+        .expect("couldn't instrument Datadog HTTP client. Please report");
+
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn default_with_hash() -> Config {
-        Config {
-            version: Some("".to_owned()),
-            ..Config::default()
-        }
-    }
-
-    #[test]
-    fn default() {
-        let config = default_with_hash();
-
-        // The Datadog config shouldn't exist by default.
-        assert!(config.datadog.is_none());
-    }
-
-    #[test]
-    fn disabled() {
-        let mut config = default_with_hash();
-
-        // Attaching config without an API enabled should avoid wiring up components.
-        assert!(!try_attach(&mut config));
-
-        assert!(!config
-            .sources
-            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
-        assert!(!config
-            .sources
-            .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
-        assert!(!config
-            .sinks
-            .contains_key(&ComponentKey::from(DATADOG_METRICS_KEY)));
-    }
-
-    #[test]
-    fn enabled() {
-        let mut config = default_with_hash();
-
-        config.datadog = Some(Options {
-            api_key: Some("xxx".to_owned()),
-            configuration_key: "zzz".to_owned(),
-            ..Options::default()
-        });
-
-        // Explicitly set to enabled and provide an API key to activate.
-        assert!(try_attach(&mut config));
-
-        assert!(config
-            .sources
-            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
-        assert!(config
-            .sources
-            .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
-        assert!(config
-            .sinks
-            .contains_key(&ComponentKey::from(DATADOG_METRICS_KEY)));
-    }
 }
