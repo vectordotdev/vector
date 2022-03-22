@@ -22,7 +22,7 @@ pub struct ParserMatchError<'a> {
 }
 
 impl InternalEvent for ParserMatchError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Pattern failed to match.",
             error_code = "no_match_found",
@@ -31,9 +31,6 @@ impl InternalEvent for ParserMatchError<'_> {
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "no_match_found",
@@ -51,7 +48,7 @@ pub struct ParserMissingFieldError<'a> {
 }
 
 impl InternalEvent for ParserMissingFieldError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Field does not exist.",
             field = %self.field,
@@ -60,9 +57,6 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "field_not_found",
@@ -81,7 +75,7 @@ pub struct ParserTargetExistsError<'a> {
 }
 
 impl<'a> InternalEvent for ParserTargetExistsError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = format!("Target field {:?} already exists.", self.target_field).as_str(),
             error_code = "target_field_exists",
@@ -89,10 +83,7 @@ impl<'a> InternalEvent for ParserTargetExistsError<'a> {
             stage = error_stage::PROCESSING,
             target_field = %self.target_field,
             internal_log_rate_secs = 10
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
             "error_code" => "target_field_exists",
@@ -112,7 +103,7 @@ pub struct ParserConversionError<'a> {
 }
 
 impl<'a> InternalEvent for ParserConversionError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Could not convert types.",
             name = %self.name,
@@ -122,9 +113,6 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "type_conversion",

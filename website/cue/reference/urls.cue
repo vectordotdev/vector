@@ -252,6 +252,8 @@ urls: {
 	inode:                                                    "\(wikipedia)/wiki/Inode"
 	ip_aton:                                                  "https://linux.die.net/man/3/inet_aton"
 	ip_ntoa:                                                  "https://linux.die.net/man/3/inet_ntoa"
+	ip_ntop:                                                  "https://linux.die.net/man/3/inet_ntop"
+	ip_pton:                                                  "https://linux.die.net/man/3/inet_pton"
 	iso_8601:                                                 "\(wikipedia)/wiki/ISO_8601"
 	iso3166_2:                                                "\(wikipedia)/wiki/ISO_3166-2"
 	issue_1694:                                               "\(vector_repo)/issues/1694"

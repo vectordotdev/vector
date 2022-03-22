@@ -10,7 +10,7 @@ pub struct DatadogMetricsEncodingError {
 }
 
 impl InternalEvent for DatadogMetricsEncodingError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to encode Datadog metrics.",
             error = %self.message,
@@ -18,9 +18,6 @@ impl InternalEvent for DatadogMetricsEncodingError {
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => self.error_code,

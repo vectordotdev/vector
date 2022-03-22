@@ -158,14 +158,14 @@ impl SourceConfig for PostgresqlMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
                 let count = metrics.len();
-                emit!(&PostgresqlMetricsCollectCompleted {
+                emit!(PostgresqlMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
 
                 let metrics = metrics.into_iter().flatten();
                 if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -472,7 +472,7 @@ impl PostgresqlMetrics {
                 iter::once(self.create_metric("up", gauge!(1.0), tags!(self.tags))).chain(metrics),
             ),
             Err(error) => {
-                emit!(&PostgresqlMetricsCollectError {
+                emit!(PostgresqlMetricsCollectError {
                     error,
                     endpoint: self.tags.get("endpoint"),
                 });
@@ -505,11 +505,11 @@ impl PostgresqlMetrics {
                     result.iter().fold((0, 0, 0), |res, (set, size)| {
                         (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
                     });
-                emit!(&BytesReceived {
+                emit!(BytesReceived {
                     byte_size: received_byte_size,
                     protocol: "tcp"
                 });
-                emit!(&EventsReceived { count, byte_size });
+                emit!(EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
                 Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }

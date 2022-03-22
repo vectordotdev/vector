@@ -144,14 +144,14 @@ impl HostMetricsConfig {
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: 0,
                 protocol: "none"
             });
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(&StreamClosedError {
+                emit!(StreamClosedError {
                     count,
                     error: error.clone()
                 });
@@ -239,7 +239,7 @@ impl HostMetrics {
                 metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: metrics.len(),
             byte_size: metrics.size_of(),
         });

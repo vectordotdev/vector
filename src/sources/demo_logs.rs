@@ -76,7 +76,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&DemoLogsEventProcessed);
+        emit!(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -153,7 +153,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: 0,
             protocol: "none",
         });
@@ -165,7 +165,7 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count,
                         byte_size: events.size_of()
                     });
@@ -180,7 +180,7 @@ async fn demo_logs_source(
                         event
                     });
                     out.send_batch(events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {

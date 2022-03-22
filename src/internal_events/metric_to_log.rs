@@ -9,20 +9,16 @@ pub struct MetricToLogSerializeError {
 }
 
 impl<'a> InternalEvent for MetricToLogSerializeError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Metric failed to serialize as JSON.",
             error = ?self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

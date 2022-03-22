@@ -15,7 +15,7 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("open_connections", self.count as f64);
     }
 }

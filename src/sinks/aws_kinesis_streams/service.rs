@@ -86,13 +86,13 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .stream_name(stream_name)
                 .send()
                 .inspect_ok(|_| {
-                    emit!(&AwsSdkBytesSent {
+                    emit!(AwsSdkBytesSent {
                         byte_size: processed_bytes_total,
                         region,
                     });
 
                     // Deprecated
-                    emit!(&AwsKinesisStreamsEventSent {
+                    emit!(AwsKinesisStreamsEventSent {
                         byte_size: processed_bytes_total
                     });
                 })

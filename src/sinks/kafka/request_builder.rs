@@ -77,7 +77,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                             if let Value::Bytes(value_bytes) = value {
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {
-                                emit!(&KafkaHeaderExtractionError {
+                                emit!(KafkaHeaderExtractionError {
                                     header_field: headers_key
                                 });
                             }
@@ -85,7 +85,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                         return Some(owned_headers);
                     }
                     _ => {
-                        emit!(&KafkaHeaderExtractionError {
+                        emit!(KafkaHeaderExtractionError {
                             header_field: headers_key
                         });
                     }

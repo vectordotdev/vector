@@ -174,7 +174,7 @@ fn decode_datadog_sketches(
         )
     })?;
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: metrics.size_of(),
         count: metrics.len(),
     });
@@ -209,7 +209,7 @@ fn decode_datadog_series(
         .flat_map(|m| into_vector_metric(m, api_key.clone(), schema_definition))
         .collect();
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: decoded_metrics.size_of(),
         count: decoded_metrics.len(),
     });

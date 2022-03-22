@@ -328,7 +328,7 @@ impl Decoder {
         frame: Result<Option<Bytes>, BoxedFramingError>,
     ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
         let frame = frame.map_err(|error| {
-            emit!(&DecoderFramingFailed { error: &error });
+            emit!(DecoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
 
@@ -344,7 +344,7 @@ impl Decoder {
             .parse(frame)
             .map(|event| Some((event, byte_size)))
             .map_err(|error| {
-                emit!(&DecoderDeserializeFailed { error: &error });
+                emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)
             })
     }

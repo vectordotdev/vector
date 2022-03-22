@@ -59,18 +59,11 @@ impl Function for ParseLogFmt {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let bytes = args.required("value");
-        let key_value_delimiter = args
-            .optional("key_value_delimiter")
-            .unwrap_or_else(|| value!("="));
-        let field_delimiter = args
-            .optional("field_delimiter")
-            .unwrap_or_else(|| value!(" "));
 
+        let key_value_delimiter = Value::from("=");
+        let field_delimiter = Value::from(" ");
         let whitespace = Whitespace::Lenient;
-
-        let standalone_key = args
-            .optional("accept_standalone_key")
-            .unwrap_or_else(|| value!(true));
+        let standalone_key = Value::from(true);
 
         super::parse_key_value::parse_key_value(
             bytes,
