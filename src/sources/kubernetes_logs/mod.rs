@@ -23,6 +23,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::pin;
+use tokio_util::time::DelayQueue;
 use vector_common::TimeZone;
 use vector_core::ByteSizeOf;
 
@@ -37,8 +38,6 @@ use crate::{
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
-    kubernetes::delayed_reflector::Delayer,
-    kubernetes::reflector_shim,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer, TaskTransform},
@@ -313,14 +312,35 @@ impl Source {
                 ..Default::default()
             },
         );
-        let pod_store_w = reflector::store::Writer::default();
+        let mut pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
-        let pod_reflector = reflector_shim(pod_store_w, pod_watcher, Delayer::new(delay_deletion));
         tokio::spawn(async move {
-            pin!(pod_reflector);
-            while let Some(_event) = pod_reflector.next().await {
-                ()
+            pin!(pod_watcher);
+            let mut delay_queue = DelayQueue::default();
+            loop {
+                tokio::select! {
+                    Some(Ok(event)) = pod_watcher.next() => {
+                        match event {
+                            watcher::Event::Applied(_) => {
+                                // Immediately apply event
+                                pod_store_w.apply_watcher_event(&event);
+                            }
+                            watcher::Event::Deleted(_) => {
+                                // Delay reconciling any `Deleted` events
+                                delay_queue.insert(event.to_owned(), delay_deletion);
+                            }
+                            watcher::Event::Restarted(_) => {
+                                // Clear all delayed events when the cache is refreshed
+                                delay_queue.clear();
+                                pod_store_w.apply_watcher_event(&event);
+                            }
+                        }
+                    }
+                    Some(Ok(event)) = delay_queue.next() => {
+                        pod_store_w.apply_watcher_event(&event.into_inner())
+                    }
+                }
             }
         });
 
@@ -328,14 +348,35 @@ impl Source {
 
         let namespaces = Api::<Namespace>::all(client);
         let ns_watcher = watcher(namespaces, ListParams::default());
-        let ns_store_w = reflector::store::Writer::default();
+        let mut ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
-        let ns_reflector = reflector_shim(ns_store_w, ns_watcher, Delayer::new(delay_deletion));
         tokio::spawn(async move {
-            pin!(ns_reflector);
-            while let Some(_event) = ns_reflector.next().await {
-                ()
+            pin!(ns_watcher);
+            let mut delay_queue = DelayQueue::default();
+            loop {
+                tokio::select! {
+                    Some(Ok(event)) = ns_watcher.next() => {
+                        match event {
+                            watcher::Event::Applied(_) => {
+                                // Immediately apply event
+                                ns_store_w.apply_watcher_event(&event);
+                            }
+                            watcher::Event::Deleted(_) => {
+                                // Delay reconciling any `Deleted` events
+                                delay_queue.insert(event.to_owned(), delay_deletion);
+                            }
+                            watcher::Event::Restarted(_) => {
+                                // Clear all delayed events when the cache is refreshed
+                                delay_queue.clear();
+                                ns_store_w.apply_watcher_event(&event);
+                            }
+                        }
+                    }
+                    Some(Ok(event)) = delay_queue.next() => {
+                        ns_store_w.apply_watcher_event(&event.into_inner())
+                    }
+                }
             }
         });
 
