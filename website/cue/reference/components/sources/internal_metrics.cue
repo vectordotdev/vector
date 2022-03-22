@@ -481,19 +481,19 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		buffer_discarded_events_total: {
-			description:       "The number of events dropped by this non-blocking buffer."
+			description:       "The number of events dropped by this non-blocking buffer before receipt."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		buffer_received_event_bytes_total: {
-			description:       "The number of bytes received by this buffer."
+			description:       "The number of bytes received by this buffer. This does not include discarded events."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		buffer_received_events_total: {
-			description:       "The number of events received by this buffer."
+			description:       "The number of events received by this buffer. This does not include discarded events."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
