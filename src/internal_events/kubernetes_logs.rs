@@ -12,16 +12,13 @@ pub struct KubernetesLogsEventsReceived<'a> {
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = 1,
             byte_size = %self.byte_size,
             file = %self.file,
         );
-    }
-
-    fn emit_metrics(&self) {
         match self.pod_name {
             Some(name) => {
                 counter!("component_received_events_total", 1, "pod_name" => name.to_owned());
@@ -53,7 +50,7 @@ pub struct KubernetesLogsEventAnnotationError<'a> {
 }
 
 impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to annotate event with pod metadata.",
             event = ?self.event,
@@ -61,9 +58,6 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
@@ -80,7 +74,7 @@ pub(crate) struct KubernetesLogsEventNamespaceAnnotationError<'a> {
 }
 
 impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to annotate event with namespace metadata.",
             event = ?self.event,
@@ -89,9 +83,6 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
@@ -108,14 +99,11 @@ pub struct KubernetesLogsFormatPickerEdgeCase {
 }
 
 impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(
             message = "Encountered format picker edge case.",
             what = %self.what,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_format_picker_edge_cases_total", 1);
     }
 }
@@ -126,7 +114,7 @@ pub struct KubernetesLogsDockerFormatParseError<'a> {
 }
 
 impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(
             message = "Failed to parse log line in docker format.",
             error = %self.error,
@@ -134,9 +122,6 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::PARSER_FAILED,
@@ -155,7 +140,7 @@ pub struct KubernetesLifecycleError<E> {
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = self.message,
             error = %self.error,
@@ -164,9 +149,6 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             stage = error_stage::PROCESSING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => KUBERNETES_LIFECYCLE,

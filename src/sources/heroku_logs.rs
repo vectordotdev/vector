@@ -166,7 +166,7 @@ fn decode_message(
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
 
-    emit!(&HerokuLogplexRequestReceived {
+    emit!(HerokuLogplexRequestReceived {
         msg_count,
         frame_id,
         drain_token
@@ -212,7 +212,7 @@ fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
-            res.map_err(|error| emit!(&HerokuLogplexRequestReadError { error }))
+            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
                 .ok()
         })
         .filter(|s| !s.is_empty())
