@@ -599,7 +599,7 @@ mod integration_tests {
             ),
             (
                 vec![OwnedSegment::field(ACCOUNT_ID_KEY)].into(),
-                "123456789",
+                "071959437513",
             ),
             (
                 vec![OwnedSegment::field(AMI_ID_KEY)].into(),
@@ -627,7 +627,7 @@ mod integration_tests {
             (LOCAL_IPV4_KEY, "192.1.1.2"),
             (LOCAL_HOSTNAME_KEY, "mock-hostname"),
             (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
-            (ACCOUNT_ID_KEY, "123456789"),
+            (ACCOUNT_ID_KEY, "071959437513"),
             (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
             (INSTANCE_TYPE_KEY, "t2.micro"),
             (REGION_KEY, "us-east-1"),
