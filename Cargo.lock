@@ -8566,6 +8566,8 @@ dependencies = [
  "aws-sdk-kinesis",
  "aws-sdk-s3",
  "aws-sdk-sqs",
+ "aws-sig-auth",
+ "aws-sigv4",
  "aws-smithy-client",
  "aws-smithy-http",
  "aws-types",
