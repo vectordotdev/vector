@@ -3,7 +3,7 @@ use std::env;
 use http::Request;
 use hyper::{Body, StatusCode};
 use serde::{Deserialize, Serialize};
-use vector_core::config::proxy::ProxyConfig;
+use tokio::time::{sleep, Duration};
 
 use super::{
     load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
@@ -15,6 +15,7 @@ use crate::{
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
+use vector_core::config::proxy::ProxyConfig;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
@@ -240,6 +241,9 @@ pub async fn try_attach(
                 }
             }
         }
+
+        // Sleep for the user-provided interval before retrying.
+        sleep(Duration::from_secs(datadog.retry_interval_secs as u64)).await;
     }
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
