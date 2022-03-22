@@ -235,7 +235,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            emit!(&ElasticsearchResponseError::new(
+            emit!(ElasticsearchResponseError::new(
                 "Response containerd errors.",
                 response
             ));
@@ -244,13 +244,13 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
-        emit!(&ElasticsearchResponseError::new(
+        emit!(ElasticsearchResponseError::new(
             "Response wasn't successful.",
             response,
         ));
         EventStatus::Errored
     } else {
-        emit!(&ElasticsearchResponseError::new(
+        emit!(ElasticsearchResponseError::new(
             "Response failed.",
             response,
         ));

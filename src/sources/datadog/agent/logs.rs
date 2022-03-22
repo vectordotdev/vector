@@ -138,7 +138,7 @@ pub(crate) fn decode_log_body(
         }
     }
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: decoded.size_of(),
         count: decoded.len(),
     });

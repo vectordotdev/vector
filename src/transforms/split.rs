@@ -119,7 +119,7 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.as_str(), value);
                     }
                     Err(error) => {
-                        emit!(&ParserConversionError { name, error });
+                        emit!(ParserConversionError { name, error });
                     }
                 }
             }
@@ -127,7 +127,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(self.field.as_str());
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);

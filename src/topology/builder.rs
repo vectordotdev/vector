@@ -394,7 +394,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(&EventsReceived {
+                        emit!(EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
                         })
@@ -585,7 +585,7 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: events.len(),
             byte_size: events.size_of(),
         });
@@ -691,7 +691,7 @@ fn build_task_transform(
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
         .inspect(|events| {
-            emit!(&EventsReceived {
+            emit!(EventsReceived {
                 count: events.len(),
                 byte_size: events.size_of(),
             })
@@ -699,7 +699,7 @@ fn build_task_transform(
     let stream = t
         .transform(Box::pin(filtered))
         .inspect(|events: &EventArray| {
-            emit!(&EventsSent {
+            emit!(EventsSent {
                 count: events.len(),
                 byte_size: events.size_of(),
                 output: None,

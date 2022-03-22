@@ -6,7 +6,7 @@ pub(crate) struct RemoveFieldsFieldMissing<'a> {
 }
 
 impl<'a> InternalEvent for RemoveFieldsFieldMissing<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Field did not exist.", field = %self.field, internal_log_rate_secs = 30);
     }
 }

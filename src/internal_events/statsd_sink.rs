@@ -11,7 +11,7 @@ pub struct StatsdInvalidMetricError<'a> {
 }
 
 impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Invalid metric received; dropping event.",
             error_code = "invalid_metric",
@@ -20,10 +20,7 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
             value = ?self.value,
             kind = ?self.kind,
             internal_log_rate_secs = 10,
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
             "error_code" => "invalid_metric",
