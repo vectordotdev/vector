@@ -252,7 +252,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(&SyslogUdpReadError { error });
+                        emit!(SyslogUdpReadError { error });
                         None
                     }
                 }

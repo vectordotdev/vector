@@ -112,7 +112,7 @@ impl tower::Service<VectorRequest> for VectorService {
                 .client
                 .push_events(request.into_request())
                 .map_ok(|_response| {
-                    emit!(&EndpointBytesSent {
+                    emit!(EndpointBytesSent {
                         byte_size,
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,

@@ -84,7 +84,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(&MetricToLogSerializeError { error }))
+            .map_err(|error| emit!(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {

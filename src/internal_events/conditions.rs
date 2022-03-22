@@ -9,15 +9,12 @@ pub struct VrlConditionExecutionError<'a> {
 }
 
 impl<'a> InternalEvent for VrlConditionExecutionError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "VRL condition execution failed.",
             error = %self.error,
             internal_log_rate_secs = 120
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!("processing_errors_total", 1);
     }
 }

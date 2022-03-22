@@ -17,16 +17,13 @@ pub struct PrometheusEventsReceived {
 }
 
 impl InternalEvent for PrometheusEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
             uri = %self.uri,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_events_total", self.count as u64,
             "uri" => self.uri.to_string(),
@@ -54,11 +51,8 @@ pub struct PrometheusRequestCompleted {
 }
 
 impl InternalEvent for PrometheusRequestCompleted {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Request completed.");
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
         histogram!("request_duration_seconds", self.end - self.start);
     }
@@ -74,7 +68,7 @@ pub struct PrometheusParseError<'a> {
 
 #[cfg(feature = "sources-prometheus")]
 impl<'a> InternalEvent for PrometheusParseError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Parsing error.",
             url = %self.url,
@@ -88,9 +82,6 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             url = %self.url,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
@@ -110,7 +101,7 @@ pub struct PrometheusHttpResponseError {
 }
 
 impl InternalEvent for PrometheusHttpResponseError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP error response.",
             url = %self.url,
@@ -120,9 +111,6 @@ impl InternalEvent for PrometheusHttpResponseError {
             error_type = error_type::REQUEST_FAILED,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "code" => self.code.to_string(),
@@ -143,7 +131,7 @@ pub struct PrometheusHttpError {
 }
 
 impl InternalEvent for PrometheusHttpError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP request processing error.",
             url = %self.url,
@@ -152,9 +140,6 @@ impl InternalEvent for PrometheusHttpError {
             stage = error_stage::RECEIVING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "url" => self.url.to_string(),
@@ -173,7 +158,7 @@ pub struct PrometheusRemoteWriteParseError {
 }
 
 impl InternalEvent for PrometheusRemoteWriteParseError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Could not decode request body.",
             error = ?self.error,
@@ -181,9 +166,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => self.error.to_string(),
@@ -199,7 +181,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 pub struct PrometheusNoNameError;
 
 impl InternalEvent for PrometheusNoNameError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Could not decode timeseries.",
             error = "Decoded timeseries is missing the __name__ field.",
@@ -207,9 +189,6 @@ impl InternalEvent for PrometheusNoNameError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => "Decoded timeseries is missing the __name__ field.",
@@ -227,16 +206,13 @@ pub struct PrometheusServerRequestComplete {
 }
 
 impl InternalEvent for PrometheusServerRequestComplete {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = "Request to prometheus server complete.";
         if self.status_code.is_success() {
             debug!(message, status_code = %self.status_code);
         } else {
             error!(message, status_code = %self.status_code);
         }
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
     }
 }

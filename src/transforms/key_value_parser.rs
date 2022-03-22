@@ -153,7 +153,7 @@ impl FunctionTransform for KeyValue {
                     if self.overwrite_target {
                         log.remove(target_field.as_str());
                     } else {
-                        emit!(&ParserTargetExistsError { target_field });
+                        emit!(ParserTargetExistsError { target_field });
                         return output.push(event);
                     }
                 }
@@ -175,7 +175,7 @@ impl FunctionTransform for KeyValue {
                             log.insert(path_key.as_str(), value);
                         }
                         Err(error) => {
-                            emit!(&KeyValueParserError { key, error });
+                            emit!(KeyValueParserError { key, error });
                         }
                     }
                 } else {
@@ -187,7 +187,7 @@ impl FunctionTransform for KeyValue {
                 log.remove(self.field.as_str());
             }
         } else {
-            emit!(&ParserMissingFieldError {
+            emit!(ParserMissingFieldError {
                 field: self.field.as_str()
             });
         };

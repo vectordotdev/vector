@@ -9,11 +9,8 @@ pub struct RedisEventsSent {
 }
 
 impl InternalEvent for RedisEventsSent {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_sent_events_total", self.count as u64);
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
         // deprecated
@@ -39,7 +36,7 @@ impl<'a> RedisSendEventError<'a> {
 }
 
 impl<'a> InternalEvent for RedisSendEventError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to send message.",
             error = %self.error,
@@ -48,12 +45,9 @@ impl<'a> InternalEvent for RedisSendEventError<'a> {
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code.clone(),
+            "error_code" => self.error_code,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
@@ -76,7 +70,7 @@ impl From<redis::RedisError> for RedisReceiveEventError {
 }
 
 impl InternalEvent for RedisReceiveEventError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to read message.",
             error = %self.error,
@@ -85,12 +79,9 @@ impl InternalEvent for RedisReceiveEventError {
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code.clone(),
+            "error_code" => self.error_code,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );

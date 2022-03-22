@@ -373,7 +373,7 @@ impl<'a> Batch<'a> {
                         }
                     }
                     Err(error) => {
-                        emit!(&JournaldInvalidRecordError {
+                        emit!(JournaldInvalidRecordError {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
@@ -388,14 +388,14 @@ impl<'a> Batch<'a> {
         drop(self.batch);
 
         if self.record_size > 0 {
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: self.record_size,
                 protocol: "journald",
             });
         }
 
         if !self.events.is_empty() {
-            emit!(&JournaldEventsReceived {
+            emit!(JournaldEventsReceived {
                 count: self.events.len(),
                 byte_size: self.events.size_of(),
             });
