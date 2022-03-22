@@ -128,7 +128,7 @@ impl ReportingError {
 
 impl<'a> PipelinesVersionPayload<'a> {
     /// Create a new Pipelines reporting payload from a config and string fields.
-    fn new(config: &'a toml::value::Table, fields: &PipelinesStrFields<'a>) -> Self {
+    const fn new(config: &'a toml::value::Table, fields: &PipelinesStrFields<'a>) -> Self {
         Self {
             data: PipelinesData {
                 attributes: PipelinesAttributes {
@@ -191,7 +191,7 @@ pub async fn try_attach(
     // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
     // exploding as func arguments to avoid confusion with multiple &str fields.
     let fields = PipelinesStrFields {
-        config_version: &config_version,
+        config_version,
         vector_version: &vector_version,
     };
 
@@ -334,10 +334,7 @@ async fn report_serialized_config_to_datadog(
     request: Request<Body>,
 ) -> Result<(), ReportingError> {
     info!("Attempting to report configuration to Datadog Pipelines");
-    let response = client
-        .send(request)
-        .await
-        .map_err(|err| ReportingError::Http(err))?;
+    let response = client.send(request).await.map_err(ReportingError::Http)?;
 
     let status = response.status();
 

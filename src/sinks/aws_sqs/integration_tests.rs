@@ -110,7 +110,7 @@ async fn ensure_queue(queue_name: String) {
         .send()
         .await
     {
-        println!("Unable to check the queue {:?}", error);
+        panic!("Unable to check the queue {:?}", error);
     }
 }
 
