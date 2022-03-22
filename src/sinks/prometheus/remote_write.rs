@@ -115,7 +115,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingError {
+                                    emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,

@@ -9,7 +9,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct WatchRequestInvoked;
 
 impl InternalEvent for WatchRequestInvoked {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("k8s_watch_requests_invoked_total", 1);
     }
 }
@@ -20,11 +20,8 @@ pub struct WatchRequestInvocationFailed<E> {
 }
 
 impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Watch invocation failed.", error = ?self.error, internal_log_rate_secs = 5);
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_watch_requests_failed_total", 1);
     }
 }
@@ -35,11 +32,8 @@ pub struct WatchStreamFailed<E> {
 }
 
 impl<E: Debug> InternalEvent for WatchStreamFailed<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Watch stream failed.", error = ?self.error, internal_log_rate_secs = 5);
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_watch_stream_failed_total", 1);
     }
 }
@@ -48,7 +42,7 @@ impl<E: Debug> InternalEvent for WatchStreamFailed<E> {
 pub struct WatchStreamItemObtained;
 
 impl InternalEvent for WatchStreamItemObtained {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("k8s_watch_stream_items_obtained_total", 1);
     }
 }

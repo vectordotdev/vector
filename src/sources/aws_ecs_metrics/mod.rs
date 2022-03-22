@@ -143,12 +143,12 @@ async fn aws_ecs_metrics(
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(&AwsEcsMetricsRequestCompleted {
+                        emit!(AwsEcsMetricsRequestCompleted {
                             start,
                             end: Instant::now()
                         });
 
-                        emit!(&HttpBytesReceived {
+                        emit!(HttpBytesReceived {
                             byte_size: body.len(),
                             protocol: "http",
                             http_path: uri.path(),
@@ -157,19 +157,19 @@ async fn aws_ecs_metrics(
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
-                                emit!(&AwsEcsMetricsEventsReceived {
+                                emit!(AwsEcsMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count,
                                     http_path: uri.path(),
                                 });
 
                                 if let Err(error) = out.send_batch(metrics).await {
-                                    emit!(&StreamClosedError { error, count });
+                                    emit!(StreamClosedError { error, count });
                                     return Err(());
                                 }
                             }
                             Err(error) => {
-                                emit!(&AwsEcsMetricsParseError {
+                                emit!(AwsEcsMetricsParseError {
                                     error,
                                     endpoint: &url,
                                     body: String::from_utf8_lossy(&body),
@@ -178,7 +178,7 @@ async fn aws_ecs_metrics(
                         }
                     }
                     Err(error) => {
-                        emit!(&AwsEcsMetricsHttpError {
+                        emit!(AwsEcsMetricsHttpError {
                             error,
                             endpoint: &url
                         });
@@ -186,13 +186,13 @@ async fn aws_ecs_metrics(
                 }
             }
             Ok(response) => {
-                emit!(&AwsEcsMetricsResponseError {
+                emit!(AwsEcsMetricsResponseError {
                     code: response.status(),
                     endpoint: &url,
                 });
             }
             Err(error) => {
-                emit!(&AwsEcsMetricsHttpError {
+                emit!(AwsEcsMetricsHttpError {
                     error,
                     endpoint: &url
                 });

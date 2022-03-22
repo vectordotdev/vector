@@ -11,7 +11,7 @@ pub struct HerokuLogplexRequestReceived<'a> {
 }
 
 impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             message = "Handling logplex request.",
             msg_count = %self.msg_count,
@@ -19,9 +19,6 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
             drain_token = %self.drain_token,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
     }
 }
@@ -32,15 +29,12 @@ pub struct HerokuLogplexRequestReadError {
 }
 
 impl InternalEvent for HerokuLogplexRequestReadError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error reading request body.",
             error = ?self.error,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("request_read_errors_total", 1);
     }
 }

@@ -79,7 +79,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
                 Err(error) => {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("message_group_id"),
                         drop_event: true,
@@ -93,7 +93,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
                 Err(error) => {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("message_deduplication_id"),
                         drop_event: true,

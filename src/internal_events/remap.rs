@@ -11,7 +11,7 @@ pub struct RemapMappingError {
 }
 
 impl InternalEvent for RemapMappingError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = if self.event_dropped {
             "Mapping failed with event; discarding event."
         } else {
@@ -24,10 +24,7 @@ impl InternalEvent for RemapMappingError {
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::CONVERSION_FAILED,
@@ -46,7 +43,7 @@ pub struct RemapMappingAbort {
 }
 
 impl InternalEvent for RemapMappingAbort {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = if self.event_dropped {
             "Event mapping aborted; discarding event."
         } else {
