@@ -130,7 +130,7 @@ where
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
-                                        emit!(&SplunkIndexerAcknowledgementUnavailableError {
+                                        emit!(SplunkIndexerAcknowledgementUnavailableError {
                                             error
                                         });
                                         EventStatus::Delivered
@@ -143,7 +143,7 @@ where
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            emit!(&SplunkResponseParseError { error });
+                            emit!(SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }

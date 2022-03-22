@@ -198,26 +198,26 @@ impl BufferUsage {
                             n => Some(n),
                         };
 
-                        emit(&BufferCreated {
+                        emit(BufferCreated {
                             idx: stage.idx,
                             max_size_bytes,
                             max_size_events,
                         });
 
-                        emit(&BufferEventsReceived {
+                        emit(BufferEventsReceived {
                             idx: stage.idx,
                             count: stage.received_event_count.swap(0, Ordering::Relaxed),
                             byte_size: stage.received_byte_size.swap(0, Ordering::Relaxed),
                         });
 
-                        emit(&BufferEventsSent {
+                        emit(BufferEventsSent {
                             idx: stage.idx,
                             count: stage.sent_event_count.swap(0, Ordering::Relaxed),
                             byte_size: stage.sent_byte_size.swap(0, Ordering::Relaxed),
                         });
 
                         if let Some(dropped_event_count) = &stage.dropped_event_count {
-                            emit(&EventsDropped {
+                            emit(EventsDropped {
                                 idx: stage.idx,
                                 count: dropped_event_count.swap(0, Ordering::Relaxed),
                             });

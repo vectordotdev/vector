@@ -230,7 +230,7 @@ impl Sink<Event> for PulsarSink {
         );
 
         let message = encode_event(item, &self.encoding, &self.avro_schema)
-            .map_err(|error| emit!(&PulsarEncodeEventError { error }))?;
+            .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,

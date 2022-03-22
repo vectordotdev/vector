@@ -11,11 +11,8 @@ pub struct SyslogUdpReadError {
 
 #[cfg(feature = "codecs")]
 impl InternalEvent for SyslogUdpReadError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Error reading datagram.", error = ?self.error, internal_log_rate_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_read_errors_total", 1, "mode" => "udp");
     }
 }
@@ -25,11 +22,8 @@ pub(crate) struct SyslogConvertUtf8Error {
 }
 
 impl InternalEvent for SyslogConvertUtf8Error {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Error converting bytes to UTF-8 string.", error = %self.error, internal_log_rate_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
         counter!("utf8_convert_errors_total", 1);
     }
 }

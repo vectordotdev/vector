@@ -392,7 +392,7 @@ where
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
-                emit!(&EndpointBytesSent {
+                emit!(EndpointBytesSent {
                     byte_size,
                     protocol: &protocol,
                     endpoint: &endpoint

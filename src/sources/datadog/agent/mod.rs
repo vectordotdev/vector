@@ -345,7 +345,7 @@ impl DatadogAgentSource {
                 }
             }
         }
-        emit!(&HttpBytesReceived {
+        emit!(HttpBytesReceived {
             byte_size: body.len(),
             http_path: path,
             protocol: self.protocol,
@@ -371,7 +371,7 @@ pub(crate) async fn handle_request(
                 out.send_batch(events).await
             }
             .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {
@@ -394,7 +394,7 @@ pub(crate) async fn handle_request(
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(&HttpDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });

@@ -9,11 +9,8 @@ pub struct InvocationDesyncReceived<E> {
 }
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationDesyncReceived<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Handling invocation desync.", reason = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_reflector_desyncs_total", 1, "type" => "invocation");
     }
 }
@@ -26,11 +23,8 @@ pub struct StreamDesyncReceived<E> {
 }
 
 impl<E: std::fmt::Debug> InternalEvent for StreamDesyncReceived<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Handling stream desync.", reason = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_reflector_desyncs_total", 1, "type" => "stream");
     }
 }
@@ -41,11 +35,8 @@ pub struct InvocationHttpErrorReceived<E> {
 }
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationHttpErrorReceived<E> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Http Error in invocation! Your k8s metadata may be stale. Continuing Loop.", reason = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
         counter!("k8s_watcher_http_error_total", 1);
     }
 }
