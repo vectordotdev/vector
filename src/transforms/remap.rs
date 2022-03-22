@@ -409,14 +409,14 @@ where
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
-                        emit!(&RemapMappingAbort {
+                        emit!(RemapMappingAbort {
                             event_dropped: self.drop_on_abort,
                         });
 
                         ("abort", error, self.drop_on_abort)
                     }
                     Terminate::Error(error) => {
-                        emit!(&RemapMappingError {
+                        emit!(RemapMappingError {
                             error: error.to_string(),
                             event_dropped: self.drop_on_error,
                         });

@@ -42,7 +42,7 @@ pub async fn watch(
             };
 
             match res {
-                Err(error) => emit!(&RedisReceiveEventError::from(error)),
+                Err(error) => emit!(RedisReceiveEventError::from(error)),
                 Ok(line) => {
                     if let Err(()) =
                         handle_line(line, &key, redis_key.as_deref(), decoder.clone(), &mut out)

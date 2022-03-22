@@ -107,7 +107,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(&SplunkHecRequestReceived {
+                        emit!(SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -226,7 +226,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -280,7 +280,7 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(&EventsReceived {
+                            emit!(EventsReceived {
                                 count: events.len(),
                                 byte_size: events.size_of(),
                             });
@@ -327,7 +327,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -660,7 +660,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(&SplunkHecRequestBodyInvalidError {
+                emit!(SplunkHecRequestBodyInvalidError {
                     error: error.into()
                 });
                 Some(Err(
@@ -769,7 +769,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(&SplunkHecRequestBodyInvalidError { error });
+                emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -807,7 +807,7 @@ fn raw_event(
         event.add_batch_notifier(batch);
     }
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         count: 1,
         byte_size: event.size_of(),
     });
@@ -916,7 +916,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(&SplunkHecRequestError { error });
+        emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
                 response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)

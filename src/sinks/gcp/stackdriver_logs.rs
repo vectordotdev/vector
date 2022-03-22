@@ -181,7 +181,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(&crate::internal_events::TemplateRenderingError {
+                    emit!(crate::internal_events::TemplateRenderingError {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -194,7 +194,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             .config
             .log_name(&event)
             .map_err(|error| {
-                emit!(&crate::internal_events::TemplateRenderingError {
+                emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     field: Some("log_id"),
                     drop_event: true,

@@ -11,16 +11,13 @@ pub struct AwsKinesisFirehoseRequestReceived<'a> {
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         info!(
             message = "Handling AWS Kinesis Firehose request.",
             request_id = %self.request_id.unwrap_or_default(),
             source_arn = %self.source_arn.unwrap_or_default(),
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
     }
 }
@@ -43,7 +40,7 @@ impl<'a> AwsKinesisFirehoseRequestError<'a> {
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error occurred while handling request.",
             error = ?self.error,
@@ -53,13 +50,10 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             internal_log_rate_secs = 10,
             request_id = %self.request_id.unwrap_or(""),
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error_code" => self.error_code.clone(),
+            "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
         );
         // deprecated
@@ -74,7 +68,7 @@ pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
 }
 
 impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
             error = ?self.error,
@@ -84,9 +78,6 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             internal_log_rate_secs = 10,
             compression = %self.compression,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "automatic_record_decode",

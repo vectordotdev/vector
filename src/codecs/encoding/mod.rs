@@ -250,13 +250,13 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
         self.serializer
             .encode(item, &mut payload)
             .map_err(|error| {
-                emit!(&EncoderSerializeFailed { error: &error });
+                emit!(EncoderSerializeFailed { error: &error });
                 Error::SerializingError(error)
             })?;
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
-            emit!(&EncoderFramingFailed { error: &error });
+            emit!(EncoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
 

@@ -74,7 +74,7 @@ pub fn build_unix_stream_source(
 
             let stream = socket
                 .after_read(|byte_size| {
-                    emit!(&BytesReceived {
+                    emit!(BytesReceived {
                         protocol: "unix",
                         byte_size,
                     });
@@ -86,13 +86,12 @@ pub fn build_unix_stream_source(
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token =
-                        connection_open.open(|count| emit!(&ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
 
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((mut events, _byte_size)) => {
-                                emit!(&SocketEventsReceived {
+                                emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.size_of(),
                                     count: events.len(),
@@ -102,11 +101,11 @@ pub fn build_unix_stream_source(
 
                                 let count = events.len();
                                 if let Err(error) = out.send_batch(events).await {
-                                    emit!(&StreamClosedError { error, count });
+                                    emit!(StreamClosedError { error, count });
                                 }
                             }
                             Err(error) => {
-                                emit!(&UnixSocketError {
+                                emit!(UnixSocketError {
                                     error: &error,
                                     path: &listen_path
                                 });
@@ -139,7 +138,7 @@ pub fn build_unix_stream_source(
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteError {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });

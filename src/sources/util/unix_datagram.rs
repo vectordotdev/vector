@@ -39,7 +39,7 @@ pub fn build_unix_datagram_source(
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteError {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });
@@ -64,13 +64,13 @@ async fn listen(
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
                     let error = codecs::decoding::Error::FramingError(error.into());
-                    emit!(&SocketReceiveError {
+                    emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
                     })
                 })?;
 
-                emit!(&BytesReceived {
+                emit!(BytesReceived {
                     protocol: "unix",
                     byte_size,
                 });
@@ -91,7 +91,7 @@ async fn listen(
                 loop {
                     match stream.next().await {
                         Some(Ok((mut events, _byte_size))) => {
-                            emit!(&SocketEventsReceived {
+                            emit!(SocketEventsReceived {
                                 mode: SocketMode::Unix,
                                 byte_size: events.size_of(),
                                 count: events.len()
@@ -101,11 +101,11 @@ async fn listen(
 
                             let count = events.len();
                             if let Err(error) = out.send_batch(events).await {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                             }
                         },
                         Some(Err(error)) => {
-                            emit!(&SocketReceiveError {
+                            emit!(SocketReceiveError {
                                 mode: SocketMode::Unix,
                                 error: &error
                             });

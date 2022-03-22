@@ -12,11 +12,11 @@ use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{self, internal_event::EventsReceived};
 
-use super::events::*;
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, BatchStatus, Event},
+    internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError},
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     SourceSender,
@@ -95,7 +95,7 @@ impl SqsSource {
             let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
             for message in messages {
                 if let Some(body) = message.body {
-                    emit!(&AwsSqsBytesReceived {
+                    emit!(AwsSqsBytesReceived {
                         byte_size: body.len()
                     });
                     let timestamp = get_timestamp(&message.attributes);
@@ -158,7 +158,7 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(&SqsMessageDeleteError { error: &err });
+            emit!(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -192,7 +192,7 @@ fn decode_message(
                         .fold_finally(
                             0,
                             |size, event: &Event| size + event.size_of(),
-                            move |byte_size| emit!(&EventsReceived { byte_size, count }),
+                            move |byte_size| emit!(EventsReceived { byte_size, count }),
                         ),
                 )
             }

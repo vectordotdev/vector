@@ -8,17 +8,14 @@ pub struct AwsCloudwatchLogsSubscriptionParserError {
 }
 
 impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::PARSER_FAILED,
@@ -39,16 +36,13 @@ pub struct AwsCloudwatchLogsMessageSizeError {
 }
 
 impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Encoded event is too long: {} > {}", self.size, self.max_size),
             error_code = "message_too_long",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "message_too_long",
@@ -70,7 +64,7 @@ pub struct AwsCloudwatchLogsEncoderError {
 }
 
 impl InternalEvent for AwsCloudwatchLogsEncoderError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error when encoding event.",
             error = %self.error,
@@ -78,9 +72,6 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,

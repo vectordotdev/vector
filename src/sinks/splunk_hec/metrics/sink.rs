@@ -136,7 +136,7 @@ impl HecMetricsProcessedEventMetadata {
             MetricValue::Counter { value } => Some(value),
             MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(&SplunkInvalidMetricReceivedError {
+                emit!(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
                     error: "Metric kind not supported.".into(),
