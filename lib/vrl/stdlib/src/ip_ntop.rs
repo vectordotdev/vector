@@ -7,11 +7,11 @@ fn ip_ntop(value: Value) -> Resolved {
 
     match value.len() {
         4 => {
-            let bytes: [u8; 4] = value[..].try_into().unwrap();
+            let bytes: [u8; 4] = value[..].try_into().expect("invalid length");
             Ok(IpAddr::from(bytes).to_string().into())
         }
         16 => {
-            let bytes: [u8; 16] = value[..].try_into().unwrap();
+            let bytes: [u8; 16] = value[..].try_into().expect("invalid length");
             Ok(IpAddr::from(bytes).to_string().into())
         }
         _ => Err(r#""value" must be of length 4 or 16 bytes"#.into()),
