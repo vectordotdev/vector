@@ -640,6 +640,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-elasticsearch"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1175670b03cc9274afa47a5e240fba05f235f5991834b82fa71c35bbefb499e"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
+name = "aws-sdk-firehose"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ccd3f34a9a53ee3f27df785f67ca13545fb4d831c8a2f06c8af44113aef6796"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-kinesis"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6305,49 +6348,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusoto_es"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10c0918d84befe989cdbdffc0cf7742887eaf777655d45b767e4603d39245ff3"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_firehose"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77cd539a7f1916f3eee0ea5ed7ac5ede35a1b962db694cc1fafcb1ffa63b708"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_kinesis"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9060c90faec6784573af8379107ff26de934206231f4431dfa878382e5584e1b"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "rusoto_s3"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8563,6 +8563,8 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
+ "aws-sdk-elasticsearch",
+ "aws-sdk-firehose",
  "aws-sdk-kinesis",
  "aws-sdk-s3",
  "aws-sdk-sqs",
@@ -8666,9 +8668,6 @@ dependencies = [
  "roaring",
  "rusoto_core",
  "rusoto_credential",
- "rusoto_es",
- "rusoto_firehose",
- "rusoto_kinesis",
  "rusoto_s3",
  "rusoto_signature",
  "rusoto_sqs",

@@ -142,9 +142,6 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 # AWS - Rusoto
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
-rusoto_es = { version = "0.47.0", optional = true }
-rusoto_firehose = { version = "0.47.0", optional = true }
-rusoto_kinesis = { version = "0.47.0", optional = true }
 rusoto_s3 = { version = "0.47.0", optional = true }
 rusoto_signature = { version = "0.47.0", optional = true }
 rusoto_sqs = { version = "0.47.0", optional = true }
@@ -157,6 +154,8 @@ aws-sdk-s3 = { version = "0.9.0", optional = true }
 aws-sdk-sqs = { version = "0.9.0", optional = true }
 aws-sdk-cloudwatch = { version = "0.9.0", optional = true }
 aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true }
+aws-sdk-elasticsearch = {version = "0.9.0", optional = true }
+aws-sdk-firehose = { version = "0.9.0", optional = true }
 aws-sdk-kinesis = { version = "0.9.0", optional = true }
 aws-smithy-client = { version = "0.39.0", optional = true }
 aws-smithy-http = { version = "0.39.0", optional = true }
@@ -646,7 +645,7 @@ sinks-metrics = [
 
 sinks-aws_cloudwatch_logs = ["aws-core", "aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
-sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
+sinks-aws_kinesis_firehose = ["aws-core", "aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
@@ -745,7 +744,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "aws-sdk-elasticsearch", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
