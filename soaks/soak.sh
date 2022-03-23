@@ -20,6 +20,9 @@ display_usage() {
     echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
     echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
     echo "  --vector-cpus: the total number of CPUs to give to soaked vector, default 4"
+    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up, default 30"
+    echo "  --total-samples: the total number of samples to take from vector, default 200"
+    echo "  --replicas: the total number of replica experiments to run, default 3"
     echo ""
 }
 
@@ -27,8 +30,10 @@ BUILD_IMAGE="true"
 SOAK_CPUS="7"
 SOAK_MEMORY="8g"
 VECTOR_CPUS="4"
-WARMUP_SECONDS="30"
 SOAKS=""
+REPLICAS=3
+TOTAL_SAMPLES=200
+WARMUP_SECONDS=30
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -69,6 +74,21 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
+      --warmup-seconds)
+          WARMUP_SECONDS=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --total-samples)
+          TOTAL_SAMPLES=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --replicas)
+          REPLICAS=$(($2 - 1))
+          shift # past argument
+          shift # past value
+          ;;
       --help)
           display_usage
           exit 0
@@ -104,6 +124,8 @@ for SOAK_NAME in ${SOAKS}; do
                       --capture-dir "${capture_dir}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
+                      --replicas "${REPLICAS}" \
+                      --total-samples "${TOTAL_SAMPLES}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}" && \
     ./bin/soak_one.sh --build-image "${BUILD_IMAGE}" \
@@ -114,6 +136,8 @@ for SOAK_NAME in ${SOAKS}; do
                       --capture-dir "${capture_dir}" \
                       --cpus "${SOAK_CPUS}" \
                       --memory "${SOAK_MEMORY}" \
+                      --replicas "${REPLICAS}" \
+                      --total-samples "${TOTAL_SAMPLES}" \
                       --warmup-seconds "${WARMUP_SECONDS}" \
                       --vector-cpus "${VECTOR_CPUS}"
 done
