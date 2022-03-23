@@ -93,6 +93,7 @@ pub fn stop_buffering() {
     *early_buffer() = None;
 }
 
+/// Gets the current [`Span`].
 pub fn current_span() -> Span {
     Span::current()
 }
