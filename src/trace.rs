@@ -59,7 +59,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let subscriber = BroadcastSubscriber { subscriber };
-        subscriber.init()
+        let _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
             .with_ansi(color)
@@ -72,7 +72,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let subscriber = BroadcastSubscriber { subscriber };
-        subscriber.init()
+        let _ = subscriber.try_init();
     }
 }
 
