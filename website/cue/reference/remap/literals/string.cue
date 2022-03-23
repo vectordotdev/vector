@@ -19,7 +19,7 @@ remap: literals: string: {
 			"Hello, world! 🌎"
 			"""#,
 		#"""
-			"Hello, world! \\u1F30E"
+			"Hello, world! \u1F30E"
 			"""#,
 		#"""
 			"Hello, \
@@ -40,14 +40,14 @@ remap: literals: string: {
 				Special characters, such as newlines, can be expressed with a backslash escape.
 				"""
 			enum: {
-				"`\\u{7FFF}`": "24-bit Unicode character code (up to 6 digits)"
-				"`\\n`":       "Newline"
-				"`\\r`":       "Carriage return"
-				"`\\t`":       "Tab"
-				"`\\\\`":      "Backslash"
-				"`\\0`":       "Null"
-				"`\\\"`":      "Double quote"
-				"`\\'`":       "Single quote"
+				"\\u{7FFF}": "24-bit Unicode character code (up to 6 digits)"
+				"\\n":       "Newline"
+				"\\r":       "Carriage return"
+				"\\t":       "Tab"
+				"\\\\":      "Backslash"
+				"\\0":       "Null"
+				"\\\"":      "Double quote"
+				"\\'":       "Single quote"
 			}
 		}
 		multiline_strings: {

@@ -274,15 +274,15 @@ impl StringCollector {
     ) {
         match (tags, extra) {
             (None, None) => Ok(()),
-            (None, Some(tag)) => write!(result, "{{{}=\"{}\"}}", tag.0, tag.1),
+            (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
                     .iter()
-                    .map(|(name, value)| format!("{}=\"{}\"", name, value))
+                    .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
-                if let Some(tag) = tag {
-                    parts.push(format!("{}=\"{}\"", tag.0, tag.1));
+                if let Some((key, value)) = tag {
+                    parts.push(Self::format_tag(key, value))
                 }
 
                 parts.sort();
@@ -298,6 +298,23 @@ impl StringCollector {
             "# HELP {} {}\n# TYPE {} {}\n",
             fullname, name, fullname, r#type
         )
+    }
+
+    fn format_tag(key: &str, mut value: &str) -> String {
+        // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
+        let mut result = String::with_capacity(key.len() + value.len() + 3);
+        result.push_str(key);
+        result.push_str("=\"");
+        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+            result.push_str(&value[..i]);
+            result.push('\\');
+            // Ugly but works because we know the character at `i` is ASCII
+            result.push(value.as_bytes()[i] as char);
+            value = &value[i + 1..];
+        }
+        result.push_str(value);
+        result.push('"');
+        result
     }
 }
 
@@ -901,5 +918,32 @@ mod tests {
 
     fn timestamp() -> DateTime<Utc> {
         Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
+    }
+
+    #[test]
+    fn escapes_tags_text() {
+        let tags: BTreeMap<String, String> = [
+            ("code", "200"),
+            ("quoted", r#"host"1""#),
+            ("path", r#"c:\Windows"#),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
     }
 }

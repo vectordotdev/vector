@@ -7,7 +7,7 @@ pub struct ConsoleEventProcessed {
 }
 
 impl InternalEvent for ConsoleEventProcessed {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -18,15 +18,12 @@ pub struct ConsoleFieldNotFound<'a> {
 }
 
 impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(
             message = "Field not found; dropping event.",
             missing_field = ?self.missing_field,
             internal_log_rate_secs = 30,
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!("processing_errors_total", 1, "error_type" => "field_not_found");
     }
 }

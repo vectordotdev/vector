@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     future::ready,
+    num::NonZeroUsize,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -48,6 +49,8 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
 pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+
+pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -299,7 +302,8 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) =
+            TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -383,7 +387,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(&EventsReceived {
+                        emit!(EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
                         })
@@ -574,7 +578,7 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: events.len(),
             byte_size: events.size_of(),
         });
@@ -682,7 +686,7 @@ fn build_task_transform(
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
         .inspect(|events| {
-            emit!(&EventsReceived {
+            emit!(EventsReceived {
                 count: events.len(),
                 byte_size: events.size_of(),
             })
@@ -690,7 +694,7 @@ fn build_task_transform(
     let stream = t
         .transform(Box::pin(filtered))
         .inspect(|events: &EventArray| {
-            emit!(&EventsSent {
+            emit!(EventsSent {
                 count: events.len(),
                 byte_size: events.size_of(),
                 output: None,

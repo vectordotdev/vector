@@ -91,7 +91,7 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else if self.last_emission.elapsed() >= self.emissions_max_delay {
-            emit!(&FilterEventDiscarded {
+            emit!(FilterEventDiscarded {
                 total: self.emissions_deferred,
             });
             self.emissions_deferred = 0;

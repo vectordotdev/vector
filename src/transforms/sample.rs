@@ -138,7 +138,7 @@ impl FunctionTransform for Sample {
                 .insert("sample_rate", self.rate.to_string());
             output.push(event);
         } else {
-            emit!(&SampleEventDiscarded);
+            emit!(SampleEventDiscarded);
         }
     }
 }
@@ -159,6 +159,7 @@ mod tests {
     fn condition_contains(key: &str, needle: &str) -> Condition {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+            runtime: Default::default(),
         }
         .build(&Default::default())
         .unwrap()

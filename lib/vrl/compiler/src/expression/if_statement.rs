@@ -53,9 +53,13 @@ impl Expression for IfStatement {
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         // Write the predicate which will leave the result on the stack.
-        self.predicate.compile_to_vm(vm)?;
+        self.predicate.compile_to_vm(vm, state)?;
 
         // If the value is false, we want to jump to the alternative block.
         // We need to store this jump as it will need updating when we know where
@@ -64,7 +68,7 @@ impl Expression for IfStatement {
         vm.write_opcode(OpCode::Pop);
 
         // Write the consequent block.
-        self.consequent.compile_to_vm(vm)?;
+        self.consequent.compile_to_vm(vm, state)?;
 
         // After the consequent block we want to jump over the alternative.
         let continue_jump = vm.emit_jump(OpCode::Jump);
@@ -75,7 +79,7 @@ impl Expression for IfStatement {
 
         if let Some(alternative) = &self.alternative {
             // Write the alternative block.
-            alternative.compile_to_vm(vm)?;
+            alternative.compile_to_vm(vm, state)?;
         } else {
             // No alternative resolves to Null.
             let null = vm.add_constant(Value::Null);

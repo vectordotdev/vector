@@ -247,13 +247,13 @@ impl VrlRunner for AstRunner {
 
 impl Remap<VmRunner> {
     pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, _) = config.compile_vrl_program(
+        let (program, functions, state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
         let runtime = Runtime::default();
-        let vm = runtime.compile(functions, &program)?;
+        let vm = runtime.compile(functions, &program, state)?;
         let runner = VmRunner {
             runtime,
             vm: Arc::new(vm),
@@ -409,14 +409,14 @@ where
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
-                        emit!(&RemapMappingAbort {
+                        emit!(RemapMappingAbort {
                             event_dropped: self.drop_on_abort,
                         });
 
                         ("abort", error, self.drop_on_abort)
                     }
                     Terminate::Error(error) => {
-                        emit!(&RemapMappingError {
+                        emit!(RemapMappingError {
                             error: error.to_string(),
                             event_dropped: self.drop_on_error,
                         });

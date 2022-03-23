@@ -84,14 +84,14 @@ where
             let stream = match invocation_result {
                 Ok(val) => val,
                 Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(&internal_events::InvocationDesyncReceived { error: source });
+                    emit!(internal_events::InvocationDesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
                     self.resource_version.reset();
                     self.state_writer.resync().await;
                     continue;
                 }
                 Err(watcher::invocation::Error::Recoverable { source }) => {
-                    emit!(&internal_events::InvocationHttpErrorReceived { error: source });
+                    emit!(internal_events::InvocationHttpErrorReceived { error: source });
                     continue;
                 }
                 Err(watcher::invocation::Error::Other { source }) => {
@@ -127,7 +127,7 @@ where
                         // We got a stream-level desync error, abort the stream
                         // and handle the desync.
                         Err(watcher::stream::Error::Desync { source }) => {
-                            emit!(&internal_events::StreamDesyncReceived { error: source });
+                            emit!(internal_events::StreamDesyncReceived { error: source });
                             // We got desynced, reset the state and retry fetching.
                             self.resource_version.reset();
                             self.state_writer.resync().await;
@@ -135,7 +135,7 @@ where
                         }
                         // We have an error, attempt to recover from this error and continue the outer loop.
                         Err(watcher::stream::Error::Recoverable { source }) => {
-                            emit!(&internal_events::InvocationHttpErrorReceived { error: source });
+                            emit!(internal_events::InvocationHttpErrorReceived { error: source });
                             continue 'outer;
                         }
                         // A fine watch response arrived, we just pass it down.

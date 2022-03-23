@@ -40,15 +40,15 @@ where
                 }
                 self.acker.ack(1);
 
-                emit!(&ConsoleEventProcessed {
+                emit!(ConsoleEventProcessed {
                     byte_size: buf.len(),
                 });
-                emit!(&EventsSent {
+                emit!(EventsSent {
                     byte_size: event_byte_size,
                     count: 1,
                     output: None,
                 });
-                emit!(&BytesSent {
+                emit!(BytesSent {
                     byte_size: buf.len(),
                     protocol: "console"
                 });

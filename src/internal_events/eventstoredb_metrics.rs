@@ -9,11 +9,8 @@ pub struct EventStoreDbMetricsEventsReceived {
 }
 
 impl InternalEvent for EventStoreDbMetricsEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
@@ -31,16 +28,13 @@ pub struct EventStoreDbMetricsHttpError {
 }
 
 impl InternalEvent for EventStoreDbMetricsHttpError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP request processing error.",
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
@@ -58,20 +52,16 @@ pub struct EventStoreDbStatsParsingError {
 }
 
 impl InternalEvent for EventStoreDbStatsParsingError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "JSON parsing error.",
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
-            "error" => self.error.to_string(),
             "error_type" => error_type::PARSER_FAILED,
         );
         // deprecated

@@ -195,7 +195,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(&ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -244,7 +244,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(&TcpSocketTlsConnectionError { error });
+                emit!(TcpSocketTlsConnectionError { error });
                 return;
             }
         },
@@ -266,7 +266,7 @@ async fn handle_stream<T>(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(&TcpBytesReceived {
+        emit!(TcpBytesReceived {
             byte_size,
             peer_addr
         });
@@ -316,9 +316,7 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
-                        info!("Got {} events at source!", count);
-
-                        emit!(&SocketEventsReceived {
+                        emit!(SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.size_of(),
                             count,
@@ -362,7 +360,7 @@ async fn handle_stream<T>(
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
-                                        emit!(&TcpSendAckError{ error });
+                                        emit!(TcpSendAckError{ error });
                                         break;
                                     }
                                 }
@@ -371,7 +369,7 @@ async fn handle_stream<T>(
                                 }
                             }
                             Err(error) => {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                                 break;
                             }
                         }

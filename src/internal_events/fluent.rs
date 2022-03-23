@@ -11,11 +11,8 @@ pub struct FluentMessageReceived {
 }
 
 impl InternalEvent for FluentMessageReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
@@ -29,11 +26,8 @@ pub struct FluentMessageDecodeError<'a> {
 }
 
 impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Error decoding fluent message.", error = ?self.error, base64_encoded_message = %self.base64_encoded_message, internal_log_rate_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
         counter!("decode_errors_total", 1);
     }
 }

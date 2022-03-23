@@ -54,7 +54,7 @@ where
 
 async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
     if !log.contains("title") {
-        emit!(&ParserMissingFieldError { field: "title" });
+        emit!(ParserMissingFieldError { field: "title" });
         return None;
     }
 
@@ -64,7 +64,7 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
         if let Some(message) = log.remove(log_schema.message_key()) {
             log.insert("text", message);
         } else {
-            emit!(&ParserMissingFieldError {
+            emit!(ParserMissingFieldError {
                 field: log_schema.message_key()
             });
             return None;

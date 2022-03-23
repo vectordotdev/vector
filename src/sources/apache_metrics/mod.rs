@@ -180,14 +180,14 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(&ApacheMetricsRequestCompleted {
+                                emit!(ApacheMetricsRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
 
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(&HttpClientBytesReceived {
+                                emit!(HttpClientBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,
@@ -212,7 +212,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(&ApacheMetricsParseError {
+                                            emit!(ApacheMetricsParseError {
                                                 error: e,
                                                 endpoint: &sanitized_url,
                                             });
@@ -221,7 +221,7 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(&ApacheMetricsEventsReceived {
+                                emit!(ApacheMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
@@ -229,7 +229,7 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(&ApacheMetricsResponseError {
+                                emit!(ApacheMetricsResponseError {
                                     code: header.status,
                                     endpoint: &sanitized_url,
                                 });
@@ -243,7 +243,7 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(&ApacheMetricsHttpError {
+                                emit!(ApacheMetricsHttpError {
                                     error,
                                     endpoint: &sanitized_url
                                 });

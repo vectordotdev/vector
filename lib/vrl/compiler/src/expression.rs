@@ -56,7 +56,11 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
     /// Compile the expression to bytecode that can be interpreted by the VM.
-    fn compile_to_vm(&self, _vm: &mut vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        _vm: &mut vm::Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         Ok(())
     }
 
@@ -129,6 +133,51 @@ impl Expr {
             Abort(..) => "abort operation",
         }
     }
+
+    pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
+        let literal = match self {
+            Expr::Literal(literal) => Ok(literal.clone()),
+            Expr::Variable(var) if var.value().is_some() => {
+                match var.value().unwrap().clone().into() {
+                    Expr::Literal(literal) => Ok(literal),
+                    expr => Err(super::function::Error::UnexpectedExpression {
+                        keyword,
+                        expected: "literal",
+                        expr,
+                    }),
+                }
+            }
+            expr => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: expr.clone(),
+            }),
+        }?;
+
+        match literal.as_value() {
+            Some(value) => Ok(value),
+            None => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: self.clone(),
+            }),
+        }
+    }
+
+    pub fn as_enum(
+        &self,
+        keyword: &'static str,
+        variants: Vec<Value>,
+    ) -> Result<Value, super::function::Error> {
+        let value = self.as_literal(keyword)?;
+        variants.iter().find(|v| **v == value).cloned().ok_or(
+            super::function::Error::InvalidEnumVariant {
+                keyword,
+                value,
+                variants,
+            },
+        )
+    }
 }
 
 impl Expression for Expr {
@@ -186,22 +235,26 @@ impl Expression for Expr {
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         use Expr::*;
 
         // Pass the call on to the contained expression.
         match self {
-            Literal(v) => v.compile_to_vm(vm),
-            Container(v) => v.compile_to_vm(vm),
-            IfStatement(v) => v.compile_to_vm(vm),
-            Op(v) => v.compile_to_vm(vm),
-            Assignment(v) => v.compile_to_vm(vm),
-            Query(v) => v.compile_to_vm(vm),
-            FunctionCall(v) => v.compile_to_vm(vm),
-            Variable(v) => v.compile_to_vm(vm),
-            Noop(v) => v.compile_to_vm(vm),
-            Unary(v) => v.compile_to_vm(vm),
-            Abort(v) => v.compile_to_vm(vm),
+            Literal(v) => v.compile_to_vm(vm, state),
+            Container(v) => v.compile_to_vm(vm, state),
+            IfStatement(v) => v.compile_to_vm(vm, state),
+            Op(v) => v.compile_to_vm(vm, state),
+            Assignment(v) => v.compile_to_vm(vm, state),
+            Query(v) => v.compile_to_vm(vm, state),
+            FunctionCall(v) => v.compile_to_vm(vm, state),
+            Variable(v) => v.compile_to_vm(vm, state),
+            Noop(v) => v.compile_to_vm(vm, state),
+            Unary(v) => v.compile_to_vm(vm, state),
+            Abort(v) => v.compile_to_vm(vm, state),
         }
     }
 }

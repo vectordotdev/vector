@@ -5,6 +5,32 @@ use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use vrl::prelude::*;
 
+fn parse_duration(bytes: Value, unit: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let value = String::from_utf8_lossy(&bytes);
+    let conversion_factor = {
+        let bytes = unit.try_bytes()?;
+        let string = String::from_utf8_lossy(&bytes);
+
+        UNITS
+            .get(string.as_ref())
+            .ok_or(format!("unknown unit format: '{}'", string))?
+    };
+    let captures = RE
+        .captures(&value)
+        .ok_or(format!("unable to parse duration: '{}'", value))?;
+    let value = Decimal::from_str(&captures["value"])
+        .map_err(|error| format!("unable to parse number: {}", error))?;
+    let unit = UNITS
+        .get(&captures["unit"])
+        .ok_or(format!("unknown duration unit: '{}'", &captures["unit"]))?;
+    let number = value * unit / conversion_factor;
+    let number = number
+        .to_f64()
+        .ok_or(format!("unable to format duration: '{}'", number))?;
+    Ok(Value::from_f64_or_zero(number))
+}
+
 static RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"(?ix)                        # i: case-insensitive, x: ignore whitespace + comments
@@ -77,6 +103,13 @@ impl Function for ParseDuration {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let unit = args.required("unit");
+
+        parse_duration(value, unit)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,35 +120,10 @@ struct ParseDurationFn {
 
 impl Expression for ParseDurationFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
+        let bytes = self.value.resolve(ctx)?;
+        let unit = self.unit.resolve(ctx)?;
 
-        let conversion_factor = {
-            let bytes = self.unit.resolve(ctx)?.try_bytes()?;
-            let string = String::from_utf8_lossy(&bytes);
-
-            UNITS
-                .get(string.as_ref())
-                .ok_or(format!("unknown unit format: '{}'", string))?
-        };
-
-        let captures = RE
-            .captures(&value)
-            .ok_or(format!("unable to parse duration: '{}'", value))?;
-
-        let value = Decimal::from_str(&captures["value"])
-            .map_err(|error| format!("unable to parse number: {}", error))?;
-
-        let unit = UNITS
-            .get(&captures["unit"])
-            .ok_or(format!("unknown duration unit: '{}'", &captures["unit"]))?;
-
-        let number = value * unit / conversion_factor;
-        let number = number
-            .to_f64()
-            .ok_or(format!("unable to format duration: '{}'", number))?;
-
-        Ok(Value::from_f64_or_zero(number))
+        parse_duration(bytes, unit)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

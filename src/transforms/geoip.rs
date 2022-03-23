@@ -179,14 +179,14 @@ impl FunctionTransform for Geoip {
                     }
                 }
                 Err(error) => {
-                    emit!(&GeoipIpAddressParseError {
+                    emit!(GeoipIpAddressParseError {
                         error,
                         address: ipaddress
                     });
                 }
             }
         } else {
-            emit!(&ParserMissingFieldError {
+            emit!(ParserMissingFieldError {
                 field: &self.source
             });
         };

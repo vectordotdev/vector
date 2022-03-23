@@ -319,6 +319,7 @@ impl Sender {
 #[cfg(test)]
 mod tests {
     use std::mem;
+    use std::num::NonZeroUsize;
 
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
@@ -339,7 +340,11 @@ mod tests {
     async fn build_sender_pair(
         capacity: usize,
     ) -> (BufferSender<EventArray>, BufferReceiver<EventArray>) {
-        TopologyBuilder::standalone_memory(capacity, WhenFull::Block).await
+        TopologyBuilder::standalone_memory(
+            NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+            WhenFull::Block,
+        )
+        .await
     }
 
     async fn build_sender_pairs(

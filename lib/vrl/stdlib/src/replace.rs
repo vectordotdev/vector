@@ -1,5 +1,43 @@
 use vrl::prelude::*;
 
+fn replace(value: Value, with_value: Value, count: Value, pattern: Value) -> Resolved {
+    let value = value.try_bytes_utf8_lossy()?;
+    let with = with_value.try_bytes_utf8_lossy()?;
+    let count = count.try_integer()?;
+    match pattern {
+        Value::Bytes(bytes) => {
+            let pattern = String::from_utf8_lossy(&bytes);
+            let replaced = match count {
+                i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
+                i if i < 0 => value.replace(pattern.as_ref(), &with),
+                _ => value.into_owned(),
+            };
+
+            Ok(replaced.into())
+        }
+        Value::Regex(regex) => {
+            let replaced = match count {
+                i if i > 0 => Bytes::copy_from_slice(
+                    regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
+                )
+                .into(),
+                i if i < 0 => {
+                    Bytes::copy_from_slice(regex.replace_all(&value, with.as_ref()).as_bytes())
+                        .into()
+                }
+                _ => value.into(),
+            };
+
+            Ok(replaced)
+        }
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::regex() | Kind::bytes(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Replace;
 
@@ -76,6 +114,15 @@ impl Function for Replace {
             count,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let pattern = args.required("pattern");
+        let with = args.required("with");
+        let count = args.optional("count").unwrap_or(value!(-1));
+
+        replace(value, with, count, pattern)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -89,45 +136,11 @@ struct ReplaceFn {
 impl Expression for ReplaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let value = value.try_bytes_utf8_lossy()?;
-
         let with_value = self.with.resolve(ctx)?;
-        let with = with_value.try_bytes_utf8_lossy()?;
+        let count = self.count.resolve(ctx)?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        let count = self.count.resolve(ctx)?.try_integer()?;
-
-        self.pattern.resolve(ctx).and_then(|pattern| match pattern {
-            Value::Bytes(bytes) => {
-                let pattern = String::from_utf8_lossy(&bytes);
-                let replaced = match count {
-                    i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
-                    i if i < 0 => value.replace(pattern.as_ref(), &with),
-                    _ => value.into_owned(),
-                };
-
-                Ok(replaced.into())
-            }
-            Value::Regex(regex) => {
-                let replaced = match count {
-                    i if i > 0 => Bytes::copy_from_slice(
-                        regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
-                    )
-                    .into(),
-                    i if i < 0 => {
-                        Bytes::copy_from_slice(regex.replace_all(&value, with.as_ref()).as_bytes())
-                            .into()
-                    }
-                    _ => value.into(),
-                };
-
-                Ok(replaced)
-            }
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::regex() | Kind::bytes(),
-            }
-            .into()),
-        })
+        replace(value, with_value, count, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

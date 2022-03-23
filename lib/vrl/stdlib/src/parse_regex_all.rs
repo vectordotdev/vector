@@ -3,11 +3,7 @@ use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
-fn parse_regex_all(
-    value: Value,
-    numeric_groups: bool,
-    pattern: &Regex,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     Ok(pattern
@@ -96,7 +92,7 @@ impl Function for ParseRegexAll {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -119,11 +115,7 @@ impl Function for ParseRegexAll {
         }
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let pattern = args
             .required_any("pattern")
             .downcast_ref::<regex::Regex>()

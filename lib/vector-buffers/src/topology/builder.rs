@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
@@ -207,7 +207,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     pub async fn standalone_memory(
-        max_events: usize,
+        max_events: NonZeroUsize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop(when_full);
@@ -243,7 +243,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     #[cfg(test)]
     pub async fn standalone_memory_test(
-        max_events: usize,
+        max_events: NonZeroUsize,
         when_full: WhenFull,
         usage_handle: BufferUsageHandle,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
@@ -284,10 +284,15 @@ mod tests {
         WhenFull,
     };
 
+    use std::num::NonZeroUsize;
+
     #[tokio::test]
     async fn single_stage_topology_block() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
         let result = builder.build(Span::none()).await;
         assert!(result.is_ok());
 
@@ -298,7 +303,10 @@ mod tests {
     #[tokio::test]
     async fn single_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropNewest,
+        );
         let result = builder.build(Span::none()).await;
         assert!(result.is_ok());
 
@@ -309,7 +317,10 @@ mod tests {
     #[tokio::test]
     async fn single_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Overflow,
+        );
         let result = builder.build(Span::none()).await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
@@ -320,8 +331,14 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_block() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
         let result = builder.build(Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
@@ -332,8 +349,14 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropNewest,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
         let result = builder.build(Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
@@ -344,8 +367,14 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Overflow,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
 
         let result = builder.build(Span::none()).await;
         assert!(result.is_ok());
