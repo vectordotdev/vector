@@ -146,7 +146,7 @@ impl ElasticsearchCommon {
         if let Some(credentials_provider) = &self.aws_auth {
             sign_request(&mut request, credentials_provider, &self.region).await?;
         }
-        let response = client.send(request.map(|x| hyper::Body::from(x))).await?;
+        let response = client.send(request.map(hyper::Body::from)).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),

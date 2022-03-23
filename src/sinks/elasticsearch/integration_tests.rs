@@ -1,5 +1,3 @@
-use aws_sigv4::http_request::SignableRequest;
-use aws_sigv4::SigningParams;
 use aws_smithy_http::body::SdkBody;
 use bytes::Bytes;
 use std::{fs::File, io::Read};
@@ -7,7 +5,6 @@ use std::{fs::File, io::Read};
 use chrono::Utc;
 use futures::StreamExt;
 use http::{Request, StatusCode};
-use hyper::Body;
 use serde_json::{json, Value};
 use vector_core::{
     config::log_schema,
@@ -80,7 +77,7 @@ impl ElasticsearchCommon {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(self.tls_settings.clone(), &proxy)
             .expect("Could not build client to flush");
-        let response = client.send(request.map(|body| SdkBody::from(body))).await?;
+        let response = client.send(request.map(SdkBody::from)).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),
