@@ -42,11 +42,6 @@ multiple sinks, by enabling this global config, all sources with acknowledgement
 support will wait before responding for acknowledgement from all the sinks that
 its events flow through.
 
-If any sink rejects a message, that failure marks the batch that the message is
-part of as _failed_, and the source will respond accordingly. For example, HTTP sources
-will produce some 400 error code, while sources like Kafka that don't handle
-rejection behaves similarly to a positive acknowledgement.
-
 But you can enable acknowledgements individually for each sink if you want more granular
 control over how acknowledgements for specific cases (e.g. you're buffering your
 data). When you enable `acknowledgements` for a supported sink, all sources connected
@@ -60,15 +55,20 @@ doing the following:
    acknowledgements.enabled = true
 ```
 
+To note, if any sink rejects a message, that failure marks the batch that the message is
+part of as _failed_, and the source will respond accordingly. For example, HTTP sources
+will produce some 400 error code, while sources like Kafka that don't have protocol
+support for rejecting messages behaves similarly to a positive acknowledgement.
+
 ## Edge cases
 
 Unsurprisingly, there are a few exceptions and edge cases for the end-to-end
 acknowledgement feature.
 
-First, as alluded to earlier, not all sources and sinks are supported. We are, of
-course, working to add support for more sources and sinks, but support for some
-sources and sinks will always be unable because they cannot provide acknowledgements
-at the protocol level.
+First, as alluded to earlier, not all sources and sinks are supported because some
+sources and sinks cannot provide acknowledgements at the protocol level. That said,
+we've yet to add support for all sources and sinks that support acknowledgements
+at the protocol level so we'll be adding that overtime.
 
 Sources that don't support acknowledgements will output a
 warning message to let you know if you try to enable acknowledgements, while sinks
@@ -80,11 +80,11 @@ Second, when buffering your observability data in a disk, the behavior of end-to
 acknowledgement is a little different. When an event is persisted in a disk buffer,
 the event will be marked as acknowledged to the source.
 
-Third, the final edge case is if you are using any user-space transforms, such
+Similarly, the final edge case is if you are using any user-space transforms, such
 as Lua. Because user-space transforms can drop, combine, split, or create events
 that may have no relation to the source event, tracking whether an event has been
 successfully delivered gets extremely complex. As such, end-to-end acknowledgement
-behavior will be put in the hands of script writers.
+is not supported.
 
 ## Parting thoughts
 
