@@ -18,12 +18,13 @@ use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
-    runtime::{reflector, watcher},
+    runtime::{
+        reflector::{self},
+        watcher,
+    },
     Client, Config as ClientConfig,
 };
 use serde::{Deserialize, Serialize};
-use tokio::pin;
-use tokio_util::time::DelayQueue;
 use vector_common::TimeZone;
 use vector_core::ByteSizeOf;
 
@@ -38,6 +39,7 @@ use crate::{
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
+    kubernetes::handle_watch_stream,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer, TaskTransform},
@@ -312,73 +314,19 @@ impl Source {
                 ..Default::default()
             },
         );
-        let mut pod_store_w = reflector::store::Writer::default();
+        let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
-        tokio::spawn(async move {
-            pin!(pod_watcher);
-            let mut delay_queue = DelayQueue::default();
-            loop {
-                tokio::select! {
-                    Some(Ok(event)) = pod_watcher.next() => {
-                        match event {
-                            watcher::Event::Applied(_) => {
-                                // Immediately apply event
-                                pod_store_w.apply_watcher_event(&event);
-                            }
-                            watcher::Event::Deleted(_) => {
-                                // Delay reconciling any `Deleted` events
-                                delay_queue.insert(event.to_owned(), delay_deletion);
-                            }
-                            watcher::Event::Restarted(_) => {
-                                // Clear all delayed events when the cache is refreshed
-                                delay_queue.clear();
-                                pod_store_w.apply_watcher_event(&event);
-                            }
-                        }
-                    }
-                    Some(Ok(event)) = delay_queue.next() => {
-                        pod_store_w.apply_watcher_event(&event.into_inner())
-                    }
-                }
-            }
-        });
+        tokio::spawn(async move { handle_watch_stream(pod_store_w, pod_watcher, delay_deletion) });
 
         // -----------------------------------------------------------------
 
         let namespaces = Api::<Namespace>::all(client);
         let ns_watcher = watcher(namespaces, ListParams::default());
-        let mut ns_store_w = reflector::store::Writer::default();
+        let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
-        tokio::spawn(async move {
-            pin!(ns_watcher);
-            let mut delay_queue = DelayQueue::default();
-            loop {
-                tokio::select! {
-                    Some(Ok(event)) = ns_watcher.next() => {
-                        match event {
-                            watcher::Event::Applied(_) => {
-                                // Immediately apply event
-                                ns_store_w.apply_watcher_event(&event);
-                            }
-                            watcher::Event::Deleted(_) => {
-                                // Delay reconciling any `Deleted` events
-                                delay_queue.insert(event.to_owned(), delay_deletion);
-                            }
-                            watcher::Event::Restarted(_) => {
-                                // Clear all delayed events when the cache is refreshed
-                                delay_queue.clear();
-                                ns_store_w.apply_watcher_event(&event);
-                            }
-                        }
-                    }
-                    Some(Ok(event)) = delay_queue.next() => {
-                        ns_store_w.apply_watcher_event(&event.into_inner())
-                    }
-                }
-            }
-        });
+        tokio::spawn(async move { handle_watch_stream(ns_store_w, ns_watcher, delay_deletion) });
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
