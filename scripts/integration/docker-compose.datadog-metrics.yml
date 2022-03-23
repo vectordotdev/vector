@@ -1,0 +1,34 @@
+version: "3"
+
+services:
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "datadog-metrics-integration-tests"
+      - "--lib"
+      - "::datadog::metrics::"
+      - "--"
+      - "--nocapture"
+    environment:
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - TEST_DATADOG_API_KEY
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+volumes:
+  cargogit: {}
+  cargoregistry: {}

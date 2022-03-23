@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
@@ -9,9 +11,12 @@ use nom::{
     sequence::{preceded, separated_pair, terminated, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
-use std::num::ParseIntError;
-use vrl::prelude::*;
-use vrl::Value;
+use vrl::{prelude::*, Value};
+
+fn parse_ruby_hash(value: Value) -> Resolved {
+    let input = value.try_bytes_utf8_lossy()?;
+    parse(&input)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;
@@ -41,7 +46,7 @@ impl Function for ParseRubyHash {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -55,6 +60,11 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_ruby_hash(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,23 +75,21 @@ struct ParseRubyHashFn {
 impl Expression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let input = value.try_bytes_utf8_lossy()?;
-        parse(&input)
+        parse_ruby_hash(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        type_def()
+        TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }
 
-fn kinds() -> Kind {
-    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Object
-}
-
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .add_object::<(), Kind>(map! { (): kinds() })
+fn inner_kinds() -> Kind {
+    Kind::null()
+        | Kind::bytes()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
@@ -400,7 +408,7 @@ mod tests {
                     testBool: true
                 }
             })),
-            tdef: type_def(),
+            tdef: TypeDef::object(Collection::from_unknown(inner_kinds())).fallible(),
         }
     ];
 }

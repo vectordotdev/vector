@@ -1,5 +1,6 @@
-use crate::DiagnosticList;
 use std::fmt;
+
+use crate::DiagnosticList;
 
 /// A formatter to display diagnostics tied to a given source.
 pub struct Formatter<'a> {
@@ -29,9 +30,9 @@ impl<'a> Formatter<'a> {
 
 impl<'a> fmt::Display for Formatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use codespan_reporting::files::SimpleFile;
-        use codespan_reporting::term;
         use std::str::from_utf8;
+
+        use codespan_reporting::{files::SimpleFile, term};
         use termcolor::Buffer;
 
         let file = SimpleFile::new("", self.source);

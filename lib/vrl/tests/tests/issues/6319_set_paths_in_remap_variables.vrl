@@ -1,4 +1,4 @@
-# issue: https://github.com/timberio/vector/issues/6319
+# issue: https://github.com/vectordotdev/vector/issues/6319
 # result: ["", "bar"]
 
 message_lines = ["foo", "bar"]

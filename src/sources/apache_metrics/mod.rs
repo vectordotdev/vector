@@ -1,28 +1,31 @@
+use std::{
+    collections::BTreeMap,
+    future::ready,
+    time::{Duration, Instant},
+};
+
+use chrono::Utc;
+use futures::{stream, FutureExt, StreamExt, TryFutureExt};
+use http::uri::Scheme;
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
+
 use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
         ApacheMetricsRequestCompleted, ApacheMetricsResponseError, HttpClientBytesReceived,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    SourceSender,
 };
-use chrono::Utc;
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use http::uri::Scheme;
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
-use std::{
-    collections::BTreeMap,
-    future::ready,
-    time::{Duration, Instant},
-};
-use tokio_stream::wrappers::IntervalStream;
-use vector_core::ByteSizeOf;
 
 mod parser;
 
@@ -69,7 +72,7 @@ impl SourceConfig for ApacheMetricsConfig {
             .iter()
             .map(|endpoint| endpoint.parse::<http::Uri>())
             .collect::<Result<Vec<_>, _>>()
-            .context(super::UriParseError)?;
+            .context(super::UriParseSnafu)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
@@ -83,12 +86,16 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         "apache_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -139,13 +146,11 @@ fn apache_metrics(
     interval: u64,
     namespace: Option<String>,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
-    Box::pin(
-        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+    Box::pin(async move {
+        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -175,14 +180,14 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(&ApacheMetricsRequestCompleted {
+                                emit!(ApacheMetricsRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
 
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(&HttpClientBytesReceived {
+                                emit!(HttpClientBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,
@@ -207,7 +212,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(&ApacheMetricsParseError {
+                                            emit!(ApacheMetricsParseError {
                                                 error: e,
                                                 endpoint: &sanitized_url,
                                             });
@@ -216,74 +221,80 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(&ApacheMetricsEventsReceived {
+                                emit!(ApacheMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
-                                Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(&ApacheMetricsResponseError {
+                                emit!(ApacheMetricsResponseError {
                                     code: header.status,
                                     endpoint: &sanitized_url,
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 1.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric)
-                                    .map(Ok),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 1.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(&ApacheMetricsHttpError {
+                                emit!(ApacheMetricsHttpError {
                                     error,
                                     endpoint: &sanitized_url
                                 });
-                                Some(
-                                    stream::iter(vec![Metric::new(
-                                        "up",
-                                        MetricKind::Absolute,
-                                        MetricValue::Gauge { value: 0.0 },
-                                    )
-                                    .with_namespace(namespace.clone())
-                                    .with_tags(Some(tags.clone()))
-                                    .with_timestamp(Some(Utc::now()))])
-                                    .map(Event::Metric)
-                                    .map(Ok),
+                                Some(stream::iter(vec![Metric::new(
+                                    "up",
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 0.0 },
                                 )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now()))]))
                             }
                         })
                     })
                     .flatten()
             })
             .flatten()
-            .forward(out)
-            .inspect(|_| info!("Finished sending.")),
-    )
+            .boxed();
+
+        match out.send_event_stream(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Error sending metric.", %error);
+                Err(())
+            }
+        }
+    })
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        config::SourceConfig,
-        test_util::components::{self, HTTP_PULL_SOURCE_TAGS, SOURCE_TESTS},
-        test_util::{collect_ready, next_addr, wait_for_tcp},
-        Error,
-    };
     use hyper::{
         service::{make_service_fn, service_fn},
-        {Body, Response, Server},
+        Body, Response, Server,
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{sleep, Duration};
+
+    use super::*;
+    use crate::{
+        config::SourceConfig,
+        test_util::{
+            collect_ready,
+            components::{self, HTTP_PULL_SOURCE_TAGS, SOURCE_TESTS},
+            next_addr, wait_for_tcp,
+        },
+        Error,
+    };
 
     #[test]
     fn generate_config() {
@@ -347,7 +358,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         components::init_test();
         let source = ApacheMetricsConfig {
@@ -355,7 +366,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -380,7 +391,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                             tags.get("endpoint"),
                             Some(&format!("http://{}/metrics", in_addr))
                         );
-                        assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }
@@ -411,14 +422,14 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -445,14 +456,14 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // will have nothing bound
         let in_addr = next_addr();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(SourceContext::new_test(tx))
+        .build(SourceContext::new_test(tx, None))
         .await
         .unwrap();
         tokio::spawn(source);

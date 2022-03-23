@@ -1,5 +1,8 @@
+{{ $algoliaThemeCssUrl := printf "https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-%s" site.Params.search.algolia_autocomplete_theme }}
+@import url({{ $algoliaThemeCssUrl }})
 @import toc
 @import syntax
+@import marketo
 
 // SVG-specific variables
 $svg-gray: #001b3d

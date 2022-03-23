@@ -1,61 +1,55 @@
-use crate::config::log_schema;
-use crate::config::{DataType, SinkConfig, SinkContext};
-use crate::event::{EventRef, LogEvent, Value};
-use crate::http::HttpClient;
-use crate::internal_events::TemplateRenderingFailed;
-use crate::rusoto::RegionOrEndpoint;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
-use crate::sinks::elasticsearch::sink::ElasticSearchSink;
-use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
-use crate::sinks::elasticsearch::{
-    ElasticSearchAuth, ElasticSearchCommon, ElasticSearchCommonMode, ElasticSearchMode,
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
 };
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::http::RequestConfig;
-use crate::sinks::util::{
-    BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
-};
-use crate::sinks::{Healthcheck, VectorSink};
-use crate::template::Template;
-use crate::tls::TlsOptions;
-use crate::transforms::metric_to_log::MetricToLogConfig;
+
 use futures::FutureExt;
-use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
-use vector_core::stream::BatcherSettings;
-
-use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
-use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
-use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
-use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
+
+use crate::{
+    aws::rusoto::RegionOrEndpoint,
+    config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    event::{EventRef, LogEvent, Value},
+    http::HttpClient,
+    internal_events::TemplateRenderingError,
+    sinks::{
+        elasticsearch::{
+            encoder::ElasticsearchEncoder,
+            request_builder::ElasticsearchRequestBuilder,
+            retry::ElasticsearchRetryLogic,
+            service::{ElasticsearchService, HttpRequestBuilder},
+            sink::ElasticsearchSink,
+            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+        },
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::Template,
+    tls::TlsOptions,
+    transforms::metric_to_log::MetricToLogConfig,
+};
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ElasticSearchConfig {
-    #[serde(alias = "host")]
+pub struct ElasticsearchConfig {
     pub endpoint: String,
 
-    // Deprecated, use `bulk.action` instead
-    pub bulk_action: Option<String>,
-
-    // Deprecated, use `bulk.index` instead
-    pub index: Option<String>,
-
-    // Deprecated, use `request.headers` instead.
-    pub headers: Option<IndexMap<String, String>>,
-
     pub doc_type: Option<String>,
+    #[serde(default)]
+    pub suppress_type_name: bool,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
     #[serde(default)]
-    pub mode: ElasticSearchMode,
+    pub mode: ElasticsearchMode,
 
     #[serde(default)]
     pub compression: Compression,
@@ -63,13 +57,13 @@ pub struct ElasticSearchConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
-    pub auth: Option<ElasticSearchAuth>,
+    pub auth: Option<ElasticsearchAuth>,
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
@@ -78,6 +72,13 @@ pub struct ElasticSearchConfig {
     pub bulk: Option<BulkConfig>,
     pub data_stream: Option<DataStreamConfig>,
     pub metrics: Option<MetricToLogConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -88,45 +89,37 @@ pub enum Encoding {
     Default,
 }
 
-impl ElasticSearchConfig {
+impl ElasticsearchConfig {
     pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
-        if self.bulk_action.is_some() {
-            warn!("ES sink config option `bulk_action` is deprecated. Use `bulk.action` instead.");
-        }
         Ok(self
             .bulk
             .as_ref()
             .and_then(|n| n.action.as_deref())
-            .or_else(|| self.bulk_action.as_deref())
-            .map(|value| Template::try_from(value).context(BatchActionTemplate))
+            .map(|value| Template::try_from(value).context(BatchActionTemplateSnafu))
             .transpose()?)
     }
 
     pub fn index(&self) -> crate::Result<Template> {
-        if self.index.is_some() {
-            warn!("ES sink config option `index` is deprecated. Use `bulk.index` instead.");
-        }
         let index = self
             .bulk
             .as_ref()
             .and_then(|n| n.index.as_deref())
-            .or_else(|| self.index.as_deref())
             .map(String::from)
             .unwrap_or_else(BulkConfig::default_index);
-        Ok(Template::try_from(index.as_str()).context(IndexTemplate)?)
+        Ok(Template::try_from(index.as_str()).context(IndexTemplateSnafu)?)
     }
 
-    pub fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
+    pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
-            ElasticSearchMode::Bulk => {
+            ElasticsearchMode::Bulk => {
                 let index = self.index()?;
                 let bulk_action = self.bulk_action()?;
-                Ok(ElasticSearchCommonMode::Bulk {
+                Ok(ElasticsearchCommonMode::Bulk {
                     index,
                     action: bulk_action,
                 })
             }
-            ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
+            ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
             )),
         }
@@ -136,9 +129,8 @@ impl ElasticSearchConfig {
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct BulkConfig {
-    #[serde(alias = "bulk_action")]
-    action: Option<String>,
-    index: Option<String>,
+    pub action: Option<String>,
+    pub index: Option<String>,
 }
 
 impl BulkConfig {
@@ -211,7 +203,7 @@ impl DataStreamConfig {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -224,7 +216,7 @@ impl DataStreamConfig {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -237,7 +229,7 @@ impl DataStreamConfig {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -258,8 +250,8 @@ impl DataStreamConfig {
         let existing = log
             .as_map_mut()
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Map(BTreeMap::new()))
-            .as_map_mut();
+            .or_insert_with(|| Value::Object(BTreeMap::new()))
+            .as_object_mut_unwrap();
         if let Some(dtype) = dtype {
             existing
                 .entry("type".into())
@@ -281,7 +273,7 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_map());
+            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy())
@@ -302,25 +294,17 @@ impl DataStreamConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
-impl SinkConfig for ElasticSearchConfig {
+impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticSearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self)?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        let batch_settings = BatchSettings::<Buffer>::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-
-        let batch_settings = BatcherSettings::new(
-            batch_settings.timeout,
-            NonZeroUsize::new(batch_settings.size.bytes).expect("Batch bytes should not be 0"),
-            NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0"),
-        );
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         // This is a bit ugly, but removes a String allocation on every event
         let mut encoding = self.encoding.clone();
         encoding.codec.doc_type = common.doc_type;
+        encoding.codec.suppress_type_name = common.suppress_type_name;
 
         let request_builder = ElasticsearchRequestBuilder {
             compression: self.compression,
@@ -343,10 +327,10 @@ impl SinkConfig for ElasticSearchConfig {
         };
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, ElasticSearchRetryLogic)
-            .service(ElasticSearchService::new(http_client, http_request_builder));
+            .settings(request_limits, ElasticsearchRetryLogic)
+            .service(ElasticsearchService::new(http_client, http_request_builder));
 
-        let sink = ElasticSearchSink {
+        let sink = ElasticsearchSink {
             batch_settings,
             request_builder,
             compression: self.compression,
@@ -357,19 +341,23 @@ impl SinkConfig for ElasticSearchConfig {
             id_key_field: self.id_key.clone(),
         };
 
-        let common = ElasticSearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self)?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
-        let stream = VectorSink::Stream(Box::new(sink));
+        let stream = VectorSink::from_event_streamsink(sink);
         Ok((stream, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "elasticsearch"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -379,12 +367,12 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+        crate::test_util::test_generate_config::<ElasticsearchConfig>();
     }
 
     #[test]
     fn parse_aws_auth() {
-        toml::from_str::<ElasticSearchConfig>(
+        toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             auth.strategy = "aws"
@@ -393,7 +381,7 @@ mod tests {
         )
         .unwrap();
 
-        toml::from_str::<ElasticSearchConfig>(
+        toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             auth.strategy = "aws"
@@ -404,7 +392,7 @@ mod tests {
 
     #[test]
     fn parse_mode() {
-        let config = toml::from_str::<ElasticSearchConfig>(
+        let config = toml::from_str::<ElasticsearchConfig>(
             r#"
             endpoint = ""
             mode = "data_stream"
@@ -412,7 +400,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(config.mode, ElasticSearchMode::DataStream));
+        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
     }
 }

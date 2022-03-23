@@ -1,19 +1,78 @@
-use super::{Error, Value};
-use crate::ExpressionError;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
-impl Value {
+use super::{Error, Value};
+use crate::value::{Kind, VrlValueConvert};
+use crate::ExpressionError;
+
+pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
-    pub fn try_mul(self, rhs: Self) -> Result<Self, Error> {
+    fn try_mul(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
+    fn try_div(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
+    fn try_add(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
+    fn try_sub(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Try to "OR" (`||`) two values types.
+    ///
+    /// If the lhs value is `null` or `false`, the rhs is evaluated and
+    /// returned. The rhs is a closure that can return an error, and thus this
+    /// method can return an error as well.
+    fn try_or(self, rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error>;
+
+    /// Try to "AND" (`&&`) two values types.
+    ///
+    /// A lhs or rhs value of `Null` returns `false`.
+    fn try_and(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
+    fn try_rem(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
+    fn try_gt(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
+    fn try_ge(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
+    fn try_lt(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
+    fn try_le(self, rhs: Self) -> Result<Self, Error>;
+
+    fn try_merge(self, rhs: Self) -> Result<Self, Error>;
+
+    /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
+    /// and floats.
+    fn eq_lossy(&self, rhs: &Self) -> bool;
+}
+
+impl VrlValueArithmetic for Value {
+    /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
+    fn try_mul(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Mul(self.kind(), rhs.kind());
 
+        // When multiplying a string by an integer, if the number is negative we set it to zero to
+        // return an empty string.
+        let as_usize = |num| if num < 0 { 0 } else { num as usize };
+
         let value = match self {
-            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv * f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
+            Value::Integer(lhv) if rhs.is_bytes() => {
+                Bytes::from(rhs.try_bytes()?.repeat(as_usize(lhv))).into()
+            }
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::from_f64_or_zero(lhv as f64 * rhs.try_float()?)
+            }
+            Value::Integer(lhv) => (lhv * rhs.try_into_i64().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv * rhs.try_into_f64().map_err(|_| err())?).into(),
+            Value::Bytes(lhv) if rhs.is_integer() => {
+                Bytes::from(lhv.repeat(as_usize(rhs.try_integer()?))).into()
+            }
             _ => return Err(err()),
         };
 
@@ -21,18 +80,18 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
-    pub fn try_div(self, rhs: Self) -> Result<Self, Error> {
+    fn try_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Div(self.kind(), rhs.kind());
 
-        let rhv = f64::try_from(&rhs).map_err(|_| err())?;
+        let rhv = rhs.try_into_f64().map_err(|_| err())?;
 
         if rhv == 0.0 {
             return Err(Error::DivideByZero);
         }
 
         let value = match self {
-            Value::Integer(lhv) => (lhv as f64 / rhv).into(),
-            Value::Float(lhv) => (lhv.into_inner() / rhv).into(),
+            Value::Integer(lhv) => Value::from_f64_or_zero(lhv as f64 / rhv),
+            Value::Float(lhv) => Value::from_f64_or_zero(lhv.into_inner() / rhv),
             _ => return Err(err()),
         };
 
@@ -40,35 +99,43 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
-    pub fn try_add(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Add(self.kind(), rhs.kind());
-
-        let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 + rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(_) if rhs.is_null() => self,
-            Value::Bytes(_) if rhs.is_bytes() => format!(
-                "{}{}",
-                self.try_bytes_utf8_lossy()?,
-                rhs.try_bytes_utf8_lossy()?,
-            )
+    fn try_add(self, rhs: Self) -> Result<Self, Error> {
+        let value = match (self, rhs) {
+            (Value::Integer(lhs), Value::Float(rhs)) => Value::from_f64_or_zero(lhs as f64 + *rhs),
+            (Value::Integer(lhs), rhs) => (lhs
+                + rhs
+                    .try_into_i64()
+                    .map_err(|_| Error::Add(Kind::integer(), rhs.kind()))?)
             .into(),
-            Value::Null if rhs.is_bytes() => rhs,
-            _ => return Err(err()),
+            (Value::Float(lhs), rhs) => (lhs
+                + rhs
+                    .try_into_f64()
+                    .map_err(|_| Error::Add(Kind::float(), rhs.kind()))?)
+            .into(),
+            (lhs @ Value::Bytes(_), Value::Null) => lhs,
+            (Value::Bytes(lhs), Value::Bytes(rhs)) => {
+                let mut value = BytesMut::with_capacity(lhs.len() + rhs.len());
+                value.put(lhs);
+                value.put(rhs);
+                value.freeze().into()
+            }
+            (Value::Null, rhs @ Value::Bytes(_)) => rhs,
+            (lhs, rhs) => return Err(Error::Add(lhs.kind(), rhs.kind())),
         };
 
         Ok(value)
     }
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
-    pub fn try_sub(self, rhs: Self) -> Result<Self, Error> {
+    fn try_sub(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 - rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::from_f64_or_zero(lhv as f64 - rhs.try_float()?)
+            }
+            Value::Integer(lhv) => (lhv - rhs.try_into_i64().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv - rhs.try_into_f64().map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
@@ -80,11 +147,8 @@ impl Value {
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
     /// returned. The rhs is a closure that can return an error, and thus this
     /// method can return an error as well.
-    pub fn try_or(
-        self,
-        mut rhs: impl FnMut() -> Result<Self, ExpressionError>,
-    ) -> Result<Self, Error> {
-        let err = |err| Error::Or(err);
+    fn try_or(self, mut rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error> {
+        let err = Error::Or;
 
         match self {
             Value::Null => rhs().map_err(err),
@@ -96,7 +160,7 @@ impl Value {
     /// Try to "AND" (`&&`) two values types.
     ///
     /// A lhs or rhs value of `Null` returns `false`.
-    pub fn try_and(self, rhs: Self) -> Result<Self, Error> {
+    fn try_and(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::And(self.kind(), rhs.kind());
 
         let value = match self {
@@ -113,13 +177,21 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
-    pub fn try_rem(self, rhs: Self) -> Result<Self, Error> {
+    fn try_rem(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Rem(self.kind(), rhs.kind());
 
+        let rhv = rhs.try_into_f64().map_err(|_| err())?;
+
+        if rhv == 0.0 {
+            return Err(Error::DivideByZero);
+        }
+
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 % rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv % i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv % f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::from_f64_or_zero(lhv as f64 % rhs.try_float()?)
+            }
+            Value::Integer(lhv) => (lhv % rhs.try_into_i64().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv % rhs.try_into_f64().map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
@@ -127,15 +199,13 @@ impl Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    pub fn try_gt(self, rhs: Self) -> Result<Self, Error> {
+    fn try_gt(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Rem(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 > rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv > i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => {
-                (lhv.into_inner() > f64::try_from(&rhs).map_err(|_| err())?).into()
-            }
+            Value::Integer(lhv) => (lhv > rhs.try_into_i64().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv.into_inner() > rhs.try_into_f64().map_err(|_| err())?).into(),
             Value::Bytes(lhv) => (lhv > rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
@@ -144,14 +214,14 @@ impl Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    pub fn try_ge(self, rhs: Self) -> Result<Self, Error> {
+    fn try_ge(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 >= rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv >= i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv >= rhs.try_into_i64().map_err(|_| err())?).into(),
             Value::Float(lhv) => {
-                (lhv.into_inner() >= f64::try_from(&rhs).map_err(|_| err())?).into()
+                (lhv.into_inner() >= rhs.try_into_f64().map_err(|_| err())?).into()
             }
             Value::Bytes(lhv) => (lhv >= rhs.try_bytes()?).into(),
             _ => return Err(err()),
@@ -161,15 +231,13 @@ impl Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    pub fn try_lt(self, rhs: Self) -> Result<Self, Error> {
+    fn try_lt(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => ((lhv as f64) < rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv < i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => {
-                (lhv.into_inner() < f64::try_from(&rhs).map_err(|_| err())?).into()
-            }
+            Value::Integer(lhv) => (lhv < rhs.try_into_i64().map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv.into_inner() < rhs.try_into_f64().map_err(|_| err())?).into(),
             Value::Bytes(lhv) => (lhv < rhs.try_bytes()?).into(),
             _ => return Err(err()),
         };
@@ -178,14 +246,14 @@ impl Value {
     }
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
-    pub fn try_le(self, rhs: Self) -> Result<Self, Error> {
+    fn try_le(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 <= rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv <= i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv <= rhs.try_into_i64().map_err(|_| err())?).into(),
             Value::Float(lhv) => {
-                (lhv.into_inner() <= f64::try_from(&rhs).map_err(|_| err())?).into()
+                (lhv.into_inner() <= rhs.try_into_f64().map_err(|_| err())?).into()
             }
             Value::Bytes(lhv) => (lhv <= rhs.try_bytes()?).into(),
             _ => return Err(err()),
@@ -194,7 +262,7 @@ impl Value {
         Ok(value)
     }
 
-    pub fn try_merge(self, rhs: Self) -> Result<Self, Error> {
+    fn try_merge(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Merge(self.kind(), rhs.kind());
 
         let value = match (&self, &rhs) {
@@ -212,15 +280,17 @@ impl Value {
 
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
-    pub fn eq_lossy(&self, rhs: &Self) -> bool {
+    fn eq_lossy(&self, rhs: &Self) -> bool {
         use Value::*;
 
         match self {
-            Integer(lhv) => f64::try_from(rhs)
+            Integer(lhv) => rhs
+                .try_into_f64()
                 .map(|rhv| *lhv as f64 == rhv)
                 .unwrap_or(false),
 
-            Float(lhv) => f64::try_from(rhs)
+            Float(lhv) => rhs
+                .try_into_f64()
                 .map(|rhv| lhv.into_inner() == rhv)
                 .unwrap_or(false),
 

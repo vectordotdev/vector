@@ -1,18 +1,18 @@
-use crate::{
-    buffers::Acker,
-    internal_events::{SocketEventsSent, SocketMode},
-};
-use bytes::Bytes;
-use futures::{ready, Sink};
-use pin_project::{pin_project, pinned_drop};
 use std::{
     io::{Error as IoError, ErrorKind},
     marker::Unpin,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use bytes::Bytes;
+use futures::{ready, Sink};
+use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
+use vector_buffers::Acker;
+
+use crate::internal_events::{SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
 
@@ -67,7 +67,7 @@ where
         if self.events_total > 0 {
             self.acker.ack(self.events_total);
 
-            emit!(&SocketEventsSent {
+            emit!(SocketEventsSent {
                 mode: self.socket_mode,
                 count: self.events_total as u64,
                 byte_size: self.bytes_total,

@@ -97,7 +97,7 @@ structured = parse_json!("not json")
 ```
 
 {{< warning title="Raising errors should be used with caution" >}}
-While raising errors can simplfy your program, you should think carefully before aborting your
+While raising errors can simplify your program, you should think carefully before aborting your
 program. If this operation is critical to the structure of your data you should abort, otherwise
 consider handling the error and proceeding with the rest of your program.
 {{< /warning >}}

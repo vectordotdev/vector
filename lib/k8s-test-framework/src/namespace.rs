@@ -1,10 +1,14 @@
 //! Manage namespaces.
 
+use std::{
+    collections::BTreeMap,
+    process::{Command, Stdio},
+};
+
+use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
 use super::{resource_file::ResourceFile, Result};
 use crate::up_down;
-use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use std::collections::BTreeMap;
-use std::process::{Command, Stdio};
 
 /// A config that holds a test `Namespace` resource file.
 #[derive(Debug)]

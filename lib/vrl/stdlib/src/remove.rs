@@ -1,6 +1,43 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
-use shared::btreemap;
 use vrl::prelude::*;
+
+fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
+    let path = match path {
+        Value::Array(path) => {
+            let mut lookup = LookupBuf::root();
+
+            for segment in path {
+                let segment = match segment {
+                    Value::Bytes(field) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                lookup.push_back(segment)
+            }
+
+            lookup
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }
+            .into())
+        }
+    };
+    let compact = compact.try_boolean()?;
+    value.target_remove(&path, compact)?;
+    Ok(value)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Remove;
@@ -97,7 +134,7 @@ impl Function for Remove {
                 title: "invalid segment type",
                 source: r#"remove!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "remove" at (0:65): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "remove" at (0:65): path segment must be either string or integer, not boolean"#,
                 ),
             },
         ]
@@ -106,7 +143,7 @@ impl Function for Remove {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -119,10 +156,18 @@ impl Function for Remove {
             compact,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let path = args.required("path");
+        let compact = args.optional("compact").unwrap_or(value!(false));
+
+        remove(path, compact, value)
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct RemoveFn {
+pub(crate) struct RemoveFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     compact: Box<dyn Expression>,
@@ -130,60 +175,27 @@ pub struct RemoveFn {
 
 impl Expression for RemoveFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut lookup = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let compact = self.compact.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-                for segment in path {
-                    let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either "string" or "integer", not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    lookup.push_back(segment)
-                }
-
-                lookup
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::Array,
-                }
-                .into())
-            }
-        };
-
-        let compact = self.compact.resolve(ctx)?.try_boolean()?;
-
-        let mut value = self.value.resolve(ctx)?;
-        value.remove(&path, compact)?;
-
-        Ok(value)
+        remove(path, compact, value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let kind = self.value.type_def(state).kind();
+        let value_td = self.value.type_def(state);
 
-        let td = TypeDef::new().fallible();
+        let mut td = TypeDef::from(Kind::empty()).fallible();
 
-        match kind {
-            Kind::Array => td.array::<Kind>(vec![]),
-            Kind::Object => td.object::<(), Kind>(btreemap! {}),
-            k if k.contains_array() && k.contains_object() => td
-                .array::<Kind>(vec![])
-                .add_object::<(), Kind>(btreemap! {}),
-            _ => unreachable!("compiler guaranteed"),
-        }
+        if value_td.is_array() {
+            td = td.add_array(Collection::any())
+        };
+
+        if value_td.is_object() {
+            td = td.add_object(Collection::any())
+        };
+
+        td
     }
 }
 
@@ -197,13 +209,13 @@ mod tests {
         array {
             args: func_args![value: value!([42]), path: value!([0])],
             want: Ok(value!([])),
-            tdef: TypeDef::new().array::<Kind>(vec![]).fallible(),
+            tdef: TypeDef::array(Collection::any()).fallible(),
         }
 
         object {
             args: func_args![value: value!({ "foo": 42 }), path: value!(["foo"])],
             want: Ok(value!({})),
-            tdef: TypeDef::new().object::<(), Kind>(btreemap!{}).fallible(),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }

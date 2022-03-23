@@ -1,13 +1,14 @@
-use crate::{
-    config::log_schema,
-    event::{self, Event, LogEvent, Value},
-    internal_events::KubernetesLogsDockerFormatParseFailed,
-    transforms::FunctionTransform,
-};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
+
+use crate::{
+    config::log_schema,
+    event::{self, Event, LogEvent, Value},
+    internal_events::KubernetesLogsDockerFormatParseError,
+    transforms::{FunctionTransform, OutputBuffer},
+};
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
@@ -22,14 +23,14 @@ pub const LOG: &str = "log";
 pub struct Docker;
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         output.push(event);
@@ -66,17 +67,17 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-        .context(TimeParsing)?;
+        .context(TimeParsingSnafu)?;
     log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG).context(LogFieldMissing)?;
+    let message = log.remove(&*LOG).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -238,7 +239,7 @@ pub mod tests {
 
         for message in cases {
             let input = Event::from(message);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             Docker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }

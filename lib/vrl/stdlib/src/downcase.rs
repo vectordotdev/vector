@@ -1,5 +1,9 @@
 use vrl::prelude::*;
 
+fn downcase(value: Value) -> Resolved {
+    Ok(value.try_bytes_utf8_lossy()?.to_lowercase().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Downcase;
 
@@ -19,7 +23,7 @@ impl Function for Downcase {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -34,6 +38,11 @@ impl Function for Downcase {
             result: Ok("foo 2 bar"),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        downcase(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -43,13 +52,12 @@ struct DowncaseFn {
 
 impl Expression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
+        let value = self.value.resolve(ctx)?;
+        downcase(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -63,7 +71,7 @@ mod tests {
         simple {
             args: func_args![value: "FOO 2 bar"],
             want: Ok(value!("foo 2 bar")),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
     ];
 }

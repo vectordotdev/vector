@@ -13,6 +13,7 @@ components: sources: nginx_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -36,16 +37,6 @@ components: sources: nginx_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"Module `ngx_http_stub_status_module` should be enabled.",
 		]
@@ -65,7 +56,6 @@ components: sources: nginx_metrics: {
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:8000/basic_status"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -84,7 +74,6 @@ components: sources: nginx_metrics: {
 			required:    false
 			type: string: {
 				default: "nginx"
-				syntax:  "literal"
 			}
 		}
 		tls: configuration._tls_connect & {_args: {
@@ -103,7 +92,7 @@ components: sources: nginx_metrics: {
 		mod_status: {
 			title: "Module `ngx_http_stub_status_module`"
 			body:  """
-				The [ngx_http_stub_status_module]9\(urls.nginx_stub_status_module))
+				The [ngx_http_stub_status_module](\(urls.nginx_stub_status_module))
 				module provides access to basic status information. Basic status
 				information is a simple web page with text data.
 				"""

@@ -1,6 +1,35 @@
-use crate::log_util;
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
+
+use crate::log_util;
+
+fn parse_apache_log(
+    bytes: Value,
+    timestamp_format: Option<Value>,
+    format: &Bytes,
+    ctx: &Context,
+) -> Resolved {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => "%d/%b/%Y:%T %z".to_owned(),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let regex = match format.as_ref() {
+        b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
+        b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
+        b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
+        _ => unreachable!(),
+    };
+    let captures = regex
+        .captures(&message)
+        .ok_or("failed parsing common log line")?;
+    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+}
+
+fn variants() -> Vec<Value> {
+    vec![value!("common"), value!("combined"), value!("error")]
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
@@ -33,14 +62,12 @@ impl Function for ParseApacheLog {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let variants = vec![value!("common"), value!("combined"), value!("error")];
-
         let value = arguments.required("value");
         let format = arguments
-            .required_enum("format", &variants)?
+            .required_enum("format", &variants())?
             .try_bytes()
             .expect("format not bytes");
 
@@ -51,6 +78,25 @@ impl Function for ParseApacheLog {
             format,
             timestamp_format,
         }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("format", Some(expr)) => {
+                let format = expr
+                    .as_enum("format", variants())?
+                    .try_bytes()
+                    .expect("format not bytes");
+                Ok(Some(Box::new(format) as _))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -78,6 +124,14 @@ impl Function for ParseApacheLog {
             },
         ]
     }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
+        let timestamp_format = args.optional("timestamp_format");
+
+        parse_apache_log(value, timestamp_format, format, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,90 +144,84 @@ struct ParseApacheLogFn {
 impl Expression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let regex = match self.format.as_ref() {
-            b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
-            b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
-            b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
-            _ => unreachable!(),
-        };
-
-        let captures = regex
-            .captures(&message)
-            .ok_or("failed parsing common log line")?;
-
-        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
-            .map_err(Into::into)
+        parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .object(match self.format.as_ref() {
-                b"common" => type_def_common(),
-                b"combined" => type_def_combined(),
-                b"error" => type_def_error(),
-                _ => unreachable!(),
-            })
+        TypeDef::object(match self.format.as_ref() {
+            b"common" => kind_common(),
+            b"combined" => kind_combined(),
+            b"error" => kind_error(),
+            _ => unreachable!(),
+        })
+        .fallible()
     }
 }
 
-fn type_def_common() -> BTreeMap<&'static str, TypeDef> {
+fn kind_common() -> BTreeMap<Field, Kind> {
     map! {
-         "host": Kind::Bytes | Kind::Null,
-         "identity": Kind::Bytes | Kind::Null,
-         "user": Kind::Bytes | Kind::Null,
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "message": Kind::Bytes | Kind::Null,
-         "method": Kind::Bytes | Kind::Null,
-         "path": Kind::Bytes | Kind::Null,
-         "protocol": Kind::Bytes | Kind::Null,
-         "status": Kind::Integer | Kind::Null,
-         "size": Kind::Integer | Kind::Null,
+         "host": Kind::bytes() | Kind::null(),
+         "identity": Kind::bytes() | Kind::null(),
+         "user": Kind::bytes() | Kind::null(),
+         "timestamp": Kind::timestamp() | Kind::null(),
+         "message": Kind::bytes() | Kind::null(),
+         "method": Kind::bytes() | Kind::null(),
+         "path": Kind::bytes() | Kind::null(),
+         "protocol": Kind::bytes() | Kind::null(),
+         "status": Kind::integer() | Kind::null(),
+         "size": Kind::integer() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
-fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
+fn kind_combined() -> BTreeMap<Field, Kind> {
     map! {
-        "host": Kind::Bytes | Kind::Null,
-        "identity": Kind::Bytes | Kind::Null,
-        "user": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp | Kind::Null,
-        "message": Kind::Bytes | Kind::Null,
-        "method": Kind::Bytes | Kind::Null,
-        "path": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Bytes | Kind::Null,
-        "status": Kind::Integer | Kind::Null,
-        "size": Kind::Integer | Kind::Null,
-        "referrer": Kind::Bytes | Kind::Null,
-        "agent": Kind::Bytes | Kind::Null,
+        "host": Kind::bytes() | Kind::null(),
+        "identity": Kind::bytes() | Kind::null(),
+        "user": Kind::bytes() | Kind::null(),
+        "timestamp": Kind::timestamp() | Kind::null(),
+        "message": Kind::bytes() | Kind::null(),
+        "method": Kind::bytes() | Kind::null(),
+        "path": Kind::bytes() | Kind::null(),
+        "protocol": Kind::bytes() | Kind::null(),
+        "status": Kind::integer() | Kind::null(),
+        "size": Kind::integer() | Kind::null(),
+        "referrer": Kind::bytes() | Kind::null(),
+        "agent": Kind::bytes() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
-fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
+fn kind_error() -> BTreeMap<Field, Kind> {
     map! {
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "module": Kind::Bytes | Kind::Null,
-         "severity": Kind::Bytes | Kind::Null,
-         "thread": Kind::Bytes | Kind::Null,
-         "port": Kind::Bytes | Kind::Null,
-         "message": Kind::Bytes | Kind::Null,
+         "timestamp": Kind::timestamp() | Kind::null(),
+         "module": Kind::bytes() | Kind::null(),
+         "severity": Kind::bytes() | Kind::null(),
+         "thread": Kind::bytes() | Kind::null(),
+         "port": Kind::bytes() | Kind::null(),
+         "message": Kind::bytes() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
-    use shared::btreemap;
+    use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         parse_common_log => ParseApacheLog;
@@ -194,8 +242,8 @@ mod tests {
                 "status" => 200,
                 "size" => 2326,
             }),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_common()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         combined_line_valid {
@@ -216,8 +264,8 @@ mod tests {
                 "referrer" => "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth",
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_combined()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         combined_line_missing_fields_valid {
@@ -236,8 +284,8 @@ mod tests {
                 "status" => 401,
                 "size" => 84170,
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_combined()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_valid {
@@ -254,8 +302,8 @@ mod tests {
                 "client" => "147.159.108.175",
                 "port" => 24259
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_ip_v6 {
@@ -272,8 +320,8 @@ mod tests {
                 "client" => "eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc",
                 "port" => 24259
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         error_line_thread_id {
@@ -292,8 +340,8 @@ mod tests {
                 "port" => 35106
 
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::Named(chrono_tz::Tz::UTC),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         log_line_valid_empty {
@@ -301,8 +349,8 @@ mod tests {
                              format: "common",
             ],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_common()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_empty_variant {
@@ -310,15 +358,15 @@ mod tests {
                              format: "common",
             ],
             want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_common()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_with_local_timestamp_format {
             args: func_args![value: format!("[{}] - - - -",
                                             Utc.ymd(2000, 10, 10).and_hms(20,55,36)
                                               .with_timezone(&Local)
-                                              .format("%a %b %d %H:%M:%S %Y").to_string()
+                                              .format("%a %b %d %H:%M:%S %Y")
                                             ),
                              timestamp_format: "%a %b %d %H:%M:%S %Y",
                              format: "error",
@@ -326,8 +374,8 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_with_timezone {
@@ -339,8 +387,8 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
         log_line_invalid {
@@ -348,8 +396,8 @@ mod tests {
                              format: "common",
             ],
             want: Err("failed parsing common log line"),
-            tdef: TypeDef::new().fallible().object(type_def_common()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_common()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_invalid_timestamp {
@@ -357,8 +405,8 @@ mod tests {
                              format: "combined",
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::object(kind_combined()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
     ];
 }

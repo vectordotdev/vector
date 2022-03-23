@@ -15,6 +15,7 @@ components: sources: logstash: {
 	}
 
 	features: {
+		acknowledgements: true
 		receive: {
 			from: {
 				service: services.logstash
@@ -40,16 +41,6 @@ components: sources: logstash: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -60,13 +51,22 @@ components: sources: logstash: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 	}
@@ -79,19 +79,18 @@ components: sources: logstash: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {
 				description: """
-						The timestamp field will be set to the first one found of the following:
+					The timestamp field will be set to the first one found of the following:
 
-						1. The `timestamp` field on the event
-						2. The `@timestamp` field on the event if it can be parsed as a timestamp
-						3. The current timestamp
+					1. The `timestamp` field on the event
+					2. The `@timestamp` field on the event if it can be parsed as a timestamp
+					3. The current timestamp
 
-						The assigned field, `timestamp`, could be different depending if you have configured
-						`log_schema.timestamp_key`.
+					The assigned field, `timestamp`, could be different depending if you have configured
+					`log_schema.timestamp_key`.
 					"""
 			}
 			"*": {
@@ -99,7 +98,6 @@ components: sources: logstash: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -118,6 +116,7 @@ components: sources: logstash: {
 						count => 1
 					}
 				}
+				```
 
 				Output if sent to stdout logstash output:
 

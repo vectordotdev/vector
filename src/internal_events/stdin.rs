@@ -10,12 +10,18 @@ pub struct StdinEventsReceived {
 }
 
 impl InternalEvent for StdinEventsReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received events.", self.count);
-    }
-
-    fn emit_metrics(&self) {
+    fn emit(self) {
+        trace!(
+            message = "Events received.",
+            count = self.count,
+            byte_size = self.byte_size,
+        );
         counter!("component_received_events_total", self.count as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
+        // deprecated
         counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }

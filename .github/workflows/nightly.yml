@@ -15,9 +15,10 @@ env:
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -31,9 +32,10 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
   build-x86_64-unknown-linux-gnu-debug-tarball:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -54,9 +56,10 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
 
   build-x86_64-unknown-linux-gnu-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -70,17 +73,18 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
 
   build-aarch64-unknown-linux-musl-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -95,9 +99,10 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
 
   build-aarch64-unknown-linux-gnu-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -112,17 +117,18 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-armv7-unknown-linux-gnueabihf-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -136,17 +142,18 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
   build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, release-builder]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -162,7 +169,7 @@ jobs:
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
@@ -193,7 +200,7 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
         shell: bash
@@ -265,7 +272,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
+        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:9","debian:10","debian:11"]
     container:
       image: ${{ matrix.container }}
     steps:
@@ -278,19 +285,19 @@ jobs:
           systemd \
           make
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - name: First install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
       - name: Second install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           ./scripts/verify-install.sh
 
   rpm-verify:
@@ -299,21 +306,32 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+        container:
+          - "quay.io/centos/centos:stream8"
+          - "quay.io/centos/centos:stream9"
+          - "amazonlinux:1"
+          - "amazonlinux:2"
+          - "fedora:34"
+          - "fedora:35"
+          - "fedora:36"
     container:
       image: ${{ matrix.container }}
     steps:
       - run: |
-          yum update -y && \
+          yum update -y
           yum install -y \
           ca-certificates \
-          curl \
           git \
           systemd \
           tar \
           make
+          # conflicts with curl-minimal on some distros and --allowerased is not
+          # supported on some distros
+          if ! command -v curl &> /dev/null ; then
+            yum install -y curl
+          fi
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -334,7 +352,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
     steps:
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -354,10 +372,10 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: Login to DockerHub
-        uses: docker/login-action@v1.10.0
+        uses: docker/login-action@v1.14.1
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
@@ -385,15 +403,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7"
@@ -416,7 +434,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -448,15 +466,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -496,19 +514,19 @@ jobs:
       - deb-verify
       - rpm-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -534,7 +552,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
       - name: Push arm64 deb
         id: push-deb-arm64
         uses: cloudsmith-io/action@master
@@ -547,7 +565,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - name: Push armhf deb
         id: push-deb-armhf
         uses: cloudsmith-io/action@master
@@ -560,7 +578,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
+          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
       - name: Push x86_64 GNU RPM
         id: push-rpm-x86_64-gnu
         uses: cloudsmith-io/action@master
@@ -601,22 +619,6 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
-  release-helm:
-    runs-on: ubuntu-18.04
-    needs:
-      # This is not strictly required, but ensures that Helm Chart doesn't
-      # appear before the image it refers to.
-      - release-docker
-    steps:
-      - uses: actions/checkout@v2.3.5
-      - name: Install Helm
-        run: scripts/environment/setup-helm.sh
-      - name: Release Helm Chart
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-        run: make release-helm
-
   nightly-failure:
     name: nightly-failure
     if: failure() && github.ref == 'refs/heads/master'
@@ -633,7 +635,6 @@ jobs:
       - release-docker
       - release-s3
       - release-cloudsmith
-      - release-helm
       - deb-verify
       - rpm-verify
       - osx-verify

@@ -1,10 +1,11 @@
+use vector_common::TimeZone;
+
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
-    transforms::FunctionTransform,
+    transforms::{FunctionTransform, OutputBuffer},
 };
-use shared::TimeZone;
 
 #[derive(Clone, Debug)]
 enum PickerState {
@@ -27,7 +28,7 @@ impl Picker {
 }
 
 impl FunctionTransform for Picker {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             PickerState::Init => {
                 let message = match event
@@ -36,7 +37,7 @@ impl FunctionTransform for Picker {
                 {
                     Some(message) => message,
                     None => {
-                        emit!(&KubernetesLogsFormatPickerEdgeCase {
+                        emit!(KubernetesLogsFormatPickerEdgeCase {
                             what: "got an event with no message field"
                         });
                         return;
@@ -46,7 +47,7 @@ impl FunctionTransform for Picker {
                 let bytes = match message {
                     Value::Bytes(bytes) => bytes,
                     _ => {
-                        emit!(&KubernetesLogsFormatPickerEdgeCase {
+                        emit!(KubernetesLogsFormatPickerEdgeCase {
                             what: "got an event with non-bytes message field"
                         });
                         return;
@@ -68,8 +69,10 @@ impl FunctionTransform for Picker {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{cri, docker, test_util};
-    use super::*;
+    use super::{
+        super::{cri, docker, test_util},
+        *,
+    };
     use crate::{
         event::{Event, LogEvent},
         test_util::trace_init,
@@ -103,7 +106,7 @@ mod tests {
         for message in cases {
             let input = Event::from(message);
             let mut picker = Picker::new(TimeZone::Local);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
@@ -126,7 +129,7 @@ mod tests {
 
         for input in cases {
             let mut picker = Picker::new(TimeZone::Local);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }

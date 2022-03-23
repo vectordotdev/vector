@@ -1,9 +1,12 @@
-use metrics::gauge;
-use std::hint;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    hint,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
+
+use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -12,7 +15,7 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("open_connections", self.count as f64);
     }
 }
@@ -39,6 +42,7 @@ impl OpenGauge {
         }
     }
 
+    #[cfg(all(feature = "sources-utils-unix", unix))]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }
@@ -103,9 +107,9 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
 
 #[cfg(test)]
 mod tests {
+    use std::{mem::drop, thread};
+
     use super::*;
-    use std::mem::drop;
-    use std::thread;
 
     /// If this fails at any run, then the algorithm in `gauge_add` is faulty.
     #[test]

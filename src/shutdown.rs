@@ -1,6 +1,3 @@
-use crate::config::ComponentKey;
-use crate::{stream::tripwire_handler, trigger::DisabledTrigger};
-use futures::{future, ready, FutureExt};
 use std::{
     collections::HashMap,
     future::Future,
@@ -8,8 +5,12 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+
+use futures::{future, ready, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
+
+use crate::{config::ComponentKey, stream::tripwire_handler, trigger::DisabledTrigger};
 
 /// When this struct goes out of scope and its internal refcount goes to 0 it is a signal that its
 /// corresponding Source has completed executing and may be cleaned up.  It is the responsibility
@@ -304,9 +305,10 @@ impl SourceShutdownCoordinator {
 
 #[cfg(test)]
 mod test {
+    use tokio::time::{Duration, Instant};
+
     use super::*;
     use crate::shutdown::SourceShutdownCoordinator;
-    use tokio::time::{Duration, Instant};
 
     #[tokio::test]
     async fn shutdown_coordinator_shutdown_source_clean() {

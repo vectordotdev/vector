@@ -1,7 +1,10 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use std::collections::BTreeMap;
+use std::fmt;
+
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
-use std::fmt;
+
+use crate::{vm, Context, Span, State, TypeDef, Value};
 
 mod abort;
 mod array;
@@ -28,8 +31,8 @@ pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
-pub use container::Container;
-pub use container::Variant;
+pub use container::{Container, Variant};
+pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -40,12 +43,9 @@ pub use not::Not;
 pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
-pub use query::Query;
-pub use query::Target;
+pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
-
-pub type Resolved = Result<Value, ExpressionError>;
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
@@ -54,6 +54,15 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
+
+    /// Compile the expression to bytecode that can be interpreted by the VM.
+    fn compile_to_vm(
+        &self,
+        _vm: &mut vm::Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 
     /// Resolve an expression to a value without any context, if possible.
     ///
@@ -124,6 +133,51 @@ impl Expr {
             Abort(..) => "abort operation",
         }
     }
+
+    pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
+        let literal = match self {
+            Expr::Literal(literal) => Ok(literal.clone()),
+            Expr::Variable(var) if var.value().is_some() => {
+                match var.value().unwrap().clone().into() {
+                    Expr::Literal(literal) => Ok(literal),
+                    expr => Err(super::function::Error::UnexpectedExpression {
+                        keyword,
+                        expected: "literal",
+                        expr,
+                    }),
+                }
+            }
+            expr => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: expr.clone(),
+            }),
+        }?;
+
+        match literal.as_value() {
+            Some(value) => Ok(value),
+            None => Err(super::function::Error::UnexpectedExpression {
+                keyword,
+                expected: "literal",
+                expr: self.clone(),
+            }),
+        }
+    }
+
+    pub fn as_enum(
+        &self,
+        keyword: &'static str,
+        variants: Vec<Value>,
+    ) -> Result<Value, super::function::Error> {
+        let value = self.as_literal(keyword)?;
+        variants.iter().find(|v| **v == value).cloned().ok_or(
+            super::function::Error::InvalidEnumVariant {
+                keyword,
+                value,
+                variants,
+            },
+        )
+    }
 }
 
 impl Expression for Expr {
@@ -178,6 +232,29 @@ impl Expression for Expr {
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
             Abort(v) => v.type_def(state),
+        }
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        use Expr::*;
+
+        // Pass the call on to the contained expression.
+        match self {
+            Literal(v) => v.compile_to_vm(vm, state),
+            Container(v) => v.compile_to_vm(vm, state),
+            IfStatement(v) => v.compile_to_vm(vm, state),
+            Op(v) => v.compile_to_vm(vm, state),
+            Assignment(v) => v.compile_to_vm(vm, state),
+            Query(v) => v.compile_to_vm(vm, state),
+            FunctionCall(v) => v.compile_to_vm(vm, state),
+            Variable(v) => v.compile_to_vm(vm, state),
+            Noop(v) => v.compile_to_vm(vm, state),
+            Unary(v) => v.compile_to_vm(vm, state),
+            Abort(v) => v.compile_to_vm(vm, state),
         }
     }
 }
@@ -270,6 +347,38 @@ impl From<Abort> for Expr {
     }
 }
 
+impl From<Value> for Expr {
+    fn from(value: Value) -> Self {
+        use Value::*;
+
+        match value {
+            Bytes(v) => Literal::from(v).into(),
+            Integer(v) => Literal::from(v).into(),
+            Float(v) => Literal::from(v).into(),
+            Boolean(v) => Literal::from(v).into(),
+            Object(v) => {
+                let object = crate::expression::Object::from(
+                    v.into_iter()
+                        .map(|(k, v)| (k, v.into()))
+                        .collect::<BTreeMap<_, _>>(),
+                );
+
+                Container::new(container::Variant::from(object)).into()
+            }
+            Array(v) => {
+                let array = crate::expression::Array::from(
+                    v.into_iter().map(Expr::from).collect::<Vec<_>>(),
+                );
+
+                Container::new(container::Variant::from(array)).into()
+            }
+            Timestamp(v) => Literal::from(v).into(),
+            Regex(v) => Literal::from(v).into(),
+            Null => Literal::from(()).into(),
+        }
+    }
+}
+
 // -----------------------------------------------------------------------------
 
 #[derive(thiserror::Error, Debug)]
@@ -304,82 +413,5 @@ impl DiagnosticError for Error {
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ExpressionError {
-    Abort {
-        span: Span,
-    },
-    Error {
-        message: String,
-        labels: Vec<Label>,
-        notes: Vec<Note>,
-    },
-}
-
-impl std::fmt::Display for ExpressionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message().fmt(f)
-    }
-}
-
-impl std::error::Error for ExpressionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl DiagnosticError for ExpressionError {
-    fn code(&self) -> usize {
-        0
-    }
-
-    fn message(&self) -> String {
-        use ExpressionError::*;
-
-        match self {
-            Abort { .. } => "aborted".to_owned(),
-            Error { message, .. } => message.clone(),
-        }
-    }
-
-    fn labels(&self) -> Vec<Label> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { span } => {
-                vec![Label::primary("aborted", span)]
-            }
-            Error { labels, .. } => labels.clone(),
-        }
-    }
-
-    fn notes(&self) -> Vec<Note> {
-        use ExpressionError::*;
-
-        match self {
-            Abort { .. } => vec![],
-            Error { notes, .. } => notes.clone(),
-        }
-    }
-}
-
-impl From<String> for ExpressionError {
-    fn from(message: String) -> Self {
-        ExpressionError::Error {
-            message,
-            labels: vec![],
-            notes: vec![],
-        }
-    }
-}
-
-impl From<&str> for ExpressionError {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
     }
 }

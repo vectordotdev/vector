@@ -1,30 +1,40 @@
-use super::BulkAction;
-use crate::event::{LogEvent, Metric, MetricKind, MetricValue, Value};
-use crate::rusoto::AwsAuthentication;
-use crate::sinks::elasticsearch::sink::process_log;
-use crate::sinks::elasticsearch::{
-    DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig,
-    ElasticSearchMode,
-};
-use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed};
-use crate::sinks::util::BatchConfig;
-use crate::template::Template;
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use http::Uri;
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
+
+use super::BulkAction;
+use crate::sinks::elasticsearch::BulkConfig;
+use crate::{
+    aws::rusoto::AwsAuthentication,
+    event::{LogEvent, Metric, MetricKind, MetricValue, Value},
+    sinks::{
+        elasticsearch::{
+            sink::process_log, DataStreamConfig, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchConfig, ElasticsearchMode,
+        },
+        util::{
+            encoding::{Encoder, EncodingConfigFixed},
+            BatchConfig,
+        },
+    },
+    template::Template,
+};
 
 #[test]
 fn sets_create_action_when_configured() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
 
-    let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("{{ action }}te")),
-        index: Some(String::from("vector")),
+    use crate::config::log_schema;
+
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: Some(String::from("{{ action }}te")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -58,16 +68,20 @@ fn data_stream_body() -> BTreeMap<String, Value> {
 
 #[test]
 fn encode_datastream_mode() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
 
-    let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+    use crate::config::log_schema;
+
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
-        mode: ElasticSearchMode::DataStream,
+        mode: ElasticsearchMode::DataStream,
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -94,13 +108,17 @@ fn encode_datastream_mode() {
 
 #[test]
 fn encode_datastream_mode_no_routing() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
 
-    let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+    use crate::config::log_schema;
+
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
-        mode: ElasticSearchMode::DataStream,
+        mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
             namespace: Template::try_from("something").unwrap(),
@@ -108,7 +126,7 @@ fn encode_datastream_mode_no_routing() {
         }),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -134,13 +152,15 @@ fn encode_datastream_mode_no_routing() {
 
 #[test]
 fn handle_metrics() {
-    let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("create")),
-        index: Some(String::from("vector")),
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: Some(String::from("create")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let metric = Metric::new(
         "cpu",
@@ -172,13 +192,15 @@ fn handle_metrics() {
 
 #[test]
 fn decode_bulk_action_error() {
-    let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("{{ action }}")),
-        index: Some(String::from("vector")),
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: Some(String::from("{{ action }}")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello world");
     log.insert("foo", "bar");
@@ -189,13 +211,15 @@ fn decode_bulk_action_error() {
 
 #[test]
 fn decode_bulk_action() {
-    let config = ElasticSearchConfig {
-        bulk_action: Some(String::from("create")),
-        index: Some(String::from("vector")),
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: Some(String::from("create")),
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let log = LogEvent::from("hello there");
     let action = es.mode.bulk_action(&log).unwrap();
@@ -204,13 +228,17 @@ fn decode_bulk_action() {
 
 #[test]
 fn encode_datastream_mode_no_sync() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
 
-    let config = ElasticSearchConfig {
-        index: Some(String::from("vector")),
+    use crate::config::log_schema;
+
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("vector")),
+        }),
         endpoint: String::from("https://example.com"),
-        mode: ElasticSearchMode::DataStream,
+        mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
             sync_fields: false,
@@ -219,7 +247,7 @@ fn encode_datastream_mode_no_sync() {
         ..Default::default()
     };
 
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -246,8 +274,11 @@ fn encode_datastream_mode_no_sync() {
 
 #[test]
 fn allows_using_excepted_fields() {
-    let config = ElasticSearchConfig {
-        index: Some(String::from("{{ idx }}")),
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("{{ idx }}")),
+        }),
         encoding: EncodingConfigFixed {
             except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
             ..Default::default()
@@ -255,7 +286,7 @@ fn allows_using_excepted_fields() {
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
-    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+    let es = ElasticsearchCommon::parse_config(&config).unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");
@@ -279,17 +310,17 @@ fn allows_using_excepted_fields() {
 
 #[test]
 fn validate_host_header_on_aws_requests() {
-    let config = ElasticSearchConfig {
-        auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
-        batch: BatchConfig {
-            max_events: Some(1),
-            ..Default::default()
-        },
+        batch,
         ..Default::default()
     };
 
-    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
 
     let signed_request = common.signed_request(
         "POST",

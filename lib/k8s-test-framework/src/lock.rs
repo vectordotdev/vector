@@ -1,5 +1,6 @@
-use once_cell::sync::OnceCell;
 use std::sync::{Mutex, MutexGuard};
+
+use once_cell::sync::OnceCell;
 
 /// A shared lock to use commonly among the tests.
 /// The goal is to guarantee that only one test is executing concurrently, since

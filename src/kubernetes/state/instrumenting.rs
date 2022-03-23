@@ -1,8 +1,9 @@
 //! An instrumenting state wrapper.
 
-use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+
+use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// adds instrumentation.
@@ -25,22 +26,22 @@ where
     type Item = <T as super::Write>::Item;
 
     async fn add(&mut self, item: Self::Item) {
-        emit!(&internal_events::StateItemAdded);
+        emit!(internal_events::StateItemAdded);
         self.inner.add(item).await
     }
 
     async fn update(&mut self, item: Self::Item) {
-        emit!(&internal_events::StateItemUpdated);
+        emit!(internal_events::StateItemUpdated);
         self.inner.update(item).await
     }
 
     async fn delete(&mut self, item: Self::Item) {
-        emit!(&internal_events::StateItemDeleted);
+        emit!(internal_events::StateItemDeleted);
         self.inner.delete(item).await
     }
 
     async fn resync(&mut self) {
-        emit!(&internal_events::StateResynced);
+        emit!(internal_events::StateResynced);
         self.inner.resync().await
     }
 }
@@ -52,26 +53,29 @@ where
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         self.inner.maintenance_request().map(|future| {
-            emit!(&internal_events::StateMaintenanceRequested);
+            emit!(internal_events::StateMaintenanceRequested);
             future
         })
     }
 
     async fn perform_maintenance(&mut self) {
-        emit!(&internal_events::StateMaintenancePerformed);
+        emit!(internal_events::StateMaintenancePerformed);
         self.inner.perform_maintenance().await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, MaintainedWrite, Write};
-    use super::*;
-    use crate::{event::metric::MetricValue, test_util::trace_init};
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use once_cell::sync::OnceCell;
     use tokio::sync::{Mutex, MutexGuard};
+
+    use super::{
+        super::{mock, MaintainedWrite, Write},
+        *,
+    };
+    use crate::{event::metric::MetricValue, test_util::trace_init};
 
     fn prepare_test() -> (
         Writer<mock::Writer<Pod>>,
@@ -108,6 +112,7 @@ mod tests {
 
         controller
             .capture_metrics()
+            .into_iter()
             .find(|metric| {
                 metric.name() == "k8s_state_ops_total" && metric.tags() == tags_to_lookup.as_ref()
             })

@@ -11,7 +11,7 @@ set -euo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 # Always exit 0 until we resolve
-# https://github.com/timberio/vector/issues/5394
+# https://github.com/vectordotdev/vector/issues/5394
 (
   echo -e "name\ttime\ttime change\tthroughput\tthroughput change\tp\tchange";
   awk --file "$DIR/parse-criterion-output.awk" |

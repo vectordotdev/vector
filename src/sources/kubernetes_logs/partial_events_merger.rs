@@ -1,9 +1,10 @@
 #![deny(missing_docs)]
 
-use super::transform_utils::optional::Optional;
-use super::FILE_KEY;
-use crate::event;
-use crate::transforms::merge::{Merge, MergeConfig};
+use super::{transform_utils::optional::Optional, FILE_KEY};
+use crate::{
+    event,
+    transforms::merge::{Merge, MergeConfig},
+};
 
 /// Partial event merger.
 pub type PartialEventsMerger = Optional<Merge>;

@@ -1,8 +1,7 @@
-use criterion::{criterion_group, BatchSize, Criterion};
-
-use chrono::Utc;
 use std::convert::TryFrom;
 
+use chrono::Utc;
+use criterion::{criterion_group, BatchSize, Criterion};
 use vector::{config::log_schema, event::Event};
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
@@ -44,7 +43,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.20);
     targets = bench_elasticsearch_index
 );

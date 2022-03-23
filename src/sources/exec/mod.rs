@@ -1,29 +1,42 @@
-use crate::{
-    async_read::VecAsyncReadExt,
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
-    serde::{default_decoding, default_framing_stream_based},
-    shutdown::ShutdownSignal,
-    sources::util::TcpError,
-    Pipeline,
+use std::{
+    io::{Error, ErrorKind},
+    path::PathBuf,
+    process::ExitStatus,
 };
+
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snafu::Snafu;
-use std::io::{Error, ErrorKind};
-use std::path::PathBuf;
-use std::process::ExitStatus;
-use tokio::io::{AsyncRead, BufReader};
-use tokio::process::Command;
-use tokio::sync::mpsc::{channel, Sender};
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::{
+    io::{AsyncRead, BufReader},
+    process::Command,
+    sync::mpsc::{channel, Sender},
+    time::{self, sleep, Duration, Instant},
+};
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    async_read::VecAsyncReadExt,
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        StreamClosedError,
+    },
+    serde::{default_decoding, default_framing_stream_based},
+    shutdown::ShutdownSignal,
+    sources::util::StreamDecodingError,
+    SourceSender,
+};
 
 pub mod sized_bytes_codec;
 
@@ -40,9 +53,9 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
     #[serde(default = "default_framing_stream_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: DeserializerConfig,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
@@ -177,7 +190,7 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
@@ -208,12 +221,16 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         EXEC
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -223,7 +240,7 @@ async fn run_scheduled(
     exec_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     debug!("Starting scheduled exec runs.");
     let schedule = Duration::from_secs(exec_interval_secs);
@@ -241,23 +258,23 @@ async fn run_scheduled(
                 shutdown.clone(),
                 out.clone(),
             ),
-        );
+        )
+        .await;
 
-        let timeout_result = timeout.await;
-
-        match timeout_result {
+        match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailed {
+                    emit!(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
-            Err(_) => {
-                emit!(&ExecTimeout {
+            Err(error) => {
+                emit!(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
+                    error,
                 });
             }
         }
@@ -274,7 +291,7 @@ async fn run_streaming(
     respawn_interval_secs: u64,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Result<(), ()> {
     if respawn_on_exit {
         let duration = Duration::from_secs(respawn_interval_secs);
@@ -292,7 +309,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailed {
+                        emit!(ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -314,7 +331,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailed {
+            emit!(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -329,7 +346,7 @@ async fn run_command(
     hostname: Option<String>,
     decoder: codecs::Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
     debug!("Starting command run.");
     let mut command = build_command(&config);
@@ -369,26 +386,20 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, byte_size), stream)) = receiver.recv().await {
-        emit!(&ExecEventsReceived {
-            count: events.len(),
+    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+        let count = events.len();
+        emit!(ExecEventsReceived {
+            count,
             command: config.command_line().as_str(),
-            byte_size,
+            byte_size: events.size_of(),
         });
 
-        for mut event in events {
-            handle_event(
-                &config,
-                &hostname,
-                &Some(stream.to_string()),
-                pid,
-                &mut event,
-            );
-
-            if out.send(event).await.is_err() {
-                error!(message = "Failed to forward event; downstream is closed.");
-                break 'send;
-            }
+        for event in &mut events {
+            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
+        }
+        if let Err(error) = out.send_batch(events).await {
+            emit!(StreamClosedError { count, error });
+            break;
         }
     }
 
@@ -412,13 +423,12 @@ async fn run_command(
     };
 
     debug!("Finished command run.");
-    let _ = out.flush().await;
 
     result
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(&ExecCommandExecuted {
+    emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -498,7 +508,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    Box::pin(tokio::spawn(async move {
+    let _ = Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
@@ -528,9 +538,13 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
+    #[cfg(not(target_os = "windows"))]
+    use futures::task::Poll;
+
     use super::*;
     use crate::test_util::trace_init;
-    use std::io::Cursor;
 
     #[test]
     fn test_generate_config() {
@@ -655,7 +669,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
         let shutdown = ShutdownSignal::noop();
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = SourceSender::new_test();
 
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
@@ -670,7 +684,7 @@ mod tests {
             .expect("command error");
         assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
-        if let Ok(Some(event)) = rx.try_next() {
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());

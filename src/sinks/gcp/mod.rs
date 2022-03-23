@@ -1,22 +1,28 @@
-use crate::{
-    config::ProxyConfig,
-    http::{HttpClient, HttpError},
-    sinks::HealthcheckError,
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
 };
+
 use futures::StreamExt;
-use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
-    GoErr,
+    scopes::Scope,
 };
-use hyper::{header::AUTHORIZATION, StatusCode};
+use hyper::header::AUTHORIZATION;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
-use snafu::{ResultExt, Snafu};
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    config::ProxyConfig,
+    http::HttpClient,
+    sinks::gcs_common::config::{
+        BuildHttpClientSnafu, GcpError, GetImplicitTokenSnafu, GetTokenBytesSnafu, GetTokenSnafu,
+        InvalidCredentials1Snafu, InvalidRsaKeySnafu,
+    },
+};
 
 pub mod cloud_storage;
 pub mod pubsub;
@@ -25,30 +31,6 @@ pub mod stackdriver_metrics;
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
-
-#[derive(Debug, Snafu)]
-enum GcpError {
-    #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
-    MissingAuth,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials0,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials1 { source: GoErr },
-    #[snafu(display("Invalid RSA key in GCP credentials"))]
-    InvalidRsaKey { source: GoErr },
-    #[snafu(display("Failed to get OAuth token"))]
-    GetToken { source: GoErr },
-    #[snafu(display("Failed to get OAuth token text"))]
-    GetTokenBytes { source: hyper::Error },
-    #[snafu(display("Failed to get implicit GCP token"))]
-    GetImplicitToken { source: HttpError },
-    #[snafu(display("Failed to parse OAuth token JSON"))]
-    TokenFromJson { source: TokenErr },
-    #[snafu(display("Failed to parse OAuth token JSON text"))]
-    TokenJsonFromStr { source: serde_json::Error },
-    #[snafu(display("Failed to build HTTP client"))]
-    BuildHttpClient { source: HttpError },
-}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GcpAuthConfig {
@@ -83,13 +65,15 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
 
     let proxy = ProxyConfig::from_env();
     let res = HttpClient::new(None, &proxy)
-        .context(BuildHttpClient)?
+        .context(BuildHttpClientSnafu)?
         .send(req)
         .await
-        .context(GetImplicitToken)?;
+        .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body).await.context(GetTokenBytes)?;
+    let bytes = hyper::body::to_bytes(body)
+        .await
+        .context(GetTokenBytesSnafu)?;
 
     // Token::from_str is irresponsible and may panic!
     match serde_json::from_slice::<Token>(&bytes) {
@@ -103,9 +87,11 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
 
 impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
+        let creds = Credentials::from_file(path).context(InvalidCredentials1Snafu)?;
         let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token(&jwt, &creds).await.context(GetToken)?;
+        let token = goauth::get_token(&jwt, &creds)
+            .await
+            .context(GetTokenSnafu)?;
         Ok(Self {
             creds: Some(creds),
             scope,
@@ -165,31 +151,8 @@ impl GcpCredentials {
 
 fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>> {
     let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
-    let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
+    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     Ok(Jwt::new(claims, rsa_key, None))
-}
-
-// Use this to map a healthcheck response, as it handles setting up the renewal task.
-pub fn healthcheck_response(
-    creds: Option<GcpCredentials>,
-    not_found_error: crate::Error,
-) -> impl FnOnce(http::Response<hyper::Body>) -> crate::Result<()> {
-    move |response| match response.status() {
-        StatusCode::OK => {
-            // If there are credentials configured, the
-            // generated OAuth token needs to be periodically
-            // regenerated. Since the health check runs at
-            // startup, after a successful health check is a
-            // good place to create the regeneration task.
-            if let Some(creds) = creds {
-                creds.spawn_regenerate_token();
-            }
-            Ok(())
-        }
-        StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
-        StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

@@ -4,7 +4,7 @@ description: Write a custom transform for aggregating log events into metrics us
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 2
+weight: 1
 tags: ["lua", "aggregation", "transform", "advanced", "guides", "guide"]
 ---
 
@@ -221,8 +221,8 @@ source = """
 
 ## A Loadable Module
 
-As the Lua source grows, it becomes benefitial to place it into a separate file. One obvious advantage is the
-possiblity to use Lua syntax highlighting in the text editor. A less obvious one is the possibility to share
+As the Lua source grows, it becomes beneficial to place it into a separate file. One obvious advantage is the
+possibility to use Lua syntax highlighting in the text editor. A less obvious one is the possibility to share
 common functionality between different scripted transforms using [loadable modules][urls.lua_modules].
 
 There are many ways to use modules in Lua. The simplest one is to just use [`require`][urls.lua_require] function to

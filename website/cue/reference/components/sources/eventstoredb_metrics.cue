@@ -13,6 +13,7 @@ components: sources: eventstoredb_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -34,16 +35,6 @@ components: sources: eventstoredb_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -58,18 +49,15 @@ components: sources: eventstoredb_metrics: {
 			common:      true
 			description: "Endpoints to scrape stats from."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["https://localhost:2113/stats"]
 				default: "https://localhost:2113/stats"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
 			common:      true
 			description: "The interval between scrapes, in seconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 15
 				unit:    "seconds"
@@ -79,11 +67,9 @@ components: sources: eventstoredb_metrics: {
 			common:      false
 			description: "The namespace used otherwise will be defaulted to eventstoredb."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["app-123-eventstoredb"]
 				default: "eventstoredb"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -158,10 +144,13 @@ components: sources: eventstoredb_metrics: {
 		}
 	}
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

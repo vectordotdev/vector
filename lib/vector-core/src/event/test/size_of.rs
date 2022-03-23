@@ -1,8 +1,9 @@
-use super::*;
-use crate::event::test::common::Name;
-use crate::ByteSizeOf;
-use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::mem;
+
+use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+
+use super::*;
+use crate::{event::test::common::Name, ByteSizeOf};
 
 #[test]
 fn at_least_wrapper_size() {
@@ -67,7 +68,7 @@ fn size_greater_than_allocated_size() {
 
 /// The action that our model interpreter loop will take.
 #[derive(Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     Contains {
         key: String,
     },
@@ -113,8 +114,8 @@ fn log_operation_maintains_size() {
             match action {
                 Action::InsertFlat { key, value } => {
                     let new_value_sz = value.size_of();
-                    let old_value_sz = log_event.get_flat(&key).map_or(0, |x| x.size_of());
-                    if !log_event.contains(&key) {
+                    let old_value_sz = log_event.get_flat(&key).map_or(0, ByteSizeOf::size_of);
+                    if !log_event.contains(key.as_str()) {
                         current_size += key.size_of();
                     }
                     log_event.insert_flat(&key, value);
@@ -125,10 +126,10 @@ fn log_operation_maintains_size() {
                     assert_eq!(current_size, log_event.size_of());
                 }
                 Action::Contains { key } => {
-                    log_event.contains(key);
+                    log_event.contains(key.as_str());
                 }
                 Action::Remove { key } => {
-                    let value_sz = log_event.remove(&key).size_of();
+                    let value_sz = log_event.remove(key.as_str()).size_of();
                     current_size -= value_sz;
                     current_size -= key.size_of();
                 }

@@ -1,4 +1,9 @@
-use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
@@ -6,11 +11,8 @@ use futures::{
     stream::FuturesUnordered,
     FutureExt, StreamExt,
 };
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+
+use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 
 /// Lifecycle encapsulates logic for managing a lifecycle of multiple futures
 /// that are bounded together by a shared shutdown condition.

@@ -1,9 +1,10 @@
-use pin_project::pin_project;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use pin_project::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Result as IoResult};
 
 pub trait VecAsyncReadExt: AsyncRead {
@@ -62,12 +63,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::shutdown::ShutdownSignal;
-    use crate::test_util::temp_file;
     use futures::FutureExt;
-    use tokio::fs::{remove_file, File};
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+    use tokio::{
+        fs::{remove_file, File},
+        io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
+    };
+
+    use super::*;
+    use crate::{shutdown::ShutdownSignal, test_util::temp_file};
 
     #[tokio::test]
     async fn test_read_line_without_shutdown() {

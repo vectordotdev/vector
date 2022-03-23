@@ -1,3 +1,7 @@
+use std::{cmp::Ordering, collections::BTreeMap};
+
+use async_graphql::{Enum, InputObject, Object};
+
 use crate::{
     api::schema::{
         filter::{filter_items, CustomFilter, StringFilter},
@@ -7,8 +11,6 @@ use crate::{
     event::Metric,
     filter_check,
 };
-use async_graphql::{Enum, InputObject, Object};
-use std::{cmp::Ordering, collections::BTreeMap};
 
 #[derive(Clone)]
 pub struct FileSourceMetricFile<'a> {
@@ -254,8 +256,10 @@ impl FileSourceMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::schema::sort::SortField;
-    use crate::event::{MetricKind, MetricValue};
+    use crate::{
+        api::schema::sort::SortField,
+        event::{MetricKind, MetricValue},
+    };
 
     struct FileSourceMetricTest {
         name: &'static str,

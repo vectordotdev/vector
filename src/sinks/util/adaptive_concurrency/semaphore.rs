@@ -2,15 +2,18 @@
 // clippy's warning that an AtomicUsize would work better is incorrect.
 #![allow(clippy::mutex_atomic)]
 
+use std::{
+    future::Future,
+    mem::{drop, replace},
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+};
+
 use futures::{
     future::{BoxFuture, FutureExt},
     ready,
 };
-use std::future::Future;
-use std::mem::{drop, replace};
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Wrapper for `tokio::sync::Semaphore` that allows for shrinking the

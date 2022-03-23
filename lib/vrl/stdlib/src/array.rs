@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn array(value: Value) -> Resolved {
+    match value {
+        v @ Value::Array(_) => Ok(v),
+        v => Err(format!("expected array, got {}", v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Array;
 
@@ -27,7 +34,7 @@ impl Function for Array {
                 title: "invalid",
                 source: "array!(true)",
                 result: Err(
-                    r#"function call error for "array" at (0:12): expected "array", got "boolean""#,
+                    r#"function call error for "array" at (0:12): expected array, got boolean"#,
                 ),
             },
         ]
@@ -36,12 +43,17 @@ impl Function for Array {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ArrayFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        array(value)
     }
 }
 
@@ -52,16 +64,13 @@ struct ArrayFn {
 
 impl Expression for ArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Array(_) => Ok(v),
-            v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
-        }
+        array(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Array)
+            .fallible_unless(Kind::array(Collection::any()))
             .restrict_array()
     }
 }

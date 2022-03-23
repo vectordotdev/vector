@@ -1,6 +1,7 @@
-use crate::event::Event;
 use metrics::counter;
 use tracing::{span, Level};
+
+use crate::event::Event;
 
 #[ignore]
 #[test]
@@ -56,21 +57,21 @@ fn test_cardinality_metric() {
             .unwrap();
         match metric.data.value {
             crate::event::MetricValue::Counter { value } => value,
-            _ => panic!("invalid metric value type, expected coutner, got something else"),
+            _ => panic!("invalid metric value type, expected counter, got something else"),
         }
     };
 
-    let intial_value = capture_value();
+    let initial_value = capture_value();
 
     counter!("cardinality_test_metric_1", 1);
-    assert!(capture_value() >= intial_value + 1.0);
+    assert!(capture_value() >= initial_value + 1.0);
 
     counter!("cardinality_test_metric_1", 1);
-    assert!(capture_value() >= intial_value + 1.0);
+    assert!(capture_value() >= initial_value + 1.0);
 
     counter!("cardinality_test_metric_2", 1);
     counter!("cardinality_test_metric_3", 1);
-    assert!(capture_value() >= intial_value + 3.0);
+    assert!(capture_value() >= initial_value + 3.0);
 
     // Other tests could possibly increase the cardinality, so just
     // try adding the same test metrics a few times and fail only if

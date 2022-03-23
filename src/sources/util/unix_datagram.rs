@@ -1,17 +1,23 @@
-use crate::{
-    codecs, emit,
-    event::Event,
-    internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
-    shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
-    Pipeline,
-};
-use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt};
 use std::{fs::remove_file, path::PathBuf};
+
+use bytes::{Bytes, BytesMut};
+use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs,
+    event::Event,
+    internal_events::{
+        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        UnixSocketFileDeleteError,
+    },
+    shutdown::ShutdownSignal,
+    sources::{util::codecs::StreamDecodingError, Source},
+    SourceSender,
+};
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
@@ -21,9 +27,9 @@ pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     max_length: usize,
     decoder: codecs::Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    out: SourceSender,
 ) -> Source {
     Box::pin(async move {
         let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
@@ -33,7 +39,7 @@ pub fn build_unix_datagram_source(
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteError {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });
@@ -48,22 +54,26 @@ async fn listen(
     max_length: usize,
     decoder: codecs::Decoder,
     mut shutdown: ShutdownSignal,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
-    out: Pipeline,
+    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
     let mut buf = BytesMut::with_capacity(max_length);
     loop {
         buf.resize(max_length, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::Error::FramingError(error.into());
-                    emit!(&SocketReceiveError {
+                    let error = codecs::decoding::Error::FramingError(error.into());
+                    emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
                     })
                 })?;
+
+                emit!(BytesReceived {
+                    protocol: "unix",
+                    byte_size,
+                });
 
                 let payload = buf.split_to(byte_size);
 
@@ -80,15 +90,22 @@ async fn listen(
 
                 loop {
                     match stream.next().await {
-                        Some(Ok((mut events, byte_size))) => {
-                            handle_events(&mut events, received_from.clone(), byte_size);
+                        Some(Ok((mut events, _byte_size))) => {
+                            emit!(SocketEventsReceived {
+                                mode: SocketMode::Unix,
+                                byte_size: events.size_of(),
+                                count: events.len()
+                            });
 
-                            for event in events {
-                                out.send(event).await?;
+                            handle_events(&mut events, received_from.clone());
+
+                            let count = events.len();
+                            if let Err(error) = out.send_batch(events).await {
+                                emit!(StreamClosedError { error, count });
                             }
                         },
                         Some(Err(error)) => {
-                            emit!(&SocketReceiveError {
+                            emit!(SocketReceiveError {
                                 mode: SocketMode::Unix,
                                 error: &error
                             });

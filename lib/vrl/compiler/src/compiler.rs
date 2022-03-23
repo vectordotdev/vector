@@ -1,14 +1,15 @@
-use crate::expression::*;
-use crate::{Function, Program, State, Value};
+use std::convert::TryFrom;
+
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
-use std::convert::TryFrom;
 
-pub type Errors = Vec<Box<dyn DiagnosticError>>;
+use crate::{expression::*, Function, Program, State, Value};
 
-pub struct Compiler<'a> {
+pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
+
+pub(crate) struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,
@@ -287,7 +288,7 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        Assignment::new(node, &mut self.state).unwrap_or_else(|err| {
+        Assignment::new(node, self.state).unwrap_or_else(|err| {
             self.state.rollback();
             self.errors.push(Box::new(err));
             Assignment::noop()
@@ -390,9 +391,17 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    fn compile_abort(&mut self, node: Node<()>) -> Abort {
+    fn compile_abort(&mut self, node: Node<ast::Abort>) -> Abort {
         self.abortable = true;
-        Abort::new(node.span())
+        let (span, abort) = node.take();
+        let message = abort
+            .message
+            .map(|expr| Node::new(expr.span(), self.compile_expr(*expr)));
+
+        Abort::new(span, message, self.state).unwrap_or_else(|err| {
+            self.errors.push(Box::new(err));
+            Abort::noop(span)
+        })
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

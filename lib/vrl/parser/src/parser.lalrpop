@@ -225,7 +225,10 @@ Ident: Ident = "identifier" => Ident(<>.to_owned());
 
 PathField: Ident = "path field" => Ident(<>.to_owned());
 
-AbortExpr: Expr = Sp<"abort"> => Expr::Abort(<>.map(|_| ()));
+AbortExpr: Expr = {
+    Sp<"abort"> => Expr::Abort(<>.map(|_| Abort { message: None })),
+    <n: Sp<"abort">> <message: Expr> => Expr::Abort(n.map(|_| Abort { message: Some(Box::new(message.clone())) })),
+}
 
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {

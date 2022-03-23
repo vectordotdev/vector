@@ -4,6 +4,7 @@
 //! and the [`Debounce::debounced`] will be resolved only once.
 
 use std::{future::pending, time::Duration};
+
 use tokio::time::{sleep_until, Instant};
 
 /// Provides an arbitrary signal debouncing.
@@ -54,8 +55,9 @@ impl Debounce {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::{pin_mut, poll};
+
+    use super::*;
 
     const TEST_DELAY_FRACTION: Duration = Duration::from_secs(60 * 60); // one hour
     const TEST_DELAY: Duration = Duration::from_secs(24 * 60 * 60); // one day

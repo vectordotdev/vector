@@ -1,39 +1,47 @@
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{self, Read},
+    iter::IntoIterator,
+    path::PathBuf,
+};
+
+use clap::Parser;
+use vector_common::TimeZone;
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value, VrlRuntime};
+
 #[cfg(feature = "repl")]
 use super::repl;
 use super::Error;
-use shared::TimeZone;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{self, Read};
-use std::iter::IntoIterator;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "VRL", about = "Vector Remap Language CLI")]
+#[derive(Parser, Debug)]
+#[clap(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
     /// The VRL program to execute. The program ".foo = true", for example, sets the event object's
     /// `foo` field to `true`.
-    #[structopt(name = "PROGRAM")]
+    #[clap(name = "PROGRAM")]
     program: Option<String>,
 
     /// The file containing the event object(s) to handle. JSON events should be one per line..
-    #[structopt(short, long = "input", parse(from_os_str))]
+    #[clap(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
     /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
-    #[structopt(short, long = "program", conflicts_with("program"), parse(from_os_str))]
+    #[clap(short, long = "program", conflicts_with("PROGRAM"), parse(from_os_str))]
     program_file: Option<PathBuf>,
 
     /// Print the (modified) event object instead of the result of the final expression. Setting
     /// this flag is equivalent to using `.` as the final expression.
-    #[structopt(short = "o", long)]
+    #[clap(short = 'o', long)]
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[structopt(short = "tz", long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
 }
 
 impl Opts {
@@ -80,7 +88,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match run(opts) {
         Ok(_) => exitcode::OK,
         Err(err) => {
-            eprintln!("{}", err);
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("{}", err);
+            }
             exitcode::SOFTWARE
         }
     }
@@ -98,16 +109,26 @@ fn run(opts: &Opts) -> Result<(), Error> {
             default_objects()
         };
 
-        repl(repl_objects, &tz)
+        repl(repl_objects, &tz, opts.runtime)
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
+        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 
         for mut object in objects {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let state = state::Runtime::default();
+            let runtime = Runtime::new(state);
+            let result = execute(
+                &mut object,
+                &program,
+                &tz,
+                runtime,
+                stdlib::all(),
+                opts.runtime,
+            )
+            .map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -115,6 +136,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 }
             });
 
+            #[allow(clippy::print_stdout)]
+            #[allow(clippy::print_stderr)]
             match result {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
@@ -125,43 +148,55 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
-fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
-    if cfg!(feature = "repl") {
-        repl::run(objects, timezone);
-        Ok(())
-    } else {
-        Err(Error::ReplFeature)
-    }
+#[cfg(feature = "repl")]
+fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
+    repl::run(objects, timezone, vrl_runtime);
+    Ok(())
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(_objects: Vec<Value>, _timezone: &TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(
     object: &mut impl Target,
     program: &Program,
     timezone: &TimeZone,
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
+    vrl_runtime: VrlRuntime,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
-
-    runtime
-        .resolve(object, program, timezone)
-        .map_err(Error::Runtime)
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime
+                .compile(functions, program, Default::default())
+                .unwrap();
+            runtime
+                .run_vm(&vm, object, timezone)
+                .map_err(Error::Runtime)
+        }
+        VrlRuntime::Ast => runtime
+            .resolve(object, program, timezone)
+            .map_err(Error::Runtime),
+    }
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {
-    use serde_json::Value;
+    use serde_json::Value as JsonValue;
 
     match value {
-        Value::Null => vrl::Value::Null,
-        Value::Object(v) => v
+        JsonValue::Null => vrl::Value::Null,
+        JsonValue::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))
             .collect::<BTreeMap<_, _>>()
             .into(),
-        Value::Bool(v) => v.into(),
-        Value::Number(v) if v.is_f64() => v.as_f64().unwrap().into(),
-        Value::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
-        Value::String(v) => v.into(),
-        Value::Array(v) => v.into_iter().map(serde_to_vrl).collect::<Vec<_>>().into(),
+        JsonValue::Bool(v) => v.into(),
+        JsonValue::Number(v) if v.is_f64() => Value::from_f64_or_zero(v.as_f64().unwrap()),
+        JsonValue::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
+        JsonValue::String(v) => v.into(),
+        JsonValue::Array(v) => v.into_iter().map(serde_to_vrl).collect::<Vec<_>>().into(),
     }
 }
 

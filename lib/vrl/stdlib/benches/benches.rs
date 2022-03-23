@@ -1,13 +1,13 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/pull/6408
+    // https://github.com/vectordotdev/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = array,
               assert,
@@ -44,6 +44,8 @@ criterion_group!(
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
+              ip_ntop,
+              ip_pton,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
@@ -79,6 +81,7 @@ criterion_group!(
               parse_duration,
               parse_glog,
               parse_grok,
+              parse_groks,
               parse_key_value,
               parse_klog,
               parse_int,
@@ -111,6 +114,7 @@ criterion_group!(
               strip_ansi_escape_codes,
               strip_whitespace,
               tally,
+              tally_value,
               timestamp,
               to_bool,
               to_float,
@@ -444,7 +448,7 @@ bench_function! {
         want: Ok("42"),
     }
 
-    hexidecimal {
+    hexadecimal {
         args: func_args![value: 42, base: 16],
         want: Ok(value!("2a")),
     }
@@ -558,6 +562,34 @@ bench_function! {
     valid {
         args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
+    }
+}
+
+bench_function! {
+    ip_ntop => vrl_stdlib::IpNtop;
+
+    ipv4 {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!("\x01\x02\x03\x04")),
+    }
+
+    ipv6 {
+        args: func_args![value: "102:304:506:708:90a:b0c:d0e:f10"],
+        want: Ok(value!("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")),
+    }
+}
+
+bench_function! {
+    ip_pton => vrl_stdlib::IpPton;
+
+    ipv4 {
+        args: func_args![value: "\x01\x02\x03\x04"],
+        want: Ok(value!("1.2.3.4")),
+    }
+
+    ipv6 {
+        args: func_args![value: "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"],
+        want: Ok(value!("102:304:506:708:90a:b0c:d0e:f10")),
     }
 }
 
@@ -1300,6 +1332,32 @@ bench_function! {
             "level": "info",
             "message": "Hello world",
         })),
+    }
+}
+
+bench_function! {
+    parse_groks => vrl_stdlib::ParseGroks;
+
+    simple {
+        args: func_args![
+            value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
+            patterns: Value::Array(vec![
+                "%{common_prefix} %{_status} %{_message}".into(),
+                "%{common_prefix} %{_message}".into(),
+                ]),
+            aliases: value!({
+                common_prefix: "%{_timestamp} %{_loglevel}",
+                _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
+                _loglevel: "%{LOGLEVEL:level}",
+                _status: "%{POSINT:status}",
+                _message: "%{GREEDYDATA:message}"
+            })
+        ],
+        want: Ok(Value::from(btreemap! {
+            "timestamp" => "2020-10-02T23:22:12.223222Z",
+            "level" => "info",
+            "message" => "hello world"
+        }))
     }
 }
 
@@ -2065,6 +2123,18 @@ bench_function! {
             value: value!(["bar", "foo", "baz", "foo"]),
         ],
         want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+}
+
+bench_function! {
+    tally_value => vrl_stdlib::TallyValue;
+
+    default {
+        args: func_args![
+            array: value!(["bar", "foo", "baz", "foo"]),
+            value: "foo",
+        ],
+        want: Ok(value!(2)),
     }
 }
 

@@ -1,5 +1,6 @@
-use metrics::histogram;
 use std::time::Duration;
+
+use metrics::histogram;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -13,7 +14,7 @@ pub struct AdaptiveConcurrencyLimit {
 }
 
 impl InternalEvent for AdaptiveConcurrencyLimit {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Changed concurrency.",
             concurrency = %self.concurrency,
@@ -23,9 +24,6 @@ impl InternalEvent for AdaptiveConcurrencyLimit {
             past_rtt = ?self.past_rtt,
             past_rtt_deviation = ?self.past_rtt_deviation,
         );
-    }
-
-    fn emit_metrics(&self) {
         // These are histograms, as they may have a number of different
         // values over each reporting interval, and each of those values
         // is valuable for diagnosis.
@@ -44,7 +42,7 @@ pub struct AdaptiveConcurrencyInFlight {
 }
 
 impl InternalEvent for AdaptiveConcurrencyInFlight {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         histogram!("adaptive_concurrency_in_flight", self.in_flight as f64);
     }
 }
@@ -55,7 +53,7 @@ pub struct AdaptiveConcurrencyObservedRtt {
 }
 
 impl InternalEvent for AdaptiveConcurrencyObservedRtt {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         histogram!("adaptive_concurrency_observed_rtt", self.rtt);
     }
 }
@@ -66,7 +64,7 @@ pub struct AdaptiveConcurrencyAveragedRtt {
 }
 
 impl InternalEvent for AdaptiveConcurrencyAveragedRtt {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         histogram!("adaptive_concurrency_averaged_rtt", self.rtt);
     }
 }

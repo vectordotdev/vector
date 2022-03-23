@@ -1,10 +1,15 @@
-use crate::expression::{Block, Expr, Resolved};
-use crate::parser::Node;
-use crate::{value::Kind, Context, Expression, Span, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
 
-pub type Result = std::result::Result<Predicate, Error>;
+use diagnostic::{DiagnosticError, Label, Note, Urls};
+
+use crate::{
+    expression::{Block, Expr, Resolved},
+    parser::Node,
+    value::Kind,
+    Context, Expression, Span, State, TypeDef, Value,
+};
+
+pub(crate) type Result = std::result::Result<Predicate, Error>;
 
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
@@ -16,11 +21,17 @@ impl Predicate {
         let (span, block) = node.take();
         let type_def = block.type_def(state);
 
+        if type_def.is_fallible() {
+            return Err(Error {
+                variant: ErrorVariant::Fallible,
+                span,
+            });
+        }
+
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind()),
+                variant: ErrorVariant::NonBoolean(type_def.into()),
                 span,
-                labels: vec![],
             });
         }
 
@@ -55,9 +66,20 @@ impl Expression for Predicate {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
 
         type_def.with_fallibility(fallible)
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> std::result::Result<(), String> {
+        for inner in &self.inner {
+            inner.compile_to_vm(vm, state)?;
+        }
+        Ok(())
     }
 }
 
@@ -108,13 +130,14 @@ pub struct Error {
     pub(crate) variant: ErrorVariant,
 
     span: Span,
-    labels: Vec<Label>,
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("non-boolean predicate")]
     NonBoolean(Kind),
+    #[error("fallible predicate")]
+    Fallible,
 }
 
 impl fmt::Display for Error {
@@ -135,6 +158,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             NonBoolean(..) => 102,
+            Fallible => 111,
         }
     }
 
@@ -145,6 +169,10 @@ impl DiagnosticError for Error {
             NonBoolean(kind) => vec![
                 Label::primary("this predicate must resolve to a boolean", self.span),
                 Label::context(format!("instead it resolves to {}", kind), self.span),
+            ],
+            Fallible => vec![
+                Label::primary("this predicate can result in runtime error", self.span),
+                Label::context("handle the error case to ensure runtime success", self.span),
             ],
         }
     }
@@ -160,6 +188,7 @@ impl DiagnosticError for Error {
                     Urls::expression_docs_url("#if"),
                 ),
             ],
+            Fallible => vec![Note::SeeErrorDocs],
         }
     }
 }

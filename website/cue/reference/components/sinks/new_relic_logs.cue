@@ -6,20 +6,20 @@ components: sinks: new_relic_logs: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
 		stateful: false
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    5240000
+				max_bytes:    1_000_000
 				timeout_secs: 1
 			}
 			compression: {
@@ -57,18 +57,12 @@ components: sinks: new_relic_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				This transform has been deprecated. Please use the [`new_relic` sink](\(urls.vector_new_relic_sink)) instead.
+				""",
+		]
 		notices: []
 	}
 
@@ -77,36 +71,30 @@ components: sinks: new_relic_logs: {
 			common:      true
 			description: "Your New Relic insert key (if applicable)."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
-				syntax: "literal"
 			}
 		}
 		license_key: {
 			common:      true
 			description: "Your New Relic license key (if applicable)."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
-				syntax: "literal"
 			}
 		}
 		region: {
 			common:      true
 			description: "The region to send data to."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "us"
 				enum: {
 					us: "United States"
 					eu: "Europe"
 				}
-				syntax: "literal"
 			}
 		}
 

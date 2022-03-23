@@ -1,7 +1,9 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+
+use crate::event::metric::{Metric, MetricKind, MetricValue};
 
 #[derive(Deserialize)]
 struct BlockIoStat {
@@ -446,7 +448,10 @@ fn network_metrics(
     .collect()
 }
 
-pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, serde_json::Error> {
+pub(super) fn parse(
+    bytes: &[u8],
+    namespace: Option<String>,
+) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
 
@@ -485,10 +490,11 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
 
 #[cfg(test)]
 mod test {
+    use chrono::{offset::TimeZone, DateTime, Utc};
+    use vector_common::assert_event_data_eq;
+
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use chrono::{offset::TimeZone, DateTime, Utc};
-    use shared::assert_event_data_eq;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

@@ -2,13 +2,15 @@
 
 #![deny(missing_docs)]
 
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
 use evmap::ReadHandle;
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    event::{Event, LogEvent},
+    kubernetes as k8s,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -59,20 +61,21 @@ impl NamespaceMetadataAnnotator {
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
     // Calculate and cache the prefix path.
-    let prefix_path = PathIter::new(fields_spec.namespace_labels.as_ref()).collect::<Vec<_>>();
+    let prefix_path = parse_path(&fields_spec.namespace_labels);
     if let Some(labels) = &metadata.labels {
         for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone().into()));
-            log.insert_path(path, val.to_owned());
+            let mut path = prefix_path.clone().segments;
+            path.push(OwnedSegment::Field(key.clone()));
+            log.insert(&path, val.to_owned());
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_common::assert_event_data_eq;
+
     use super::*;
-    use shared::assert_event_data_eq;
 
     #[test]
     fn test_annotate_from_metadata() {
@@ -99,8 +102,8 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.namespace_labels.sandbox0-label0", "val0");
-                    log.insert("kubernetes.namespace_labels.sandbox0-label1", "val1");
+                    log.insert("kubernetes.namespace_labels.\"sandbox0-label0\"", "val0");
+                    log.insert("kubernetes.namespace_labels.\"sandbox0-label1\"", "val1");
                     log
                 },
             ),
@@ -123,8 +126,8 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("ns_labels.sandbox0-label0", "val0");
-                    log.insert("ns_labels.sandbox0-label1", "val1");
+                    log.insert("ns_labels.\"sandbox0-label0\"", "val0");
+                    log.insert("ns_labels.\"sandbox0-label1\"", "val1");
                     log
                 },
             ),
@@ -149,11 +152,11 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(r#"kubernetes.namespace_labels.nested0\.label0"#, "val0");
-                    log.insert(r#"kubernetes.namespace_labels.nested0\.label1"#, "val1");
-                    log.insert(r#"kubernetes.namespace_labels.nested1\.label0"#, "val2");
+                    log.insert(r#"kubernetes.namespace_labels."nested0.label0""#, "val0");
+                    log.insert(r#"kubernetes.namespace_labels."nested0.label1""#, "val1");
+                    log.insert(r#"kubernetes.namespace_labels."nested1.label0""#, "val2");
                     log.insert(
-                        r#"kubernetes.namespace_labels.nested2\.label0\.deep0"#,
+                        r#"kubernetes.namespace_labels."nested2.label0.deep0""#,
                         "val3",
                     );
                     log

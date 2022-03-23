@@ -19,7 +19,7 @@ rustPlatform.buildRustPackage rec {
   %>";
 
   src = <% if ENV.has_key?("GITHUB_SHA256") %>fetchFromGitHub {
-      owner  = "timberio";
+      owner  = "vectordotdev";
       repo   = pname;
       rev    = "refs/tags/v${version}";
       sha256 = "<%= ENV["GITHUB_SHA256"] %>";
@@ -60,7 +60,7 @@ rustPlatform.buildRustPackage rec {
 
   meta = with stdenv.lib; {
     description = "A lightweight and ultra-fast tool for building observability pipelines";
-    homepage    = "https://github.com/timberio/vector";
+    homepage    = "https://github.com/vectordotdev/vector";
     license     = with licenses; [ asl20 ];
     maintainers = with maintainers; [ thoughtpolice ];
     platforms   = platforms.all;

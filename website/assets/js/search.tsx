@@ -1,7 +1,7 @@
+import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js'
+import algoliasearch from 'algoliasearch/lite'
 import React, { createElement, Fragment, useEffect, useRef } from 'react'
 import ReactDOM, { render } from 'react-dom'
-import algoliasearch from 'algoliasearch/lite'
-import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js'
 
 // Algolia search
 const appId = process.env.ALGOLIA_APP_ID
@@ -152,6 +152,7 @@ const Autocomplete = (props) => {
 const Search = () => {
   return (
     <Autocomplete
+      aria-label="Search query results"
       openOnFocus={false}
       detachedMediaQuery=""
       defaultActiveItemId={0}

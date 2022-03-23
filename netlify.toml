@@ -48,7 +48,7 @@ force = true
 
 [[redirects]]
 from = "https://discussions.vector.dev/*"
-to = "https://github.com/timberio/vector/discussions"
+to = "https://github.com/vectordotdev/vector/discussions"
 status = 302
 force = true
 
@@ -83,3 +83,9 @@ for = "/index.json"
 [headers.values]
 Access-Control-Allow-Origin = "*"
 
+# Netlify plugins
+[[plugins]]
+package = "@netlify/plugin-lighthouse"
+
+[plugins.inputs]
+output_path = "reports/lighthouse/index.html"

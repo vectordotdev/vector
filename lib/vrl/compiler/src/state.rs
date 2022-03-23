@@ -1,21 +1,28 @@
-use crate::expression::assignment;
-use crate::{parser::ast::Ident, TypeDef, Value};
-use std::{any::Any, collections::HashMap};
+use anymap::AnyMap;
+use std::collections::HashMap;
+
+use value::Kind;
+
+use crate::{expression::assignment, parser::ast::Ident, Value};
 
 /// The state held by the compiler.
 ///
 /// This state allows the compiler to track certain invariants during
 /// compilation, which in turn drives our progressive type checking system.
-#[derive(Default)]
+#[derive(Debug)]
 pub struct Compiler {
-    /// stored external target type definition
+    /// Stored external target type definitions.
+    //
+    // TODO(Jean): Change this to point to a `value::Collection<Field>` type, to ensure the target
+    // is always an object. Although we probably also need to support arrays, in which case we
+    // should wrap it in an enum to also support `value::Collection<Index>`.
     target: Option<assignment::Details>,
 
-    /// stored internal variable type definitions
+    /// Stored internal variable type definitions.
     variables: HashMap<Ident, assignment::Details>,
 
-    /// context passed between the client program and a VRL function.
-    external_context: Option<Box<dyn Any>>,
+    /// Context passed between the client program and a VRL function.
+    external_context: AnyMap,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -30,20 +37,38 @@ pub struct Compiler {
     snapshot: Option<Box<Self>>,
 }
 
+impl Default for Compiler {
+    fn default() -> Self {
+        Self {
+            external_context: AnyMap::new(),
+            target: None,
+            variables: HashMap::default(),
+            snapshot: None,
+        }
+    }
+}
+
 impl Compiler {
     pub fn new() -> Self {
         Default::default()
     }
 
-    /// Creates a new compiler that starts with an initial given typedef.
-    pub fn new_with_type_def(type_def: TypeDef) -> Self {
+    /// Creates a new compiler that starts with an initial given [`Kind`].
+    pub fn new_with_kind(kind: Kind) -> Self {
         Self {
             target: Some(assignment::Details {
-                type_def,
+                type_def: kind.into(),
                 value: None,
             }),
             ..Default::default()
         }
+    }
+
+    /// Get the kind information of the program target (e.g. the type accessed through `.`).
+    pub fn target_kind(&self) -> Option<&Kind> {
+        self.target()
+            .as_ref()
+            .map(|details| details.type_def.kind())
     }
 
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
@@ -76,7 +101,7 @@ impl Compiler {
         let snapshot = Self {
             target,
             variables,
-            external_context: None,
+            external_context: AnyMap::new(),
             snapshot: None,
         };
 
@@ -85,36 +110,35 @@ impl Compiler {
 
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
-        if let Some(mut snapshot) = self.snapshot.take() {
-            let context = snapshot.external_context.take();
+        if let Some(snapshot) = self.snapshot.take() {
+            let external_context = self.swap_external_context(AnyMap::new());
             *self = *snapshot;
-            self.external_context = context;
+            self.external_context = external_context;
         }
     }
 
-    /// Returns the root typedef for the paths (not the variables) of the object.
-    pub fn target_type_def(&self) -> Option<&TypeDef> {
-        self.target.as_ref().map(|assignment| &assignment.type_def)
-    }
-
     /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context(&mut self, data: Option<Box<dyn Any>>) {
-        self.external_context = data;
+    pub fn set_external_context<T: 'static>(&mut self, data: T) {
+        self.external_context.insert::<T>(data);
     }
 
     /// Retrieves the first data of the required type from the external context.
+    #[must_use]
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context
-            .as_ref()
-            .and_then(|data| data.downcast_ref::<T>())
+        self.external_context.get::<T>()
     }
 
     /// Retrieves a mutable reference to the first data of the required type from
     /// the external context.
+    #[must_use]
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context
-            .as_mut()
-            .and_then(|data| data.downcast_mut::<T>())
+        self.external_context.get_mut::<T>()
+    }
+
+    /// Swap the existing external contexts with new ones, returning the old ones.
+    #[must_use]
+    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
+        std::mem::replace(&mut self.external_context, ctx)
     }
 }
 

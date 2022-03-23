@@ -1,31 +1,33 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    sync::Arc,
+};
+
+use bytes::Bytes;
+use vector_buffers::EventCount;
+use vector_common::EventDataEq;
+
 use crate::ByteSizeOf;
-use buffers::bytes::{DecodeBytes, EncodeBytes};
-use bytes::{Buf, BufMut, Bytes};
-use chrono::{DateTime, SecondsFormat, Utc};
+pub use ::value::Value;
+pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
 };
-pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-use prost::{DecodeError, EncodeError, Message};
-use shared::EventDataEq;
-use std::collections::{BTreeMap, HashMap};
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::sync::Arc;
-pub use util::log::PathComponent;
-pub use util::log::PathIter;
-pub use value::Value;
+pub use r#ref::{EventMutRef, EventRef};
+pub use trace::TraceEvent;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
+pub mod array;
 pub mod discriminant;
 pub mod error;
 mod finalization;
-mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -33,10 +35,12 @@ pub mod merge_state;
 mod metadata;
 pub mod metric;
 pub mod proto;
+mod r#ref;
+mod ser;
 #[cfg(test)]
 mod test;
+mod trace;
 pub mod util;
-mod value;
 #[cfg(feature = "vrl")]
 mod vrl_target;
 
@@ -46,6 +50,7 @@ pub const PARTIAL: &str = "_partial";
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
+    Trace(TraceEvent),
 }
 
 impl ByteSizeOf for Event {
@@ -53,26 +58,24 @@ impl ByteSizeOf for Event {
         match self {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
+            Event::Trace(trace_event) => trace_event.allocated_bytes(),
         }
+    }
+}
+
+impl EventCount for Event {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log) => log.metadata_mut().take_finalizers(),
-            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
+            Event::Log(log_event) => log_event.take_finalizers(),
+            Event::Metric(metric) => metric.take_finalizers(),
+            Event::Trace(trace_event) => trace_event.take_finalizers(),
         }
-    }
-}
-
-impl<T: Finalizable> Finalizable for Vec<T> {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.iter_mut()
-            .fold(EventFinalizers::default(), |mut acc, x| {
-                acc.merge(x.take_finalizers());
-                acc
-            })
     }
 }
 
@@ -118,6 +121,16 @@ impl Event {
         }
     }
 
+    /// Fallibly coerces self into a `LogEvent`
+    ///
+    /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
+    pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
     /// Return self as a `Metric`
     ///
     /// # Panics
@@ -154,10 +167,67 @@ impl Event {
         }
     }
 
+    /// Fallibly coerces self into a `Metric`
+    ///
+    /// If the event is a `Metric`, then `Some(metric)` is returned, otherwise `None`.
+    pub fn try_into_metric(self) -> Option<Metric> {
+        match self {
+            Event::Metric(metric) => Some(metric),
+            _ => None,
+        }
+    }
+
+    /// Return self as a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_trace(&self) -> &TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Return self as a mutable `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn as_mut_trace(&mut self) -> &mut TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Coerces self into a `TraceEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Trace`.
+    pub fn into_trace(self) -> TraceEvent {
+        match self {
+            Event::Trace(trace) => trace,
+            _ => panic!("Failed type coercion, {:?} is not a trace event", self),
+        }
+    }
+
+    /// Fallibly coerces self into a `TraceEvent`
+    ///
+    /// If the event is a `TraceEvent`, then `Some(trace)` is returned, otherwise `None`.
+    pub fn try_into_trace(self) -> Option<TraceEvent> {
+        match self {
+            Event::Trace(trace) => Some(trace),
+            _ => None,
+        }
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         match self {
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+            Self::Trace(trace) => trace.metadata(),
         }
     }
 
@@ -165,6 +235,7 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
+            Self::Trace(trace) => trace.metadata_mut(),
         }
     }
 
@@ -173,6 +244,7 @@ impl Event {
         match self {
             Self::Log(log) => log.into_parts().1,
             Self::Metric(metric) => metric.into_parts().2,
+            Self::Trace(trace) => trace.into_parts().1,
         }
     }
 
@@ -181,13 +253,25 @@ impl Event {
         match self {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
         }
     }
 
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier(batch).into(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        match self {
+            Self::Log(log) => log.with_batch_notifier_option(batch).into(),
+            Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
+            Self::Trace(trace) => trace.with_batch_notifier_option(batch).into(),
         }
     }
 }
@@ -197,13 +281,10 @@ impl EventDataEq for Event {
         match (self, other) {
             (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
+            (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             _ => false,
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 impl From<BTreeMap<String, Value>> for Event {
@@ -243,6 +324,7 @@ impl TryInto<serde_json::Value> for Event {
         match self {
             Event::Log(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
+            Event::Trace(fields) => serde_json::to_value(fields),
         }
     }
 }
@@ -295,7 +377,7 @@ impl From<proto::HistogramBucket> for metric::Bucket {
 impl From<metric::Quantile> for proto::SummaryQuantile {
     fn from(quantile: metric::Quantile) -> Self {
         Self {
-            upper_limit: quantile.upper_limit,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }
@@ -304,7 +386,7 @@ impl From<metric::Quantile> for proto::SummaryQuantile {
 impl From<proto::SummaryQuantile> for metric::Quantile {
     fn from(quantile: proto::SummaryQuantile) -> Self {
         Self {
-            upper_limit: quantile.upper_limit,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }
@@ -340,6 +422,12 @@ impl From<Metric> for Event {
     }
 }
 
+impl From<TraceEvent> for Event {
+    fn from(trace: TraceEvent) -> Self {
+        Event::Trace(trace)
+    }
+}
+
 pub trait MaybeAsLogMut {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent>;
 }
@@ -348,58 +436,7 @@ impl MaybeAsLogMut for Event {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
         match self {
             Event::Log(log) => Some(log),
-            Event::Metric(_) => None,
+            _ => None,
         }
-    }
-}
-
-/// A wrapper for references to inner event types, where reconstituting
-/// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
-#[derive(Clone, Copy, Debug)]
-pub enum EventRef<'a> {
-    Log(&'a LogEvent),
-    Metric(&'a Metric),
-}
-
-impl<'a> From<&'a Event> for EventRef<'a> {
-    fn from(event: &'a Event) -> Self {
-        match event {
-            Event::Log(log) => log.into(),
-            Event::Metric(metric) => metric.into(),
-        }
-    }
-}
-
-impl<'a> From<&'a LogEvent> for EventRef<'a> {
-    fn from(log: &'a LogEvent) -> Self {
-        Self::Log(log)
-    }
-}
-
-impl<'a> From<&'a Metric> for EventRef<'a> {
-    fn from(metric: &'a Metric) -> Self {
-        Self::Metric(metric)
-    }
-}
-
-impl EncodeBytes<Event> for Event {
-    type Error = EncodeError;
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
-    where
-        B: BufMut,
-    {
-        proto::EventWrapper::from(self).encode(buffer)
-    }
-}
-
-impl DecodeBytes<Event> for Event {
-    type Error = DecodeError;
-
-    fn decode<B>(buffer: B) -> Result<Event, Self::Error>
-    where
-        B: Buf,
-    {
-        proto::EventWrapper::decode(buffer).map(|wrp| wrp.into())
     }
 }

@@ -1,23 +1,25 @@
-use crate::event::{Event, LogEvent};
-use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
-use futures::stream::BoxStream;
-use std::num::NonZeroUsize;
-use vector_core::partition::NullPartitioner;
+use std::{fmt, num::NonZeroUsize};
 
-use crate::buffers::Acker;
-use crate::event::Value;
-use crate::sinks::elasticsearch::encoder::ProcessedEvent;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
-use crate::sinks::elasticsearch::service::{ElasticSearchRequest, ElasticSearchResponse};
-use crate::sinks::elasticsearch::{BulkAction, ElasticSearchCommonMode};
-use crate::transforms::metric_to_log::MetricToLog;
-use crate::Error;
 use async_trait::async_trait;
-use futures::future;
-use futures::StreamExt;
-use tower::util::BoxService;
-use vector_core::stream::BatcherSettings;
-use vector_core::ByteSizeOf;
+use futures::{future, stream::BoxStream, StreamExt};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
+
+use crate::{
+    event::{Event, LogEvent, Value},
+    sinks::{
+        elasticsearch::{
+            encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
+            service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
+        },
+        util::{Compression, SinkBuilderExt, StreamSink},
+    },
+    transforms::metric_to_log::MetricToLog,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -36,18 +38,24 @@ impl ByteSizeOf for BatchedEvents {
     }
 }
 
-pub struct ElasticSearchSink {
+pub struct ElasticsearchSink<S> {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
-    pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
+    pub service: S,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
-    pub mode: ElasticSearchCommonMode,
+    pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
 }
 
-impl ElasticSearchSink {
+impl<S> ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -59,12 +67,12 @@ impl ElasticSearchSink {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
+                    _ => None,
                 }))
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -83,7 +91,7 @@ impl ElasticSearchSink {
 
 pub fn process_log(
     mut log: LogEvent,
-    mode: &ElasticSearchCommonMode,
+    mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
@@ -93,7 +101,9 @@ pub fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) = id_key_field.as_ref().and_then(|key| log.remove(key))
+    let id = if let Some(Value::Bytes(key)) = id_key_field
+        .as_ref()
+        .and_then(|key| log.remove(key.as_str()))
     {
         Some(String::from_utf8_lossy(&key).into_owned())
     } else {
@@ -108,7 +118,13 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink for ElasticSearchSink {
+impl<S> StreamSink<Event> for ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

@@ -1,5 +1,24 @@
 use vrl::prelude::*;
 
+fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {
+    let pattern = pattern.try_regex()?;
+    let list = list.try_array()?;
+    let all = match all {
+        Some(value) => value.try_boolean()?,
+        None => false,
+    };
+    let matcher = |i: &Value| match i.try_bytes_utf8_lossy() {
+        Ok(v) => pattern.is_match(&v),
+        _ => false,
+    };
+    let included = if all {
+        list.iter().all(matcher)
+    } else {
+        list.iter().any(matcher)
+    };
+    Ok(included.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct MatchArray;
 
@@ -26,7 +45,7 @@ impl Function for MatchArray {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -59,6 +78,14 @@ impl Function for MatchArray {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let pattern = args.required("pattern");
+        let all = args.optional("all");
+
+        match_array(value, pattern, all)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,38 +97,28 @@ pub(crate) struct MatchArrayFn {
 
 impl Expression for MatchArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?.try_array()?;
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
+        let list = self.value.resolve(ctx)?;
+        let pattern = self.pattern.resolve(ctx)?;
+        let all = self
+            .all
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let all = match &self.all {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
-        };
-
-        let matcher = |i: &Value| match i.try_bytes_utf8_lossy() {
-            Ok(v) => pattern.is_match(&v),
-            _ => false,
-        };
-
-        let included = if all {
-            list.iter().all(matcher)
-        } else {
-            list.iter().any(matcher)
-        };
-
-        Ok(included.into())
+        match_array(list, pattern, all)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+        TypeDef::boolean().infallible()
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         match_array => MatchArray;
@@ -112,7 +129,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("foo").unwrap().into())
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         all {
@@ -122,7 +139,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         not_all {
@@ -132,7 +149,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values {
@@ -141,7 +158,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("abc").unwrap().into())
             ],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values_no_match {
@@ -150,7 +167,7 @@ mod tests {
                 pattern: Value::Regex(Regex::new("xyz").unwrap().into()),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         mixed_values_no_match_all {
@@ -160,7 +177,7 @@ mod tests {
                 all: value!(true),
             ],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

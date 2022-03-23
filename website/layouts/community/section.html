@@ -14,7 +14,7 @@ Community | {{ site.Title }}
     <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
       {{ range $buttons }}
       <button class="rounded-lg border p-4 md:p-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
-        <a href="{{ .url }}" title="{{ .title | safeHTML }}" target="_blank">
+        <a href="{{ .url }}" title="{{ .title | safeHTML }}" rel="noopener" target="_blank">
           <div class="flex flex-col space-y-2.5 md:space-y-4 items-center justify-center">
             <ion-icon name="{{ .ionicon }}" class="h-10 w-10 md:h-12 md:w-12 lg:h-16 lg:w-16 {{ .icon_classes }}"></ion-icon>
 

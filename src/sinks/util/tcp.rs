@@ -1,11 +1,31 @@
+use std::{
+    io::ErrorKind,
+    net::SocketAddr,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio::{
+    io::{AsyncRead, ReadBuf},
+    net::TcpStream,
+    time::sleep,
+};
+use vector_core::{buffers::Acker, ByteSizeOf};
+
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
-        TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -19,25 +39,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    io::ErrorKind,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{
-    io::{AsyncRead, ReadBuf},
-    net::TcpStream,
-    time::sleep,
-};
-use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -97,7 +98,7 @@ impl TcpSinkConfig {
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -145,7 +146,7 @@ impl TcpConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(TcpError::NoAddresses)?;
 
@@ -153,7 +154,7 @@ impl TcpConnector {
         self.tls
             .connect(&self.host, &addr)
             .await
-            .context(ConnectError)
+            .context(ConnectSnafu)
             .map(|mut maybe_tls| {
                 if let Some(keepalive) = self.keepalive {
                     if let Err(error) = maybe_tls.set_keepalive(keepalive) {
@@ -176,13 +177,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(&TcpSocketConnectionEstablished {
+                    emit!(TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(&TcpSocketConnectionFailed { error });
+                    emit!(TcpSocketConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -249,7 +250,7 @@ impl TcpSink {
 }
 
 #[async_trait]
-impl StreamSink for TcpSink {
+impl StreamSink<Event> for TcpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
@@ -270,7 +271,7 @@ impl StreamSink for TcpSink {
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -282,9 +283,9 @@ impl StreamSink for TcpSink {
 
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(&TcpSocketConnectionShutdown {});
+                    emit!(TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(&TcpSocketError { error });
+                    emit!(TcpSocketError { error });
                 }
             }
         }
@@ -295,9 +296,10 @@ impl StreamSink for TcpSink {
 
 #[cfg(test)]
 mod test {
+    use tokio::net::TcpListener;
+
     use super::*;
     use crate::test_util::{next_addr, trace_init};
-    use tokio::net::TcpListener;
 
     #[tokio::test]
     async fn healthcheck() {

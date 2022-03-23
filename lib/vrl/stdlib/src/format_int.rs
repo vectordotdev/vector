@@ -2,6 +2,27 @@ use std::collections::VecDeque;
 
 use vrl::prelude::*;
 
+fn format_int(value: Value, base: Option<Value>) -> Resolved {
+    let value = value.try_integer()?;
+    let base = match base {
+        Some(base) => {
+            let value = base.try_integer()?;
+            if !(2..=36).contains(&value) {
+                return Err(format!(
+                    "invalid base {}: must be be between 2 and 36 (inclusive)",
+                    value
+                )
+                .into());
+            }
+
+            value as u32
+        }
+        None => 10u32,
+    };
+    let converted = format_radix(value, base as u32);
+    Ok(converted.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct FormatInt;
 
@@ -28,7 +49,7 @@ impl Function for FormatInt {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -46,16 +67,23 @@ impl Function for FormatInt {
                 result: Ok("\"42\""),
             },
             Example {
-                title: "format hexidecimal integer",
+                title: "format hexadecimal integer",
                 source: r#"format_int!(42, 16)"#,
                 result: Ok("2a"),
             },
             Example {
-                title: "format negative hexidecimal integer",
+                title: "format negative hexadecimal integer",
                 source: r#"format_int!(-42, 16)"#,
                 result: Ok("-2a"),
             },
         ]
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let base = args.optional("base");
+
+        format_int(value, base)
     }
 }
 
@@ -67,32 +95,19 @@ struct FormatIntFn {
 
 impl Expression for FormatIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_integer()?;
-        let base = match &self.base {
-            Some(base) => base
-                .resolve(ctx)
-                .and_then(|value| value.try_integer().map_err(Into::into))
-                .and_then(|value| {
-                    if !(2..=36).contains(&value) {
-                        return Err(format!(
-                            "invalid base {}: must be be between 2 and 36 (inclusive)",
-                            value
-                        )
-                        .into());
-                    }
+        let value = self.value.resolve(ctx)?;
 
-                    Ok(value as u32)
-                }),
-            None => Ok(10u32),
-        }?;
+        let base = self
+            .base
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let converted = format_radix(value, base as u32);
-
-        Ok(converted.into())
+        format_int(value, base)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+        TypeDef::integer().fallible()
     }
 }
 
@@ -135,19 +150,19 @@ mod tests {
         decimal {
             args: func_args![value: 42],
             want: Ok(value!("42")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         hexidecimal {
             args: func_args![value: 42, base: 16],
             want: Ok(value!("2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
 
         negative_hexidecimal {
             args: func_args![value: -42, base: 16],
             want: Ok(value!("-2a")),
-            tdef: TypeDef::new().fallible().integer(),
+            tdef: TypeDef::integer().fallible(),
         }
     ];
 }

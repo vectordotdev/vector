@@ -1,7 +1,7 @@
 ---
 date: "2020-03-31"
 title: "ARMv7 and ARM64 Support on Linux"
-description: "These architectures are widely used in embeded devices and servers"
+description: "These architectures are widely used in embedded devices and servers"
 authors: ["binarylogic"]
 pr_numbers: [1054, 1292]
 release: "0.6.0"

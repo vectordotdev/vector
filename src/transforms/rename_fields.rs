@@ -1,12 +1,17 @@
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
-    serde::Fields,
-    transforms::{FunctionTransform, Transform},
-};
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::Event,
+    internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
+    schema,
+    serde::Fields,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -45,12 +50,12 @@ impl TransformConfig for RenameFieldsConfig {
         )?))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -65,17 +70,17 @@ impl RenameFields {
 }
 
 impl FunctionTransform for RenameFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key, self.drop_empty) {
+            match log.remove_prune(old_key.as_str(), self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key, v).is_some() {
-                        emit!(&RenameFieldsFieldOverwritten { field: old_key });
+                    if event.as_mut_log().insert(new_key.as_str(), v).is_some() {
+                        emit!(RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(&RenameFieldsFieldDoesNotExist { field: old_key });
+                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }

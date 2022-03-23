@@ -1,6 +1,12 @@
+use std::{
+    slice,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
+};
+
 use metrics::GaugeValue;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::{slice, sync::Arc};
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -25,7 +31,7 @@ impl AtomicF64 {
     {
         let res = self.inner.fetch_update(set_order, fetch_order, |x| {
             let opt: Option<f64> = f(f64::from_bits(x));
-            opt.map(|i| i.to_bits())
+            opt.map(f64::to_bits)
         });
 
         res.map(f64::from_bits).map_err(f64::from_bits)
@@ -80,7 +86,7 @@ impl Handle {
 
 #[derive(Debug)]
 pub struct Histogram {
-    buckets: Box<[(f64, AtomicU32); 22]>,
+    buckets: Box<[(f64, AtomicU32); 20]>,
     count: AtomicU32,
     sum: AtomicF64,
 }
@@ -96,14 +102,12 @@ impl Histogram {
         // around but never quite get to zero with an increasingly coarse
         // long-tail.
         let buckets = Box::new([
-            (f64::NEG_INFINITY, AtomicU32::new(0)),
             (0.015_625, AtomicU32::new(0)),
             (0.03125, AtomicU32::new(0)),
             (0.0625, AtomicU32::new(0)),
             (0.125, AtomicU32::new(0)),
             (0.25, AtomicU32::new(0)),
             (0.5, AtomicU32::new(0)),
-            (0.0, AtomicU32::new(0)),
             (1.0, AtomicU32::new(0)),
             (2.0, AtomicU32::new(0)),
             (4.0, AtomicU32::new(0)),
@@ -127,13 +131,11 @@ impl Histogram {
     }
 
     pub(crate) fn record(&self, value: f64) {
-        let mut prev_bound = f64::NEG_INFINITY;
         for (bound, bucket) in self.buckets.iter() {
-            if value > prev_bound && value <= *bound {
+            if value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
                 break;
             }
-            prev_bound = *bound;
         }
 
         self.count.fetch_add(1, Ordering::Relaxed);
@@ -210,7 +212,7 @@ impl Gauge {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)] // see https://github.com/timberio/vector/pull/7341#discussion_r626693005
+    #[allow(clippy::needless_pass_by_value)] // see https://github.com/vectordotdev/vector/pull/7341#discussion_r626693005
     pub(crate) fn record(&self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
@@ -231,8 +233,9 @@ impl Gauge {
 
 #[cfg(test)]
 mod test {
-    use crate::metrics::handle::{Counter, Histogram};
     use quickcheck::{QuickCheck, TestResult};
+
+    use crate::metrics::handle::{Counter, Histogram};
 
     // Adapted from https://users.rust-lang.org/t/assert-eq-for-float-numbers/7034/4?u=blt
     fn nearly_equal(a: f64, b: f64) -> bool {

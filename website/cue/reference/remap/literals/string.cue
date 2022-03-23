@@ -10,7 +10,7 @@ remap: literals: string: {
 		no special meaning and the string may contain newlines.
 
 		**Interpreted string** literals are character sequences between double quotes (`"..."`). Within the quotes,
-		any character may appear except newline and unescaped double quote. The text between the quotes forms the result
+		any character may appear except unescaped newline and unescaped double quote. The text between the quotes forms the result
 		of the literal, with backslash escapes interpreted as defined below.
 		"""
 
@@ -19,7 +19,11 @@ remap: literals: string: {
 			"Hello, world! 🌎"
 			"""#,
 		#"""
-			"Hello, world! \\u1F30E"
+			"Hello, world! \u1F30E"
+			"""#,
+		#"""
+			"Hello, \
+			 world!"
 			"""#,
 		#"""
 			s'Hello, world!'
@@ -36,15 +40,23 @@ remap: literals: string: {
 				Special characters, such as newlines, can be expressed with a backslash escape.
 				"""
 			enum: {
-				"`\\u{7FFF}`": "24-bit Unicode character code (up to 6 digits)"
-				"`\\n`":       "Newline"
-				"`\\r`":       "Carriage return"
-				"`\\t`":       "Tab"
-				"`\\\\`":      "Backslash"
-				"`\\0`":       "Null"
-				"`\\\"`":      "Double quote"
-				"`\\'`":       "Single quote"
+				"\\u{7FFF}": "24-bit Unicode character code (up to 6 digits)"
+				"\\n":       "Newline"
+				"\\r":       "Carriage return"
+				"\\t":       "Tab"
+				"\\\\":      "Backslash"
+				"\\0":       "Null"
+				"\\\"":      "Double quote"
+				"\\'":       "Single quote"
 			}
+		}
+		multiline_strings: {
+			title: "Multiline strings"
+			description: """
+				Long strings can be split over multiple lines by adding a backslash just before the
+				newline. The newline and any whitespace at the start of the ensuing line is not
+				included in the string.
+				"""
 		}
 		concatenation: {
 			title: "Concatenation"

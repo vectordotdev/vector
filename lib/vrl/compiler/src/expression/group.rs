@@ -1,6 +1,9 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{Expr, Resolved},
+    Context, Expression, State, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
@@ -22,6 +25,14 @@ impl Expression for Group {
 
     fn type_def(&self, state: &State) -> TypeDef {
         self.inner.type_def(state)
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        self.inner.compile_to_vm(vm, state)
     }
 }
 

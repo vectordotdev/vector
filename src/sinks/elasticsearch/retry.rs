@@ -1,12 +1,13 @@
-use crate::{
-    http::HttpError,
-    sinks::util::retries::{RetryAction, RetryLogic},
-};
-
 use http::StatusCode;
 use serde::Deserialize;
 
-use crate::sinks::elasticsearch::service::ElasticSearchResponse;
+use crate::{
+    http::HttpError,
+    sinks::{
+        elasticsearch::service::ElasticsearchResponse,
+        util::retries::{RetryAction, RetryLogic},
+    },
+};
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -44,17 +45,17 @@ struct EsErrorDetails {
 }
 
 #[derive(Clone)]
-pub struct ElasticSearchRetryLogic;
+pub struct ElasticsearchRetryLogic;
 
-impl RetryLogic for ElasticSearchRetryLogic {
+impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
-    type Response = ElasticSearchResponse;
+    type Response = ElasticsearchResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &ElasticSearchResponse) -> RetryAction {
+    fn should_retry_response(&self, response: &ElasticsearchResponse) -> RetryAction {
         let status = response.http_response.status();
 
         match status {
@@ -62,25 +63,28 @@ impl RetryLogic for ElasticSearchRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!(
-                "{}: {}",
-                status,
-                String::from_utf8_lossy(response.http_response.body())
-            )),
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!(
+                    "{}: {}",
+                    status,
+                    String::from_utf8_lossy(response.http_response.body())
+                )
+                .into(),
+            ),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
-                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body))
+                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body).into())
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
 
                 if body.contains("\"errors\":true") {
-                    RetryAction::DontRetry(get_error_reason(&body))
+                    RetryAction::DontRetry(get_error_reason(&body).into())
                 } else {
                     RetryAction::Successful
                 }
             }
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
 }
@@ -100,11 +104,12 @@ fn get_error_reason(body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::event::EventStatus;
     use bytes::Bytes;
     use http::Response;
     use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::event::EventStatus;
 
     #[test]
     fn handles_error_response() {
@@ -113,11 +118,13 @@ mod tests {
             .status(StatusCode::OK)
             .body(Bytes::from(json))
             .unwrap();
-        let logic = ElasticSearchRetryLogic;
+        let logic = ElasticsearchRetryLogic;
         assert!(matches!(
-            logic.should_retry_response(&ElasticSearchResponse {
+            logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
-                event_status: EventStatus::Failed
+                event_status: EventStatus::Rejected,
+                batch_size: 1,
+                events_byte_size: 1,
             }),
             RetryAction::DontRetry(_)
         ));

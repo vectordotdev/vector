@@ -1,5 +1,18 @@
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
+
+fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let input = String::from_utf8_lossy(&bytes);
+    if let Some(expr) = format {
+        let bytes = expr.try_bytes()?;
+        parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
+    } else {
+        parse_log(&input, None)
+    }
+    .map_err(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -49,7 +62,7 @@ impl Function for ParseAwsVpcFlowLog {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -72,6 +85,13 @@ impl Function for ParseAwsVpcFlowLog {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.optional("format");
+
+        parse_aws_vpc_flow_log(value, format)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,53 +108,52 @@ impl ParseAwsVpcFlowLogFn {
 
 impl Expression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let input = String::from_utf8_lossy(&bytes);
+        let value = self.value.resolve(ctx)?;
+        let format = self
+            .format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.try_bytes()?;
-            parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
-        } else {
-            parse_log(&input, None)
-        }
-        .map_err(Into::into)
+        parse_aws_vpc_flow_log(value, format)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Log parsing error
-            .object::<&str, Kind>(inner_type_def())
+        TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+fn inner_kind() -> BTreeMap<Field, Kind> {
     map! {
-        "account_id": Kind::Integer | Kind::Null,
-        "action": Kind::Bytes | Kind::Null,
-        "az_id": Kind::Bytes | Kind::Null,
-        "bytes": Kind::Integer | Kind::Null,
-        "dstaddr": Kind::Bytes | Kind::Null,
-        "dstport": Kind::Integer | Kind::Null,
-        "end": Kind::Integer | Kind::Null,
-        "instance_id": Kind::Bytes | Kind::Null,
-        "interface_id": Kind::Bytes | Kind::Null,
-        "log_status": Kind::Bytes | Kind::Null,
-        "packets": Kind::Integer | Kind::Null,
-        "pkt_dstaddr": Kind::Bytes | Kind::Null,
-        "pkt_srcaddr": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Integer | Kind::Null,
-        "region": Kind::Bytes | Kind::Null,
-        "srcaddr": Kind::Bytes | Kind::Null,
-        "srcport": Kind::Integer | Kind::Null,
-        "start": Kind::Integer | Kind::Null,
-        "sublocation_id": Kind::Bytes | Kind::Null,
-        "sublocation_type": Kind::Bytes | Kind::Null,
-        "subnet_id": Kind::Bytes | Kind::Null,
-        "tcp_flags": Kind::Integer | Kind::Null,
-        "type": Kind::Bytes | Kind::Null,
-        "version": Kind::Integer | Kind::Null,
-        "vpc_id": Kind::Bytes | Kind::Null,
+        "account_id": Kind::integer() | Kind::null(),
+        "action": Kind::bytes() | Kind::null(),
+        "az_id": Kind::bytes() | Kind::null(),
+        "bytes": Kind::integer() | Kind::null(),
+        "dstaddr": Kind::bytes() | Kind::null(),
+        "dstport": Kind::integer() | Kind::null(),
+        "end": Kind::integer() | Kind::null(),
+        "instance_id": Kind::bytes() | Kind::null(),
+        "interface_id": Kind::bytes() | Kind::null(),
+        "log_status": Kind::bytes() | Kind::null(),
+        "packets": Kind::integer() | Kind::null(),
+        "pkt_dstaddr": Kind::bytes() | Kind::null(),
+        "pkt_srcaddr": Kind::bytes() | Kind::null(),
+        "protocol": Kind::integer() | Kind::null(),
+        "region": Kind::bytes() | Kind::null(),
+        "srcaddr": Kind::bytes() | Kind::null(),
+        "srcport": Kind::integer() | Kind::null(),
+        "start": Kind::integer() | Kind::null(),
+        "sublocation_id": Kind::bytes() | Kind::null(),
+        "sublocation_type": Kind::bytes() | Kind::null(),
+        "subnet_id": Kind::bytes() | Kind::null(),
+        "tcp_flags": Kind::integer() | Kind::null(),
+        "type": Kind::bytes() | Kind::null(),
+        "version": Kind::integer() | Kind::null(),
+        "vpc_id": Kind::bytes() | Kind::null(),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -294,7 +313,7 @@ mod tests {
                  "start": 1418530010,
                  "version": 2
              })),
-             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+             tdef: TypeDef::object(inner_kind()).fallible(),
          }
 
         fields {
@@ -323,7 +342,7 @@ mod tests {
                  "version": 3,
                  "vpc_id": "vpc-abcdefab012345678"
              })),
-             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+             tdef: TypeDef::object(inner_kind()).fallible(),
          }
     ];
 }

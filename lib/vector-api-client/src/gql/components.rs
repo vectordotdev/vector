@@ -1,7 +1,9 @@
-use crate::{BoxedSubscription, QueryResult};
+use std::fmt;
+
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
-use std::fmt;
+
+use crate::{BoxedSubscription, QueryResult};
 
 /// Components query for returning sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -157,6 +159,38 @@ impl components_query::ComponentsQueryComponentsEdgesNodeOn {
                 .as_ref()
                 .map(|p| p.sent_events_total as i64)
                 .unwrap_or(0),
+        }
+    }
+
+    pub fn outputs(&self) -> Vec<(String, i64)> {
+        match self {
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
+                .outputs
+                .iter()
+                .map(|o| {
+                    (
+                        o.output_id.clone(),
+                        o.sent_events_total
+                            .as_ref()
+                            .map(|p| p.sent_events_total as i64)
+                            .unwrap_or(0),
+                    )
+                })
+                .collect(),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
+                .outputs
+                .iter()
+                .map(|o| {
+                    (
+                        o.output_id.clone(),
+                        o.sent_events_total
+                            .as_ref()
+                            .map(|p| p.sent_events_total as i64)
+                            .unwrap_or(0),
+                    )
+                })
+                .collect(),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(_) => vec![],
         }
     }
 }

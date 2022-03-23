@@ -1,20 +1,38 @@
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::Arc;
+use std::{collections::BTreeMap, fmt, sync::Arc};
+
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
 };
 
+fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Resolved {
+    let bytes = value.try_bytes_utf8_lossy()?;
+    let remove_empty = remove_empty.try_boolean()?;
+    match pattern.match_against(&bytes) {
+        Some(matches) => {
+            let mut result = BTreeMap::new();
+
+            for (name, value) in matches.iter() {
+                if !remove_empty || !value.is_empty() {
+                    result.insert(name.to_string(), Value::from(value));
+                }
+            }
+
+            Ok(Value::from(result))
+        }
+        None => Err("unable to parse input with grok pattern".into()),
+    }
+}
+
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(grok::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::InvalidGrokPattern(err) => write!(f, "{}", err.to_string()),
+            Error::InvalidGrokPattern(err) => err.fmt(f),
         }
     }
 }
@@ -30,7 +48,7 @@ impl DiagnosticError for Error {
         match self {
             Error::InvalidGrokPattern(err) => {
                 vec![Label::primary(
-                    format!("grok pattern error: {}", err.to_string()),
+                    format!("grok pattern error: {}", err),
                     Span::default(),
                 )]
             }
@@ -88,7 +106,7 @@ impl Function for ParseGrok {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -116,6 +134,46 @@ impl Function for ParseGrok {
             remove_empty,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("pattern", Some(expr)) => {
+                let pattern = expr
+                    .as_literal("pattern")?
+                    .try_bytes_utf8_lossy()
+                    .expect("grok pattern not bytes")
+                    .into_owned();
+
+                let mut grok = grok::Grok::with_patterns();
+                let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
+                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                })?);
+
+                Ok(Some(Box::new(pattern) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let remove_empty = args
+            .optional("remove_empty")
+            .unwrap_or(Value::Boolean(false));
+        let pattern = args
+            .required_any("pattern")
+            .downcast_ref::<Arc<grok::Pattern>>()
+            .unwrap()
+            .clone();
+
+        parse_grok(value, remove_empty, pattern)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -130,36 +188,22 @@ struct ParseGrokFn {
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let bytes = value.try_bytes_utf8_lossy()?;
-        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
+        let remove_empty = self.remove_empty.resolve(ctx)?;
+        let pattern = self.pattern.clone();
 
-        match self.pattern.match_against(&bytes) {
-            Some(matches) => {
-                let mut result = BTreeMap::new();
-
-                for (name, value) in matches.iter() {
-                    if !remove_empty || !value.is_empty() {
-                        result.insert(name.to_string(), Value::from(value));
-                    }
-                }
-
-                Ok(Value::from(result))
-            }
-            None => Err("unable to parse input with grok pattern".into()),
-        }
+        parse_grok(value, remove_empty, pattern)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(map! {
-            (): Kind::all(),
-        })
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
 #[cfg(test)]
 mod test {
+    use vector_common::btreemap;
+
     use super::*;
-    use shared::btreemap;
 
     test_function![
         parse_grok => ParseGrok;
@@ -168,27 +212,21 @@ mod test {
             args: func_args![ value: "foo",
                               pattern: "%{NOG}"],
             want: Err("The given pattern definition name \"NOG\" could not be found in the definition map"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error {
             args: func_args![ value: "an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
             want: Err("unable to parse input with grok pattern"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
             want: Err("unable to parse input with grok pattern"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         parsed {
@@ -199,9 +237,7 @@ mod test {
                 "level" => "info",
                 "message" => "Hello world",
             })),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         parsed2 {
@@ -211,22 +247,18 @@ mod test {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         remove_empty {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:levell)",
+                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})",
                               remove_empty: true,
             ],
             want: Ok(Value::from(
                 btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }

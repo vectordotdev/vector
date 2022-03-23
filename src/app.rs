@@ -1,3 +1,17 @@
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+
+use futures::StreamExt;
+use once_cell::race::OnceNonZeroUsize;
+use tokio::{
+    runtime::{self, Runtime},
+    sync::mpsc,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
+#[cfg(windows)]
+use crate::service;
+#[cfg(feature = "api")]
+use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, graph, heartbeat, list, metrics,
@@ -5,21 +19,10 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
-use tokio::{
-    runtime::{self, Runtime},
-    sync::mpsc,
-};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 #[cfg(feature = "api-client")]
 use crate::{tap, top};
 
-#[cfg(windows)]
-use crate::service;
+pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
@@ -44,38 +47,50 @@ pub struct Application {
 
 impl Application {
     pub fn prepare() -> Result<Self, exitcode::ExitCode> {
-        let opts = Opts::get_matches();
+        let opts = Opts::get_matches().map_err(|error| {
+            // Printing to stdout/err can itself fail; ignore it.
+            let _ = error.print();
+            exitcode::USAGE
+        })?;
+
         Self::prepare_from_opts(opts)
     }
 
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
-            "off" => "off".to_owned(),
-            #[cfg(feature = "tokio-console")]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                "runtime=trace".to_owned(),
-                "tokio=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-            #[cfg(not(feature = "tokio-console"))]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-        });
+        let level = std::env::var("VECTOR_LOG")
+            .or_else(|_| {
+                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+                std::env::var("LOG")
+            })
+            .unwrap_or_else(|_| match opts.log_level() {
+                "off" => "off".to_owned(),
+                #[cfg(feature = "tokio-console")]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    "runtime=trace".to_owned(),
+                    "tokio=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                    format!("buffers={}", level),
+                ]
+                .join(","),
+                #[cfg(not(feature = "tokio-console"))]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                    format!("buffers={}", level),
+                ]
+                .join(","),
+            });
 
         let root_opts = opts.root;
 
@@ -105,6 +120,9 @@ impl Application {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             } else {
+                WORKER_THREADS
+                    .set(NonZeroUsize::new(threads).expect("already checked"))
+                    .expect("double thread initialization");
                 rt_builder.worker_threads(threads);
             }
         }
@@ -126,6 +144,7 @@ impl Application {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::Graph(g) => graph::cmd(&g),
+                        SubCommand::Config(c) => config::cmd(&c, &config_paths),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         #[cfg(windows)]
@@ -228,19 +247,20 @@ impl Application {
         crate::trace::stop_buffering();
 
         rt.block_on(async move {
-            emit!(&VectorStarted);
+            emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
 
             // Configure the API server, if applicable.
             #[cfg(feature = "api")]
             // Assigned to prevent the API terminating when falling out of scope.
             let api_server = if api_config.enabled {
-                emit!(&ApiStarted {
+                use std::sync::{Arc, atomic::AtomicBool};
+                emit!(ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), topology.watch()))
+                Some(api::Server::start(topology.config(), topology.watch(), Arc::<AtomicBool>::clone(&topology.running)))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
@@ -271,20 +291,20 @@ impl Application {
                                                     api_server.update_config(topology.config());
                                                 }
 
-                                                emit!(&VectorReloaded { config_paths: &config_paths })
+                                                emit!(VectorReloaded { config_paths: &config_paths })
                                             },
-                                            Ok(false) => emit!(&VectorReloadFailed),
+                                            Ok(false) => emit!(VectorReloadFailed),
                                             // Trigger graceful shutdown for what remains of the topology
                                             Err(()) => {
-                                                emit!(&VectorReloadFailed);
-                                                emit!(&VectorRecoveryFailed);
+                                                emit!(VectorReloadFailed);
+                                                emit!(VectorRecoveryFailed);
                                                 break SignalTo::Shutdown;
                                             }
                                         }
                                         sources_finished = topology.sources_finished();
                                     },
                                     Err(_) => {
-                                        emit!(&VectorConfigLoadFailed);
+                                        emit!(VectorConfigLoadFailed);
                                     }
                                 }
                             }
@@ -314,19 +334,19 @@ impl Application {
                                                 api_server.update_config(topology.config());
                                             }
 
-                                            emit!(&VectorReloaded { config_paths: &config_paths })
+                                            emit!(VectorReloaded { config_paths: &config_paths })
                                         },
-                                        Ok(false) => emit!(&VectorReloadFailed),
+                                        Ok(false) => emit!(VectorReloadFailed),
                                         // Trigger graceful shutdown for what remains of the topology
                                         Err(()) => {
-                                            emit!(&VectorReloadFailed);
-                                            emit!(&VectorRecoveryFailed);
+                                            emit!(VectorReloadFailed);
+                                            emit!(VectorRecoveryFailed);
                                             break SignalTo::Shutdown;
                                         }
                                     }
                                     sources_finished = topology.sources_finished();
                                 } else {
-                                    emit!(&VectorConfigLoadFailed);
+                                    emit!(VectorConfigLoadFailed);
                                 }
                             }
                             _ => break signal,
@@ -341,19 +361,19 @@ impl Application {
 
             match signal {
                 SignalTo::Shutdown => {
-                    emit!(&VectorStopped);
+                    emit!(VectorStopped);
                     tokio::select! {
                         _ = topology.stop() => (), // Graceful shutdown finished
                         _ = signal_rx.recv() => {
                             // It is highly unlikely that this event will exit from topology.
-                            emit!(&VectorQuit);
+                            emit!(VectorQuit);
                             // Dropping the shutdown future will immediately shut the server down
                         }
                     }
                 }
                 SignalTo::Quit => {
                     // It is highly unlikely that this event will exit from topology.
-                    emit!(&VectorQuit);
+                    emit!(VectorQuit);
                     drop(topology);
                 }
                 _ => unreachable!(),

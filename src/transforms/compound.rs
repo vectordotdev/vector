@@ -1,15 +1,17 @@
-use crate::{
-    config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
-    transforms::Transform,
-};
 use indexmap::IndexMap;
 use serde::{self, Deserialize, Serialize};
 
+use crate::{
+    config::{
+        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    schema,
+    transforms::Transform,
+};
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CompoundConfig {
+struct CompoundConfig {
     steps: Vec<TransformStep>,
 }
 
@@ -55,18 +57,18 @@ impl TransformConfig for CompoundConfig {
         }
 
         if !map.is_empty() {
-            Ok(Some((map, ExpandType::Serial)))
+            Ok(Some((map, ExpandType::Serial { alias: false })))
         } else {
             Err("must specify at least one transform".into())
         }
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -106,7 +108,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},"Serial"]"#
+            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},{"Serial":{"alias":false}}]"#
         );
     }
 }

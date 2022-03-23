@@ -5,14 +5,11 @@ updates:
     schedule:
       interval: "daily"
       time: "04:00" # UTC
-    reviewers:
-      - "timberio/vector-support"
-    assignees:
-      - "timberio/vector-support"
     labels:
       - "domain: deps"
     commit-message:
       prefix: "chore(deps)"
+    open-pull-requests-limit: 10
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

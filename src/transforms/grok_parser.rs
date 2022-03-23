@@ -1,17 +1,23 @@
-use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter, Value},
-    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
-    transforms::{FunctionTransform, Transform},
-    types::{parse_conversion_map, Conversion},
-};
+use std::{collections::HashMap, str};
+
 use bytes::Bytes;
 use grok::Pattern;
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
-use std::str;
+use vector_common::TimeZone;
+
+use crate::{
+    config::{
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::{Event, Value},
+    internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+    types::{parse_conversion_map, Conversion},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -62,15 +68,19 @@ impl TransformConfig for GrokParserConfig {
                 paths: HashMap::new(),
             })
             .map(Transform::function)
-            .context(InvalidGrok)?)
+            .context(InvalidGrokSnafu)?)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -87,7 +97,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent<'static>>>,
+    paths: HashMap<String, OwnedPath>,
 }
 
 impl Clone for GrokParser {
@@ -105,9 +115,9 @@ impl Clone for GrokParser {
 }
 
 impl FunctionTransform for GrokParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = event.into_log();
-        let value = event.get(&self.field).map(|s| s.to_string_lossy());
+        let value = event.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {
@@ -117,29 +127,27 @@ impl FunctionTransform for GrokParser {
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
+                                event.insert(path, value);
                             } else {
-                                let path = PathIter::new(name)
-                                    .map(|component| component.into_static())
-                                    .collect::<Vec<_>>();
+                                let path = parse_path(name);
                                 self.paths.insert(name.to_string(), path.clone());
-                                event.insert_path(path, value);
+                                event.insert(&path, value);
                             }
                         }
-                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(ParserConversionError { name, error }),
                     }
                 }
 
                 if drop_field {
-                    event.remove(&self.field);
+                    event.remove(self.field.as_str());
                 }
             } else {
-                emit!(&GrokParserFailedMatch {
+                emit!(ParserMatchError {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(&GrokParserMissingField {
+            emit!(ParserMissingFieldError {
                 field: self.field.as_ref()
             });
         }
@@ -150,13 +158,15 @@ impl FunctionTransform for GrokParser {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, TransformConfig, TransformContext},
         event::{self, Event, LogEvent},
+        transforms::OutputBuffer,
     };
-    use pretty_assertions::assert_eq;
-    use serde_json::json;
 
     #[test]
     fn generate_config() {
@@ -184,9 +194,9 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

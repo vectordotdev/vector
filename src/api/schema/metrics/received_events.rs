@@ -1,7 +1,10 @@
-use crate::config::ComponentKey;
-use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
+
+use crate::{
+    config::ComponentKey,
+    event::{Metric, MetricValue},
+};
 
 pub struct ReceivedEventsTotal(Metric);
 

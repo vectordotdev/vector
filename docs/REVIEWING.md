@@ -31,7 +31,7 @@ should be used for all pull requests:
 - [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backwards compatibility](#backwards-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
-- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/timberio/vector-test-harness)? (see [Performance Testing](#performance-testing))
+- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
 ## Expectations
@@ -74,7 +74,7 @@ documentation, nor should they be merged with "TODOs" opened for documentation.
 Vector currently offers 2 methods for performance testing:
 
 1. Internal benchmarks located in the [`/benches` folder](benches).
-2. A full end-to-end [test harness](https://github.com/timberio/vector-test-harness)
+2. A full end-to-end [test harness](https://github.com/vectordotdev/vector-test-harness)
    for complex integration and performance testing.
 
 ## Single Concern

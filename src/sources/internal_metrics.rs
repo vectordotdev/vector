@@ -1,35 +1,44 @@
-use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    metrics::Controller,
-    shutdown::ShutdownSignal,
-    Pipeline,
-};
-use futures::{stream, SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{EventsReceived, StreamClosedError},
+    metrics::Controller,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[derivative(Default(value = "2"))]
-    scrape_interval_secs: u64,
+    #[derivative(Default(value = "2.0"))]
+    scrape_interval_secs: f64,
     tags: TagsConfig,
     namespace: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
 }
 
 impl InternalMetricsConfig {
-    /// Override the default namespace.
-    pub fn namespace<T: Into<String>>(namespace: T) -> Self {
+    /// Return an internal metrics config with enterprise reporting defaults.
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
-            namespace: Some(namespace.into()),
+            namespace: Some("pipelines".to_owned()),
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
             ..Self::default()
         }
     }
 
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 }
@@ -52,13 +61,16 @@ impl_generate_config_from_default!(InternalMetricsConfig);
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        if self.scrape_interval_secs == 0 {
+        if self.scrape_interval_secs == 0.0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
-        let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
+        let version = self.version.clone();
+        let configuration_key = self.configuration_key.clone();
+
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -73,6 +85,8 @@ impl SourceConfig for InternalMetricsConfig {
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
             namespace,
+            version,
+            configuration_key,
             host_key,
             pid_key,
             Controller::get()?,
@@ -82,39 +96,53 @@ impl SourceConfig for InternalMetricsConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         "internal_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
     namespace: Option<String>,
+    version: Option<String>,
+    configuration_key: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
     interval: time::Duration,
-    out: Pipeline,
+    mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out =
-        out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
-
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let hostname = crate::get_hostname();
         let pid = std::process::id().to_string();
 
         let metrics = controller.capture_metrics();
+        let count = metrics.len();
+        let byte_size = metrics.size_of();
+        emit!(EventsReceived { count, byte_size });
 
-        out.send_all(&mut stream::iter(metrics).map(|mut metric| {
+        let batch = metrics.into_iter().map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
             // if an explicit namespace is provided to this source.
             if namespace.is_some() {
                 metric = metric.with_namespace(namespace.as_ref());
+            }
+
+            // Version and configuration key are reported in enterprise.
+            if let Some(version) = &version {
+                metric.insert_tag("version".to_owned(), version.clone());
+            }
+            if let Some(configuration_key) = &configuration_key {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
 
             if let Some(host_key) = host_key {
@@ -125,9 +153,13 @@ async fn run(
             if let Some(pid_key) = pid_key {
                 metric.insert_tag(pid_key.to_owned(), pid.clone());
             }
-            Ok(metric.into())
-        }))
-        .await?;
+            metric
+        });
+
+        if let Err(error) = out.send_batch(batch).await {
+            emit!(StreamClosedError { error, count });
+            return Err(());
+        }
     }
 
     Ok(())
@@ -135,6 +167,10 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use metrics::{counter, gauge, histogram};
+
     use super::*;
     use crate::{
         event::{
@@ -142,10 +178,8 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        Pipeline,
+        SourceSender,
     };
-    use metrics::{counter, gauge, histogram};
-    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
@@ -175,6 +209,7 @@ mod tests {
 
         let output = controller
             .capture_metrics()
+            .into_iter()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
@@ -191,7 +226,7 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[11].count, 2);
+                assert_eq!(buckets[9].count, 2);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 11.0);
             }
@@ -208,8 +243,8 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[11].count, 1);
-                assert_eq!(buckets[12].count, 1);
+                assert_eq!(buckets[9].count, 1);
+                assert_eq!(buckets[10].count, 1);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }
@@ -224,11 +259,11 @@ mod tests {
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
         let _ = crate::metrics::init_test();
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, mut recv) = SourceSender::new_test();
 
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await

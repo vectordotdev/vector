@@ -34,8 +34,8 @@ subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 c
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
-favicon = "favicon.ico"
 display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+favicon = "favicon.ico"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
@@ -141,6 +141,11 @@ name = "Blog"
 url = "/blog"
 weight = 5
 
+[[languages.en.menus.navbar]]
+name = "Support"
+url = "/support-services"
+weight = 6
+
 # Footer menu
 [[languages.en.menus.footer]]
 name = "About"
@@ -212,6 +217,12 @@ name = "Administration"
 url = "/docs/administration"
 parent = "setup"
 weight = 4
+
+[[languages.en.menus.footer]]
+name = "Going to Prod"
+url = "/docs/setup/going-to-prod"
+parent = "setup"
+weight = 5
 
 [[languages.en.menus.footer]]
 name = "Community"
@@ -307,3 +318,16 @@ weight = 1
 name = "Privacy policy"
 url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 2
+
+[security]
+  enableInlineShortcodes = false
+  [security.exec]
+    allow = ['^babel$', '^dart-sass-embedded$', '^go$', '^npx$', '^postcss$']
+    osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
+
+  [security.funcs]
+    getenv = ['^HUGO_']
+
+  [security.http]
+    methods = ['(?i)GET|POST']
+    urls = ['.*']

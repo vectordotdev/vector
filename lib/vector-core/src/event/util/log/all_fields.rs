@@ -1,9 +1,11 @@
-use super::Value;
-use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     iter, slice,
 };
+
+use serde::{Serialize, Serializer};
+
+use super::Value;
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -46,7 +48,7 @@ impl<'a> FieldsIter<'a> {
 
     fn push(&mut self, value: &'a Value, component: PathComponent<'a>) -> Option<&'a Value> {
         match value {
-            Value::Map(map) if !map.is_empty() => {
+            Value::Object(map) if !map.is_empty() => {
                 self.stack.push(LeafIter::Map(map.iter()));
                 self.path.push(component);
                 None
@@ -73,7 +75,7 @@ impl<'a> FieldsIter<'a> {
                 None => return res,
                 Some(PathComponent::Key(key)) => {
                     if key.contains('.') {
-                        res.push_str(&key.replace(".", "\\."));
+                        res.push_str(&key.replace('.', "\\."));
                     } else {
                         res.push_str(key);
                     }
@@ -129,10 +131,10 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use pretty_assertions::assert_eq;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn keys_simple() {
@@ -178,7 +180,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Map(BTreeMap::new())),
+            ("d", Value::Object(BTreeMap::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()

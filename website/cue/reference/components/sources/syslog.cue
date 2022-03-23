@@ -8,6 +8,8 @@ components: sources: syslog: {
 	classes: sources.socket.classes
 
 	features: {
+		acknowledgements: sources.socket.features.acknowledgements
+
 		multiline: sources.socket.features.multiline
 
 		receive: {
@@ -51,10 +53,8 @@ components: sources: syslog: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -65,17 +65,14 @@ components: sources: syslog: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {
 			common:      true
 			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -84,24 +81,30 @@ components: sources: syslog: {
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP socket."
 					udp:  "UDP socket."
 					unix: "Unix domain stream socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 	}
@@ -114,7 +117,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["app-name"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -123,7 +125,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
-					syntax: "literal"
 				}
 			}
 			facility: {
@@ -131,7 +132,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["1"]
-					syntax: "literal"
 				}
 			}
 			message: {
@@ -139,7 +139,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["Hello world"]
-					syntax: "literal"
 				}
 			}
 			msgid: {
@@ -147,7 +146,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["ID47"]
-					syntax: "literal"
 				}
 			}
 			procid: {
@@ -155,7 +153,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["8710"]
-					syntax: "literal"
 				}
 			}
 			severity: {
@@ -163,7 +160,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["notice"]
-					syntax: "literal"
 				}
 			}
 			source_ip: {
@@ -171,7 +167,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -192,7 +187,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}

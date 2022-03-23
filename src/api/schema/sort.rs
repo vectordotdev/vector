@@ -1,3 +1,11 @@
+use std::cmp::Ordering;
+
+use async_graphql::{Enum, InputObject, InputType};
+use itertools::{
+    FoldWhile::{Continue, Done},
+    Itertools,
+};
+
 use crate::api::schema::{
     components::{
         sink::SinksSortFieldName, source::SourcesSortFieldName, transform::TransformsSortFieldName,
@@ -5,12 +13,6 @@ use crate::api::schema::{
     },
     metrics::source::file::FileSourceMetricFilesSortFieldName,
 };
-use async_graphql::{Enum, InputObject, InputType};
-use itertools::{
-    FoldWhile::{Continue, Done},
-    Itertools,
-};
-use std::cmp::Ordering;
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
 pub enum Direction {

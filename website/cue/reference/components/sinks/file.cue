@@ -14,7 +14,7 @@ components: sinks: file: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: {
@@ -36,16 +36,6 @@ components: sinks: file: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -56,7 +46,6 @@ components: sinks: file: {
 			common:      false
 			description: "The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    null
@@ -65,7 +54,6 @@ components: sinks: file: {
 		path: {
 			description: "File name to write events to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
 				syntax: "template"
@@ -86,6 +74,18 @@ components: sinks: file: {
 				and the file when emitting events to the file sink. This
 				requires that the Vector agent have the correct permissions
 				to create and write to files in the specified directories.
+				"""
+		}
+
+		durability: {
+			title: "Durability of Created Files"
+			body: """
+				Vector makes no attempt to ensure the files output by
+				this sink are durably written to disk by using any of
+				the "sync" write modes. As such, this sink only
+				ensures that the operating system does not generate an
+				error, it does not wait until the data is written to
+				disk before acknowledging the events.
 				"""
 		}
 	}

@@ -17,6 +17,8 @@ pub mod aws_s3;
 pub mod aws_sqs;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
+pub mod azure_common;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
@@ -25,7 +27,11 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(any(
+    feature = "sinks-datadog_events",
+    feature = "sinks-datadog_logs",
+    feature = "sinks-datadog_metrics"
+))]
 pub mod datadog;
 #[cfg(feature = "sinks-datadog_archives")]
 pub mod datadog_archives;
@@ -35,6 +41,8 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
+#[cfg(any(feature = "sinks-gcp"))]
+pub mod gcs_common;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
@@ -51,6 +59,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
+#[cfg(feature = "sinks-new_relic")]
+pub mod new_relic;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -61,7 +71,10 @@ pub mod prometheus;
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]
 pub mod redis;
-#[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
+#[cfg(all(
+    any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"),
+    feature = "aws-core"
+))]
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;

@@ -1,19 +1,25 @@
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
-    transforms::{FunctionTransform, Transform},
-};
+use std::collections::btree_map::Entry;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::btree_map::Entry;
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::Event,
+    internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
-    pub tags: IndexMap<String, String>,
+    tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(super) overwrite: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -46,12 +52,12 @@ impl TransformConfig for AddTagsConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -66,7 +72,7 @@ impl AddTags {
 }
 
 impl FunctionTransform for AddTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         if !self.tags.is_empty() {
             let metric = event.as_mut_metric();
 
@@ -77,11 +83,11 @@ impl FunctionTransform for AddTags {
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(&AddTagsTagOverwritten { tag: name.as_ref() });
+                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(_entry), false) => {
-                        emit!(&AddTagsTagNotOverwritten { tag: name.as_ref() })
+                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
                     }
                 }
             }
@@ -93,12 +99,13 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         transforms::test::transform_one,
     };
-    use shared::btreemap;
 
     #[test]
     fn generate_config() {

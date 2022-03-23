@@ -1,6 +1,7 @@
+use diagnostic::DiagnosticError;
+
 use super::Kind;
 use crate::ExpressionError;
-use diagnostic::DiagnosticError;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {

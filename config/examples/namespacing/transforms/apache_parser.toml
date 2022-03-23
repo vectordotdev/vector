@@ -1,0 +1,6 @@
+# Structure and parse the data
+inputs       = ["apache_logs"]
+type         = "regex_parser"                # fast/powerful regex
+patterns     = ['^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$']
+
+

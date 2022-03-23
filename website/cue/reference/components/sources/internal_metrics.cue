@@ -18,6 +18,7 @@ components: sources: internal_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.vector
@@ -26,16 +27,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		notices: []
 		requirements: []
 		warnings: []
@@ -52,15 +43,14 @@ components: sources: internal_metrics: {
 			required:    false
 			type: string: {
 				default: "vector"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
 			required:    false
-			type: uint: {
-				default: 2
+			type: float: {
+				default: 2.0
 				unit:    "seconds"
 			}
 		}
@@ -69,7 +59,6 @@ components: sources: internal_metrics: {
 			description: "Metric tag options."
 			required:    false
 
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -83,10 +72,8 @@ components: sources: internal_metrics: {
 				Set to "" to suppress this key.
 				"""
 						required:    false
-						warnings: []
 						type: string: {
 							default: "host"
-							syntax:  "literal"
 						}
 					}
 					pid_key: {
@@ -98,10 +85,8 @@ components: sources: internal_metrics: {
 					Set to "" to suppress this key.
 					"""
 						required: false
-						warnings: []
 						type: string: {
 							default: "pid"
-							syntax:  "literal"
 						}
 					}
 				}
@@ -470,7 +455,7 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		processed_events_total: {
 			description:       """
@@ -525,8 +510,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_discarded_events_total: {
+			description:       "The number of events dropped by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
-			description:       "The number of raw bytes accepted by this component from source origins."
+			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
@@ -602,10 +593,22 @@ components: sources: internal_metrics: {
 			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {output: _output}
 		}
 		component_sent_event_bytes_total: {
 			description:       "The total number of event bytes emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {output: _output}
+		}
+		datadog_logs_received_in_total: {
+			description:       "Number of Datadog logs received."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		datadog_metrics_received_in_total: {
+			description:       "Number of Datadog metrics received."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -928,6 +931,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		splunk_pending_acks: {
+			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		streams_total: {
 			description:       "The total number of streams."
 			type:              "counter"
@@ -1151,18 +1160,22 @@ components: sources: internal_metrics: {
 			description: "The type of the error"
 			required:    true
 			enum: {
+				"acknowledgements_failed":     "The acknowledgement operation failed."
 				"delete_failed":               "The file deletion failed."
 				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
+				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
+				"stream_closed":               "The downstream was closed, forwarding the event(s) failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
@@ -1190,6 +1203,10 @@ components: sources: internal_metrics: {
 				unix: "Unix domain socket"
 			}
 		}
+		_output: {
+			description: "The specific output of the component."
+			required:    false
+		}
 		_stage: {
 			description: "The stage within the component at which the error occurred."
 			required:    true
@@ -1215,5 +1232,12 @@ components: sources: internal_metrics: {
 				"oversized":    "The event was too large."
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

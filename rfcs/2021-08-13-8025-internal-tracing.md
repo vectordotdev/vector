@@ -19,8 +19,8 @@ be made, we will revisit this topic.
 
 ## Context
 
-- Existing experimental implementation ([#7929](https://github.com/timberio/vector/pull/7929))
-- Internal instrumentation epic ([#3900](https://github.com/timberio/vector/issues/3900))
+- Existing experimental implementation ([#7929](https://github.com/vectordotdev/vector/pull/7929))
+- Internal instrumentation epic ([#3900](https://github.com/vectordotdev/vector/issues/3900))
 
 ## Scope
 

@@ -1,31 +1,50 @@
 mod cmd;
 
-use structopt::StructOpt;
+use clap::Parser;
+pub(crate) use cmd::cmd;
 use url::Url;
 use vector_api_client::gql::TapEncodingFormat;
 
-pub use cmd::cmd;
-
-#[derive(StructOpt, Debug, Clone)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug, Clone)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Interval to sample metrics at, in milliseconds
-    #[structopt(default_value = "500", short = "i", long)]
+    /// Interval to sample logs at, in milliseconds
+    #[clap(default_value = "500", short = 'i', long)]
     interval: u32,
 
     /// Vector GraphQL API server endpoint
-    #[structopt(short, long)]
+    #[clap(short, long)]
     url: Option<Url>,
 
-    /// Sample log events to the provided limit
-    #[structopt(default_value = "100", short = "l", long)]
+    /// Maximum number of events to sample each interval
+    #[clap(default_value = "100", short = 'l', long)]
     limit: u32,
 
-    /// Encoding format for logs printed to screen
-    #[structopt(default_value = "json", possible_values = &["json", "yaml"], short = "f", long)]
+    /// Encoding format for events printed to screen
+    #[clap(default_value = "json", possible_values = &["json", "yaml", "logfmt"], short = 'f', long)]
     format: TapEncodingFormat,
 
     /// Components IDs to observe (comma-separated; accepts glob patterns)
-    #[structopt(default_value = "*", use_delimiter(true))]
+    #[clap(use_value_delimiter(true))]
     component_id_patterns: Vec<String>,
+
+    /// Components (sources, transforms) IDs whose outputs to observe (comma-separated; accepts glob patterns)
+    #[clap(use_value_delimiter(true), long)]
+    outputs_of: Vec<String>,
+
+    /// Components (transforms, sinks) IDs whose inputs to observe (comma-separated; accepts glob patterns)
+    #[clap(use_value_delimiter(true), long)]
+    inputs_of: Vec<String>,
+
+    /// Quiet output includes only events
+    #[clap(short, long)]
+    quiet: bool,
+
+    /// Include metadata such as the event's associated component ID
+    #[clap(short, long)]
+    meta: bool,
+
+    /// Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops.
+    #[clap(short, long)]
+    no_reconnect: bool,
 }

@@ -1,11 +1,12 @@
-use pretty_assertions::assert_eq;
 use std::collections::HashMap;
+
+use pretty_assertions::assert_eq;
 use vector::{
     config::{self, ConfigDiff, Format},
     topology,
 };
 
-async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
+async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
     match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
@@ -52,7 +53,7 @@ async fn happy_path() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -68,7 +69,7 @@ async fn happy_path() {
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sample"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
-      Some(Format::Toml),
+      Format::Toml,
     )
     .await
     .unwrap();
@@ -76,7 +77,7 @@ async fn happy_path() {
 
 #[tokio::test]
 async fn early_eof() {
-    let err = load("[sinks]\n[sin", Some(Format::Toml)).await.unwrap_err();
+    let err = load("[sinks]\n[sin", Format::Toml).await.unwrap_err();
 
     assert_eq!(
         err,
@@ -86,7 +87,7 @@ async fn early_eof() {
 
 #[tokio::test]
 async fn bad_syntax() {
-    let err = load(r#"{{{"#, Some(Format::Toml)).await.unwrap_err();
+    let err = load(r#"{{{"#, Format::Toml).await.unwrap_err();
 
     assert_eq!(
         err,
@@ -108,7 +109,7 @@ async fn missing_key() {
         mode = "tcp"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -134,7 +135,7 @@ async fn missing_key2() {
         inputs = ["in"]
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -160,7 +161,7 @@ async fn bad_type() {
         inputs = ["in"]
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -212,7 +213,7 @@ async fn bad_inputs() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -259,7 +260,7 @@ async fn duplicate_name() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -299,7 +300,7 @@ async fn bad_regex() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -326,7 +327,7 @@ async fn bad_regex() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -364,7 +365,7 @@ async fn good_regex_parser() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await;
 
@@ -401,7 +402,7 @@ async fn good_tokenizer() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await;
 
@@ -441,35 +442,17 @@ async fn bad_s3_region() {
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
-        region = "us-east-1"
-        endpoint = "https://localhost"
+        endpoint = "this shouldnt work"
 
-        [sinks.out4]
-        type = "aws_s3"
-        inputs = ["in"]
-        compression = "gzip"
-        encoding = "text"
-        bucket = "asdf"
-        key_prefix = "logs/"
-        endpoint = "this shoudlnt work"
-
-        [sinks.out4.batch]
+        [sinks.out3.batch]
         max_bytes = 100000
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
 
-    assert_eq!(
-        err,
-        vec![
-            "Sink \"out1\": Must set either 'region' or 'endpoint'",
-            "Sink \"out2\": Failed to parse region: Not a valid AWS region: moonbase-alpha",
-            "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
-            "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
-        ]
-    )
+    assert_eq!(err, vec!["Sink \"out3\": invalid uri character"])
 }
 
 #[cfg(all(
@@ -516,7 +499,7 @@ async fn warnings() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -575,7 +558,7 @@ async fn cycle() {
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap_err();
@@ -604,7 +587,7 @@ async fn disabled_healthcheck() {
         encoding = "text"
         healthcheck = false
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -624,7 +607,7 @@ async fn parses_sink_no_request() {
         uri = "https://localhost"
         encoding = "json"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -647,7 +630,7 @@ async fn parses_sink_partial_request() {
         [sinks.out.request]
         concurrency = 42
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -676,7 +659,7 @@ async fn parses_sink_full_request() {
         retry_max_duration_secs = 10
         retry_initial_backoff_secs = 6
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -700,7 +683,7 @@ async fn parses_sink_full_batch_bytes() {
         max_bytes = 100
         timeout_secs = 10
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -726,7 +709,7 @@ async fn parses_sink_full_batch_event() {
         max_events = 100
         timeout_secs = 10
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -751,7 +734,7 @@ async fn parses_sink_full_auth() {
         user = "user"
         password = "password"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -768,14 +751,14 @@ async fn parses_sink_full_es_basic_auth() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://localhost"
+        endpoint = "https://localhost"
 
         [sinks.out.auth]
         strategy = "basic"
         user = "user"
         password = "password"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -792,12 +775,12 @@ async fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        host = "https://es.us-east-1.amazonaws.com"
+        endpoint = "https://es.us-east-1.amazonaws.com"
 
         [sinks.out.auth]
         strategy = "aws"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();
@@ -825,18 +808,14 @@ async fn route() {
         type = "check_fields"
         "host.eq" = "gerry"
 
-        [transforms.splitting_gerrys.route.no_gerrys]
-        type = "check_fields"
-        "host.neq" = "gerry"
-
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys._unmatched"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
-        Some(Format::Toml),
+        Format::Toml,
     )
     .await
     .unwrap();

@@ -25,16 +25,6 @@ components: transforms: logfmt_parser: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
@@ -53,18 +43,15 @@ components: transforms: logfmt_parser: {
 			common:      true
 			description: "If the specified `field` should be dropped (removed) after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to parse."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

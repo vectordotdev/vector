@@ -251,7 +251,7 @@ async function buildIndex() {
     }
   ];
 
-  // Recurse through each section and push the resuling records to `allRecords`
+  // Recurse through each section and push the resulting records to `allRecords`
   for (const section of sections) {
     let files = await glob(section.path);
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));

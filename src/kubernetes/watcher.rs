@@ -2,7 +2,6 @@
 
 use futures::{future::BoxFuture, stream::Stream};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, WatchOptional};
-
 use serde::de::DeserializeOwned;
 use snafu::Snafu;
 

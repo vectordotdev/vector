@@ -1,7 +1,20 @@
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use bytes::{Bytes, BytesMut};
+use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
+use vector_buffers::Acker;
+
 use super::SinkBuildError;
-use crate::udp;
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     dns,
     event::Event,
@@ -13,19 +26,8 @@ use crate::{
         util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
+    udp,
 };
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
@@ -81,7 +83,7 @@ impl UdpSinkConfig {
         let connector = self.build_connector(cx.clone())?;
         let sink = UdpSink::new(connector.clone(), cx.acker(), encode_event);
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
         ))
     }
@@ -114,14 +116,14 @@ impl UdpConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(UdpError::NoAddresses)?;
 
         let addr = SocketAddr::new(ip, self.port);
         let bind_address = find_bind_address(&addr);
 
-        let socket = UdpSocket::bind(bind_address).await.context(BindError)?;
+        let socket = UdpSocket::bind(bind_address).await.context(BindSnafu)?;
 
         if let Some(send_buffer_bytes) = self.send_buffer_bytes {
             if let Err(error) = udp::set_send_buffer_size(&socket, send_buffer_bytes) {
@@ -129,7 +131,7 @@ impl UdpConnector {
             }
         }
 
-        socket.connect(addr).await.context(ConnectError)?;
+        socket.connect(addr).await.context(ConnectSnafu)?;
 
         Ok(socket)
     }
@@ -139,11 +141,11 @@ impl UdpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(&UdpSocketConnectionEstablished {});
+                    emit!(UdpSocketConnectionEstablished {});
                     return socket;
                 }
                 Err(error) => {
-                    emit!(&UdpSocketConnectionFailed { error });
+                    emit!(UdpSocketConnectionFailed { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -176,7 +178,7 @@ impl UdpService {
     }
 }
 
-impl tower::Service<Bytes> for UdpService {
+impl tower::Service<BytesMut> for UdpService {
     type Response = ();
     type Error = UdpError;
     type Future = BoxFuture<'static, Result<(), Self::Error>>;
@@ -196,7 +198,7 @@ impl tower::Service<Bytes> for UdpService {
                 }
                 UdpServiceState::Connected(_) => break,
                 UdpServiceState::Sending(fut) => {
-                    let socket = match ready!(fut.poll_unpin(cx)).context(ServiceChannelRecvError) {
+                    let socket = match ready!(fut.poll_unpin(cx)).context(ServiceChannelRecvSnafu) {
                         Ok(socket) => socket,
                         Err(error) => return Poll::Ready(Err(error)),
                     };
@@ -207,7 +209,7 @@ impl tower::Service<Bytes> for UdpService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, msg: Bytes) -> Self::Future {
+    fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
 
         let mut socket =
@@ -218,7 +220,7 @@ impl tower::Service<Bytes> for UdpService {
 
         Box::pin(async move {
             // TODO: Add reconnect support as TCP/Unix?
-            let result = udp_send(&mut socket, &msg).await.context(SendError);
+            let result = udp_send(&mut socket, &msg).await.context(SendSnafu);
             let _ = sender.send(socket);
             result
         })
@@ -246,7 +248,7 @@ impl UdpSink {
 }
 
 #[async_trait]
-impl StreamSink for UdpSink {
+impl StreamSink<Event> for UdpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 
@@ -261,13 +263,13 @@ impl StreamSink for UdpSink {
                 };
 
                 match udp_send(&mut socket, &input).await {
-                    Ok(()) => emit!(&SocketEventsSent {
+                    Ok(()) => emit!(SocketEventsSent {
                         mode: SocketMode::Udp,
                         count: 1,
                         byte_size: input.len(),
                     }),
                     Err(error) => {
-                        emit!(&UdpSocketError { error });
+                        emit!(UdpSocketError { error });
                         break;
                     }
                 };
@@ -281,7 +283,7 @@ impl StreamSink for UdpSink {
 async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
     let sent = socket.send(buf).await?;
     if sent != buf.len() {
-        emit!(&UdpSendIncomplete {
+        emit!(UdpSendIncomplete {
             data_size: buf.len(),
             sent,
         });

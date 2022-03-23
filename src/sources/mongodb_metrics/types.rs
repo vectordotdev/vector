@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use mongodb::bson::DateTime;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Type of mongo instance.
 /// Can be determined with `isMaster` command, see `CommandIsMaster`.
@@ -279,7 +280,7 @@ pub struct CommandServerStatusOpLatenciesStat {
 
 #[derive(Debug, Deserialize)]
 pub struct CommandServerStatusOpLatenciesStatHistBucket {
-    pub micros: i64,
+    pub(crate) micros: i64,
     pub count: i64,
 }
 

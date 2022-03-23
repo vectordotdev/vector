@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
@@ -77,7 +79,7 @@ prop_compose! {
 
 prop_compose! {
     fn string_literal()(val in "[^\"\\\\\\)\\}]*") -> Literal {
-        Literal::String(val.replace("\\", "\\\\").replace("\"", "\\\""))
+        Literal::String(val.replace('\\', "\\\\").replace('\"', "\\\""))
     }
 }
 
@@ -275,22 +277,22 @@ proptest! {
     #[test]
     fn expr_parses(expr in expr()) {
         let expr = program(expr);
-        let source = format!("{}", expr);
+        let source = expr.to_string();
         let program = parser::parse(source.clone()).unwrap();
 
-        assert_eq!(format!("{}", program),
-                   format!("{}", expr),
+        assert_eq!(program.to_string(),
+                   expr.to_string(),
                    "{}", source);
     }
 
     #[test]
     fn if_parses(expr in if_statement()) {
         let expr = program(expr);
-        let source = format!("{}", expr);
+        let source = expr.to_string();
         let program = parser::parse(source.clone()).unwrap();
 
-        assert_eq!(format!("{}", program),
-                   format!("{}", expr),
+        assert_eq!(program.to_string(),
+                   expr.to_string(),
                    "{}", source);
     }
 }

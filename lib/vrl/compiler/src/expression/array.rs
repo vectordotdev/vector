@@ -1,6 +1,10 @@
-use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
-use std::{fmt, ops::Deref};
+use std::{collections::BTreeMap, fmt, ops::Deref};
+
+use crate::{
+    expression::{Expr, Resolved},
+    vm::OpCode,
+    Context, Expression, State, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
@@ -49,7 +53,33 @@ impl Expression for Array {
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
-        TypeDef::new().array(type_defs).with_fallibility(fallible)
+        let collection = type_defs
+            .into_iter()
+            .enumerate()
+            .map(|(index, type_def)| (index.into(), type_def.into()))
+            .collect::<BTreeMap<_, _>>();
+
+        TypeDef::array(collection).with_fallibility(fallible)
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        // Evaluate each of the elements of the array, the result of each
+        // will be added to the stack.
+        for value in self.inner.iter().rev() {
+            value.compile_to_vm(vm, state)?;
+        }
+
+        vm.write_opcode(OpCode::CreateArray);
+
+        // Add the length of the array as a primitive so the VM knows how
+        // many elements to move into the array.
+        vm.write_primitive(self.inner.len());
+
+        Ok(())
     }
 }
 
@@ -74,35 +104,37 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
-    use crate::{expr, map, test_type_def, value::Kind, TypeDef};
+    use super::*;
+    use crate::{expr, test_type_def, value::Kind, TypeDef};
+    use value::kind::Collection;
 
     test_type_def![
         empty_array {
             expr: |_| expr!([]),
-            want: TypeDef::new().array::<TypeDef>(vec![]),
+            want: TypeDef::array(Collection::empty()),
         }
 
         scalar_array {
             expr: |_| expr!([1, "foo", true]),
-            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
-                0: Kind::Integer,
-                1: Kind::Bytes,
-                2: Kind::Boolean,
-            }),
+            want: TypeDef::array(BTreeMap::from([
+                (0.into(), Kind::integer()),
+                (1.into(), Kind::bytes()),
+                (2.into(), Kind::boolean()),
+            ])),
         }
 
         mixed_array {
             expr: |_| expr!([1, [true, "foo"], { "bar": null }]),
-            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
-                0: Kind::Integer,
-                1: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
-                    0: Kind::Boolean,
-                    1: Kind::Bytes,
-                }),
-                2: TypeDef::new().object::<&str, TypeDef>(map! {
-                    "bar": Kind::Null,
-                }),
-            }),
+            want: TypeDef::array(BTreeMap::from([
+                (0.into(), Kind::integer()),
+                (1.into(), Kind::array(BTreeMap::from([
+                    (0.into(), Kind::boolean()),
+                    (1.into(), Kind::bytes()),
+                ]))),
+                (2.into(), Kind::object(BTreeMap::from([
+                    ("bar".into(), Kind::null())
+                ]))),
+            ])),
         }
     ];
 }

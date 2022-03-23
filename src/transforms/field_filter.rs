@@ -1,9 +1,14 @@
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    transforms::{FunctionTransform, Transform},
-};
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::Event,
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -40,12 +45,12 @@ impl TransformConfig for FieldFilterConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -66,11 +71,11 @@ impl FieldFilter {
 }
 
 impl FunctionTransform for FieldFilter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if event
             .as_log()
-            .get(&self.field_name)
-            .map(|f| f.as_bytes())
+            .get(self.field_name.as_str())
+            .map(|f| f.coerce_to_bytes())
             .map_or(false, |b| b == self.value.as_bytes())
         {
             output.push(event);

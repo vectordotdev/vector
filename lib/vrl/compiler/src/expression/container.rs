@@ -1,6 +1,9 @@
-use crate::expression::{Array, Block, Group, Object, Resolved, Value};
-use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
+
+use crate::{
+    expression::{Array, Block, Group, Object, Resolved, Value},
+    Context, Expression, State, TypeDef,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Container {
@@ -52,6 +55,22 @@ impl Expression for Container {
             Block(v) => v.type_def(state),
             Array(v) => v.type_def(state),
             Object(v) => v.type_def(state),
+        }
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        use Variant::*;
+
+        // Pass the call on to the contained expression.
+        match &self.variant {
+            Group(v) => v.compile_to_vm(vm, state),
+            Block(v) => v.compile_to_vm(vm, state),
+            Array(v) => v.compile_to_vm(vm, state),
+            Object(v) => v.compile_to_vm(vm, state),
         }
     }
 }

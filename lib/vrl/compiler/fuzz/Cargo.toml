@@ -1,0 +1,40 @@
+[package]
+name = "vrl-compiler-fuzz"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.parser]
+package = "vrl-parser"
+path = "../../parser"
+features = ["fuzz"]
+
+[dependencies.vrl]
+package = "vrl"
+path = "../../vrl"
+
+[dependencies.vrl-compiler]
+path = ".."
+
+[dependencies.stdlib]
+package = "vrl-stdlib"
+path = "../../stdlib"
+
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "vm_differential"
+path = "fuzz_targets/vm_differential.rs"
+test = false
+doc = false

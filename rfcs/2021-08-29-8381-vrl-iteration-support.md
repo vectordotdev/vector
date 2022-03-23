@@ -49,9 +49,9 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 * feat(remap): add for-loop statement [#5875][]
 * Remap enumerating/looping RFC [#6031][]
 
-[#5785]: https://github.com/timberio/vector/issues/5785
-[#5875]: https://github.com/timberio/vector/issues/5875
-[#6031]: https://github.com/timberio/vector/issues/6031
+[#5785]: https://github.com/vectordotdev/vector/issues/5785
+[#5875]: https://github.com/vectordotdev/vector/issues/5875
+[#6031]: https://github.com/vectordotdev/vector/issues/6031
 
 ## Cross cutting concerns
 
@@ -61,11 +61,11 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 * Complex nested parsing with Remap (waninfo) [#5852][]
 * enhancement(vrl): add filter_array [#7908][]
 
-[#5377]: https://github.com/timberio/vector/issues/5377
-[#5783]: https://github.com/timberio/vector/issues/5783
-[#5784]: https://github.com/timberio/vector/issues/5784
-[#5852]: https://github.com/timberio/vector/issues/5852
-[#7908]: https://github.com/timberio/vector/issues/7908
+[#5377]: https://github.com/vectordotdev/vector/issues/5377
+[#5783]: https://github.com/vectordotdev/vector/issues/5783
+[#5784]: https://github.com/vectordotdev/vector/issues/5784
+[#5852]: https://github.com/vectordotdev/vector/issues/5852
+[#7908]: https://github.com/vectordotdev/vector/issues/7908
 
 ## Scope
 
@@ -312,7 +312,7 @@ be implemented:
 Let's discuss these one by one, before we arrive at the final part, implementing
 the `map` function that uses both concepts.
 
-[doc]: https://github.com/timberio/vector/blob/jean/vrl-design-doc/lib/vrl/DESIGN.md
+[doc]: https://github.com/vectordotdev/vector/blob/jean/vrl-design-doc/lib/vrl/DESIGN.md
 
 #### Closure-support For Functions
 

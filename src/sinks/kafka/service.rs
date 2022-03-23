@@ -1,18 +1,29 @@
-use crate::buffers::Ackable;
-use crate::event::{EventFinalizers, EventStatus, Finalizable};
-use crate::kafka::KafkaStatisticsContext;
+use std::task::{Context, Poll};
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rdkafka::error::KafkaError;
-use rdkafka::message::OwnedHeaders;
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::util::Timeout;
-use std::task::{Context, Poll};
+use rdkafka::{
+    error::KafkaError,
+    message::OwnedHeaders,
+    producer::{FutureProducer, FutureRecord},
+    util::Timeout,
+};
 use tower::Service;
+use vector_core::{
+    buffers::Ackable,
+    internal_event::{BytesSent, EventsSent},
+    stream::DriverResponse,
+};
+
+use crate::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    kafka::KafkaStatisticsContext,
+};
 
 pub struct KafkaRequest {
     pub body: Vec<u8>,
     pub metadata: KafkaRequestMetadata,
+    pub event_byte_size: usize,
 }
 
 pub struct KafkaRequestMetadata {
@@ -23,11 +34,21 @@ pub struct KafkaRequestMetadata {
     pub topic: String,
 }
 
-pub struct KafkaResponse {}
+pub struct KafkaResponse {
+    event_byte_size: usize,
+}
 
-impl AsRef<EventStatus> for KafkaResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for KafkaResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: 1,
+            byte_size: self.event_byte_size,
+            output: None,
+        }
     }
 }
 
@@ -49,7 +70,9 @@ pub struct KafkaService {
 }
 
 impl KafkaService {
-    pub const fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+    pub(crate) const fn new(
+        kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    ) -> KafkaService {
         KafkaService { kafka_producer }
     }
 }
@@ -80,7 +103,16 @@ impl Service<KafkaRequest> for KafkaService {
 
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse {}),
+                Ok((_partition, _offset)) => {
+                    emit!(BytesSent {
+                        byte_size: request.body.len()
+                            + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                        protocol: "kafka"
+                    });
+                    Ok(KafkaResponse {
+                        event_byte_size: request.event_byte_size,
+                    })
+                }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             };
             result

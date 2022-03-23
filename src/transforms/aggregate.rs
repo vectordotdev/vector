@@ -1,16 +1,19 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{metric, Event, EventMetadata},
-    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
-    transforms::{TaskTransform, Transform},
-};
-use async_stream::stream;
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap},
     pin::Pin,
     time::Duration,
+};
+
+use async_stream::stream;
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    event::{metric, Event, EventMetadata},
+    internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
+    schema,
+    transforms::{TaskTransform, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -35,15 +38,15 @@ impl_generate_config_from_default!(AggregateConfig);
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Aggregate::new(self).map(Transform::task)
+        Aggregate::new(self).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -80,7 +83,7 @@ impl Aggregate {
                     if existing.0.kind == data.kind && existing.0.update(&data) {
                         existing.1.merge(metadata);
                     } else {
-                        emit!(&AggregateUpdateFailed);
+                        emit!(AggregateUpdateFailed);
                         *existing = (data, metadata);
                     }
                 }
@@ -94,7 +97,7 @@ impl Aggregate {
             }
         };
 
-        emit!(&AggregateEventRecorded);
+        emit!(AggregateEventRecorded);
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
@@ -103,11 +106,11 @@ impl Aggregate {
             output.push(Event::Metric(metric));
         }
 
-        emit!(&AggregateFlushed);
+        emit!(AggregateFlushed);
     }
 }
 
-impl TaskTransform for Aggregate {
+impl TaskTransform<Event> for Aggregate {
     fn transform(
         mut self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -145,10 +148,12 @@ impl TaskTransform for Aggregate {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{event::metric, event::Event, event::Metric};
-    use futures::{stream, SinkExt};
     use std::{collections::BTreeSet, task::Poll};
+
+    use futures::{stream, SinkExt};
+
+    use super::*;
+    use crate::event::{metric, Event, Metric};
 
     #[test]
     fn generate_config() {
@@ -450,10 +455,10 @@ interval_ms = 999999
         );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
-        // Queue up some events to be consummed & recorded
+        // Queue up some events to be consumed & recorded
         let in_stream = Box::pin(stream::iter(inputs));
         // Kick off the transform process which should consume & record them
-        let mut out_stream = agg.transform(in_stream);
+        let mut out_stream = agg.transform_events(in_stream);
 
         // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
         // part of the loop and do the shutting down final flush immediately. We'll already be able
@@ -511,7 +516,7 @@ interval_ms = 999999
         );
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = agg.transform(Box::pin(rx));
+        let mut out_stream = agg.transform_events(Box::pin(rx));
 
         tokio::time::pause();
 
@@ -526,7 +531,7 @@ interval_ms = 999999
         tx.send(gauge_a_2.clone()).await.unwrap();
         // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Now fast foward time enough that our flush should trigger.
+        // Now fast forward time enough that our flush should trigger.
         tokio::time::advance(Duration::from_secs(11)).await;
         // We should have had an interval fire now and our output aggregate events should be
         // available.
@@ -540,7 +545,7 @@ interval_ms = 999999
                 };
                 count += 1;
             } else {
-                panic!("Unexpectedly recieved None in output stream");
+                panic!("Unexpectedly received None in output stream");
             }
         }
         // We should be back to pending, having nothing waiting for us

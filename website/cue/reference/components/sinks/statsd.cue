@@ -6,8 +6,8 @@ components: sinks: statsd: {
 	classes: sinks.socket.classes
 
 	features: {
-		buffer:      sinks.socket.features.buffer
-		healthcheck: sinks.socket.features.healthcheck
+		acknowledgements: sinks.socket.features.acknowledgements
+		healthcheck:      sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
 			encoding: enabled: false
@@ -54,11 +54,9 @@ components: sinks: statsd: {
 				A namespace will be prefixed to a metric's name.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

@@ -21,7 +21,7 @@ remap: expressions: if: {
 					The `predicate` _must_ be an expression that resolves to a Boolean. If a Boolean isn't returned, a
 					compile-time error is raised.
 					The predicate can contain multiple expressions. Multiple expression predicates must be wrapped in
-					parentheses. The expressions need to be seperated by either a semicolon (`;`) or a new line.
+					parentheses. The expressions need to be separated by either a semicolon (`;`) or a new line.
 					"""
 			}
 		}

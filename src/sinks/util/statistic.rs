@@ -1,6 +1,8 @@
-use crate::event::metric::Sample;
-use snafu::Snafu;
 use std::cmp::Ordering;
+
+use snafu::Snafu;
+
+use crate::event::metric::Sample;
 
 #[derive(Debug, Snafu)]
 pub enum ValidationError {

@@ -1,14 +1,16 @@
+use std::{collections::HashMap, str};
+
+use serde::{Deserialize, Serialize};
+use vector_common::TimeZone;
+
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
-    internal_events::CoercerConversionFailed,
-    transforms::{FunctionTransform, Transform},
+    internal_events::CoercerConversionError,
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -30,18 +32,18 @@ impl TransformConfig for CoercerConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
-        Ok(Transform::function(Coercer {
+        Ok(Transform::function(Coercer::new(
             types,
-            drop_unspecified: self.drop_unspecified,
-        }))
+            self.drop_unspecified,
+        )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -55,8 +57,17 @@ pub struct Coercer {
     drop_unspecified: bool,
 }
 
+impl Coercer {
+    pub const fn new(types: HashMap<String, Conversion>, drop_unspecified: bool) -> Self {
+        Self {
+            types,
+            drop_unspecified,
+        }
+    }
+}
+
 impl FunctionTransform for Coercer {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut log = event.into_log();
 
         if self.drop_unspecified {
@@ -66,12 +77,12 @@ impl FunctionTransform for Coercer {
             // conversion.
             let mut new_log = LogEvent::new_with_metadata(log.metadata().clone());
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                if let Some(value) = log.remove(field.as_str()) {
+                    match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            new_log.insert(field, converted);
+                            new_log.insert(field.as_str(), converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(CoercerConversionError { field, error }),
                     }
                 }
             }
@@ -79,12 +90,12 @@ impl FunctionTransform for Coercer {
             return;
         } else {
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                if let Some(value) = log.remove(field.as_str()) {
+                    match conv.convert::<Value>(value.coerce_to_bytes()) {
                         Ok(converted) => {
-                            log.insert(field, converted);
+                            log.insert(field.as_str(), converted);
                         }
-                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(CoercerConversionError { field, error }),
                     }
                 }
             }
@@ -95,12 +106,14 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::CoercerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -133,9 +146,9 @@ mod tests {
         .await
         .unwrap();
         let coercer = coercer.as_function();
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         coercer.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(&metadata, result.metadata());
         result
     }
@@ -167,6 +180,6 @@ mod tests {
         expected.as_mut_log().insert("bool", true);
         expected.as_mut_log().insert("number", 1234);
 
-        shared::assert_event_data_eq!(log, expected.into_log());
+        vector_common::assert_event_data_eq!(log, expected.into_log());
     }
 }

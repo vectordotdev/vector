@@ -1,16 +1,17 @@
-use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::discriminant::Discriminant,
-    event::merge_state::LogEventMergeState,
-    event::{self, Event},
-    transforms::{TaskTransform, Transform},
-};
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map, HashMap},
     future::ready,
     pin::Pin,
+};
+
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
+    schema,
+    transforms::{TaskTransform, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -56,15 +57,15 @@ impl Default for MergeConfig {
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(Merge::from(self.clone())))
+        Ok(Transform::event_task(Merge::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -96,7 +97,10 @@ impl Merge {
 
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
-        if event.remove(&self.partial_event_marker_field).is_some() {
+        if event
+            .remove(self.partial_event_marker_field.as_str())
+            .is_some()
+        {
             // We got a partial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
@@ -145,7 +149,7 @@ impl From<MergeConfig> for Merge {
     }
 }
 
-impl TaskTransform for Merge {
+impl TaskTransform<Event> for Merge {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -217,7 +221,7 @@ mod test {
 
         let make_event = |message, stream| {
             let mut event = LogEvent::from(message);
-            event.insert(stream_discriminant_field.clone(), stream);
+            event.insert(stream_discriminant_field.as_str(), stream);
             event
         };
 

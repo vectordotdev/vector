@@ -1,7 +1,8 @@
+use std::time::Duration;
+
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
 };
-use std::time::Duration;
 use vector_core::event::LogEvent;
 
 fn rename_key_flat(c: &mut Criterion) {

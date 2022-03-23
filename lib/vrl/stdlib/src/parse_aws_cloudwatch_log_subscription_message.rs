@@ -1,6 +1,26 @@
-use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use std::collections::BTreeMap;
+
+use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
+
+fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
+        .map_err(|e| format!("unable to parse: {}", e))?;
+    Ok(map![
+        "owner": message.owner,
+        "message_type": message.message_type.as_str(),
+        "log_group": message.log_group,
+        "log_stream": message.log_stream,
+        "subscription_filters": message.subscription_filters,
+        "log_events": message.log_events.into_iter().map(|event| map![
+            "id": event.id,
+            "timestamp": event.timestamp,
+            "message": event.message,
+        ]).collect::<Vec<_>>(),
+    ]
+    .into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;
@@ -49,7 +69,7 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -66,6 +86,11 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_aws_cloudwatch_log_subscription_message(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -75,54 +100,42 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
 
 impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
-            .map_err(|e| format!("unable to parse: {}", e))?;
-
-        Ok(map![
-            "owner": message.owner,
-            "message_type": message.message_type.as_str(),
-            "log_group": message.log_group,
-            "log_stream": message.log_stream,
-            "subscription_filters": message.subscription_filters,
-            "log_events": message.log_events.into_iter().map(|event| map![
-                "id": event.id,
-                "timestamp": event.timestamp,
-                "message": event.message,
-            ]).collect::<Vec<_>>(),
-        ]
-        .into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_cloudwatch_log_subscription_message(bytes)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Message parsing error
-            .object::<&str, TypeDef>(inner_type_def())
+        TypeDef::object(inner_kind()).fallible(/* message parsing error */)
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
+fn inner_kind() -> BTreeMap<Field, Kind> {
     map! {
-        "owner": Kind::Bytes,
-        "message_type": Kind::Bytes,
-        "log_group": Kind::Bytes,
-        "log_stream": Kind::Bytes,
-        "subscription_filters": TypeDef::new().array_mapped::<(), Kind>(map! {
-            (): Kind::Bytes
+        "owner": Kind::bytes(),
+        "message_type": Kind::bytes(),
+        "log_group": Kind::bytes(),
+        "log_stream": Kind::bytes(),
+        "subscription_filters": Kind::array({
+            let mut v = Collection::any();
+            v.set_unknown(Kind::bytes());
+            v
         }),
-        "log_events": TypeDef::new().object::<&str, Kind>(map! {
-            "id": Kind::Bytes,
-            "timestamp": Kind::Timestamp,
-            "message": Kind::Bytes,
-        }),
+        "log_events": Kind::object(BTreeMap::from([
+            ("id".into(), Kind::bytes()),
+            ("timestamp".into(), Kind::timestamp()),
+            ("message".into(), Kind::bytes()),
+        ])),
     }
+    .into_iter()
+    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{TimeZone, Utc};
+
+    use super::*;
 
     test_function![
         parse_aws_cloudwatch_log_subscription_message => ParseAwsCloudWatchLogSubscriptionMessage;
@@ -130,7 +143,7 @@ mod tests {
         invalid_type {
             args: func_args![value: "42"],
             want: Err("unable to parse: invalid type: integer `42`, expected struct AwsCloudWatchLogsSubscriptionMessage at line 1 column 2"),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         string {
@@ -173,13 +186,13 @@ mod tests {
                     "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
                 ]],
             ]),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         invalid_value {
             args: func_args![value: r#"{ INVALID }"#],
             want: Err("unable to parse: key must be a string at line 1 column 3"),
-            tdef: TypeDef::new().fallible().object::<&str, TypeDef>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

@@ -1,28 +1,30 @@
-use crate::{
-    config::{DataType, GenerateConfig, Resource, SinkContext},
-    sinks::util::tcp::TcpSinkConfig,
-    sinks::{Healthcheck, VectorSink},
-    tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
-};
 use bytes::{BufMut, Bytes, BytesMut};
-use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use vector_core::event::{proto, Event};
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+use crate::{
+    config::{GenerateConfig, SinkContext},
+    sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
+    tcp::TcpKeepaliveConfig,
+    tls::TlsConfig,
+};
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    #[set = "pub"]
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
 impl VectorConfig {
+    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+        self.tls = config;
+    }
+
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -66,18 +68,6 @@ impl VectorConfig {
         );
 
         sink_config.build(cx, |event| Some(encode_event(event)))
-    }
-
-    pub(super) const fn input_type(&self) -> DataType {
-        DataType::Any
-    }
-
-    pub(super) const fn sink_type(&self) -> &'static str {
-        "vector"
-    }
-
-    pub(super) const fn resources(&self) -> Vec<Resource> {
-        Vec::new()
     }
 }
 

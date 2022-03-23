@@ -1,5 +1,37 @@
 use vrl::prelude::*;
 
+fn parse_int(value: Value, base: Option<Value>) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let (base, index) = match base {
+        Some(base) => {
+            let base = base.try_integer()?;
+
+            if !(2..=36).contains(&base) {
+                return Err(format!(
+                    "invalid base {}: must be be between 2 and 36 (inclusive)",
+                    value
+                )
+                .into());
+            }
+            (base as u32, 0)
+        }
+        None => match string.chars().next() {
+            Some('0') => match string.chars().nth(1) {
+                Some('b') => (2, 2),
+                Some('o') => (8, 2),
+                Some('x') => (16, 2),
+                _ => (8, 1),
+            },
+            Some(_) => (10u32, 0),
+            None => return Err("value is empty".into()),
+        },
+    };
+    let converted = i64::from_str_radix(&string[index..], base)
+        .map_err(|err| format!("could not parse integer: {}", err))?;
+
+    Ok(converted.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseInt;
 
@@ -31,12 +63,12 @@ impl Function for ParseInt {
                 result: Ok("-42"),
             },
             Example {
-                title: "hexidecimal",
+                title: "hexadecimal",
                 source: r#"parse_int!("0x2a")"#,
                 result: Ok("42"),
             },
             Example {
-                title: "hexidecimal explicit",
+                title: "hexadecimal explicit",
                 source: r#"parse_int!("2a", base: 16)"#,
                 result: Ok("42"),
             },
@@ -46,13 +78,20 @@ impl Function for ParseInt {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
         Ok(Box::new(ParseIntFn { value, base }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let base = args.optional("base");
+
+        parse_int(value, base)
     }
 }
 
@@ -65,43 +104,17 @@ struct ParseIntFn {
 impl Expression for ParseIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
+        let base = self
+            .base
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let (base, index) = match &self.base {
-            Some(base) => base
-                .resolve(ctx)
-                .and_then(|value| value.try_integer().map_err(Into::into))
-                .and_then(|value| {
-                    if !(2..=36).contains(&value) {
-                        return Err(format!(
-                            "invalid base {}: must be be between 2 and 36 (inclusive)",
-                            value
-                        )
-                        .into());
-                    }
-
-                    Ok((value as u32, 0))
-                }),
-            None => match string.chars().next() {
-                Some('0') => match string.chars().nth(1) {
-                    Some('b') => Ok((2, 2)),
-                    Some('o') => Ok((8, 2)),
-                    Some('x') => Ok((16, 2)),
-                    _ => Ok((8, 1)),
-                },
-                Some(_) => Ok((10u32, 0)),
-                None => Err("value is empty".into()),
-            },
-        }?;
-
-        let converted = i64::from_str_radix(&string[index..], base)
-            .map_err(|err| format!("could not parse integer: {}", err))?;
-
-        Ok(converted.into())
+        parse_int(value, base)
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().integer()
+        TypeDef::integer().fallible()
     }
 }
 
@@ -115,31 +128,31 @@ mod tests {
         decimal {
              args: func_args![value: "-42"],
              want: Ok(-42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         binary {
              args: func_args![value: "0b1001"],
              want: Ok(9),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         octal {
              args: func_args![value: "042"],
              want: Ok(34),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
-        hexidecimal {
+        hexadecimal {
              args: func_args![value: "0x2a"],
              want: Ok(42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
-        explicit_hexidecimal {
+        explicit_hexadecimal {
              args: func_args![value: "2a", base: 16],
              want: Ok(42),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
     ];
 }

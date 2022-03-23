@@ -1,33 +1,37 @@
-use super::{
-    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError,
-    TcpBind, TlsError, TlsSettings,
-};
-#[cfg(feature = "sources-utils-tcp-socket")]
-use crate::tcp;
-#[cfg(feature = "sources-utils-tcp-keepalive")]
-use crate::tcp::TcpKeepaliveConfig;
-use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
-use snafu::ResultExt;
+use std::sync::Arc;
 use std::{
     future::Future,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use futures::{future::BoxFuture, stream, FutureExt, Stream};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use snafu::ResultExt;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
 };
 use tokio_openssl::SslStream;
 
+use super::{
+    CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
+    SslBuildSnafu, TcpBindSnafu, TlsError, TlsSettings,
+};
+#[cfg(feature = "sources-utils-tcp-socket")]
+use crate::tcp;
+#[cfg(feature = "sources-utils-tcp-keepalive")]
+use crate::tcp::TcpKeepaliveConfig;
+
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
-                let mut acceptor =
-                    SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptor)?;
+                let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())
+                    .context(CreateAcceptorSnafu)?;
                 self.apply_context(&mut acceptor)?;
                 Ok(acceptor.build())
             }
@@ -37,7 +41,7 @@ impl TlsSettings {
 
 impl MaybeTlsSettings {
     pub(crate) async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBind)?;
+        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
         let acceptor = match self {
             Self::Tls(tls) => Some(tls.acceptor()?),
@@ -61,7 +65,7 @@ impl MaybeTlsListener {
             .map(|(stream, peer_addr)| {
                 MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
             })
-            .context(IncomingListener)
+            .context(IncomingListenerSnafu)
     }
 
     async fn into_accept(
@@ -70,6 +74,7 @@ impl MaybeTlsListener {
         (self.accept().await, self)
     }
 
+    #[allow(unused)]
     pub(crate) fn accept_stream(
         self,
     ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> {
@@ -80,6 +85,44 @@ impl MaybeTlsListener {
                 Poll::Ready(Some(item))
             }
             Poll::Pending => Poll::Pending,
+        })
+    }
+
+    #[allow(unused)]
+    pub(crate) fn accept_stream_limited(
+        self,
+        max_connections: Option<u32>,
+    ) -> impl Stream<
+        Item = (
+            crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>,
+            Option<OwnedSemaphorePermit>,
+        ),
+    > {
+        let connection_semaphore =
+            max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
+
+        let mut semaphore_future = connection_semaphore
+            .clone()
+            .map(|x| Box::pin(x.acquire_owned()));
+        let mut accept = Box::pin(self.into_accept());
+        stream::poll_fn(move |context| {
+            let permit = match semaphore_future.as_mut() {
+                Some(semaphore) => match semaphore.as_mut().poll(context) {
+                    Poll::Ready(permit) => {
+                        semaphore.set(connection_semaphore.clone().unwrap().acquire_owned());
+                        permit.ok()
+                    }
+                    Poll::Pending => return Poll::Pending,
+                },
+                None => None,
+            };
+            match accept.as_mut().poll(context) {
+                Poll::Ready((item, this)) => {
+                    accept.set(this.into_accept());
+                    Poll::Ready(Some((item, permit)))
+                }
+                Poll::Pending => Poll::Pending,
+            }
         })
     }
 
@@ -182,9 +225,12 @@ impl MaybeTlsIncomingStream<TcpStream> {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
                 async move {
-                    let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
-                    let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
-                    Pin::new(&mut stream).accept().await.context(Handshake)?;
+                    let ssl = Ssl::new(acceptor.context()).context(SslBuildSnafu)?;
+                    let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
+                    Pin::new(&mut stream)
+                        .accept()
+                        .await
+                        .context(HandshakeSnafu)?;
                     Ok(stream)
                 }
                 .boxed(),

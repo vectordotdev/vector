@@ -1,12 +1,14 @@
+use std::{collections::BTreeMap, fmt::Write as _};
+
+use chrono::Utc;
+use indexmap::map::IndexMap;
+use prometheus_parser::{proto, METRIC_NAME_LABEL};
+use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
+
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
-use chrono::Utc;
-use indexmap::map::IndexMap;
-use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {
     type Output;
@@ -32,7 +34,6 @@ pub(super) trait MetricCollector {
         default_namespace: Option<&str>,
         buckets: &[f64],
         quantiles: &[f64],
-        expired: bool,
         metric: &Metric,
     ) {
         let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
@@ -51,39 +52,24 @@ pub(super) trait MetricCollector {
                     self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Set { values } => {
-                    // sets could expire
-                    let value = if expired { 0 } else { values.len() };
-                    self.emit_value(timestamp, name, "", value as f64, tags, None);
+                    self.emit_value(timestamp, name, "", values.len() as f64, tags, None);
                 }
                 MetricValue::Distribution {
                     samples,
                     statistic: StatisticKind::Histogram,
                 } => {
                     // convert distributions into aggregated histograms
-                    let mut counts = vec![0; buckets.len()];
-                    let mut sum = 0.0;
-                    let mut count = 0;
-                    for sample in samples {
-                        buckets
-                            .iter()
-                            .enumerate()
-                            .skip_while(|&(_, b)| *b < sample.value)
-                            .for_each(|(i, _)| {
-                                counts[i] += sample.rate;
-                            });
-
-                        sum += sample.value * (sample.rate as f64);
-                        count += sample.rate;
-                    }
-
-                    for (b, c) in buckets.iter().zip(counts.iter()) {
+                    let (buckets, count, sum) = samples_to_buckets(samples, buckets);
+                    let mut bucket_count = 0.0;
+                    for bucket in buckets {
+                        bucket_count += bucket.count as f64;
                         self.emit_value(
                             timestamp,
                             name,
                             "_bucket",
-                            *c as f64,
+                            bucket_count as f64,
                             tags,
-                            Some(("le", b.to_string())),
+                            Some(("le", bucket.upper_limit.to_string())),
                         );
                     }
                     self.emit_value(
@@ -135,16 +121,31 @@ pub(super) trait MetricCollector {
                     count,
                     sum,
                 } => {
-                    let mut value = 0f64;
+                    let mut bucket_count = 0.0;
                     for bucket in buckets {
-                        // prometheus uses cumulative histogram
-                        // https://prometheus.io/docs/concepts/metric_types/#histogram
-                        value += bucket.count as f64;
+                        // Aggregated histograms are cumulative in Prometheus.  This means that the
+                        // count of values in a bucket should only go up at the upper limit goes up,
+                        // because if you count a value in a specific bucket, by definition, it is
+                        // less than the upper limit of the next bucket.
+                        //
+                        // While most sources should give us buckets that have an "infinity" bucket
+                        // -- everything else that didn't fit in the non-infinity-upper-limit buckets
+                        // -- we can't be sure, so we calculate that bucket ourselves.  This is why
+                        // we make sure to avoid encoding a bucket if its upper limit is already
+                        // infinity, so that we don't double report.
+                        //
+                        // This check will also avoid printing out a bucket whose upper limit is
+                        // negative infinity, because that would make no sense.
+                        if bucket.upper_limit.is_infinite() {
+                            continue;
+                        }
+
+                        bucket_count += bucket.count as f64;
                         self.emit_value(
                             timestamp,
                             name,
                             "_bucket",
-                            value,
+                            bucket_count,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );
@@ -172,12 +173,46 @@ pub(super) trait MetricCollector {
                             "",
                             quantile.value,
                             tags,
-                            Some(("quantile", quantile.upper_limit.to_string())),
+                            Some(("quantile", quantile.quantile.to_string())),
                         );
                     }
                     self.emit_value(timestamp, name, "_sum", *sum, tags, None);
                     self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
+                MetricValue::Sketch { sketch } => match sketch {
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        for q in quantiles {
+                            let quantile = Quantile {
+                                quantile: *q,
+                                value: ddsketch.quantile(*q).unwrap_or(0.0),
+                            };
+                            self.emit_value(
+                                timestamp,
+                                name,
+                                "",
+                                quantile.value,
+                                tags,
+                                Some(("quantile", quantile.quantile.to_string())),
+                            );
+                        }
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_sum",
+                            ddsketch.sum().unwrap_or(0.0),
+                            tags,
+                            None,
+                        );
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_count",
+                            ddsketch.count() as f64,
+                            tags,
+                            None,
+                        );
+                    }
+                },
             }
         }
     }
@@ -239,15 +274,15 @@ impl StringCollector {
     ) {
         match (tags, extra) {
             (None, None) => Ok(()),
-            (None, Some(tag)) => write!(result, "{{{}=\"{}\"}}", tag.0, tag.1),
+            (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
                     .iter()
-                    .map(|(name, value)| format!("{}=\"{}\"", name, value))
+                    .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
-                if let Some(tag) = tag {
-                    parts.push(format!("{}=\"{}\"", tag.0, tag.1));
+                if let Some((key, value)) = tag {
+                    parts.push(Self::format_tag(key, value))
                 }
 
                 parts.sort();
@@ -263,6 +298,23 @@ impl StringCollector {
             "# HELP {} {}\n# TYPE {} {}\n",
             fullname, name, fullname, r#type
         )
+    }
+
+    fn format_tag(key: &str, mut value: &str) -> String {
+        // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
+        let mut result = String::with_capacity(key.len() + value.len() + 3);
+        result.push_str(key);
+        result.push_str("=\"");
+        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+            result.push_str(&value[..i]);
+            result.push('\\');
+            // Ugly but works because we know the character at `i` is ASCII
+            result.push(value.as_bytes()[i] as char);
+            value = &value[i + 1..];
+        }
+        result.push_str(value);
+        result.push('"');
+        result
     }
 }
 
@@ -381,27 +433,32 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
         } => MetricType::Summary,
         MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
         MetricValue::AggregatedSummary { .. } => MetricType::Summary,
+        MetricValue::Sketch { .. } => MetricType::Summary,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::default_summary_quantiles;
-    use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use std::collections::BTreeSet;
+
     use chrono::{DateTime, TimeZone};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+
+    use super::{super::default_summary_quantiles, *};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        test_util::stats::VariableHistogram,
+    };
 
     fn encode_one<T: MetricCollector>(
         default_namespace: Option<&str>,
         buckets: &[f64],
         quantiles: &[f64],
-        expired: bool,
         metric: &Metric,
     ) -> T::Output {
         let mut s = T::new();
-        s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
+        s.encode_metric(default_namespace, buckets, quantiles, metric);
         s.finish()
     }
 
@@ -479,7 +536,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -510,7 +567,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -542,7 +599,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -570,11 +627,11 @@ mod tests {
             "users".to_owned(),
             MetricKind::Absolute,
             MetricValue::Set {
-                values: vec!["foo".into()].into_iter().collect(),
+                values: BTreeSet::new(),
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], true, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -621,13 +678,13 @@ mod tests {
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[0.0, 2.5, 5.0], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[0.0, 2.5, 5.0], &[], &metric)
     }
 
     #[test]
     fn encodes_histogram_text() {
         assert_eq!(
-            encode_histogram::<StringCollector>(),
+            encode_histogram::<StringCollector>(false),
             indoc! {r#"
                 # HELP vector_requests requests
                 # TYPE vector_requests histogram
@@ -635,7 +692,7 @@ mod tests {
                 vector_requests_bucket{le="2.1"} 3 1612325106789
                 vector_requests_bucket{le="3"} 6 1612325106789
                 vector_requests_bucket{le="+Inf"} 6 1612325106789
-                vector_requests_sum 12.5 1612325106789
+                vector_requests_sum 11.5 1612325106789
                 vector_requests_count 6 1612325106789
             "#}
         );
@@ -644,32 +701,75 @@ mod tests {
     #[test]
     fn encodes_histogram_request() {
         assert_eq!(
-            encode_histogram::<TimeSeries>(),
+            encode_histogram::<TimeSeries>(false),
             write_request!(
                 "vector_requests", "requests", Histogram [
                         "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
                         "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
                         "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
                         "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 12.5 [],
+                        "_sum" @ 1612325106789 = 11.5 [],
                         "_count" @ 1612325106789 = 6.0 []
                     ]
             )
         );
     }
 
-    fn encode_histogram<T: MetricCollector>() -> T::Output {
+    #[test]
+    fn encodes_histogram_text_with_extra_infinity_bound() {
+        assert_eq!(
+            encode_histogram::<StringCollector>(true),
+            indoc! {r#"
+                # HELP vector_requests requests
+                # TYPE vector_requests histogram
+                vector_requests_bucket{le="1"} 1 1612325106789
+                vector_requests_bucket{le="2.1"} 3 1612325106789
+                vector_requests_bucket{le="3"} 6 1612325106789
+                vector_requests_bucket{le="+Inf"} 6 1612325106789
+                vector_requests_sum 11.5 1612325106789
+                vector_requests_count 6 1612325106789
+            "#}
+        );
+    }
+
+    #[test]
+    fn encodes_histogram_request_with_extra_infinity_bound() {
+        assert_eq!(
+            encode_histogram::<TimeSeries>(true),
+            write_request!(
+                "vector_requests", "requests", Histogram [
+                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1612325106789 = 11.5 [],
+                        "_count" @ 1612325106789 = 6.0 []
+                    ]
+            )
+        );
+    }
+
+    fn encode_histogram<T: MetricCollector>(add_inf_bound: bool) -> T::Output {
+        let bounds = if add_inf_bound {
+            &[1.0, 2.1, 3.0, f64::INFINITY][..]
+        } else {
+            &[1.0, 2.1, 3.0][..]
+        };
+
+        let mut histogram = VariableHistogram::new(bounds);
+        histogram.record_many(&[0.4, 2.0, 1.75, 2.6, 2.25, 2.5][..]);
+
         let metric = Metric::new(
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
-                count: 6,
-                sum: 12.5,
+                buckets: histogram.buckets(),
+                count: histogram.count(),
+                sum: histogram.sum(),
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -715,7 +815,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("ns"), &[], &[], false, &metric)
+        encode_one::<T>(Some("ns"), &[], &[], &metric)
     }
 
     #[test]
@@ -771,13 +871,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(
-            Some("ns"),
-            &[],
-            &default_summary_quantiles(),
-            false,
-            &metric,
-        )
+        encode_one::<T>(Some("ns"), &[], &default_summary_quantiles(), &metric)
     }
 
     #[test]
@@ -807,7 +901,7 @@ mod tests {
             MetricValue::Counter { value: 2.0 },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(None, &[], &[], false, &metric)
+        encode_one::<T>(None, &[], &[], &metric)
     }
 
     #[test]
@@ -818,11 +912,38 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
         );
-        let encoded = encode_one::<TimeSeries>(None, &[], &[], false, &metric);
+        let encoded = encode_one::<TimeSeries>(None, &[], &[], &metric);
         assert!(encoded.timeseries[0].samples[0].timestamp >= now);
     }
 
     fn timestamp() -> DateTime<Utc> {
         Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
+    }
+
+    #[test]
+    fn escapes_tags_text() {
+        let tags: BTreeMap<String, String> = [
+            ("code", "200"),
+            ("quoted", r#"host"1""#),
+            ("path", r#"c:\Windows"#),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
     }
 }

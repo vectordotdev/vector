@@ -56,6 +56,17 @@ glossary: #Glossary & [
 			"""
 	},
 	{
+		term:        "Enrichment tables"
+		description: """
+			File-based information that you can use to enrich Vector [events](#event) in
+			[`remap`](\(urls.vector_remap_transform)) transforms. [VRL](\(urls.vrl_reference))
+			provides two functions for using enrichment tables:
+
+			* [`find_enrichment_table_records`](\(urls.vrl_functions)/#find_enrichment_table_records)
+			* [`get_enrichment_table_record`](\(urls.vrl_functions)/#get_enrichment_table_record)
+			"""
+	},
+	{
 		term:        "Event"
 		description: """
 			A single unit of data that flows through Vector. You can learn more about events on the

@@ -1,28 +1,24 @@
-use crate::{
-    config::log_schema,
-    event::{EventRef, Metric, Value},
-};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
 use snafu::Snafu;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
-use std::hash::Hash;
-use std::path::PathBuf;
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
-}
+use crate::{
+    config::log_schema,
+    event::{EventRef, Metric, Value},
+};
+
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 #[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
@@ -158,8 +154,9 @@ fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateR
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
                 EventRef::Metric(metric) => render_metric_field(key, metric),
+                EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
@@ -192,6 +189,10 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
             .and_then(Value::as_timestamp)
             .copied(),
         EventRef::Metric(metric) => metric.timestamp(),
+        EventRef::Trace(trace) => trace
+            .get(log_schema().timestamp_key())
+            .and_then(Value::as_timestamp)
+            .copied(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -239,10 +240,11 @@ impl Serialize for Template {
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeZone;
+    use vector_common::btreemap;
+
     use super::*;
     use crate::event::{Event, MetricKind, MetricValue};
-    use chrono::TimeZone;
-    use shared::btreemap;
 
     #[test]
     fn get_fields() {
@@ -413,10 +415,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("%F", "foo");
+        event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
-        let template = Template::try_from("nested {{ %F }} %T").unwrap();
+        let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),

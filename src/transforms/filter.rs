@@ -1,16 +1,28 @@
+use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
+
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::FilterEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-struct FilterConfig {
+pub struct FilterConfig {
     condition: AnyCondition,
+}
+
+impl From<AnyCondition> for FilterConfig {
+    fn from(condition: AnyCondition) -> Self {
+        Self { condition }
+    }
 }
 
 inventory::submit! {
@@ -36,12 +48,16 @@ impl TransformConfig for FilterConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Any
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -53,21 +69,35 @@ impl TransformConfig for FilterConfig {
 #[derivative(Debug)]
 pub struct Filter {
     #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
+    condition: Condition,
+    last_emission: Instant,
+    emissions_max_delay: Duration,
+    emissions_deferred: u64,
 }
 
 impl Filter {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
-        Self { condition }
+    pub fn new(condition: Condition) -> Self {
+        Self {
+            condition,
+            last_emission: Instant::now(),
+            emissions_max_delay: Duration::new(2, 0),
+            emissions_deferred: 0,
+        }
     }
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
+        } else if self.last_emission.elapsed() >= self.emissions_max_delay {
+            emit!(FilterEventDiscarded {
+                total: self.emissions_deferred,
+            });
+            self.emissions_deferred = 0;
+            self.last_emission = Instant::now();
         } else {
-            emit!(&FilterEventDiscarded);
+            self.emissions_deferred += 1;
         }
     }
 }
@@ -88,9 +118,7 @@ mod test {
 
     #[test]
     fn passes_metadata() {
-        let mut filter = Filter {
-            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
-        };
+        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
         let event = Event::from("message");
         let metadata = event.metadata().clone();
         let result = transform_one(&mut filter, event).unwrap();

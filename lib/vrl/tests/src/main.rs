@@ -1,41 +1,51 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
+
 mod test_enrichment;
+
+use std::str::FromStr;
 
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
+use clap::Parser;
 use glob::glob;
-use shared::TimeZone;
-use std::str::FromStr;
-use structopt::StructOpt;
+use vector_common::TimeZone;
+use vrl::prelude::VrlValueConvert;
+use vrl::VrlRuntime;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
-
 use vrl_tests::{docs, Test};
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[derive(Parser, Debug)]
+#[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pattern: Option<String>,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     fail_early: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     verbose: bool,
 
-    #[structopt(short, long)]
+    #[clap(short, long)]
     no_diff: bool,
-
-    #[structopt(long)]
-    skip_functions: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     logging: bool,
 
-    #[structopt(short = "tz", long)]
+    #[clap(short = 'z', long)]
     timezone: Option<String>,
+
+    /// Should we use the VM to evaluate the VRL
+    #[clap(short, long = "runtime", default_value_t)]
+    runtime: VrlRuntime,
 }
 
 impl Cmd {
@@ -63,7 +73,7 @@ fn should_run(name: &str, pat: &Option<String>) -> bool {
 }
 
 fn main() {
-    let cmd = Cmd::from_args();
+    let cmd = Cmd::parse();
 
     if cmd.logging {
         tracing_subscriber::fmt::init();
@@ -117,7 +127,11 @@ fn main() {
             continue;
         }
 
-        let dots = 60 - test.name.len();
+        let dots = if test.name.len() >= 60 {
+            0
+        } else {
+            60 - test.name.len()
+        };
         print!(
             "  {}{}",
             test.name,
@@ -129,19 +143,31 @@ fn main() {
         }
 
         let state = state::Runtime::default();
-        let mut runtime = Runtime::new(state);
+        let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
-        let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
-        let program = vrl::compile(&test.source, &functions, Some(test_enrichment.clone()));
-        test_enrichment.finish_load();
+        let test_enrichment = test_enrichment::test_enrichment_table();
+
+        let mut state = vrl::state::Compiler::new();
+        state.set_external_context(test_enrichment.clone());
+
+        let program = vrl::compile_with_state(&test.source, &functions, &mut state);
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
 
         match program {
             Ok(program) => {
-                let result = runtime.resolve(&mut test.object, &program, &timezone);
+                let result = run_vrl(
+                    runtime,
+                    functions,
+                    program,
+                    &mut test,
+                    timezone,
+                    cmd.runtime,
+                    state,
+                    test_enrichment,
+                );
 
                 match result {
                     Ok(got) => {
@@ -297,6 +323,30 @@ fn main() {
     }
 
     print_result(failed_count)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_vrl(
+    mut runtime: Runtime,
+    functions: Vec<Box<dyn vrl::Function>>,
+    program: vrl::Program,
+    test: &mut Test,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+    state: vrl::state::Compiler,
+    test_enrichment: enrichment::TableRegistry,
+) -> Result<Value, Terminate> {
+    match vrl_runtime {
+        VrlRuntime::Vm => {
+            let vm = runtime.compile(functions, &program, state).unwrap();
+            test_enrichment.finish_load();
+            runtime.run_vm(&vm, &mut test.object, &timezone)
+        }
+        VrlRuntime::Ast => {
+            test_enrichment.finish_load();
+            runtime.resolve(&mut test.object, &program, &timezone)
+        }
+    }
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {

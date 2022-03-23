@@ -1,8 +1,9 @@
 //! Perform a version lookup.
-use super::Result;
-
 use std::process::Stdio;
+
 use tokio::process::Command;
+
+use super::Result;
 
 /// Exec a `kubectl` command to pull down the kubernetes version
 /// metadata for a running cluster for use in the test framework
@@ -22,14 +23,14 @@ pub async fn get(kubectl_command: &str) -> Result<K8sVersion> {
     let json: serde_json::Value = serde_json::from_slice(&reader.stdout)?;
 
     Ok(K8sVersion {
-        major: json["serverVersion"]["major"].to_string().replace("\"", ""),
-        minor: json["serverVersion"]["minor"].to_string().replace("\"", ""),
+        major: json["serverVersion"]["major"].to_string().replace('\"', ""),
+        minor: json["serverVersion"]["minor"].to_string().replace('\"', ""),
         platform: json["serverVersion"]["platform"]
             .to_string()
-            .replace("\"", ""),
+            .replace('\"', ""),
         git_version: json["serverVersion"]["gitVersion"]
             .to_string()
-            .replace("\"", ""),
+            .replace('\"', ""),
     })
 }
 

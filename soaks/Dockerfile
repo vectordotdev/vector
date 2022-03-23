@@ -1,18 +1,21 @@
 #
-# BUILDER
+# VECTOR BUILDER
 #
-FROM docker.io/rust:1.55-buster as builder
+FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:0f819918e54ef60efcdff6478f7cea4f554a8879eee1326356146c19814eb7cc as builder
 WORKDIR vector
-ARG VECTOR_FEATURES
-RUN apt-get -y update && apt-get -y install build-essential cmake libclang-dev libsasl2-dev
 COPY . .
-RUN cargo build --release --bin vector --no-default-features --features "${VECTOR_FEATURES}"
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/vector/target \
+    /usr/local/bin/mold -run cargo build --bin vector --release && \
+    cp target/release/vector .
 
 #
 # TARGET
 #
-FROM gcr.io/distroless/cc-debian11
-COPY --from=builder /vector/target/release/vector /usr/bin/vector
+FROM docker.io/debian:bullseye-slim@sha256:b0d53c872fd640c2af2608ba1e693cfc7dedea30abcd8f584b23d583ec6dadc7
+RUN apt-get update && apt-get -y install zlib1g
+COPY --from=builder /vector/vector /usr/bin/vector
 VOLUME /var/lib/vector/
 
 # Smoke test

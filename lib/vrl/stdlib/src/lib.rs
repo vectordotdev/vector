@@ -1,3 +1,10 @@
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 mod util;
 
 #[cfg(feature = "append")]
@@ -68,6 +75,10 @@ mod ip_aton;
 mod ip_cidr_contains;
 #[cfg(feature = "ip_ntoa")]
 mod ip_ntoa;
+#[cfg(feature = "ip_ntop")]
+mod ip_ntop;
+#[cfg(feature = "ip_pton")]
+mod ip_pton;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -144,6 +155,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_groks")]
+mod parse_groks;
 #[cfg(feature = "parse_int")]
 mod parse_int;
 #[cfg(feature = "parse_json")]
@@ -214,6 +227,8 @@ mod strip_whitespace;
 mod tag_types_externally;
 #[cfg(feature = "tally")]
 mod tally;
+#[cfg(feature = "tally_value")]
+mod tally_value;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -321,6 +336,10 @@ pub use ip_aton::IpAton;
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_ntoa")]
 pub use ip_ntoa::IpNtoa;
+#[cfg(feature = "ip_ntop")]
+pub use ip_ntop::IpNtop;
+#[cfg(feature = "ip_pton")]
+pub use ip_pton::IpPton;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -387,6 +406,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_groks")]
+pub use parse_groks::ParseGroks;
 #[cfg(feature = "parse_int")]
 pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
@@ -457,6 +478,8 @@ pub use strip_whitespace::StripWhitespace;
 pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "tally")]
 pub use tally::Tally;
+#[cfg(feature = "tally_value")]
+pub use tally_value::TallyValue;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -560,6 +583,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IpCidrContains),
         #[cfg(feature = "ip_ntoa")]
         Box::new(IpNtoa),
+        #[cfg(feature = "ip_ntop")]
+        Box::new(IpNtop),
+        #[cfg(feature = "ip_pton")]
+        Box::new(IpPton),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]
@@ -609,7 +636,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
-        // https://github.com/timberio/vector/issues/5607
+        // https://github.com/vectordotdev/vector/issues/5607
         //#[cfg(feature = "only_fields")]
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]
@@ -632,6 +659,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_groks")]
+        Box::new(ParseGroks),
         #[cfg(feature = "parse_int")]
         Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
@@ -700,6 +729,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripWhitespace),
         #[cfg(feature = "tally")]
         Box::new(Tally),
+        #[cfg(feature = "tally_value")]
+        Box::new(TallyValue),
         #[cfg(feature = "tag_types_externally")]
         Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]

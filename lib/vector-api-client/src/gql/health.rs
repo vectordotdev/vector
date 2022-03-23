@@ -46,7 +46,7 @@ impl HealthQueryExt for crate::Client {
 
 /// Extension methods for health subscriptions
 pub trait HealthSubscriptionExt {
-    /// Executes a heartbeart subscription, on a millisecond `interval`.
+    /// Executes a heartbeat subscription, on a millisecond `interval`.
     fn heartbeat_subscription(
         &self,
         interval: i64,
@@ -54,7 +54,7 @@ pub trait HealthSubscriptionExt {
 }
 
 impl HealthSubscriptionExt for crate::SubscriptionClient {
-    /// Executes a heartbeart subscription, on a millisecond `interval`.
+    /// Executes a heartbeat subscription, on a millisecond `interval`.
     fn heartbeat_subscription(
         &self,
         interval: i64,

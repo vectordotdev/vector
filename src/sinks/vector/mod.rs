@@ -1,8 +1,11 @@
 pub mod v1;
 pub mod v2;
 
-use crate::config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription};
 use serde::{Deserialize, Serialize};
+
+use crate::config::{
+    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
@@ -13,7 +16,7 @@ enum V1 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV1 {
-    version: Option<V1>,
+    version: V1,
     #[serde(flatten)]
     config: v1::VectorConfig,
 }
@@ -27,7 +30,7 @@ enum V2 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV2 {
-    version: V2,
+    version: Option<V2>,
     #[serde(flatten)]
     config: v2::VectorConfig,
 }
@@ -67,23 +70,18 @@ impl SinkConfig for VectorConfig {
         }
     }
 
-    fn input_type(&self) -> DataType {
-        match self {
-            VectorConfig::V1(v1) => v1.config.input_type(),
-            VectorConfig::V2(v2) => v2.config.input_type(),
-        }
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {
-        match self {
-            VectorConfig::V1(v1) => v1.config.sink_type(),
-            VectorConfig::V2(v2) => v2.config.sink_type(),
-        }
+        "vector"
     }
-    fn resources(&self) -> Vec<Resource> {
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
         match self {
-            VectorConfig::V1(v1) => v1.config.resources(),
-            VectorConfig::V2(v2) => v2.config.resources(),
+            Self::V1(_) => None,
+            Self::V2(v2) => Some(&v2.config.acknowledgements),
         }
     }
 }

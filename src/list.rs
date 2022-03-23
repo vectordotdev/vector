@@ -1,13 +1,15 @@
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
-use serde::Serialize;
 use std::collections::HashSet;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+use clap::Parser;
+use serde::Serialize;
+
+use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[structopt(long, default_value = "text", possible_values = &["text", "json", "avro"])]
+    #[clap(long, default_value = "text", possible_values = &["text", "json", "avro"])]
     format: Format,
 }
 
@@ -52,6 +54,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     transforms.retain(|name| !deprecated.contains(name));
     sinks.retain(|name| !deprecated.contains(name));
 
+    #[allow(clippy::print_stdout)]
     match opts.format {
         Format::Text => {
             println!("Sources:");

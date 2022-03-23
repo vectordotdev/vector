@@ -1,8 +1,8 @@
+use std::{convert::TryInto, path::PathBuf};
+
 use bytes::Bytes;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{stream, SinkExt, StreamExt};
-use std::convert::TryInto;
-use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::fs::OpenOptions;
 use tokio_util::codec::{BytesCodec, FramedWrite};
@@ -56,6 +56,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
                         compression: sinks::file::Compression::None,
+                        acknowledgements: Default::default(),
                     },
                 );
 
@@ -95,7 +96,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates inherent CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_files_no_partitions
 );

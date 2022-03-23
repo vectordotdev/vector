@@ -1,8 +1,13 @@
 #![cfg(test)]
 
-use std::fmt::{self, Display, Formatter};
-use std::ops::Deref;
-use std::time::Instant;
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Deref,
+    time::Instant,
+};
+
+use ordered_float::OrderedFloat;
+use vector_core::event::metric::Bucket;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct HistogramStats {
@@ -138,6 +143,68 @@ impl Deref for LevelTimeHistogram {
 impl Display for LevelTimeHistogram {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         self.histogram.fmt(fmt)
+    }
+}
+
+/// A histogram with user-defined, variable-width buckets.
+///
+/// Values are only recorded into the bucket that the value is less than or equal to.
+#[derive(Debug)]
+pub struct VariableHistogram {
+    buckets: Vec<(f64, u32)>,
+    count: u32,
+    sum: f64,
+}
+
+impl VariableHistogram {
+    pub fn new(upper_limits: &[f64]) -> Self {
+        let mut buckets = upper_limits.iter().map(|v| (*v, 0)).collect::<Vec<_>>();
+
+        // Clear out any duplicate buckets, and sort them from smallest to largest.
+        buckets.dedup_by_key(|(upper_limit, _)| OrderedFloat(*upper_limit));
+        buckets.sort_by_key(|(upper_limit, _)| OrderedFloat(*upper_limit));
+
+        Self {
+            buckets,
+            count: 0,
+            sum: 0.0,
+        }
+    }
+
+    pub fn record(&mut self, value: f64) {
+        for (bound, count) in self.buckets.iter_mut() {
+            if value <= *bound {
+                *count += 1;
+                break;
+            }
+        }
+
+        self.count += 1;
+        self.sum += value;
+    }
+
+    pub fn record_many(&mut self, values: &[f64]) {
+        for value in values {
+            self.record(*value);
+        }
+    }
+
+    pub const fn count(&self) -> u32 {
+        self.count
+    }
+
+    pub const fn sum(&self) -> f64 {
+        self.sum
+    }
+
+    pub fn buckets(&self) -> Vec<Bucket> {
+        self.buckets
+            .iter()
+            .map(|(upper_limit, count)| Bucket {
+                upper_limit: *upper_limit,
+                count: *count,
+            })
+            .collect()
     }
 }
 

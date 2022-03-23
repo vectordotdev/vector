@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use nom::{
     bytes::complete::{tag, take_while_m_n},
     combinator::{all_consuming, map_res},
@@ -5,7 +7,6 @@ use nom::{
     sequence::{preceded, terminated, tuple},
 };
 use snafu::Snafu;
-use std::convert::TryFrom;
 
 #[derive(Debug, Snafu, PartialEq)]
 pub enum ParseError {

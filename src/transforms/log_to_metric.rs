@@ -1,22 +1,25 @@
-use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
-    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{Event, Value},
-    internal_events::{
-        LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
-        LogToMetricTemplateParseError, TemplateRenderingFailed,
-    },
-    template::{Template, TemplateParseError, TemplateRenderingError},
-    transforms::{FunctionTransform, Transform},
-};
+use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::num::ParseFloatError;
+
+use crate::{
+    config::{
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::{
+        metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        Event, Value,
+    },
+    internal_events::{
+        LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        ParserMissingFieldError,
+    },
+    schema,
+    template::{Template, TemplateParseError, TemplateRenderingError},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -130,12 +133,16 @@ impl TransformConfig for LogToMetricConfig {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -185,7 +192,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(crate::internal_events::TemplateRenderingError {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -376,33 +383,33 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(config, &event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNullError {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(ParserMissingFieldError {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(&LogToMetricParseFloatError {
+                    emit!(LogToMetricParseFloatError {
                         field: field.as_ref(),
                         error
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(crate::internal_events::TemplateRenderingError {
                         error,
                         drop_event: false,
                         field: None,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
-                    emit!(&LogToMetricTemplateParseError { error })
+                    emit!(LogToMetricTemplateParseError { error })
                 }
             }
         }
@@ -411,14 +418,17 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{offset::TimeZone, DateTime, Utc};
+
     use super::*;
-    use crate::transforms::test::transform_one;
     use crate::{
         config::log_schema,
-        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        event::Event,
+        event::{
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
+            Event,
+        },
+        transforms::test::transform_one,
     };
-    use chrono::{offset::TimeZone, DateTime, Utc};
 
     #[test]
     fn generate_config() {
@@ -719,13 +729,14 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
         assert_eq!(2, output.len());
+        let mut output = output.into_events();
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "exception_total",
+                "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata.clone(),
@@ -733,9 +744,9 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
-            output.pop().unwrap().into_metric(),
+            output.next().unwrap().into_metric(),
             Metric::new_with_metadata(
-                "status",
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
                 metadata,
@@ -774,30 +785,31 @@ mod tests {
 
         let mut transform = LogToMetric::new(config);
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         transform.transform(&mut output, event);
+        let output: Vec<_> = output.into_events().collect();
         assert_eq!(2, output.len());
         assert_eq!(
-            output.pop().unwrap().into_metric(),
-            Metric::new_with_metadata(
-                "xyz_exception_total",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 1.0 },
-                metadata.clone(),
-            )
-            .with_namespace(Some("local"))
-            .with_timestamp(Some(ts()))
-        );
-        assert_eq!(
-            output.pop().unwrap().into_metric(),
-            Metric::new_with_metadata(
+            output[0].as_metric(),
+            &Metric::new_with_metadata(
                 "local_abc_status_set",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["42".into()].into_iter().collect()
                 },
+                metadata.clone(),
+            )
+            .with_timestamp(Some(ts()))
+        );
+        assert_eq!(
+            output[1].as_metric(),
+            &Metric::new_with_metadata(
+                "xyz_exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
                 metadata,
             )
+            .with_namespace(Some("local"))
             .with_timestamp(Some(ts()))
         );
     }

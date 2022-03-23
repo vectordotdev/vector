@@ -1,6 +1,7 @@
-use crate::grammar::{unescape, DEFAULT_FIELD};
-
+use once_cell::sync::Lazy;
 use regex::Regex;
+
+use crate::grammar::{unescape, DEFAULT_FIELD};
 
 /// This enum represents value comparisons that Queries might perform
 #[derive(Debug, Copy, Clone)]
@@ -138,7 +139,7 @@ pub enum QueryNode {
     MatchAllDocs,
     /// Match no documents.
     MatchNoDocs,
-    /// Validate existance of an attribute within a document.
+    /// Validate existence of an attribute within a document.
     AttributeExists { attr: String },
     /// Validate lack of an attribute within a document.
     AttributeMissing { attr: String },
@@ -357,11 +358,9 @@ pub struct LuceneClause {
     pub node: QueryNode,
 }
 
+static ESCAPE_RE: Lazy<Regex> = Lazy::new(|| Regex::new("^\"(.+)\"$").unwrap());
+
 /// Escapes surrounding `"` quotes when distinguishing between quoted terms isn't needed.
 fn escape_quotes<T: AsRef<str>>(value: T) -> String {
-    lazy_static::lazy_static! {
-        static ref RE: Regex = Regex::new("^\"(.+)\"$").unwrap();
-    }
-
-    RE.replace_all(value.as_ref(), "$1").to_string()
+    ESCAPE_RE.replace_all(value.as_ref(), "$1").to_string()
 }

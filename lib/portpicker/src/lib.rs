@@ -1,4 +1,4 @@
-// Modified by `Vector Contributors <vector@timber.io>`.
+// Modified by `Vector Contributors <vector@datadoghq.com>`.
 // Based on `https://github.com/Dentosal/portpicker-rs` by `Hannes Karppila <hannes.karppila@gmail.com>`.
 // `portpicker-rs` LICENSE:
 // This is free and unencumbered software released into the public domain.
@@ -26,8 +26,9 @@
 
 // For more information, please refer to <http://unlicense.org>
 
-use rand::{thread_rng, Rng};
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
+
+use rand::{thread_rng, Rng};
 
 pub type Port = u16;
 
@@ -93,8 +94,9 @@ pub fn pick_unused_port(ip: IpAddr) -> Port {
 
 #[cfg(test)]
 mod tests {
-    use super::pick_unused_port;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    use super::pick_unused_port;
 
     #[test]
     fn ipv4_localhost() {

@@ -1,5 +1,33 @@
 use vrl::prelude::*;
 
+fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
+    let path = query.path();
+    if query.is_external() {
+        return Ok(ctx
+            .target_mut()
+            .target_remove(path, false)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::Null));
+    }
+    if let Some(ident) = query.variable_ident() {
+        return match ctx.state_mut().variable_mut(ident) {
+            Some(value) => {
+                let new_value = value.get_by_path(path).cloned();
+                value.remove_by_path(path, false);
+                Ok(new_value.unwrap_or(Value::Null))
+            }
+            None => Ok(Value::Null),
+        };
+    }
+    if let Some(expr) = query.expression_target() {
+        let value = expr.resolve(ctx)?;
+
+        return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+    }
+    Ok(Value::Null)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Del;
 
@@ -52,17 +80,52 @@ impl Function for Del {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
 
         Ok(Box::new(DelFn { query }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("target", Some(expr)) => {
+                let query = match expr {
+                    expression::Expr::Query(query) => query,
+                    _ => {
+                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                            keyword: "field",
+                            expected: "query",
+                            expr: expr.clone(),
+                        }))
+                    }
+                };
+
+                Ok(Some(Box::new(query.clone()) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let query = args
+            .required_any("target")
+            .downcast_ref::<expression::Query>()
+            .unwrap();
+
+        del(query, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct DelFn {
+pub(crate) struct DelFn {
     query: expression::Query,
 }
 
@@ -94,48 +157,33 @@ impl Expression for DelFn {
     // immutable fields for now, but we'll circle back to this in the near
     // future to potentially improve this situation.
     //
-    // see tracking issue: https://github.com/timberio/vector/issues/5887
+    // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.query.path();
-
-        if self.query.is_external() {
-            return Ok(ctx
-                .target_mut()
-                .remove(path, false)
-                .ok()
-                .flatten()
-                .unwrap_or(Value::Null));
-        }
-
-        if let Some(ident) = self.query.variable_ident() {
-            return match ctx.state_mut().variable_mut(ident) {
-                Some(value) => {
-                    let new_value = value.get_by_path(path).cloned();
-                    value.remove_by_path(path, false);
-                    Ok(new_value.unwrap_or(Value::Null))
-                }
-                None => Ok(Value::Null),
-            };
-        }
-
-        if let Some(expr) = self.query.expression_target() {
-            let value = expr.resolve(ctx)?;
-
-            return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
-        }
-
-        Ok(Value::Null)
+        del(&self.query, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().unknown()
+        TypeDef::any()
     }
 
     fn update_state(
         &mut self,
         state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
-        self.query.delete_type_def(state);
+        // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
+        // supported.
+        if self.query.is_external() {
+            match self.query.delete_type_def(state) {
+                Err(value::kind::remove::Error::RootPath)
+                | Err(value::kind::remove::Error::CoalescedPath)
+                | Err(value::kind::remove::Error::NegativeIndexPath) => {
+                    // This function is (currently) infallible, so we ignore any errors here.
+                    //
+                    // see: https://github.com/vectordotdev/vector/issues/11264
+                }
+                Ok(_) => {}
+            }
+        }
         Ok(())
     }
 }
@@ -148,8 +196,9 @@ impl fmt::Display for DelFn {
 
 #[cfg(test)]
 mod tests {
+    use vector_common::{btreemap, TimeZone};
+
     use super::*;
-    use shared::{btreemap, TimeZone};
 
     #[test]
     fn del() {

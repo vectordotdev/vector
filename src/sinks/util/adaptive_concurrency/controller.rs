@@ -1,9 +1,16 @@
-use super::semaphore::ShrinkableSemaphore;
-use super::{instant_now, AdaptiveConcurrencySettings};
+use std::{
+    future::Future,
+    sync::{Arc, Mutex, MutexGuard},
+    time::{Duration, Instant},
+};
+
+use tokio::sync::OwnedSemaphorePermit;
+use tower::timeout::error::Elapsed;
+
+use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
-    emit,
     http::HttpError,
     internal_events::{
         AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
@@ -12,11 +19,6 @@ use crate::{
     sinks::util::retries::{RetryAction, RetryLogic},
     stats::{EwmaVar, Mean, MeanVariance},
 };
-use std::future::Future;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
-use tokio::sync::OwnedSemaphorePermit;
-use tower::timeout::error::Elapsed;
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
@@ -99,7 +101,7 @@ impl<L> Controller<L> {
             inner.reached_limit = true;
         }
 
-        emit!(&AdaptiveConcurrencyInFlight {
+        emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
     }
@@ -113,7 +115,7 @@ impl<L> Controller<L> {
 
         let rtt = now.saturating_duration_since(start);
         if use_rtt {
-            emit!(&AdaptiveConcurrencyObservedRtt { rtt });
+            emit!(AdaptiveConcurrencyObservedRtt { rtt });
         }
         let rtt = rtt.as_secs_f64();
 
@@ -133,7 +135,7 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight -= 1;
-        emit!(&AdaptiveConcurrencyInFlight {
+        emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
 
@@ -172,7 +174,7 @@ impl<L> Controller<L> {
                     }
 
                     if let Some(current_rtt) = current_rtt {
-                        emit!(&AdaptiveConcurrencyAveragedRtt {
+                        emit!(AdaptiveConcurrencyAveragedRtt {
                             rtt: Duration::from_secs_f64(current_rtt)
                         });
                     }
@@ -230,7 +232,7 @@ impl<L> Controller<L> {
             self.semaphore.forget_permits(to_forget);
             inner.current_limit -= to_forget;
         }
-        emit!(&AdaptiveConcurrencyLimit {
+        emit!(AdaptiveConcurrencyLimit {
             concurrency: inner.current_limit as u64,
             reached_limit: inner.reached_limit,
             had_back_pressure: inner.had_back_pressure,

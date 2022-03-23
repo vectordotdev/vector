@@ -1,12 +1,18 @@
+use std::{str::FromStr, sync::Arc};
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
-    internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
-    transforms::{FunctionTransform, Transform},
+    internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -17,26 +23,14 @@ pub struct GeoipConfig {
     pub target: String,
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct Geoip {
     #[derivative(Debug = "ignore")]
-    pub dbreader: maxminddb::Reader<Vec<u8>>,
+    pub dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
     pub database: String,
     pub source: String,
     pub target: String,
-}
-
-impl Clone for Geoip {
-    fn clone(&self) -> Self {
-        Self {
-            dbreader: maxminddb::Reader::open_readfile(self.database.clone())
-                .expect("Panicked while cloning GeoIP lookup database. Did you move the GeoIP database on disk during runtime?"),
-            database: self.database.clone(),
-            source: self.source.clone(),
-            target: self.target.clone()
-        }
-    }
 }
 
 fn default_geoip_target_field() -> String {
@@ -69,12 +63,12 @@ impl TransformConfig for GeoipConfig {
         )?))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -91,7 +85,7 @@ const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 impl Geoip {
     pub fn new(database: String, source: String, target: String) -> crate::Result<Self> {
         Ok(Geoip {
-            dbreader: maxminddb::Reader::open_readfile(database.clone())?,
+            dbreader: Arc::new(maxminddb::Reader::open_readfile(database.clone())?),
             database,
             source,
             target,
@@ -124,67 +118,75 @@ struct City<'a> {
 }
 
 impl FunctionTransform for Geoip {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let mut isp: Isp = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();
         let ipaddress = event
             .as_log()
-            .get(&self.source)
+            .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
-            if let Ok(ip) = FromStr::from_str(ipaddress) {
-                if self.has_isp_db() {
-                    if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
-                        if let Some(as_number) = data.autonomous_system_number {
-                            isp.autonomous_system_number = as_number as i64;
+            match FromStr::from_str(ipaddress) {
+                Ok(ip) => {
+                    if self.has_isp_db() {
+                        if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
+                            if let Some(as_number) = data.autonomous_system_number {
+                                isp.autonomous_system_number = as_number as i64;
+                            }
+                            if let Some(as_organization) = data.autonomous_system_organization {
+                                isp.autonomous_system_organization = as_organization;
+                            }
+                            if let Some(isp_name) = data.isp {
+                                isp.isp = isp_name;
+                            }
+                            if let Some(organization) = data.organization {
+                                isp.organization = organization;
+                            }
                         }
-                        if let Some(as_organization) = data.autonomous_system_organization {
-                            isp.autonomous_system_organization = as_organization;
+                    } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
+                        if let Some(city_names) = data.city.and_then(|c| c.names) {
+                            if let Some(city_name) = city_names.get("en") {
+                                city.city_name = city_name;
+                            }
                         }
-                        if let Some(isp_name) = data.isp {
-                            isp.isp = isp_name;
+
+                        if let Some(continent_code) = data.continent.and_then(|c| c.code) {
+                            city.continent_code = continent_code;
                         }
-                        if let Some(organization) = data.organization {
-                            isp.organization = organization;
+
+                        if let Some(country_code) = data.country.and_then(|cy| cy.iso_code) {
+                            city.country_code = country_code;
+                        };
+
+                        if let Some(time_zone) = data.location.clone().and_then(|loc| loc.time_zone)
+                        {
+                            city.timezone = time_zone;
                         }
-                    }
-                } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                    if let Some(city_names) = data.city.and_then(|c| c.names) {
-                        if let Some(city_name) = city_names.get("en") {
-                            city.city_name = city_name;
+
+                        if let Some(latitude) = data.location.clone().and_then(|loc| loc.latitude) {
+                            city.latitude = latitude.to_string();
                         }
-                    }
 
-                    if let Some(continent_code) = data.continent.and_then(|c| c.code) {
-                        city.continent_code = continent_code;
-                    }
+                        if let Some(longitude) = data.location.clone().and_then(|loc| loc.longitude)
+                        {
+                            city.longitude = longitude.to_string();
+                        }
 
-                    if let Some(country_code) = data.country.and_then(|cy| cy.iso_code) {
-                        city.country_code = country_code;
-                    };
-
-                    if let Some(time_zone) = data.location.clone().and_then(|loc| loc.time_zone) {
-                        city.timezone = time_zone;
-                    }
-
-                    if let Some(latitude) = data.location.clone().and_then(|loc| loc.latitude) {
-                        city.latitude = latitude.to_string();
-                    }
-
-                    if let Some(longitude) = data.location.clone().and_then(|loc| loc.longitude) {
-                        city.longitude = longitude.to_string();
-                    }
-
-                    if let Some(postal_code) = data.postal.clone().and_then(|p| p.code) {
-                        city.postal_code = postal_code;
+                        if let Some(postal_code) = data.postal.clone().and_then(|p| p.code) {
+                            city.postal_code = postal_code;
+                        }
                     }
                 }
-            } else {
-                emit!(&GeoipIpAddressParseError { address: ipaddress });
+                Err(error) => {
+                    emit!(GeoipIpAddressParseError {
+                        error,
+                        address: ipaddress
+                    });
+                }
             }
         } else {
-            emit!(&GeoipFieldDoesNotExist {
+            emit!(ParserMissingFieldError {
                 field: &self.source
             });
         };
@@ -195,7 +197,7 @@ impl FunctionTransform for Geoip {
             serde_json::to_value(city)
         };
         if let Ok(json_value) = json_value {
-            event.as_mut_log().insert(target_field, json_value);
+            event.as_mut_log().insert(target_field.as_str(), json_value);
         }
 
         output.push(event);
@@ -205,6 +207,8 @@ impl FunctionTransform for Geoip {
 #[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{
         event::Event,
@@ -213,7 +217,6 @@ mod tests {
             test::transform_one,
         },
     };
-    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {
@@ -238,7 +241,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -261,7 +268,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -284,7 +295,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
     }
@@ -307,7 +322,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -327,7 +346,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -347,7 +370,11 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
     }

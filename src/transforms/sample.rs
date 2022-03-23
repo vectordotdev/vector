@@ -1,11 +1,16 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -48,12 +53,12 @@ impl TransformConfig for SampleConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -72,12 +77,12 @@ impl TransformConfig for SampleCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
-    fn output_type(&self) -> DataType {
-        self.0.output_type()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -89,12 +94,12 @@ impl TransformConfig for SampleCompatConfig {
 pub struct Sample {
     rate: u64,
     key_field: Option<String>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     count: u64,
 }
 
 impl Sample {
-    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Box<dyn Condition>>) -> Self {
+    pub const fn new(rate: u64, key_field: Option<String>, exclude: Option<Condition>) -> Self {
         Self {
             rate,
             key_field,
@@ -105,7 +110,7 @@ impl Sample {
 }
 
 impl FunctionTransform for Sample {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         if let Some(condition) = self.exclude.as_ref() {
             if condition.check(&event) {
                 output.push(event);
@@ -116,7 +121,7 @@ impl FunctionTransform for Sample {
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field))
+            .and_then(|key_field| event.as_log().get(key_field.as_str()))
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -133,13 +138,15 @@ impl FunctionTransform for Sample {
                 .insert("sample_rate", self.rate.to_string());
             output.push(event);
         } else {
-            emit!(&SampleEventDiscarded);
+            emit!(SampleEventDiscarded);
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+
     use super::*;
     use crate::{
         conditions::{ConditionConfig, VrlConfig},
@@ -148,11 +155,11 @@ mod tests {
         test_util::random_lines,
         transforms::test::transform_one,
     };
-    use approx::assert_relative_eq;
 
-    fn condition_contains(key: &str, needle: &str) -> Box<dyn Condition> {
+    fn condition_contains(key: &str, needle: &str) -> Condition {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+            runtime: Default::default(),
         }
         .build(&Default::default())
         .unwrap()
@@ -176,9 +183,9 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 2.0f64;
@@ -194,9 +201,9 @@ mod tests {
         let total_passed = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .count();
         let ideal = 1.0f64 / 25.0f64;
@@ -217,17 +224,17 @@ mod tests {
             .clone()
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
         let second_run = events
             .into_iter()
             .filter_map(|event| {
-                let mut buf = Vec::with_capacity(1);
+                let mut buf = OutputBuffer::with_capacity(1);
                 sampler.transform(&mut buf, event);
-                buf.pop()
+                buf.into_events().next()
             })
             .collect::<Vec<_>>();
 

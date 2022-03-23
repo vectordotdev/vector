@@ -1,17 +1,3 @@
-use crate::paths_provider::PathsProvider;
-use crate::{
-    checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::FileWatcher,
-    fingerprinter::{FileFingerprint, Fingerprinter},
-    FileSourceInternalEvents, ReadFrom,
-};
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
-use futures::{
-    future::{select, Either, FutureExt},
-    stream, Future, Sink, SinkExt,
-};
-use indexmap::IndexMap;
 use std::{
     cmp,
     collections::{BTreeMap, HashSet},
@@ -20,8 +6,24 @@ use std::{
     sync::Arc,
     time::{self, Duration},
 };
+
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use futures::{
+    future::{select, Either, FutureExt},
+    stream, Future, Sink, SinkExt,
+};
+use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    checkpointer::{Checkpointer, CheckpointsView},
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    paths_provider::PathsProvider,
+    FileSourceInternalEvents, ReadFrom,
+};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -399,7 +401,7 @@ where
         // checkpoint was only loaded for new files when Vector was started up, but the
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
-        // https://github.com/timberio/vector/issues/7139
+        // https://github.com/vectordotdev/vector/issues/7139
         let read_from = if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)

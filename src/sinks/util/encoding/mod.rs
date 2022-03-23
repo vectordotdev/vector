@@ -57,34 +57,48 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+#[cfg(feature = "codecs")]
+mod adapter;
 mod codec;
-
-pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
-
 mod config;
-
-pub use config::EncodingConfig;
-
 mod fixed;
-
-pub use fixed::EncodingConfigFixed;
-
 mod with_default;
 
-pub use codec::as_tracked_write;
-pub use with_default::EncodingConfigWithDefault;
+use std::{fmt::Debug, io, sync::Arc};
 
-use crate::event::{LogEvent, MaybeAsLogMut};
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io, sync::Arc};
+
+#[cfg(feature = "codecs")]
+pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator, Transformer};
+pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use config::EncodingConfig;
+pub use fixed::EncodingConfigFixed;
+use lookup::lookup_v2::{parse_path, OwnedPath};
+pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
+
+    /// Encodes the input into a String.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
+    fn encode_input_to_string(&self, input: T) -> io::Result<String> {
+        let mut buffer = vec![];
+        self.encode_input(input, &mut buffer)?;
+        Ok(String::from_utf8_lossy(&buffer).to_string())
+    }
 }
 
 impl<E, T> Encoder<T> for Arc<E>
@@ -103,8 +117,7 @@ pub trait EncodingConfiguration {
 
     fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>>;
     fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
@@ -113,11 +126,10 @@ pub trait EncodingConfiguration {
             let mut to_remove = log
                 .keys()
                 .filter(|field| {
-                    let field_path = PathIter::new(field).collect::<Vec<_>>();
-                    !only_fields.iter().any(|only| {
-                        // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                        field_path.starts_with(&only[..])
-                    })
+                    let field_path = parse_path(field);
+                    !only_fields
+                        .iter()
+                        .any(|only| field_path.segments.starts_with(&only.segments[..]))
                 })
                 .collect::<Vec<_>>();
 
@@ -127,14 +139,14 @@ pub trait EncodingConfiguration {
             to_remove.sort_by(|a, b| b.cmp(a));
 
             for removal in to_remove {
-                log.remove_prune(removal, true);
+                log.remove_prune(removal.as_str(), true);
             }
         }
     }
     fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = &self.except_fields() {
             for field in except_fields {
-                log.remove(field);
+                log.remove(field.as_str());
             }
         }
     }
@@ -149,7 +161,7 @@ pub trait EncodingConfiguration {
                         }
                     }
                     for (k, v) in unix_timestamps {
-                        log.insert(k, v);
+                        log.insert(k.as_str(), v);
                     }
                 }
                 // RFC3339 is the default serialization of a timestamp.
@@ -164,19 +176,10 @@ pub trait EncodingConfiguration {
     ///
     /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
     fn validate(&self) -> Result<()> {
-        if let (Some(only_fields), Some(except_fields)) =
-            (&self.only_fields(), &self.except_fields())
-        {
-            if except_fields.iter().any(|f| {
-                let path_iter = PathIter::new(f).collect::<Vec<_>>();
-                only_fields.iter().any(|v| v == &path_iter)
-            }) {
-                return Err(
-                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
-                );
-            }
-        }
-        Ok(())
+        validate_fields(
+            self.only_fields().as_deref(),
+            self.except_fields().as_deref(),
+        )
     }
 
     /// Apply the EncodingConfig rules to the provided event.
@@ -196,27 +199,76 @@ pub trait EncodingConfiguration {
     }
 }
 
-impl<E> Encoder<Event> for E
+/// Check if `except_fields` and `only_fields` items are mutually exclusive.
+///
+/// If an error is returned, the entire encoding configuration should be considered inoperable.
+pub fn validate_fields(
+    only_fields: Option<&[OwnedPath]>,
+    except_fields: Option<&[String]>,
+) -> Result<()> {
+    if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
+        if except_fields.iter().any(|f| {
+            let path_iter = parse_path(f);
+            only_fields.iter().any(|v| v == &path_iter)
+        }) {
+            return Err("`except_fields` and `only_fields` should be mutually exclusive.".into());
+        }
+    }
+    Ok(())
+}
+
+// These types of traits will likely move into some kind of event container once the
+// event layout is refactored, but trying it out here for now.
+// Ideally this would return an iterator, but that's not the easiest thing to make generic
+pub trait VisitLogMut {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent);
+}
+
+impl<T> VisitLogMut for Vec<T>
 where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Event>,
+    T: VisitLogMut,
 {
-    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
-        self.apply_rules(&mut event);
-        self.codec().encode_input(event, writer)
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        for item in self {
+            item.visit_logs_mut(&func);
+        }
     }
 }
 
-impl<E> Encoder<Vec<Event>> for E
+impl VisitLogMut for Event {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        if let Event::Log(log_event) = self {
+            func(log_event)
+        }
+    }
+}
+impl VisitLogMut for LogEvent {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        func(self);
+    }
+}
+
+impl<E, T> Encoder<T> for E
 where
     E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<Event>>,
+    E::Codec: Encoder<T>,
+    T: VisitLogMut,
 {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            self.apply_rules(event);
-        }
-
+    fn encode_input(&self, mut input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
+        input.visit_logs_mut(|log| {
+            self.apply_rules(log);
+        });
         self.codec().encode_input(input, writer)
     }
 }
@@ -230,10 +282,11 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+    use vector_common::btreemap;
+
     use super::*;
     use crate::config::log_schema;
-    use indoc::indoc;
-    use shared::btreemap;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -245,11 +298,6 @@ mod tests {
     #[serde(deny_unknown_fields)]
     struct TestConfig {
         encoding: EncodingConfig<TestEncoding>,
-    }
-
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<PathComponent> {
-        PathIter::new(a).collect()
     }
 
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
@@ -273,10 +321,7 @@ mod tests {
         config.encoding.validate().unwrap();
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
-        assert_eq!(
-            config.encoding.only_fields,
-            Some(vec![as_path_components("Boop")])
-        );
+        assert_eq!(config.encoding.only_fields, Some(vec![parse_path("Boop")]));
     }
 
     const TOML_EXCLUSIVITY_VIOLATION: &str = indoc! {r#"
@@ -351,8 +396,8 @@ mod tests {
             log.insert("d.z", 1);
             log.insert("e[0]", 1);
             log.insert("e[1]", 1);
-            log.insert("f\\.z", 1);
-            log.insert("g\\.z", 1);
+            log.insert("\"f.z\"", 1);
+            log.insert("\"g.z\"", 1);
             log.insert("h", btreemap! {});
             log.insert("i", Vec::<Value>::new());
         }
@@ -361,7 +406,7 @@ mod tests {
         assert!(event.as_mut_log().contains("b"));
         assert!(event.as_mut_log().contains("b[1].x"));
         assert!(event.as_mut_log().contains("c[0].y"));
-        assert!(event.as_mut_log().contains("g\\.z"));
+        assert!(event.as_mut_log().contains("\"g.z\""));
 
         assert!(!event.as_mut_log().contains("a.b.d"));
         assert!(!event.as_mut_log().contains("c[0].x"));

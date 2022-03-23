@@ -1,9 +1,11 @@
 //! Wait for a resource to reach a certain condition.
 
+use std::{ffi::OsStr, process::Stdio};
+
+use tokio::process::Command;
+
 use super::Result;
 use crate::util::run_command;
-use std::{ffi::OsStr, process::Stdio};
-use tokio::process::Command;
 
 /// Specify what condition to wait for.
 #[derive(Debug)]

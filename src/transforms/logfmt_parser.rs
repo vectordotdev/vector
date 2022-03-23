@@ -1,14 +1,17 @@
+use std::{collections::HashMap, str};
+
+use lookup::lookup_v2::BorrowedSegment;
+use serde::{Deserialize, Serialize};
+use vector_common::TimeZone;
+
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
-    transforms::{FunctionTransform, Transform},
+    internal_events::{ParserConversionError, ParserMissingFieldError},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use std::collections::HashMap;
-use std::str;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -43,12 +46,16 @@ impl TransformConfig for LogfmtConfig {
         }))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn transform_type(&self) -> &'static str {
@@ -64,8 +71,11 @@ pub struct Logfmt {
 }
 
 impl FunctionTransform for Logfmt {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;
         if let Some(value) = &value {
@@ -82,25 +92,29 @@ impl FunctionTransform for Logfmt {
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
-                            event.as_mut_log().insert(key, value);
+                            event
+                                .as_mut_log()
+                                .insert(&[BorrowedSegment::field(key.as_str())], value);
                         }
                         Err(error) => {
-                            emit!(&LogfmtParserConversionFailed {
+                            emit!(ParserConversionError {
                                 name: key.as_ref(),
                                 error
                             });
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(key, val);
+                    event
+                        .as_mut_log()
+                        .insert(&[BorrowedSegment::field(key.as_str())], val);
                 }
             }
 
             if drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
-            emit!(&LogfmtParserMissingField { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);
@@ -113,6 +127,7 @@ mod tests {
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
+        transforms::OutputBuffer,
     };
 
     #[test]
@@ -135,9 +150,9 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        let mut buf = Vec::with_capacity(1);
+        let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.into_events().next().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
@@ -177,7 +192,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["number"], Value::from(42.3));
         assert_eq!(log["flag"], Value::Boolean(true));
         assert_eq!(log["code"], Value::Integer(1234));
         assert_eq!(log["rest"], Value::Bytes("word".into()));
@@ -216,11 +231,11 @@ mod tests {
             log["dyno"],
             "heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456".into()
         );
-        assert_eq!(log["sample#memory_total"], "21.00MB".into());
-        assert_eq!(log["sample#memory_rss"], "21.22MB".into());
-        assert_eq!(log["sample#memory_cache"], "0.00MB".into());
-        assert_eq!(log["sample#memory_swap"], "0.00MB".into());
-        assert_eq!(log["sample#memory_pgpgin"], "348836pages".into());
-        assert_eq!(log["sample#memory_pgpgout"], "343403pages".into());
+        assert_eq!(log["\"sample#memory_total\""], "21.00MB".into());
+        assert_eq!(log["\"sample#memory_rss\""], "21.22MB".into());
+        assert_eq!(log["\"sample#memory_cache\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_swap\""], "0.00MB".into());
+        assert_eq!(log["\"sample#memory_pgpgin\""], "348836pages".into());
+        assert_eq!(log["\"sample#memory_pgpgout\""], "343403pages".into());
     }
 }

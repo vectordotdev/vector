@@ -1,6 +1,6 @@
 resource "kubernetes_config_map" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
   }
 
@@ -11,14 +11,13 @@ resource "kubernetes_config_map" "vector" {
 
 resource "kubernetes_service" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
   }
   spec {
     selector = {
+      app  = "vector"
       type = var.type
-      soak_test   = kubernetes_deployment.vector.metadata.0.labels.soak_test
-      sha         = kubernetes_deployment.vector.metadata.0.labels.sha
     }
     session_affinity = "ClientIP"
     port {
@@ -38,12 +37,11 @@ resource "kubernetes_service" "vector" {
 
 resource "kubernetes_deployment" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
     labels = {
-        type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
+      app  = "vector"
+      type = var.type
     }
   }
 
@@ -52,23 +50,21 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
+        app  = "vector"
         type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
       }
     }
 
     template {
       metadata {
         labels = {
-        type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
+          app  = "vector"
+          type = var.type
         }
         annotations = {
           "prometheus.io/scrape" = true
-          "prometheus.io/port" = 9090
-          "prometheus.io/path" = "/metrics"
+          "prometheus.io/port"   = 9090
+          "prometheus.io/path"   = "/metrics"
         }
       }
 
@@ -78,6 +74,11 @@ resource "kubernetes_deployment" "vector" {
           image_pull_policy = "IfNotPresent"
           image             = var.vector_image
           name              = "vector"
+
+          env {
+            name  = "VECTOR_THREADS"
+            value = var.vector_cpus
+          }
 
           volume_mount {
             mount_path = "/var/lib/vector"
@@ -90,14 +91,16 @@ resource "kubernetes_deployment" "vector" {
             read_only  = true
           }
 
+          # WARNING limits should match requests and both cpu and memory should be specified
+          # This guarantees that the Vector pod is given a QOS of Guaranteed
           resources {
             limits = {
-              cpu    = "4"
-              memory = "512Mi"
+              cpu = var.vector_cpus
+              memory = "4Gi"
             }
             requests = {
-              cpu    = "4"
-              memory = "512Mi"
+              cpu    = var.vector_cpus
+              memory = "4Gi"
             }
           }
 

@@ -294,8 +294,8 @@
     insert_at = "remap_quoted_path"
     type = "log"
     [tests.input.log_fields]
-      "a.b\\.c" = "bar"
-      "d\\.e" = "baz"
+      "a.\"b.c\"" = "bar"
+      "\"d.e\"" = "baz"
   [[tests.outputs]]
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
@@ -1188,7 +1188,7 @@
         .map == { "foo": { "string": "bar" } } &&
         .array == [{ "string": "foo" }] &&
         .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
-        .regex == { "regex": ".*" } &&
+        .regex == { "regex": r'.*' } &&
         .null == null
       '''
 
@@ -2255,3 +2255,31 @@ schema.id = "integer"
                    {"id": 7, "tree": "yew"}]
       '''
 
+[transforms.remap_metadata]
+  inputs = []
+  type = "remap"
+  source = '''
+      set_metadata_field("datadog_api_key", "iamanapikey")
+      .key = get_metadata_field("datadog_api_key")
+      remove_metadata_field("datadog_api_key")
+      .empty_key = get_metadata_field("datadog_api_key")
+
+      set_metadata_field("splunk_hec_token", "iamasplunkhectoken")
+      .splunk_hec_token = get_metadata_field("splunk_hec_token")
+      remove_metadata_field("splunk_hec_token")
+      .empty_splunk_hec_token = get_metadata_field("splunk_hec_token")
+  '''
+[[tests]]
+  name = "remap_metadata"
+  [tests.input]
+    insert_at = "remap_metadata"
+    type = "log"
+    log_fields = {}
+  [[tests.outputs]]
+    extract_from = "remap_metadata"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .key == "iamanapikey" && .empty_key == null &&
+        .splunk_hec_token == "iamasplunkhectoken" && .empty_splunk_hec_token == null
+      '''

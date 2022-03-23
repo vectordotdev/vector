@@ -1,16 +1,3 @@
-use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
-    topology::{self, RunningTopology},
-    trace,
-};
-use flate2::read::MultiGzDecoder;
-use futures::{
-    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
-};
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
-use portpicker::pick_unused_port;
-use rand::{thread_rng, Rng};
-use rand_distr::Alphanumeric;
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -27,6 +14,15 @@ use std::{
     },
     task::{Context, Poll},
 };
+
+use flate2::read::MultiGzDecoder;
+use futures::{
+    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+};
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
+use rand::{thread_rng, Rng};
+use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
@@ -39,13 +35,22 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_core::event::{BatchNotifier, Event, LogEvent};
+use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+
+use crate::{
+    config::{Config, ConfigDiff, GenerateConfig},
+    topology::{self, RunningTopology},
+    trace,
+};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
 
+#[cfg(test)]
 pub mod components;
+#[cfg(test)]
+pub mod metrics;
 pub mod stats;
 
 #[macro_export]
@@ -187,36 +192,81 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn map_event_batch_stream(
+    stream: impl Stream<Item = Event>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch).into())
+}
+
+// TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |log| {
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(batch),
-        }
-        .into()
-    })
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |log| vec![log.with_batch_notifier_option(&batch)].into())
+}
+
+pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
+    generator: Gen,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
+    let lines = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
+    (lines, stream)
 }
 
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
-    let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
-    (lines, stream)
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
+    let generator = move |_| random_string(len);
+    generate_lines_with_stream(generator, count, batch)
+}
+
+pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
+    generator: Gen,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+    let events = (0..count).map(generator).collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
         .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = EventArray>)
+where
+    F: Fn((usize, Event)) -> Event,
+{
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .enumerate()
+        .map(update_fn)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -305,20 +355,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-#[cfg(feature = "sources-aws_s3")]
-pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!(message = "Reading zst file.", path = %path.as_ref().display());
-    let mut file = File::open(path).unwrap();
-    let mut zst_bytes = Vec::new();
-    file.read_to_end(&mut zst_bytes).unwrap();
-    let mut output = String::new();
-    zstd::stream::Decoder::new(&zst_bytes[..])
-        .unwrap()
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
-}
-
 pub fn runtime() -> runtime::Runtime {
     runtime::Builder::new_multi_thread()
         .enable_all()
@@ -394,11 +430,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::retry_until;
     use std::{
         sync::{Arc, RwLock},
         time::Duration,
     };
+
+    use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
     async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {

@@ -1,22 +1,27 @@
-use crate::transforms::TaskTransform;
-use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
-    internal_events::{
-        TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
-        TagCardinalityValueLimitReached,
-    },
-    transforms::Transform,
-};
-use bloom::{BloomFilter, ASMS};
-use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
     fmt,
     future::ready,
     pin::Pin,
+};
+
+use bloom::{BloomFilter, ASMS};
+use futures::{Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
+    event::Event,
+    internal_events::{
+        TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
+        TagCardinalityValueLimitReached,
+    },
+    schema,
+    transforms::{TaskTransform, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -90,15 +95,17 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
+        Ok(Transform::event_task(TagCardinalityLimit::new(
+            self.clone(),
+        )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -207,7 +214,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                emit!(&TagCardinalityValueLimitReached { key });
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -224,7 +231,7 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingEvent {
+                            emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -236,7 +243,7 @@ impl TagCardinalityLimit {
                     let mut to_delete = Vec::new();
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingTag {
+                            emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -253,7 +260,7 @@ impl TagCardinalityLimit {
     }
 }
 
-impl TaskTransform for TagCardinalityLimit {
+impl TaskTransform<Event> for TagCardinalityLimit {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -268,10 +275,13 @@ impl TaskTransform for TagCardinalityLimit {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
-    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{metric, Event, Metric},
+        transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
+    };
 
     #[test]
     fn generate_config() {

@@ -1,10 +1,15 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::RemoveFieldsFieldMissing,
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -41,12 +46,12 @@ impl TransformConfig for RemoveFieldsConfig {
             .map(Transform::function)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -61,13 +66,13 @@ impl RemoveFields {
 }
 
 impl FunctionTransform for RemoveFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         for field in &self.fields {
             let field_string = field.to_string();
-            let old_val = log.remove_prune(&field_string, self.drop_empty);
+            let old_val = log.remove_prune(field_string.as_str(), self.drop_empty);
             if old_val.is_none() {
-                emit!(&RemoveFieldsFieldMissing {
+                emit!(RemoveFieldsFieldMissing {
                     field: &field_string
                 });
             }

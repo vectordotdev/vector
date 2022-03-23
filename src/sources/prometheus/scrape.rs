@@ -1,26 +1,30 @@
-use super::parser;
-use crate::{
-    config::{self, GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
-    http::Auth,
-    http::HttpClient,
-    internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusHttpResponseError,
-        PrometheusParseError, PrometheusRequestCompleted,
-    },
-    shutdown::ShutdownSignal,
-    sources,
-    tls::{TlsOptions, TlsSettings},
-    Pipeline,
-};
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
 use std::{
     future::ready,
     time::{Duration, Instant},
 };
+
+use futures::{stream, FutureExt, StreamExt, TryFutureExt};
+use hyper::{Body, Request};
+use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
+
+use super::parser;
+use crate::{
+    config::{
+        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
+    },
+    http::{Auth, HttpClient},
+    internal_events::{
+        BytesReceived, PrometheusEventsReceived, PrometheusHttpError, PrometheusHttpResponseError,
+        PrometheusParseError, PrometheusRequestCompleted, StreamClosedError,
+    },
+    shutdown::ShutdownSignal,
+    sources,
+    tls::{TlsOptions, TlsSettings},
+    SourceSender,
+};
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
 // gave up trying to format, but reported no error
@@ -51,7 +55,7 @@ struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -85,7 +89,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let urls = self
             .endpoints
             .iter()
-            .map(|s| s.parse::<http::Uri>().context(sources::UriParseError))
+            .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
@@ -102,12 +106,16 @@ impl SourceConfig for PrometheusScrapeConfig {
         ))
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -147,12 +155,16 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         "prometheus_scrape"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -186,12 +198,10 @@ fn prometheus(
     proxy: ProxyConfig,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: SourceSender,
 ) -> sources::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
-    Box::pin(
-        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+    Box::pin(async move {
+        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -235,6 +245,10 @@ fn prometheus(
                     .and_then(|response| async move {
                         let (header, body) = response.into_parts();
                         let body = hyper::body::to_bytes(body).await?;
+                        emit!(BytesReceived {
+                            byte_size: body.len(),
+                            protocol: "http"
+                        });
                         Ok((header, body))
                     })
                     .into_stream()
@@ -244,18 +258,17 @@ fn prometheus(
 
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(&PrometheusRequestCompleted {
+                                emit!(PrometheusRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
 
-                                let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
-                                        emit!(&PrometheusEventReceived {
-                                            byte_size,
+                                        emit!(PrometheusEventsReceived {
+                                            byte_size: events.size_of(),
                                             count: events.len(),
                                             uri: url.clone()
                                         });
@@ -313,18 +326,18 @@ fn prometheus(
                                                     }
                                                 }
                                             }
-                                            Ok(event)
+                                            event
                                         }))
                                     }
                                     Err(error) => {
                                         if url.path() == "/" {
-                                            // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                            // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                             warn!(
                                                 message = PARSE_ERROR_NO_PATH,
                                                 endpoint = %url,
                                             );
                                         }
-                                        emit!(&PrometheusParseError {
+                                        emit!(PrometheusParseError {
                                             error,
                                             url: url.clone(),
                                             body,
@@ -337,20 +350,20 @@ fn prometheus(
                                 if header.status == hyper::StatusCode::NOT_FOUND
                                     && url.path() == "/"
                                 {
-                                    // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                    // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
                                     warn!(
                                         message = NOT_FOUND_NO_PATH,
                                         endpoint = %url,
                                     );
                                 }
-                                emit!(&PrometheusHttpResponseError {
+                                emit!(PrometheusHttpResponseError {
                                     code: header.status,
                                     url: url.clone(),
                                 });
                                 None
                             }
                             Err(error) => {
-                                emit!(&PrometheusHttpError {
+                                emit!(PrometheusHttpError {
                                     error,
                                     url: url.clone(),
                                 });
@@ -361,13 +374,32 @@ fn prometheus(
                     .flatten()
             })
             .flatten()
-            .forward(out)
-            .inspect(|_| info!("Finished sending.")),
-    )
+            .boxed();
+
+        match out.send_event_stream(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
+                Err(())
+            }
+        }
+    })
 }
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        Body, Client, Response, Server,
+    };
+    use pretty_assertions::assert_eq;
+    use tokio::time::{sleep, Duration};
+    use warp::Filter;
+
     use super::*;
     use crate::{
         config,
@@ -375,16 +407,9 @@ mod test {
         test_util::{self, next_addr, start_topology},
         Error,
     };
-    use hyper::{
-        service::{make_service_fn, service_fn},
-        {Body, Client, Response, Server},
-    };
-    use pretty_assertions::assert_eq;
-    use tokio::time::{sleep, Duration};
-    use warp::Filter;
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
     }
 
@@ -410,8 +435,11 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -460,8 +488,11 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -566,7 +597,8 @@ mod test {
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
-                flush_period_secs: 1,
+                distributions_as_summaries: false,
+                flush_period_secs: Duration::from_secs(1),
             },
         );
 
@@ -621,13 +653,14 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::SourceContext,
         event::{MetricKind, MetricValue},
-        test_util, Pipeline,
+        test_util, SourceSender,
     };
-    use tokio::time::Duration;
 
     #[tokio::test]
     async fn scrapes_metrics() {
@@ -641,8 +674,11 @@ mod integration_tests {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let (tx, rx) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
 
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;

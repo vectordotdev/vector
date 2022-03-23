@@ -1,8 +1,9 @@
 //! A state wrapper that delays deletes.
 
+use std::{collections::VecDeque, time::Duration};
+
 use async_trait::async_trait;
 use futures::{future::BoxFuture, FutureExt};
-use std::{collections::VecDeque, time::Duration};
 use tokio::time::{sleep_until, timeout_at, Instant};
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
@@ -39,17 +40,6 @@ where
     T: super::Write + Send,
     <T as super::Write>::Item: Send + Sync,
 {
-    /// Schedules the delayed deletion of the item at the future.
-    pub fn schedule_delete(&mut self, item: <T as super::Write>::Item) {
-        let deadline = Instant::now() + self.sleep;
-        self.queue.push_back((item, deadline));
-    }
-
-    /// Clear the delayed deletion requests.
-    pub fn clear(&mut self) {
-        self.queue.clear();
-    }
-
     /// Perform the queued deletions.
     pub async fn perform(&mut self) {
         let now = Instant::now();
@@ -136,11 +126,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{mock, MaintainedWrite, Write};
-    use super::*;
-    use crate::test_util::trace_init;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+
+    use super::{
+        super::{mock, MaintainedWrite, Write},
+        *,
+    };
+    use crate::test_util::trace_init;
 
     const DELAY_FOR: Duration = Duration::from_secs(3600);
 

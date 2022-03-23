@@ -34,7 +34,7 @@ the new `contains` predicate:
 ```toml
 [transforms.errors]
   type = "filter"
-  condition."message.cotnain" = "error"
+  condition."message.contain" = "error"
 ```
 
 The world is your oyster.

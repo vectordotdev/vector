@@ -1,5 +1,14 @@
 //! A watcher based on the k8s API.
 
+use futures::{
+    future::BoxFuture,
+    stream::{BoxStream, Stream, StreamExt},
+};
+use http::StatusCode;
+use hyper::Error as BodyError;
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, WatchOptional};
+use snafu::{ResultExt, Snafu};
+
 use super::{
     client::Client,
     stream as k8s_stream,
@@ -7,15 +16,6 @@ use super::{
     watcher::{self, Watcher},
 };
 use crate::internal_events::kubernetes::api_watcher as internal_events;
-use futures::{
-    future::BoxFuture,
-    stream::{BoxStream, Stream, StreamExt},
-};
-use http::StatusCode;
-use hyper::Error as BodyError;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::WatchEvent;
-use k8s_openapi::WatchOptional;
-use snafu::{ResultExt, Snafu};
 
 /// A simple watcher atop of the Kubernetes API [`Client`].
 pub struct ApiWatcher<B>
@@ -60,8 +60,8 @@ where
         let request = self
             .request_builder
             .build(watch_optional)
-            .context(invocation::RequestPreparation)?;
-        emit!(&internal_events::RequestPrepared { request: &request });
+            .context(invocation::RequestPreparationSnafu)?;
+        emit!(internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
         let response = match self.client.send(request).await {
@@ -78,7 +78,7 @@ where
             }
         };
 
-        emit!(&internal_events::ResponseReceived {
+        emit!(internal_events::ResponseReceived {
             response: &response
         });
 
@@ -202,21 +202,23 @@ pub mod stream {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use k8s_openapi::{
+        api::core::v1::Pod,
+        apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
+        WatchOptional,
+    };
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    use super::*;
     use crate::{
         config::ProxyConfig,
         kubernetes::{api_watcher, client},
         tls::TlsOptions,
     };
-
-    use super::*;
-    use futures::StreamExt;
-    use k8s_openapi::WatchOptional;
-    use k8s_openapi::{
-        api::core::v1::Pod,
-        apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
-    };
-    use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     macro_rules! assert_matches {
         ($expression:expr, $($pattern:tt)+) => {

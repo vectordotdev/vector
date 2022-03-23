@@ -81,9 +81,9 @@ more info navigating your solution.
 
 ### Before creating an RFC
 
-1. Search Github for [previous issues](https://github.com/timberio/vector/issues) and
-   [RFCs](https://github.com/timberio/vector/tree/master/rfcs) on this topic.
-1. If an RFC issue does not exist, [open one](https://github.com/timberio/vector/issues/new/choose).
+1. Search Github for [previous issues](https://github.com/vectordotdev/vector/issues) and
+   [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
+1. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
 1. Use the issue to obtain consensus that an RFC is necessary.
    * The change might be quickly rejected.
    * The change might be on our long term roadmap and get deferred.
@@ -94,7 +94,7 @@ more info navigating your solution.
 1. Create a new branch
 1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
    name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
-1. Fill in your RFC, pay attention the bullets and guidelines. Do not ommit any sections.
+1. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
 1. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
 1. Submit your RFC as a pull request and tag reviewers for approval.
 
@@ -120,7 +120,7 @@ demonstrating intent over conceptual discussions.
 
 ### What if I need to investigate and feel out solutions?
 
-This is expected. RFCs are the time to discuss with the Vector team and experiement with code-level spikes. It is not
+This is expected. RFCs are the time to discuss with the Vector team and experiment with code-level spikes. It is not
 uncommon for RFCs to span one or two sprints, but they should not take longer than two sprints. Generally, if an RFC
 takes two sprints it involves many cross cutting concerns that result in incremental RFCs.
 

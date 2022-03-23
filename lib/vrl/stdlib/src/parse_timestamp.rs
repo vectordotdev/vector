@@ -1,5 +1,19 @@
-use shared::conversion::Conversion;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
+
+fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
+    match value {
+        Value::Bytes(v) => {
+            let format = format.try_bytes_utf8_lossy()?;
+            Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
+                .map_err(|e| e.to_string())?
+                .convert(v)
+                .map_err(|e| e.to_string().into())
+        }
+        Value::Timestamp(_) => Ok(value),
+        _ => Err("unable to convert value to timestamp".into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTimestamp;
@@ -20,7 +34,7 @@ impl Function for ParseTimestamp {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -43,6 +57,12 @@ impl Function for ParseTimestamp {
             },
         ]
     }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let format = args.required("format");
+        parse_timestamp(value, format, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -54,32 +74,20 @@ struct ParseTimestampFn {
 impl Expression for ParseTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        match value {
-            Value::Bytes(v) => {
-                let bytes = self.format.resolve(ctx)?;
-                let format = bytes.try_bytes_utf8_lossy()?;
-                Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
-                    .map_err(|e| format!("{}", e))?
-                    .convert(v)
-                    .map_err(|e| e.to_string().into())
-            }
-            Value::Timestamp(_) => Ok(value),
-            _ => Err("unable to convert value to timestamp".into()),
-        }
+        let format = self.format.resolve(ctx)?;
+        parse_timestamp(value, format, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Always fallible because the format needs to be parsed at runtime
-            .timestamp()
+        TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
+
+    use super::*;
 
     test_function![
         parse_timestamp => ParseTimestamp;
@@ -96,8 +104,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text {
@@ -110,8 +118,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::default(),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         parse_text_with_tz {
@@ -124,8 +132,8 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             )),
-            tdef: TypeDef::new().fallible().timestamp(),
-            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
+            tdef: TypeDef::timestamp().fallible(),
+            tz: vector_common::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];
 }

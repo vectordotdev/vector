@@ -1,23 +1,33 @@
-use super::config::MAX_PAYLOAD_BYTES;
-use super::service::LogApiRequest;
-use crate::config::SinkContext;
-use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed, StandardEncodings};
-use crate::sinks::util::{Compression, Compressor, RequestBuilder, SinkBuilderExt};
+use std::{
+    fmt::Debug,
+    io::{self, Write},
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::StreamExt;
+use bytes::Bytes;
+use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
-use std::fmt::Debug;
-use std::io::{self, Write};
-use std::num::NonZeroUsize;
-use std::sync::Arc;
 use tower::Service;
-use vector_core::buffers::Acker;
-use vector_core::config::{log_schema, LogSchema};
-use vector_core::event::{Event, EventFinalizers, EventStatus, Finalizable, Value};
-use vector_core::partition::Partitioner;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
+use vector_core::{
+    buffers::Acker,
+    config::{log_schema, LogSchema},
+    event::{Event, EventFinalizers, Finalizable, Value},
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
+
+use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
+use crate::{
+    config::SinkContext,
+    sinks::util::{
+        encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        Compression, Compressor, RequestBuilder, SinkBuilderExt,
+    },
+};
 #[derive(Default)]
 struct EventPartitioner;
 
@@ -153,10 +163,10 @@ struct LogRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
-    type Metadata = (Arc<str>, usize, EventFinalizers);
+    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<DatadogLogsJsonEncoding>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -172,9 +182,10 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         let (api_key, mut events) = input;
         let events_len = events.len();
         let finalizers = events.take_finalizers();
+        let events_byte_size = events.size_of();
 
         let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
-        ((api_key, events_len, finalizers), events)
+        ((api_key, events_len, finalizers, events_byte_size), events)
     }
 
     fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
@@ -191,17 +202,18 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
 
-        Ok(compressor.into_inner())
+        Ok(compressor.into_inner().freeze())
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (api_key, batch_size, finalizers) = metadata;
+        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
         LogApiRequest {
             batch_size,
             api_key,
             compression: self.compression,
             body: payload,
             finalizers,
+            events_byte_size,
         }
     }
 }
@@ -210,7 +222,7 @@ impl<S> LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -226,7 +238,7 @@ where
         };
 
         let sink = input
-            .batched(partitioner, self.batch_settings)
+            .batched_partitioned(partitioner, self.batch_settings)
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -244,11 +256,11 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for LogSink<S>
+impl<S> StreamSink<Event> for LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

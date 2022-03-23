@@ -1,25 +1,23 @@
-use crate::{
-    buffers::Acker,
-    conditions,
-    event::Metric,
-    shutdown::ShutdownSignal,
-    sinks::{self, util::UriSerde},
-    sources, Pipeline,
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display, Formatter},
+    hash::Hash,
+    net::SocketAddr,
+    path::PathBuf,
 };
+
 use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
-use std::hash::Hash;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-pub use vector_core::config::GlobalOptions;
-pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
+pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
+pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
+
+use crate::{conditions, event::Metric};
 
 pub mod api;
 mod builder;
+mod cmd;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -30,23 +28,30 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
+mod schema;
+mod sink;
+mod source;
+mod transform;
 mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, ComponentScope, OutputId};
+pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use unit_test::build_unit_tests_main as build_unit_tests;
+pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
+pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
+pub use transform::{TransformDescription, TransformOuter};
+pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vector_core::config::proxy::ProxyConfig;
-pub use vector_core::config::{log_schema, LogSchema};
+pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
@@ -88,11 +93,13 @@ impl ConfigPath {
 
 #[derive(Debug, Default)]
 pub struct Config {
-    pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub schema: schema::Options,
+    pub version: Option<String>,
     #[cfg(feature = "datadog-pipelines")]
-    pub datadog: datadog::Options,
+    pub datadog: Option<datadog::Options>,
+    pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
@@ -100,6 +107,78 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
+}
+
+impl Config {
+    pub fn builder() -> builder::ConfigBuilder {
+        Default::default()
+    }
+
+    /// Expand a logical component id (i.e. from the config file) into the ids of the
+    /// components it was expanded to as part of the macro process. Does not check that the
+    /// identifier is otherwise valid.
+    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
+        self.expansions
+            .get(identifier)
+            .cloned()
+            .unwrap_or_else(|| vec![identifier.clone()])
+    }
+
+    pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        if self.global.acknowledgements.enabled() {
+            for (name, sink) in &self.sinks {
+                if sink.inner.acknowledgements().is_none() {
+                    warn!(
+                        message = "Acknowledgements are globally enabled but sink does not support them.",
+                        sink = %name,
+                    );
+                }
+            }
+        }
+
+        let inputs: Vec<_> = self
+            .sinks
+            .iter()
+            .filter(|(_, sink)| {
+                sink.inner
+                    .acknowledgements()
+                    .unwrap_or(&self.global.acknowledgements)
+                    .merge_default(&self.global.acknowledgements)
+                    .enabled()
+            })
+            .flat_map(|(name, sink)| {
+                sink.inputs
+                    .iter()
+                    .map(|input| (name.clone(), input.clone()))
+            })
+            .collect();
+        self.propagate_acks_rec(inputs);
+        Ok(())
+    }
+
+    fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
+        for (sink, input) in sink_inputs {
+            let component = &input.component;
+            if let Some(source) = self.sources.get_mut(component) {
+                if source.inner.can_acknowledge() {
+                    source.sink_acknowledgements = true;
+                } else {
+                    warn!(
+                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
+                        source = component.id(),
+                        sink = sink.id(),
+                    );
+                }
+            } else if let Some(transform) = self.transforms.get(component) {
+                let inputs = transform
+                    .inputs
+                    .iter()
+                    .map(|input| (sink.clone(), input.clone()))
+                    .collect();
+                self.propagate_acks_rec(inputs);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -145,288 +224,6 @@ macro_rules! impl_generate_config_from_default {
         }
     };
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SourceOuter {
-    #[serde(default = "default_acknowledgements")]
-    pub acknowledgements: bool,
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
-    #[serde(flatten)]
-    pub(super) inner: Box<dyn SourceConfig>,
-}
-
-const fn default_acknowledgements() -> bool {
-    false
-}
-
-impl SourceOuter {
-    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
-        Self {
-            acknowledgements: default_acknowledgements(),
-            inner: Box::new(source),
-            proxy: Default::default(),
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SourceConfig: core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
-
-    fn output_type(&self) -> DataType;
-
-    fn source_type(&self) -> &'static str;
-
-    /// Resources that the source is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-}
-
-pub struct SourceContext {
-    pub key: ComponentKey,
-    pub globals: GlobalOptions,
-    pub shutdown: ShutdownSignal,
-    pub out: Pipeline,
-    pub acknowledgements: bool,
-    pub proxy: ProxyConfig,
-}
-
-impl SourceContext {
-    #[cfg(test)]
-    pub fn new_shutdown(
-        key: &ComponentKey,
-        out: Pipeline,
-    ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
-        let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(key);
-        (
-            Self {
-                key: key.clone(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out,
-                acknowledgements: default_acknowledgements(),
-                proxy: Default::default(),
-            },
-            shutdown,
-        )
-    }
-
-    #[cfg(test)]
-    pub fn new_test(out: Pipeline) -> Self {
-        Self {
-            key: ComponentKey::from("default"),
-            globals: GlobalOptions::default(),
-            shutdown: ShutdownSignal::noop(),
-            out,
-            acknowledgements: default_acknowledgements(),
-            proxy: Default::default(),
-        }
-    }
-}
-
-pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
-
-inventory::collect!(SourceDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    // We are accepting this option for backward compatibility.
-    healthcheck_uri: Option<UriSerde>,
-
-    // We are accepting bool for backward compatibility.
-    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
-    #[serde(default)]
-    healthcheck: SinkHealthcheckOptions,
-
-    #[serde(default)]
-    pub buffer: crate::buffers::BufferConfig,
-
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
-
-    #[serde(flatten)]
-    pub inner: Box<dyn SinkConfig>,
-}
-
-impl<T> SinkOuter<T> {
-    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
-        SinkOuter {
-            inputs,
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
-            proxy: Default::default(),
-        }
-    }
-
-    pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
-        let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(&id.to_string()));
-        resources
-    }
-
-    pub fn healthcheck(&self) -> SinkHealthcheckOptions {
-        if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
-            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
-        } else if self.healthcheck_uri.is_some() {
-            warn!(
-                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
-            )
-        }
-        SinkHealthcheckOptions {
-            uri: self
-                .healthcheck
-                .uri
-                .clone()
-                .or_else(|| self.healthcheck_uri.clone()),
-            ..self.healthcheck.clone()
-        }
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
-        SinkOuter {
-            inputs,
-            inner: self.inner,
-            buffer: self.buffer,
-            healthcheck: self.healthcheck,
-            healthcheck_uri: self.healthcheck_uri,
-            proxy: self.proxy,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(default)]
-pub struct SinkHealthcheckOptions {
-    pub enabled: bool,
-    pub uri: Option<UriSerde>,
-}
-
-impl Default for SinkHealthcheckOptions {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            uri: None,
-        }
-    }
-}
-
-impl From<bool> for SinkHealthcheckOptions {
-    fn from(enabled: bool) -> Self {
-        Self { enabled, uri: None }
-    }
-}
-
-impl From<UriSerde> for SinkHealthcheckOptions {
-    fn from(uri: UriSerde) -> Self {
-        Self {
-            enabled: true,
-            uri: Some(uri),
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
-
-    fn input_type(&self) -> DataType;
-
-    fn sink_type(&self) -> &'static str;
-
-    /// Resources that the sink is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SinkContext {
-    pub(super) acker: Acker,
-    pub(super) healthcheck: SinkHealthcheckOptions,
-    pub(super) globals: GlobalOptions,
-    pub(super) proxy: ProxyConfig,
-}
-
-impl SinkContext {
-    #[cfg(test)]
-    pub fn new_test() -> Self {
-        Self {
-            acker: Acker::Null,
-            healthcheck: SinkHealthcheckOptions::default(),
-            globals: GlobalOptions::default(),
-            proxy: ProxyConfig::default(),
-        }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
-    }
-
-    pub const fn globals(&self) -> &GlobalOptions {
-        &self.globals
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-}
-
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
-
-inventory::collect!(SinkDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
-
-impl<T> TransformOuter<T> {
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
-        TransformOuter {
-            inputs,
-            inner: self.inner,
-        }
-    }
-}
-
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
-
-inventory::collect!(TransformDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct EnrichmentTableOuter {
@@ -541,15 +338,108 @@ impl Display for Resource {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition {
+pub struct TestDefinition<T = OutputId> {
     pub name: String,
     pub input: Option<TestInput>,
     #[serde(default)]
     pub inputs: Vec<TestInput>,
     #[serde(default)]
-    pub outputs: Vec<TestOutput>,
+    pub outputs: Vec<TestOutput<T>>,
     #[serde(default)]
-    pub no_outputs_from: Vec<ComponentKey>,
+    pub no_outputs_from: Vec<T>,
+}
+
+impl TestDefinition<String> {
+    fn resolve_outputs(
+        self,
+        graph: &graph::Graph,
+    ) -> Result<TestDefinition<OutputId>, Vec<String>> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+        let mut errors = Vec::new();
+
+        let output_map = graph.input_map().expect("ambiguous outputs");
+
+        let outputs = outputs
+            .into_iter()
+            .filter_map(|old| {
+                if let Some(output_id) = output_map.get(&old.extract_from) {
+                    Some(TestOutput {
+                        extract_from: output_id.clone(),
+                        conditions: old.conditions,
+                    })
+                } else {
+                    errors.push(format!(
+                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                        name, old.extract_from
+                    ));
+                    None
+                }
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from
+            .into_iter()
+            .filter_map(|o| {
+                if let Some(output_id) = output_map.get(&o) {
+                    Some(output_id.clone())
+                } else {
+                    errors.push(format!(
+                        r#"Invalid no_outputs_from target in test '{}': '{}' does not exist"#,
+                        name, o
+                    ));
+                    None
+                }
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(TestDefinition {
+                name,
+                input,
+                inputs,
+                outputs,
+                no_outputs_from,
+            })
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+impl TestDefinition<OutputId> {
+    fn stringify(self) -> TestDefinition<String> {
+        let TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        } = self;
+
+        let outputs = outputs
+            .into_iter()
+            .map(|old| TestOutput {
+                extract_from: old.extract_from.to_string(),
+                conditions: old.conditions,
+            })
+            .collect();
+
+        let no_outputs_from = no_outputs_from.iter().map(ToString::to_string).collect();
+
+        TestDefinition {
+            name,
+            input,
+            inputs,
+            outputs,
+            no_outputs_from,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -578,25 +468,9 @@ fn default_test_input_type() -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestOutput {
-    pub extract_from: ComponentKey,
+pub struct TestOutput<T = OutputId> {
+    pub extract_from: T,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
-}
-
-impl Config {
-    pub fn builder() -> builder::ConfigBuilder {
-        Default::default()
-    }
-
-    /// Expand a logical component id (i.e. from the config file) into the ids of the
-    /// components it was expanded to as part of the macro process. Does not check that the
-    /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
-        self.expansions
-            .get(identifier)
-            .cloned()
-            .unwrap_or_else(|| vec![identifier.clone()])
-    }
 }
 
 #[cfg(all(
@@ -605,10 +479,12 @@ impl Config {
     feature = "sinks-console",
     feature = "transforms-json_parser"
 ))]
-mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
-    use indoc::indoc;
+mod tests {
     use std::path::PathBuf;
+
+    use indoc::indoc;
+
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
 
     #[test]
     fn default_data_dir() {
@@ -623,7 +499,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -646,7 +522,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -679,7 +555,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -701,7 +577,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -730,7 +606,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -759,7 +635,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
 
@@ -780,7 +656,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::Toml),
+                    Format::Toml,
                 )
                 .unwrap()
             ),
@@ -812,7 +688,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -845,7 +721,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
@@ -855,14 +731,159 @@ mod test {
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
     }
+
+    #[test]
+    #[cfg(feature = "datadog-pipelines")]
+    fn order_independent_sha256_hashes() {
+        let config1: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+
+                [api]
+                    enabled = true
+
+                [sources.file]
+                    type = "file"
+                    ignore_older_secs = 600
+                    include = ["/var/log/**/*.log"]
+                    read_from = "beginning"
+
+                [sources.internal_metrics]
+                    type = "internal_metrics"
+                    namespace = "pipelines"
+
+                [transforms.filter]
+                    type = "filter"
+                    inputs = ["internal_metrics"]
+                    condition = """
+                        .name == "processed_bytes_total"
+                    """
+
+                [sinks.out]
+                    type = "console"
+                    inputs = ["filter"]
+                    target = "stdout"
+                    encoding.codec = "json"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        let config2: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+
+                [sources.internal_metrics]
+                    type = "internal_metrics"
+                    namespace = "pipelines"
+
+                [sources.file]
+                    type = "file"
+                    ignore_older_secs = 600
+                    include = ["/var/log/**/*.log"]
+                    read_from = "beginning"
+
+                [transforms.filter]
+                    type = "filter"
+                    inputs = ["internal_metrics"]
+                    condition = """
+                        .name == "processed_bytes_total"
+                    """
+
+                [sinks.out]
+                    type = "console"
+                    inputs = ["filter"]
+                    target = "stdout"
+                    encoding.codec = "json"
+
+                [api]
+                    enabled = true
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-file",
+    feature = "sinks-file",
+    feature = "transforms-json_parser"
+))]
+mod acknowledgements_tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn propagates_settings() {
+        // The topology:
+        // in1 => out1
+        // in2 => out2 (acks enabled)
+        // in3 => parse3 => out3 (acks enabled)
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+                [sources.in1]
+                    type = "file"
+                [sources.in2]
+                    type = "file"
+                [sources.in3]
+                    type = "file"
+                [transforms.parse3]
+                    type = "json_parser"
+                    inputs = ["in3"]
+                [sinks.out1]
+                    type = "file"
+                    inputs = ["in1"]
+                    encoding = "text"
+                    path = "/path/to/out1"
+                [sinks.out2]
+                    type = "file"
+                    inputs = ["in2"]
+                    encoding = "text"
+                    path = "/path/to/out2"
+                    acknowledgements = true
+                [sinks.out3]
+                    type = "file"
+                    inputs = ["parse3"]
+                    encoding = "text"
+                    path = "/path/to/out3"
+                    acknowledgements.enabled = true
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        for source in config.sources.values() {
+            assert!(
+                !source.sink_acknowledgements,
+                "Source `sink_acknowledgements` should be `false` before propagation"
+            );
+        }
+
+        let config = config.build().unwrap();
+
+        let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
+        assert!(!get("in1").sink_acknowledgements);
+        assert!(get("in2").sink_acknowledgements);
+        assert!(get("in3").sink_acknowledgements);
+    }
 }
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::{load_from_str, Format, Resource};
+    use std::{
+        collections::{HashMap, HashSet},
+        net::{Ipv4Addr, SocketAddr},
+    };
+
     use indoc::indoc;
-    use std::collections::{HashMap, HashSet};
-    use std::net::{Ipv4Addr, SocketAddr};
+
+    use super::{load_from_str, Format, Resource};
 
     fn localhost(port: u16) -> Resource {
         Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
@@ -989,8 +1010,55 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::Toml),
+            Format::Toml,
         )
         .is_err());
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-stdin",
+    feature = "sinks-console",
+    feature = "transforms-pipelines",
+    feature = "transforms-filter"
+))]
+mod pipelines_tests {
+    use indoc::indoc;
+
+    use super::{load_from_str, Format};
+
+    #[test]
+    fn forbid_pipeline_nesting() {
+        let res = load_from_str(
+            indoc! {r#"
+                [sources.in]
+                  type = "stdin"
+
+                [transforms.processing]
+                  inputs = ["in"]
+                  type = "pipelines"
+
+                  [transforms.processing.logs.pipelines.foo]
+                    name = "foo"
+
+                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                      type = "pipelines"
+
+                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                        name = "bar"
+
+                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                            type = "filter"
+                            condition = ""
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["processing"]
+                  encoding = "json"
+            "#},
+            Format::Toml,
+        );
+        assert!(res.is_err(), "should error");
     }
 }

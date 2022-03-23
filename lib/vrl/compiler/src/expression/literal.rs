@@ -1,13 +1,14 @@
-use crate::expression::Resolved;
-use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
+use std::{borrow::Cow, convert::TryFrom, fmt};
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
+use regex::Regex;
+use value::ValueRegex;
+
+use crate::{expression::Resolved, vm::OpCode, Context, Expression, Span, State, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -15,7 +16,7 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(Regex),
+    Regex(ValueRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
@@ -74,16 +75,28 @@ impl Expression for Literal {
         use Literal::*;
 
         let type_def = match self {
-            String(_) => TypeDef::new().bytes(),
-            Integer(_) => TypeDef::new().integer(),
-            Float(_) => TypeDef::new().float(),
-            Boolean(_) => TypeDef::new().boolean(),
-            Regex(_) => TypeDef::new().regex(),
-            Timestamp(_) => TypeDef::new().timestamp(),
-            Null => TypeDef::new().null(),
+            String(_) => TypeDef::bytes(),
+            Integer(_) => TypeDef::integer(),
+            Float(_) => TypeDef::float(),
+            Boolean(_) => TypeDef::boolean(),
+            Regex(_) => TypeDef::regex(),
+            Timestamp(_) => TypeDef::timestamp(),
+            Null => TypeDef::null(),
         };
 
         type_def.infallible()
+    }
+
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        // Add the literal as a constant.
+        let constant = vm.add_constant(self.to_value());
+        vm.write_opcode(OpCode::Constant);
+        vm.write_primitive(constant);
+        Ok(())
     }
 }
 
@@ -222,13 +235,13 @@ impl From<bool> for Literal {
 
 impl From<Regex> for Literal {
     fn from(regex: Regex) -> Self {
-        Literal::Regex(regex)
+        Literal::Regex(ValueRegex::new(regex))
     }
 }
 
-impl From<regex::Regex> for Literal {
-    fn from(regex: regex::Regex) -> Self {
-        Literal::Regex(regex.into())
+impl From<ValueRegex> for Literal {
+    fn from(regex: ValueRegex) -> Self {
+        Literal::Regex(regex)
     }
 }
 
@@ -266,7 +279,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("invalid regular expression")]
     InvalidRegex(#[from] regex::Error),
 
@@ -378,12 +391,12 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| expr!("foo"),
-            want: TypeDef::new().bytes(),
+            want: TypeDef::bytes(),
         }
 
         integer {
             expr: |_| expr!(12),
-            want: TypeDef::new().integer(),
+            want: TypeDef::integer(),
         }
     ];
 }

@@ -31,8 +31,6 @@ export AUTODESPAWN ?= ${AUTOSPAWN}
 export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
-# Override to set a different Rust toolchain
-export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 # Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
@@ -44,7 +42,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= timberio/ci_image
+export ENVIRONMENT_UPSTREAM ?= timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -60,6 +58,8 @@ export VERSION ?= $(shell scripts/version.sh)
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
+
+export RUST_VERSION ?= $(shell grep channel rust-toolchain.toml | cut -d '"' -f 2)
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
@@ -118,9 +118,9 @@ define ENVIRONMENT_EXEC
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
-			--mount type=bind,source=${CURRENT_DIR},target=/git/timberio/vector \
+			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
+			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			$(ENVIRONMENT_UPSTREAM)
 endef
@@ -262,15 +262,15 @@ target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	rm -rf target/scratch/vector-${TRIPLE} || true
 	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		target/${TRIPLE}/${PROFILE}/vector \
 		target/scratch/vector-${TRIPLE}/bin/vector
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		README.md \
 		LICENSE \
 		config \
 		target/scratch/vector-${TRIPLE}/
-	cp --recursive --force --verbose \
+	cp -R -f -v \
 		distribution/systemd \
 		target/scratch/vector-${TRIPLE}/etc/
 	tar --create \
@@ -283,12 +283,27 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
+# nextest doesn't support running doc tests yet so this is split out as
+# `test-docs`
+# https://github.com/nextest-rs/nextest/issues/16
+#
+# criterion doesn't support the flags needed by nextest to run so these are left
+# out for now
+# https://github.com/bheisler/criterion.rs/issues/562
+#
+# `cargo test` lacks support for testing _just_ benches otherwise we'd have
+# a target for that
+# https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+
+.PHONY: test-docs
+test-docs: ## Run the docs test suite
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -308,151 +323,22 @@ test-integration: test-integration-aws test-integration-azure test-integration-c
 test-integration: test-integration-eventstoredb_metrics test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-shutdown
 
-.PHONY: test-integration-aws
-test-integration-aws: ## Runs AWS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-	@scripts/setup_integration_env.sh aws start
-	sleep 10 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh aws stop
-endif
+.PHONY: test-integration-aws-sqs
+test-integration-aws-sqs: ## Runs AWS SQS integration tests
+	FILTER=::aws_sqs make test-integration-aws
 
-.PHONY: test-integration-azure
-test-integration-azure: ## Runs Azure integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh azure stop
-	@scripts/setup_integration_env.sh azure start
-	sleep 5 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features azure-integration-tests --lib ::azure_ -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh azure stop
-endif
+.PHONY: test-integration-aws-cloudwatch-logs
+test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
+	FILTER=::aws_cloudwatch_logs make test-integration-aws
 
-.PHONY: test-integration-clickhouse
-test-integration-clickhouse: ## Runs Clickhouse integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-	@scripts/setup_integration_env.sh clickhouse start
-	sleep 5 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh clickhouse stop
-endif
-
-.PHONY: test-integration-docker-logs
-test-integration-docker-logs: ## Runs Docker Logs integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs::
-
-.PHONY: test-integration-elasticsearch
-test-integration-elasticsearch: ## Runs Elasticsearch integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-	@scripts/setup_integration_env.sh elasticsearch start
-	sleep 60 # Many services are very slow... Give them a sec...
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh elasticsearch stop
-endif
-
-.PHONY: test-integration-eventstoredb_metrics
-test-integration-eventstoredb_metrics: ## Runs EventStoreDB metric integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-	@scripts/setup_integration_env.sh eventstoredb_metrics start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features eventstoredb_metrics-integration-tests --lib ::eventstoredb_metrics:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh eventstoredb_metrics stop
-endif
-
-.PHONY: test-integration-fluent
-test-integration-fluent: ## Runs Fluent integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features fluent-integration-tests --lib ::fluent::
-
-.PHONY: test-integration-gcp
-test-integration-gcp: ## Runs GCP integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-	@scripts/setup_integration_env.sh gcp start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
-	 --lib ::gcp::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh gcp stop
-endif
-
-.PHONY: test-integration-humio
-test-integration-humio: ## Runs Humio integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh humio stop
-	@scripts/setup_integration_env.sh humio start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh humio stop
-endif
-.PHONY: test-integration-influxdb
-test-integration-influxdb: ## Runs InfluxDB integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh influxdb start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-endif
-
-.PHONY: test-integration-kafka
-test-integration-kafka: ## Runs Kafka integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
-
-.PHONY: test-integration-loki
-test-integration-loki: ## Runs Loki integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-	@scripts/setup_integration_env.sh loki start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh loki stop
-endif
-
-.PHONY: test-integration-logstash
-test-integration-logstash: ## Runs Logstash integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features logstash-integration-tests --lib ::logstash:: -- --nocapture
-
-.PHONY: test-integration-mongodb_metrics
-test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh mongodb_metrics stop
-	@scripts/setup_integration_env.sh mongodb_metrics start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh mongodb_metrics stop
-endif
+.PHONY: test-integration-datadog-agent
+test-integration-datadog-agent: ## Runs Datadog Agent integration tests
+	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
@@ -461,114 +347,40 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nats start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
 
-.PHONY: test-integration-nginx
-test-integration-nginx: ## Runs nginx integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
-	@scripts/setup_integration_env.sh nginx start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nginx stop
-endif
-
-.PHONY: test-integration-postgresql_metrics
-test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh postgresql_metrics stop
-	@scripts/setup_integration_env.sh postgresql_metrics start
-	sleep 5 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh postgresql_metrics stop
-endif
-
-.PHONY: test-integration-prometheus
-test-integration-prometheus: ## Runs Prometheus integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
-	@scripts/setup_integration_env.sh influxdb start
-	@scripts/setup_integration_env.sh prometheus start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh influxdb stop
-	@scripts/setup_integration_env.sh prometheus stop
-endif
-
-.PHONY: test-integration-pulsar
-test-integration-pulsar: ## Runs Pulsar integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh pulsar stop
-	@scripts/setup_integration_env.sh pulsar start
-	sleep 15 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh pulsar stop
-endif
-
-.PHONY: test-integration-redis
-test-integration-redis: ## Runs Redis integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
-	@scripts/setup_integration_env.sh redis start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features redis-integration-tests --lib ::redis:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh redis stop
-endif
-
-.PHONY: test-integration-splunk
-test-integration-splunk: ## Runs Splunk integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
-	@scripts/setup_integration_env.sh splunk start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh splunk stop
-endif
+tests/data/dnstap/socket:
+	mkdir -p tests/data/dnstap/socket
+	chmod 777 tests/data/dnstap/socket
 
 .PHONY: test-integration-dnstap
-test-integration-dnstap: ## Runs dnstap integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
-	@scripts/setup_integration_env.sh dnstap start
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap::
+test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml build
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh dnstap stop
+	make test-integration-dnstap-cleanup
+endif
+
+test-integration-%-cleanup:
+	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
+
+test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
+ifeq ($(AUTODESPAWN), true)
+	make test-integration-$*-cleanup
 endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
 	@scripts/test-e2e-kubernetes.sh
 
-.PHONY: test-shutdown
-test-shutdown: ## Runs shutdown tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-	@scripts/setup_integration_env.sh kafka start
-	sleep 30 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh kafka stop
-endif
-
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -629,12 +441,10 @@ check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
-check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
-check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -668,28 +478,12 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
-.PHONY: check-helm-lint
-check-helm-lint: ## Check that Helm charts pass helm lint
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
-
-.PHONY: check-helm-dependencies
-check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
-
-.PHONY: check-helm-snapshots
-check-helm-snapshots: ## Check that the Helm template snapshots do not diverge from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh check
-
-.PHONY: check-kubernetes-yaml
-check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
-
-check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
 	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
 
 ##@ Packaging
@@ -751,37 +545,37 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
 package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
 
 .PHONY: package-deb-x86_64-unknown-linux-musl
 package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-deb.sh
 
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
 package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-x86_64-unknown-linux-musl
 package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=x86_64-unknown-linux-musl $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf $(ENVIRONMENT_UPSTREAM) ./scripts/package-rpm.sh
 
 ##@ Releasing
 
@@ -801,7 +595,7 @@ release-github: ## Release to Github
 	@scripts/release-github.sh
 
 .PHONY: release-homebrew
-release-homebrew: ## Release to timberio Homebrew tap
+release-homebrew: ## Release to vectordotdev Homebrew tap
 	@scripts/release-homebrew.sh
 
 .PHONY: release-prepare
@@ -820,10 +614,6 @@ release-rollback: ## Rollback pending release changes
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
-.PHONY: release-helm
-release-helm: ## Package and release Helm Chart
-	@scripts/release-helm.sh
-
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
@@ -833,10 +623,6 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 .PHONY: test-vrl
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
-
-.PHONY: check-stdlib-features
-check-stdlib-features: ## Ensure VRL stdlib features build
-	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
 
 ##@ Utility
 
@@ -853,13 +639,13 @@ fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
 
+.PHONY: generate-kubernetes-manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
+	scripts/generate-manifests.sh
+
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
-
-.PHONY: slim-builds
-slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
 
 ifeq (${CI}, true)
 .PHONY: ci-sweep
@@ -881,18 +667,6 @@ version: ## Get the current Vector version
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
-
-.PHONY: update-helm-dependencies
-update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
-
-.PHONY: update-helm-snapshots
-update-helm-snapshots: ## Update the Helm template snapshots from the Helm charts
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh update
-
-.PHONY: update-kubernetes-yaml
-update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)

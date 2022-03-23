@@ -1,64 +1,79 @@
-// ## skip check-events ##
-
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
-use vector_core::internal_event::InternalEvent;
-use vector_core::update_counter;
+
+use vector_core::{internal_event::InternalEvent, update_counter};
 
 #[derive(Debug)]
-pub struct KafkaEventReceived {
+pub struct KafkaEventsReceived {
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for KafkaEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.", internal_log_rate_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
+impl InternalEvent for KafkaEventsReceived {
+    fn emit(self) {
+        trace!(
+            message = "Events received.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+        );
+        counter!("component_received_events_total", self.count as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
+        // deprecated
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
 #[derive(Debug)]
-pub struct KafkaOffsetUpdateFailed {
+pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
 }
 
-impl InternalEvent for KafkaOffsetUpdateFailed {
-    fn emit_logs(&self) {
-        error!(message = "Unable to update consumer offset.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
+impl InternalEvent for KafkaOffsetUpdateError {
+    fn emit(self) {
+        error!(
+            message = "Unable to update consumer offset.",
+            error = %self.error,
+            error_code = "kafka_offset_update",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "kafka_offset_update",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
         counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct KafkaEventFailed {
+pub struct KafkaReadError {
     pub error: rdkafka::error::KafkaError,
 }
 
-impl InternalEvent for KafkaEventFailed {
-    fn emit_logs(&self) {
-        error!(message = "Failed to read message.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
+impl InternalEvent for KafkaReadError {
+    fn emit(self) {
+        error!(
+            message = "Failed to read message.",
+            error = %self.error,
+            error_code = "reading_message",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("events_failed_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct KafkaKeyExtractionFailed<'a> {
-    pub key_field: &'a str,
-}
-
-impl InternalEvent for KafkaKeyExtractionFailed<'_> {
-    fn emit_logs(&self) {
-        error!(message = "Failed to extract key.", key_field = %self.key_field);
     }
 }
 
@@ -68,7 +83,7 @@ pub struct KafkaStatisticsReceived<'a> {
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("kafka_queue_messages", self.statistics.msg_cnt as f64);
         gauge!(
             "kafka_queue_messages_bytes",
@@ -103,19 +118,26 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
     }
 }
 
-pub struct KafkaHeaderExtractionFailed<'a> {
+pub struct KafkaHeaderExtractionError<'a> {
     pub header_field: &'a str,
 }
 
-impl InternalEvent for KafkaHeaderExtractionFailed<'_> {
-    fn emit_logs(&self) {
+impl InternalEvent for KafkaHeaderExtractionError<'_> {
+    fn emit(self) {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
-            header_field = self.header_field
+            error_code = "extracing_header",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+            header_field = self.header_field,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "extracing_field",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
         counter!("kafka_header_extraction_failures_total", 1);
     }
 }

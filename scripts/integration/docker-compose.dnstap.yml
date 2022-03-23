@@ -1,0 +1,49 @@
+version: "3"
+
+services:
+  dnstap:
+    build:
+      context: ${PWD}/tests/data/dnstap
+    container_name: vector_dnstap
+    hostname: ns.example.com
+    volumes:
+      - ${PWD}/tests/data/dnstap/socket:/bind1/etc/bind/socket
+      - ${PWD}/tests/data/dnstap/socket:/bind2/etc/bind/socket
+      - ${PWD}/tests/data/dnstap/socket:/bind3/etc/bind/socket
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "dnstap-integration-tests"
+      - "--lib"
+      - "::dnstap::"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - dnstap
+    environment:
+      - BIND_SOCKET=/run/bind/socket
+    volumes:
+      - ${PWD}:/code
+      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
+      - /var/run/docker.sock:/var/run/docker.sock
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+networks:
+  public: {}
+  proxy: {}
+
+volumes:
+  cargogit: {}
+  cargoregistry: {}

@@ -1,38 +1,40 @@
-use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::elasticsearch::{
-    finish_signer, ElasticSearchAuth, ElasticSearchCommonMode, ElasticSearchConfig, ParseError,
-};
-use crate::transforms::metric_to_log::MetricToLog;
+use std::{collections::HashMap, convert::TryFrom};
 
-use crate::sinks::util::http::RequestConfig;
-
-use crate::rusoto::region_from_endpoint;
-use crate::sinks::util::{Compression, TowerRequestConfig, UriSerde};
-use crate::tls::TlsSettings;
 use http::{StatusCode, Uri};
 use hyper::Body;
+use rusoto_core::Region;
 use rusoto_signature::SignedRequest;
 use snafu::ResultExt;
-use std::convert::TryFrom;
 
-use super::{InvalidHost, Request};
-use crate::rusoto;
-use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::HealthcheckError;
-use rusoto_core::Region;
-use std::collections::HashMap;
+use super::{InvalidHostSnafu, Request};
+use crate::{
+    aws::{rusoto, rusoto::region_from_endpoint},
+    http::{Auth, HttpClient, MaybeAuth},
+    sinks::{
+        elasticsearch::{
+            encoder::ElasticsearchEncoder, finish_signer, ElasticsearchAuth,
+            ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
+        },
+        util::{
+            encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
+            UriSerde,
+        },
+        HealthcheckError,
+    },
+    tls::TlsSettings,
+    transforms::metric_to_log::MetricToLog,
+};
 
 #[derive(Debug)]
-pub struct ElasticSearchCommon {
+pub struct ElasticsearchCommon {
     pub base_url: String,
-    pub id_key: Option<String>,
     pub bulk_uri: Uri,
     pub authorization: Option<Auth>,
     pub credentials: Option<rusoto::AwsCredentialsProvider>,
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
-    pub mode: ElasticSearchCommonMode,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub mode: ElasticsearchCommonMode,
     pub doc_type: String,
+    pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
     pub compression: Compression,
     pub region: Region,
@@ -41,11 +43,11 @@ pub struct ElasticSearchCommon {
     pub metric_to_log: MetricToLog,
 }
 
-impl ElasticSearchCommon {
-    pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
+impl ElasticsearchCommon {
+    pub fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri.parse::<Uri>().with_context(|| InvalidHost {
+        let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
             host: &config.endpoint,
         })?;
         if uri.host().is_none() {
@@ -56,7 +58,7 @@ impl ElasticSearchCommon {
         }
 
         let authorization = match &config.auth {
-            Some(ElasticSearchAuth::Basic { user, password }) => Some(Auth::Basic {
+            Some(ElasticsearchAuth::Basic { user, password }) => Some(Auth::Basic {
                 user: user.clone(),
                 password: password.clone(),
             }),
@@ -72,8 +74,8 @@ impl ElasticSearchCommon {
         };
 
         let credentials = match &config.auth {
-            Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
+            Some(ElasticsearchAuth::Basic { .. }) | None => None,
+            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
         };
 
         let compression = config.compression;
@@ -104,9 +106,8 @@ impl ElasticSearchCommon {
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
-        let mut config = config.clone();
-        let mut request = config.request;
-        request.add_old_option(config.headers.take());
+        let config = config.clone();
+        let request = config.request;
 
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
@@ -121,8 +122,8 @@ impl ElasticSearchCommon {
             compression,
             credentials,
             doc_type,
+            suppress_type_name: config.suppress_type_name,
             encoding: config.encoding,
-            id_key: config.id_key,
             mode,
             query_params,
             request,
