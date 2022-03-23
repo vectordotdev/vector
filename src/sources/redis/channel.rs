@@ -47,7 +47,7 @@ pub async fn subscribe(
                         break;
                     }
                 }
-                Err(error) => emit!(&RedisReceiveEventError::from(error)),
+                Err(error) => emit!(RedisReceiveEventError::from(error)),
             }
         }
         Ok(())

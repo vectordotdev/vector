@@ -164,7 +164,7 @@ impl FunctionTransform for Concat {
                     }
                 };
                 if start >= end {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "start >= end",
                         source: substring.source.as_ref(),
                         start,
@@ -174,7 +174,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if start > b.len() {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "start > len",
                         source: substring.source.as_ref(),
                         start,
@@ -184,7 +184,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if end > b.len() {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "end > len",
                         source: substring.source.as_ref(),
                         start,
@@ -195,7 +195,7 @@ impl FunctionTransform for Concat {
                 }
                 content_vec.push(b.slice(start..end));
             } else {
-                emit!(&ConcatSubstringSourceMissing {
+                emit!(ConcatSubstringSourceMissing {
                     source: substring.source.as_ref()
                 });
             }

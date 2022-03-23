@@ -88,6 +88,8 @@ default = [
     "ip_cidr_contains",
     "ip_subnet",
     "ip_ntoa",
+    "ip_ntop",
+    "ip_pton",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
@@ -210,6 +212,8 @@ integer = []
 ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
 ip_ntoa = []
+ip_ntop = []
+ip_pton = ["bytes"]
 ip_subnet = ["once_cell", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []

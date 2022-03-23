@@ -82,7 +82,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field.as_str(), converted);
                         }
-                        Err(error) => emit!(&CoercerConversionError { field, error }),
+                        Err(error) => emit!(CoercerConversionError { field, error }),
                     }
                 }
             }
@@ -95,7 +95,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             log.insert(field.as_str(), converted);
                         }
-                        Err(error) => emit!(&CoercerConversionError { field, error }),
+                        Err(error) => emit!(CoercerConversionError { field, error }),
                     }
                 }
             }

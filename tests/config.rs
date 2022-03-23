@@ -808,14 +808,10 @@ async fn route() {
         type = "check_fields"
         "host.eq" = "gerry"
 
-        [transforms.splitting_gerrys.route.no_gerrys]
-        type = "check_fields"
-        "host.neq" = "gerry"
-
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys._unmatched"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,

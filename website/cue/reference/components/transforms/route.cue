@@ -32,7 +32,8 @@ components: transforms: route: {
 			description: """
 				A table of route identifiers to logical conditions representing the filter of the route. Each route
 				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
-				Note, `_default` is a reserved output name and cannot be used as a route name.
+				If an event doesn't match any route, it will be sent to the `<transform_name>._unmatched` output.
+				Note, `_default` and `_unmatched` are reserved output names and cannot be used as route names.
 				"""
 			required: true
 			type: object: {
@@ -117,12 +118,4 @@ components: transforms: route: {
 			description: "Each route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
 		},
 	]
-
-	telemetry: metrics: {
-		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total & {
-			tags: {
-				output: components.sources.internal_metrics.output.metrics._output
-			}
-		}
-	}
 }

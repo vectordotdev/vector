@@ -177,7 +177,7 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: frame.len(),
             protocol: "protobuf",
         });
@@ -194,20 +194,20 @@ impl FrameHandler for DnstapFrameHandler {
                 self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventsReceived {
+            emit!(DnstapEventsReceived {
                 byte_size: event.size_of(),
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseError {
+                    emit!(DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventsReceived {
+                    emit!(DnstapEventsReceived {
                         byte_size: event.size_of(),
                     });
                     Some(event)

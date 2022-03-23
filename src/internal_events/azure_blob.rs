@@ -17,19 +17,16 @@ impl From<hyper::StatusCode> for AzureBlobResponseError {
 }
 
 impl InternalEvent for AzureBlobResponseError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP error response.",
             error_code = %self.error_code,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code.clone(),
+            "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
@@ -44,7 +41,7 @@ pub struct AzureBlobHttpError {
 }
 
 impl InternalEvent for AzureBlobHttpError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error processing request.",
             error = %self.error,
@@ -52,9 +49,6 @@ impl InternalEvent for AzureBlobHttpError {
             stage = error_stage::SENDING,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::REQUEST_FAILED,
@@ -71,11 +65,8 @@ pub struct AzureBlobEventsSent {
 }
 
 impl InternalEvent for AzureBlobEventsSent {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events sent.", request_id = %self.request_id, count = 1, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_sent_events_total", 1);
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
         // deprecated

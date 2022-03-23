@@ -4,7 +4,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct DemoLogsEventProcessed;
 
 impl InternalEvent for DemoLogsEventProcessed {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Received one event.");
     }
 }

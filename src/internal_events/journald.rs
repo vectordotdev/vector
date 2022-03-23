@@ -9,11 +9,8 @@ pub struct JournaldEventsReceived {
 }
 
 impl InternalEvent for JournaldEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
@@ -31,7 +28,7 @@ pub struct JournaldInvalidRecordError {
 }
 
 impl InternalEvent for JournaldInvalidRecordError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Invalid record from journald, discarding.",
             error = ?self.error,
@@ -39,9 +36,6 @@ impl InternalEvent for JournaldInvalidRecordError {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,

@@ -640,6 +640,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-elasticsearch"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1175670b03cc9274afa47a5e240fba05f235f5991834b82fa71c35bbefb499e"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tokio-stream",
+ "tower",
+]
+
+[[package]]
+name = "aws-sdk-firehose"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ccd3f34a9a53ee3f27df785f67ca13545fb4d831c8a2f06c8af44113aef6796"
+dependencies = [
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes 1.1.0",
+ "http",
+ "tower",
+]
+
+[[package]]
 name = "aws-sdk-kinesis"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3816,9 +3859,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.120"
+version = "0.2.121"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad5c14e80759d0939d013e6ca49930e59fc53dd8e5009132f76240c179380c09"
+checksum = "efaa7b300f3b5fe8eb6bf21ce3895e1751d9665086af2d64b42f19701015ff4f"
 
 [[package]]
 name = "libflate"
@@ -6305,49 +6348,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusoto_es"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10c0918d84befe989cdbdffc0cf7742887eaf777655d45b767e4603d39245ff3"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_firehose"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77cd539a7f1916f3eee0ea5ed7ac5ede35a1b962db694cc1fafcb1ffa63b708"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_kinesis"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9060c90faec6784573af8379107ff26de934206231f4431dfa878382e5584e1b"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "rusoto_s3"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7536,9 +7536,9 @@ checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
 
 [[package]]
 name = "test-case"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f7d58e237f65d5fe5eaf1105188c94c9a441e1fbc298ed5df45ec9c9af236d3"
+checksum = "4b712a2c4665154f693a4d2e7601f321ef9be194a4bc1ea16c90ea1f71a14e5c"
 dependencies = [
  "cfg-if 1.0.0",
  "proc-macro-error",
@@ -8563,6 +8563,8 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
+ "aws-sdk-elasticsearch",
+ "aws-sdk-firehose",
  "aws-sdk-kinesis",
  "aws-sdk-s3",
  "aws-sdk-sqs",
@@ -8666,9 +8668,6 @@ dependencies = [
  "roaring",
  "rusoto_core",
  "rusoto_credential",
- "rusoto_es",
- "rusoto_firehose",
- "rusoto_kinesis",
  "rusoto_s3",
  "rusoto_signature",
  "rusoto_sqs",
