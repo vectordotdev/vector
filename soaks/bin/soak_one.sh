@@ -22,7 +22,8 @@ display_usage() {
     echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
     echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
     echo "  --vector-cpus: the total number of CPUs to give to soaked vector"
-    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up"
+    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up, default 30"
+    echo "  --total-samples: the total number of samples to take from vector, default 200"
     echo "  --replicas: the total number of replica experiments to run, default 3"
     echo ""
 }
@@ -68,6 +69,11 @@ while [[ $# -gt 0 ]]; do
           ;;
       --warmup-seconds)
           WARMUP_SECONDS=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --total-samples)
+          TOTAL_SAMPLES=$2
           shift # past argument
           shift # past value
           ;;
@@ -122,7 +128,7 @@ do
     mkdir -p "${SOAK_CAPTURE_DIR}"
     touch "${SOAK_CAPTURE_FILE}"
     # shellcheck disable=SC2140
-    DOCKER_BUILDKIT=1 docker run --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}" --network "host" --privileged --env RUST_LOG="error" \
+    DOCKER_BUILDKIT=1 docker run --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}" --network "host" --privileged --env RUST_LOG="info" \
                    --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/lading.yaml",target="/etc/lading/lading.yaml",readonly \
                    --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/vector.toml",target="/etc/vector/vector.toml",readonly \
                    --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/data",target="/data",readonly \
