@@ -42,19 +42,6 @@ impl ElasticsearchCommon {
             .unwrap();
         let mut builder = Request::post(&url);
 
-        // if let Some(credentials_provider) = &self.credentials {
-        //     let mut request = self.signed_request("POST", &url, true);
-        //
-        //     if let Some(ce) = self.compression.content_encoding() {
-        //         request.add_header("Content-Encoding", ce);
-        //     }
-        //
-        //     for (header, value) in &self.request.headers {
-        //         request.add_header(header, value);
-        //     }
-        //
-        //     builder = finish_signer(&mut request, credentials_provider, builder).await?;
-        // } else {
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
         }
@@ -66,7 +53,6 @@ impl ElasticsearchCommon {
         if let Some(auth) = &self.http_auth {
             builder = auth.apply_builder(builder);
         }
-        // }
 
         let mut request = builder.body(Bytes::new())?;
 
