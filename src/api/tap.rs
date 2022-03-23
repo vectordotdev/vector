@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet}, num::NonZeroUsize};
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroUsize,
+};
 
 use futures::{future::try_join_all, FutureExt};
 use itertools::Itertools;

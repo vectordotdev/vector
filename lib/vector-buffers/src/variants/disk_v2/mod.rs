@@ -140,9 +140,7 @@ use std::{
     marker::PhantomData,
     num::NonZeroU64,
     path::PathBuf,
-    pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
 };
 
 use async_trait::async_trait;
