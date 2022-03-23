@@ -686,6 +686,16 @@ bench_function! {
         want: Ok(true),
     }
 
+    empty_object {
+        args: func_args![value: value!({})],
+        want: Ok(value!(true)),
+    }
+
+    non_empty_object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(value!(false)),
+    }
+
     string {
         args: func_args![value: "foo"],
         want: Ok(false),
