@@ -114,6 +114,7 @@ struct PipelinesAttributes<'a> {
 enum ReportingError {
     Http(HttpError),
     StatusCode(StatusCode),
+    TooManyRedirects,
 }
 
 impl ReportingError {
@@ -122,6 +123,9 @@ impl ReportingError {
             Self::Http(err) => err.to_string(),
             Self::StatusCode(status) => {
                 format!("Request was unsuccessful: {}", status)
+            }
+            Self::TooManyRedirects => {
+                format!("Too many redirects from the server")
             }
         }
     }
@@ -217,10 +221,9 @@ pub async fn try_attach(
     // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
     // of `max_retries`.
     for _ in 0..datadog.max_retries {
-        match report_serialized_config_to_datadog(
-            &client,
-            build_request(&endpoint, &auth, &payload),
-        )
+        match report_serialized_config_to_datadog(&client, || {
+            build_request(&endpoint, &auth, &payload)
+        })
         .await
         {
             Ok(()) => {
@@ -236,11 +239,30 @@ pub async fn try_attach(
                     err = ?err.to_error_string()
                 );
 
-                if datadog.exit_on_fatal_error {
-                    return Err(PipelinesError::FatalCouldNotReportConfig);
+                if let ReportingError::StatusCode(status) = err {
+                    // If the error is 'fatal', and the user has elected to exit on fatal errors,
+                    // return control back upstream.
+                    //
+                    // A fatal error is currently determined to be one of the following:
+                    //
+                    // - 4xx class of status code
+                    if status.is_client_error() {
+                        if datadog.exit_on_fatal_error {
+                            return Err(PipelinesError::FatalCouldNotReportConfig);
+                        } else {
+                            // Otherwise, break out of the loop, to avoid hitting the same error.
+                            break;
+                        }
+                    }
                 }
             }
         }
+
+        // If we're at this point, there was an error that was deemed non-fatal, so retry.
+        info!(
+            "Retrying config reporting to Datadog Observability Pipelines in {} seconds",
+            datadog.retry_interval_secs
+        );
 
         // Sleep for the user-provided interval before retrying.
         sleep(Duration::from_secs(datadog.retry_interval_secs as u64)).await;
@@ -335,16 +357,27 @@ fn build_request<'a>(
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
 async fn report_serialized_config_to_datadog(
     client: &HttpClient,
-    request: Request<Body>,
+    request_fn: impl Fn() -> Request<Body>,
 ) -> Result<(), ReportingError> {
     info!("Attempting to report configuration to Datadog Pipelines");
-    let response = client.send(request).await.map_err(ReportingError::Http)?;
 
-    let status = response.status();
+    // Follow redirection responses a maximum of one time.
+    for _ in 0..=1 {
+        let response = client
+            .send(request_fn())
+            .await
+            .map_err(ReportingError::Http)?;
 
-    if status.is_success() {
-        Ok(())
-    } else {
-        Err(ReportingError::StatusCode(status))
+        let status = response.status();
+
+        if status.is_redirection() {
+            continue;
+        } else if status.is_success() {
+            return Ok(());
+        } else {
+            return Err(ReportingError::StatusCode(status));
+        }
     }
+
+    Err(ReportingError::TooManyRedirects)
 }
