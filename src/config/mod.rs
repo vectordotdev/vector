@@ -48,6 +48,7 @@ pub use loading::{
     load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
+pub use secret::SecretBackend;
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
 pub use transform::{TransformDescription, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};

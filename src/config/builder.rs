@@ -12,8 +12,8 @@ use super::api;
 use super::datadog;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -42,6 +42,8 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 #[cfg(feature = "datadog-pipelines")]

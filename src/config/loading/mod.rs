@@ -14,7 +14,7 @@ use config_builder::ConfigBuilderLoader;
 use loader::process::Process;
 
 use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, secret, secret::SecretBackend, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -255,6 +255,13 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
+    //
+    let mut e = secret::ExecBackend {
+        command: vec!["/Users/pierre.rognant/tmp/sample".into()],
+        timeout: 5,
+    };
+    let res = e.retrieve(vec!["a_key".into()]);
+    warn!("res == {:#?}", res);
     Ok(vars::interpolate(&source_string, &vars))
 }
 
