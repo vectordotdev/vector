@@ -18,7 +18,7 @@ snafu = { version = "0.7.0", default-features = false }
 tracing = { version = "0.1.32", default-features = false }
 
 # Optional
-async-graphql = { version = "3.0.35", default-features = false, optional = true }
+async-graphql = { version = "3.0.36", default-features = false, optional = true }
 mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"], optional = true }
 serde_json = { version = "1.0.79", optional = true }
