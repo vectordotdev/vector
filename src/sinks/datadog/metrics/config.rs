@@ -23,6 +23,7 @@ use crate::{
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
+    tls::MaybeTlsSettings,
 };
 
 // TODO: revisit our concurrency and batching defaults
@@ -188,7 +189,8 @@ impl DatadogMetricsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let settings = MaybeTlsSettings::enable_client()?;
+        let client = HttpClient::new(settings, proxy)?;
         Ok(client)
     }
 
