@@ -1,9 +1,9 @@
 package metadata
 
 remap: functions: is_empty: {
-	category: "Array"
+	category: "Type"
 	description: """
-		Check if the array or string is empty or not.
+		Check if the object, array, or string is empty.
 		"""
 
 	arguments: [
@@ -11,7 +11,7 @@ remap: functions: is_empty: {
 			name:        "value"
 			description: #"The value to check"#
 			required:    true
-			type: ["array", "string"]
+			type: ["object", "array", "string"]
 		},
 	]
 	internal_failure_reasons: []
@@ -35,6 +35,13 @@ remap: functions: is_empty: {
 			title: "Non-empty string"
 			source: """
 				is_empty("a string")
+				"""
+			return: false
+		},
+		{
+			title: "Non-empty object"
+			source: """
+				is_empty({"foo": "bar"})
 				"""
 			return: false
 		},

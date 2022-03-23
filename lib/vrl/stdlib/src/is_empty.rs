@@ -54,7 +54,7 @@ impl Function for IsEmpty {
             },
             Example {
                 title: "non-empty array",
-                source: r#"is_empty([null])"#,
+                source: r#"is_empty([1,2,3])"#,
                 result: Ok("false"),
             },
         ]
