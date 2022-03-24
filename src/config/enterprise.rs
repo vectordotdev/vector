@@ -1,4 +1,7 @@
-use std::env;
+use std::{
+    env,
+    fmt::{Display, Formatter},
+};
 
 use http::Request;
 use hyper::{Body, StatusCode};
@@ -75,6 +78,8 @@ impl Default for Options {
     }
 }
 
+/// Pipelines error, relevant to an upstream caller. This abstracts away HTTP-specific error
+/// codes that are implementation details of whether we consider a request successful or not.
 pub enum PipelinesError {
     Disabled,
     MissingApiKey,
@@ -112,21 +117,22 @@ struct PipelinesAttributes<'a> {
     config: &'a toml::value::Table,
 }
 
+/// Internal reporting error, necessary to determine the severity of an error response.
 enum ReportingError {
     Http(HttpError),
     StatusCode(StatusCode),
     TooManyRedirects,
 }
 
-impl ReportingError {
-    fn to_error_string(&self) -> String {
+impl Display for ReportingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Http(err) => err.to_string(),
+            Self::Http(err) => write!(f, "{}", err),
             Self::StatusCode(status) => {
-                format!("Request was unsuccessful: {}", status)
+                write!(f, "Request was unsuccessful: {}", status)
             }
             Self::TooManyRedirects => {
-                format!("Too many redirects from the server")
+                write!(f, "Too many redirects from the server")
             }
         }
     }
@@ -161,7 +167,7 @@ pub async fn try_attach(
     config_paths: &[ConfigPath],
 ) -> Result<(), PipelinesError> {
     // Only valid if a [datadog] section is present in config.
-    let datadog = match config.datadog.as_ref() {
+    let datadog = match config.enterprise.as_ref() {
         Some(datadog) => datadog,
         _ => return Err(PipelinesError::Disabled),
     };
@@ -239,7 +245,7 @@ pub async fn try_attach(
             }
             Err(err) => {
                 error!(
-                    err = ?err.to_error_string(),
+                    err = ?err.to_string(),
                     "Could not report Vector config to {}", DATADOG_REPORTING_PRODUCT
                 );
 

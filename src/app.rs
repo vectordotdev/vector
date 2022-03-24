@@ -8,8 +8,8 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "datadog-pipelines")]
-use crate::config::datadog::PipelinesError;
+#[cfg(feature = "enterprise")]
+use crate::config::enterprise::PipelinesError;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
@@ -194,10 +194,10 @@ impl Application {
                 }
                 config.healthchecks.set_require_healthy(require_healthy);
 
-                #[cfg(feature = "datadog-pipelines")]
+                #[cfg(feature = "enterprise")]
                 // Augment config to enable observability within Datadog, if applicable.
                 if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::datadog::try_attach(&mut config, &config_paths).await
+                    config::enterprise::try_attach(&mut config, &config_paths).await
                 {
                     return Err(exitcode::UNAVAILABLE);
                 }
@@ -283,9 +283,9 @@ impl Application {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
-                                        #[cfg(feature = "datadog-pipelines")]
+                                        #[cfg(feature = "enterprise")]
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                            config::datadog::try_attach(&mut new_config, &config_paths).await
+                                            config::enterprise::try_attach(&mut new_config, &config_paths).await
                                         {
                                             break SignalTo::Shutdown;
                                         }
@@ -330,10 +330,10 @@ impl Application {
                                 if let Some(mut new_config) = new_config {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
-                                    #[cfg(feature = "datadog-pipelines")]
+                                    #[cfg(feature = "enterprise")]
                                     // Augment config to enable observability within Datadog, if applicable.
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                        config::datadog::try_attach(&mut new_config, &config_paths).await
+                                        config::enterprise::try_attach(&mut new_config, &config_paths).await
                                     {
                                         break SignalTo::Shutdown;
                                     }
