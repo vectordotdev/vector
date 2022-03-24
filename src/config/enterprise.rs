@@ -87,7 +87,7 @@ pub enum PipelinesError {
     FatalCouldNotReportConfig,
 }
 
-/// Holds data required to authorize a request to the Datadog Pipelines reporting endpoint.
+/// Holds data required to authorize a request to the Datadog OP reporting endpoint.
 struct PipelinesAuth<'a> {
     api_key: &'a str,
     application_key: &'a str,
@@ -99,7 +99,7 @@ struct PipelinesStrFields<'a> {
     vector_version: &'a str,
 }
 
-/// Top-level struct representing the field structure for reporting a config to Datadog Pipelines.
+/// Top-level struct representing the field structure for reporting a config to Datadog OP.
 #[derive(Debug, Serialize)]
 struct PipelinesVersionPayload<'a> {
     data: PipelinesData<'a>,
@@ -222,12 +222,12 @@ pub async fn try_attach(
         application_key: &datadog.application_key,
     };
 
-    // Create a HTTP client for posting a Vector version to Datadog Pipelines. This will
+    // Create a HTTP client for posting a Vector version to Datadog OP. This will
     // respect any proxy settings provided in top-level config.
     let client = HttpClient::new(None, &datadog.proxy)
         .expect("couldn't instrument Datadog HTTP client. Please report");
 
-    // Endpoint to report a config to Datadog Pipelines.
+    // Endpoint to report a config to Datadog OP.
     let endpoint = get_reporting_endpoint(datadog.site.as_ref(), &datadog.configuration_key);
 
     // Datadog uses a JSON:API, so we'll serialize the config to a JSON
@@ -352,7 +352,7 @@ fn get_reporting_endpoint(site: Option<&String>, configuration_key: &str) -> Str
     )
 }
 
-/// Build a POST request for reporting a Vector config to Datadog Pipelines.
+/// Build a POST request for reporting a Vector config to Datadog OP.
 fn build_request<'a>(
     endpoint: &Url,
     auth: &'a PipelinesAuth,
@@ -377,7 +377,10 @@ async fn report_serialized_config_to_datadog<'a>(
     auth: &'a PipelinesAuth<'a>,
     payload: &'a PipelinesVersionPayload<'a>,
 ) -> Result<(), ReportingError> {
-    info!("Attempting to report configuration to Datadog Pipelines.");
+    info!(
+        "Attempting to report configuration to {}.",
+        DATADOG_REPORTING_PRODUCT
+    );
 
     let mut endpoint = Url::parse(endpoint).map_err(ReportingError::EndpointError)?;
 
