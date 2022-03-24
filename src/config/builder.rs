@@ -79,7 +79,7 @@ impl From<Config> for ConfigBuilder {
             api,
             schema,
             #[cfg(feature = "enterprise")]
-                enterprise: datadog,
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,
@@ -107,7 +107,7 @@ impl From<Config> for ConfigBuilder {
             api,
             schema,
             #[cfg(feature = "enterprise")]
-            enterprise: datadog,
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,

@@ -50,7 +50,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         api,
         schema,
         #[cfg(feature = "enterprise")]
-            enterprise: datadog,
+        enterprise,
         healthchecks,
         enrichment_tables,
         sources,
@@ -104,7 +104,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             api,
             schema,
             #[cfg(feature = "enterprise")]
-            enterprise: datadog,
+            enterprise,
             version,
             healthchecks,
             enrichment_tables,
