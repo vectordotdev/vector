@@ -10,13 +10,14 @@ use futures::FutureExt;
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::Decoder as _;
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{self, internal_event::EventsReceived};
 
 use crate::{
     codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, BatchStatus, Event},
-    internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError},
+    internal_events::{
+        AwsSqsBytesReceived, EventsReceived, SqsMessageDeleteError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     sources::util::StreamDecodingError,
     SourceSender,
@@ -90,35 +91,34 @@ impl SqsSource {
         };
 
         if let Some(messages) = receive_message_output.messages {
-            let mut receipts_to_ack = vec![];
+            let mut receipts_to_ack = Vec::with_capacity(messages.len());
+            let mut events = Vec::with_capacity(messages.len());
+            let mut byte_size = 0;
 
             let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
             for message in messages {
                 if let Some(body) = message.body {
-                    emit!(AwsSqsBytesReceived {
-                        byte_size: body.len()
-                    });
+                    byte_size += body.len();
+                    // a receipt handle should always exist
+                    if let Some(receipt_handle) = message.receipt_handle {
+                        receipts_to_ack.push(receipt_handle);
+                    }
                     let timestamp = get_timestamp(&message.attributes);
-                    let events = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
-                    let send_result = if let Some(batch) = batch.as_ref() {
-                        let events = events.map(|event| event.with_batch_notifier(batch));
-                        out.send_batch(events).await
+                    let decoded = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
+                    if let Some(batch) = batch.as_ref() {
+                        let decoded = decoded.map(|event| event.with_batch_notifier(batch));
+                        events.extend(decoded);
                     } else {
-                        out.send_batch(events).await
-                    };
-
-                    match send_result {
-                        Err(err) => error!(message = "Error sending to sink.", error = %err),
-                        Ok(()) => {
-                            // a receipt handle should always exist
-                            if let Some(receipt_handle) = message.receipt_handle {
-                                receipts_to_ack.push(receipt_handle);
-                            }
-                        }
+                        events.extend(decoded);
                     }
                 }
             }
-            drop(batch);
+            drop(batch); // Drop last reference to batch acknowledgement finalizer
+            emit!(AwsSqsBytesReceived { byte_size });
+            let count = events.len();
+            if let Err(error) = out.send_batch(events).await {
+                emit!(StreamClosedError { error, count });
+            }
 
             if let Some(receiver) = batch_receiver {
                 let client = self.client.clone();

@@ -28,8 +28,11 @@ jobs:
           all_but_latest: true # can cancel workflows scheduled later
 
   observer:
-    name: Build and push 'observer' to Github CR
+    name: Build and push 'observer' (${{ matrix.platform }})
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -68,15 +71,18 @@ jobs:
           context: .
           file: lib/soak/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   soak-builder:
-    name: Build and push 'soak-builder' to Github CR
+    name: Build and push 'soak-builder' (${{ matrix.platform }})
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -113,7 +119,7 @@ jobs:
           context: .
           file: soaks/Dockerfile.builder
           push: ${{ github.ref == 'refs/heads/master' }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
