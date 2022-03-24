@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn string(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn string(value: Value) -> Resolved {
     match value {
         v @ Value::Bytes(_) => Ok(v),
         v => Err(format!("expected string, got {}", v.kind()).into()),

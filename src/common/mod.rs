@@ -7,3 +7,6 @@ pub(crate) mod datadog;
     feature = "sources-aws_s3"
 ))]
 pub(crate) mod sqs;
+
+#[cfg(any(feature = "sinks-aws_s3"))]
+pub(crate) mod s3;

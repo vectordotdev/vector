@@ -1,6 +1,12 @@
 use indexmap::IndexSet;
 use vrl::prelude::*;
 
+fn unique(value: Value) -> Resolved {
+    let value = value.try_array()?;
+    let set: IndexSet<_> = value.into_iter().collect();
+    Ok(set.into_iter().collect())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Unique;
 
@@ -35,6 +41,11 @@ impl Function for Unique {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        unique(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,11 +55,8 @@ pub(crate) struct UniqueFn {
 
 impl Expression for UniqueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_array()?;
-
-        let set: IndexSet<_> = value.into_iter().collect();
-
-        Ok(set.into_iter().collect())
+        let value = self.value.resolve(ctx)?;
+        unique(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

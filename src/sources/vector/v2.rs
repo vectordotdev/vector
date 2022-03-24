@@ -46,7 +46,7 @@ impl proto::Service for Service {
         let count = events.len();
         let byte_size = events.size_of();
 
-        emit!(&EventsReceived { count, byte_size });
+        emit!(EventsReceived { count, byte_size });
 
         let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
 
@@ -55,7 +55,7 @@ impl proto::Service for Service {
             .send_batch(events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 Status::unavailable(message)
             })
             .and_then(|_| handle_batch_status(receiver))
@@ -162,7 +162,7 @@ async fn run(
         result.map(|socket| {
             let peer_addr = socket.connect_info().remote_addr.ip();
             socket.after_read(move |byte_size| {
-                emit!(&TcpBytesReceived {
+                emit!(TcpBytesReceived {
                     byte_size,
                     peer_addr,
                 })

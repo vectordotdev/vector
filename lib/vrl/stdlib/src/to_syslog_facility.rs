@@ -1,5 +1,38 @@
 use vrl::prelude::*;
 
+fn to_syslog_facility(value: Value) -> Resolved {
+    let value = value.try_integer()?;
+    // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
+    let code = match value {
+        0 => "kern",
+        1 => "user",
+        2 => "mail",
+        3 => "daemon",
+        4 => "auth",
+        5 => "syslog",
+        6 => "lpr",
+        7 => "news",
+        8 => "uucp",
+        9 => "cron",
+        10 => "authpriv",
+        11 => "ftp",
+        12 => "ntp",
+        13 => "security",
+        14 => "console",
+        15 => "solaris-cron",
+        16 => "local0",
+        17 => "local1",
+        18 => "local2",
+        19 => "local3",
+        20 => "local4",
+        21 => "local5",
+        22 => "local6",
+        23 => "local7",
+        _ => return Err(format!("facility code {} not valid", value).into()),
+    };
+    Ok(code.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToSyslogFacility;
 
@@ -43,6 +76,11 @@ impl Function for ToSyslogFacility {
 
         Ok(Box::new(ToSyslogFacilityFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        to_syslog_facility(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,38 +90,9 @@ struct ToSyslogFacilityFn {
 
 impl Expression for ToSyslogFacilityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_integer()?;
+        let value = self.value.resolve(ctx)?;
 
-        // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
-        let code = match value {
-            0 => "kern",
-            1 => "user",
-            2 => "mail",
-            3 => "daemon",
-            4 => "auth",
-            5 => "syslog",
-            6 => "lpr",
-            7 => "news",
-            8 => "uucp",
-            9 => "cron",
-            10 => "authpriv",
-            11 => "ftp",
-            12 => "ntp",
-            13 => "security",
-            14 => "console",
-            15 => "solaris-cron",
-            16 => "local0",
-            17 => "local1",
-            18 => "local2",
-            19 => "local3",
-            20 => "local4",
-            21 => "local5",
-            22 => "local6",
-            23 => "local7",
-            _ => return Err(format!("facility code {} not valid", value).into()),
-        };
-
-        Ok(code.into())
+        to_syslog_facility(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

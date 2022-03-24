@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn encode_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn encode_json(value: Value) -> Resolved {
     // With `vrl::Value` it should not be possible to get `Err`.
     match serde_json::to_string(&value) {
         Ok(value) => Ok(value.into()),
@@ -43,11 +43,7 @@ impl Function for EncodeJson {
         }]
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         encode_json(value)
     }

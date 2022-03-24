@@ -3,6 +3,33 @@ use std::result::Result;
 use vector_common::encode_key_value;
 use vrl::prelude::*;
 
+/// Also used by `encode_logfmt`.
+pub(crate) fn encode_key_value(
+    fields: Option<Value>,
+    value: Value,
+    key_value_delimiter: Value,
+    field_delimiter: Value,
+    flatten_boolean: Value,
+) -> Result<Value, ExpressionError> {
+    let fields = match fields {
+        None => Ok(vec![]),
+        Some(fields) => resolve_fields(fields),
+    }?;
+    let object = value.try_object()?;
+    let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+    let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+    let flatten_boolean = flatten_boolean.try_boolean()?;
+    Ok(encode_key_value::to_string(
+        &object,
+        &fields[..],
+        &key_value_delimiter,
+        &field_delimiter,
+        flatten_boolean,
+    )
+    .expect("Should always succeed.")
+    .into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
 
@@ -90,6 +117,31 @@ impl Function for EncodeKeyValue {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let fields = args.optional("fields_ordering");
+
+        let key_value_delimiter = args
+            .optional("key_value_delimiter")
+            .unwrap_or_else(|| Value::from("="));
+
+        let field_delimiter = args
+            .optional("field_delimiter")
+            .unwrap_or_else(|| Value::from(" "));
+
+        let flatten_boolean = args
+            .optional("flatten_boolean")
+            .unwrap_or_else(|| Value::from(false));
+
+        encode_key_value(
+            fields,
+            value,
+            key_value_delimiter,
+            field_delimiter,
+            flatten_boolean,
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -116,32 +168,22 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
 impl Expression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let fields = match &self.fields {
-            None => Ok(vec![]),
-            Some(expr) => {
-                let fields = expr.resolve(ctx)?;
-                resolve_fields(fields)
-            }
-        }?;
+        let fields = self
+            .fields
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
+        let field_delimiter = self.field_delimiter.resolve(ctx)?;
+        let flatten_boolean = self.flatten_boolean.resolve(ctx)?;
 
-        let object = value.try_object()?;
-
-        let value = self.key_value_delimiter.resolve(ctx)?;
-        let key_value_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let value = self.field_delimiter.resolve(ctx)?;
-        let field_delimiter = value.try_bytes_utf8_lossy()?;
-        let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
-
-        Ok(encode_key_value::to_string(
-            &object,
-            &fields[..],
-            &key_value_delimiter,
-            &field_delimiter,
+        encode_key_value(
+            fields,
+            value,
+            key_value_delimiter,
+            field_delimiter,
             flatten_boolean,
         )
-        .expect("Should always succeed.")
-        .into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {

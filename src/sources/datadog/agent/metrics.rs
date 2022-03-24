@@ -142,7 +142,7 @@ fn series_v2_service() -> BoxedFilter<(Response,)> {
         // but the route exists in the agent codebase
         .and(path!("api" / "v2" / "series" / ..))
         .and_then(|| {
-            error!(message = "/api/v2/series route is not supported.");
+            error!(message = "The route /api/v2/series is not supported.");
             let response: Result<Response, Rejection> =
                 Err(warp::reject::custom(ErrorMessage::new(
                     StatusCode::UNPROCESSABLE_ENTITY,
@@ -174,7 +174,7 @@ fn decode_datadog_sketches(
         )
     })?;
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: metrics.size_of(),
         count: metrics.len(),
     });
@@ -209,7 +209,7 @@ fn decode_datadog_series(
         .flat_map(|m| into_vector_metric(m, api_key.clone(), schema_definition))
         .collect();
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: decoded_metrics.size_of(),
         count: decoded_metrics.len(),
     });
