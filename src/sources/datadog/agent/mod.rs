@@ -168,9 +168,8 @@ impl SourceConfig for DatadogAgentConfig {
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => self.decoding.schema_definition(),
 
-            DeserializerConfig::Native | DeserializerConfig::NativeJson => {
-                todo!("this probably doesn't make sense")
-            }
+            DeserializerConfig::Native => self.decoding.schema_definition(),
+            DeserializerConfig::NativeJson => self.decoding.schema_definition(),
         };
 
         if self.multiple_outputs {
