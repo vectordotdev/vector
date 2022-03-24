@@ -57,7 +57,7 @@ pub struct PodMetadataAnnotator {
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
+    pub const fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
         Self {
             pods_state_reader,
             fields_spec,

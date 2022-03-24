@@ -31,7 +31,7 @@ pub struct NamespaceMetadataAnnotator {
 
 impl NamespaceMetadataAnnotator {
     /// Create a new [`NamespaceMetadataAnnotator`].
-    pub fn new(namespace_state_reader: Store<Namespace>, fields_spec: FieldsSpec) -> Self {
+    pub const fn new(namespace_state_reader: Store<Namespace>, fields_spec: FieldsSpec) -> Self {
         Self {
             namespace_state_reader,
             fields_spec,
