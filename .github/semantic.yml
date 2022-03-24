@@ -129,6 +129,7 @@ scopes:
   - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
+  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
   - heroku_logs source # Anything `heroku_logs` source related

@@ -66,7 +66,7 @@ impl Decoder {
         }
 
         if total_had_errors {
-            emit!(&DecoderMalformedReplacement {
+            emit!(DecoderMalformedReplacement {
                 from_encoding: self.inner.encoding().name()
             });
         }
@@ -87,7 +87,7 @@ impl Decoder {
             .get(..BOM_UTF8_LEN)
             .map_or(false, |start| start == BOM_UTF8)
         {
-            emit!(&DecoderBomRemoval {
+            emit!(DecoderBomRemoval {
                 from_encoding: self.inner.encoding().name()
             });
             output.slice(BOM_UTF8_LEN..)
@@ -174,7 +174,7 @@ impl Encoder {
         }
 
         if total_had_errors {
-            emit!(&EncoderUnmappableReplacement {
+            emit!(EncoderUnmappableReplacement {
                 to_encoding: self.inner.encoding().name()
             });
         }

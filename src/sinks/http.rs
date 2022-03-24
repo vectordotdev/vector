@@ -256,7 +256,7 @@ impl HttpEventEncoder<BytesMut> for HttpSinkEventEncoder {
         let mut body = BytesMut::new();
         self.encoder.encode(event, &mut body).ok()?;
 
-        emit!(&HttpEventEncoded {
+        emit!(HttpEventEncoded {
             byte_size: body.len(),
         });
 

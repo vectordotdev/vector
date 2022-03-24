@@ -7,7 +7,7 @@ pub struct BlackholeEventReceived {
 }
 
 impl InternalEvent for BlackholeEventReceived {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

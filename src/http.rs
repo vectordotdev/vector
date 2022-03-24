@@ -83,7 +83,7 @@ where
 
         default_request_headers(&mut request, &self.user_agent);
 
-        emit!(&http_client::AboutToSendHttpRequest { request: &request });
+        emit!(http_client::AboutToSendHttpRequest { request: &request });
 
         let response = self.client.request(request);
 
@@ -103,7 +103,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(&http_client::GotHttpError {
+                    emit!(http_client::GotHttpError {
                         error: &error,
                         roundtrip
                     });
@@ -112,7 +112,7 @@ where
                 .context(CallRequestSnafu)?;
 
             // Emit the response into the internal events system.
-            emit!(&http_client::GotHttpResponse {
+            emit!(http_client::GotHttpResponse {
                 response: &response,
                 roundtrip
             });

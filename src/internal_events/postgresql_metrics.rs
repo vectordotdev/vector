@@ -11,11 +11,8 @@ pub struct PostgresqlMetricsCollectCompleted {
 }
 
 impl InternalEvent for PostgresqlMetricsCollectCompleted {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Collection completed.");
-    }
-
-    fn emit_metrics(&self) {
         counter!("collect_completed_total", 1);
         histogram!("collect_duration_seconds", self.end - self.start);
     }
@@ -28,7 +25,7 @@ pub struct PostgresqlMetricsCollectError<'a> {
 }
 
 impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = "PostgreSQL query error.";
         match self.endpoint {
             Some(endpoint) => error!(
@@ -45,12 +42,8 @@ impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
                 stage = error_stage::RECEIVING,
             ),
         }
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );

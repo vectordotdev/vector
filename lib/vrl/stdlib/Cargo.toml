@@ -42,7 +42,7 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
-utf8-width = { version = "0.1.5", optional = true }
+utf8-width = { version = "0.1.6", optional = true }
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [dev-dependencies]
@@ -88,6 +88,8 @@ default = [
     "ip_cidr_contains",
     "ip_subnet",
     "ip_ntoa",
+    "ip_ntop",
+    "ip_pton",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
@@ -210,6 +212,8 @@ integer = []
 ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
 ip_ntoa = []
+ip_ntop = []
+ip_pton = ["bytes"]
 ip_subnet = ["once_cell", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []

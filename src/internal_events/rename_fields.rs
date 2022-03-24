@@ -6,7 +6,7 @@ pub struct RenameFieldsFieldOverwritten<'a> {
 }
 
 impl<'a> InternalEvent for RenameFieldsFieldOverwritten<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
     }
 }
@@ -17,7 +17,7 @@ pub struct RenameFieldsFieldDoesNotExist<'a> {
 }
 
 impl<'a> InternalEvent for RenameFieldsFieldDoesNotExist<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Field did not exist.", field = %self.field, internal_log_rate_secs = 30);
     }
 }

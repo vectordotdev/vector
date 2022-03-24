@@ -139,7 +139,7 @@ impl Lua {
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            emit!(&LuaGcTriggered {
+            emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
             self.lua.gc_collect()?;
@@ -153,7 +153,7 @@ impl Lua {
         match self.process(event) {
             Ok(event) => event,
             Err(error) => {
-                emit!(&LuaScriptError { error });
+                emit!(LuaScriptError { error });
                 None
             }
         }
@@ -178,7 +178,7 @@ impl TaskTransform<Event> for Lua {
                         Some(stream::iter(output))
                     }
                     Err(error) => {
-                        emit!(&LuaScriptError { error });
+                        emit!(LuaScriptError { error });
                         None
                     }
                 })

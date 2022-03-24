@@ -124,7 +124,7 @@ fn handle_dd_trace_payload(
             TraceEvent::from(convert_span(s))
         })).collect();
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: trace_events.size_of(),
         count: trace_events.len(),
     });

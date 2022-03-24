@@ -44,6 +44,8 @@ criterion_group!(
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
+              ip_ntop,
+              ip_pton,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
@@ -559,6 +561,34 @@ bench_function! {
     valid {
         args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
+    }
+}
+
+bench_function! {
+    ip_ntop => vrl_stdlib::IpNtop;
+
+    ipv4 {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!("\x01\x02\x03\x04")),
+    }
+
+    ipv6 {
+        args: func_args![value: "102:304:506:708:90a:b0c:d0e:f10"],
+        want: Ok(value!("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")),
+    }
+}
+
+bench_function! {
+    ip_pton => vrl_stdlib::IpPton;
+
+    ipv4 {
+        args: func_args![value: "\x01\x02\x03\x04"],
+        want: Ok(value!("1.2.3.4")),
+    }
+
+    ipv6 {
+        args: func_args![value: "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"],
+        want: Ok(value!("102:304:506:708:90a:b0c:d0e:f10")),
     }
 }
 
