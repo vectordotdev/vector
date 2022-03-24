@@ -361,10 +361,12 @@ fn build_request<'a>(
         .header("DD-API-KEY", auth.api_key)
         .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
-        .expect(&format!(
-            "couldn't create {} HTTP request. Please report",
-            DATADOG_REPORTING_PRODUCT
-        ))
+        .unwrap_or_else(|_| {
+            panic!(
+                "couldn't create {} HTTP request. Please report",
+                DATADOG_REPORTING_PRODUCT
+            )
+        })
 }
 
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
