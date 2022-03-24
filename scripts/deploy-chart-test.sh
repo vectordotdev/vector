@@ -89,10 +89,8 @@ up() {
     --set "image.tag=$CONTAINER_IMAGE_TAG"
   )
 
-  # TODO: remove devel flag once vector 0.7.0 chart is released
   set -x
   $VECTOR_TEST_HELM install \
-    --devel \
     --atomic \
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
