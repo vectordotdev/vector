@@ -379,7 +379,7 @@ where
 
         // out_of_order_action's that require a complete ordering are limited to building 1 request
         // at a time
-        let request_builder_concurrency = match config.out_of_order_action {
+        let request_builder_concurrency = match self.out_of_order_action {
             OutOfOrderAction::Accept => NonZeroUsize::new(50),
             OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => NonZeroUsize::new(1),
         };
