@@ -129,7 +129,6 @@ jobs:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
               target: target,     // run each experiment
-              replica: [1, 2, 3], // run three replicas of each experiment/variant
             }
 
             // export this variable to be available to other github steps
@@ -230,7 +229,7 @@ jobs:
           path: /tmp/comparison-image.tar
 
   soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
+    name: Soak (${{ matrix.target }}) - baseline
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
@@ -262,14 +261,14 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
+                                  --replicas 4 \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clear up unused images
         run: |
@@ -316,7 +315,7 @@ jobs:
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
+    name: Soak (${{ matrix.target }}) - comparison
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
@@ -348,14 +347,14 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
+                                  --replicas 4 \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clear up unused images
         run: |
@@ -530,12 +529,6 @@ jobs:
           ./soaks/bin/plot_analysis --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                     --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
-
-      - name: Plot up analysis
-        run: |
-          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
-          ./soaks/bin/plot_up --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                              --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
 
       - name: Upload plots
         uses: actions/upload-artifact@v1
