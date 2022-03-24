@@ -118,7 +118,7 @@ pub async fn setup<const N: usize>(
         .add_to_builder(&mut builder, data_dir, id)
         .expect("should not fail to add variant to builder");
     let (tx, rx, _acker) = builder
-        .build(Span::none())
+        .build(String::from("benches"), Span::none())
         .await
         .expect("should not fail to build topology");
 

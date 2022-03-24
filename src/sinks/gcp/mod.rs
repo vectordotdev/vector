@@ -41,7 +41,7 @@ pub struct GcpAuthConfig {
 impl GcpAuthConfig {
     pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or_else(|| gap.as_ref());
+        let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
         Ok(match (&creds_path, &self.api_key) {
             (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
             (None, Some(_)) => None,

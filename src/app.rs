@@ -66,20 +66,6 @@ impl Application {
             })
             .unwrap_or_else(|_| match opts.log_level() {
                 "off" => "off".to_owned(),
-                #[cfg(feature = "tokio-console")]
-                level => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("vrl={}", level),
-                    format!("file_source={}", level),
-                    "tower_limit=trace".to_owned(),
-                    "runtime=trace".to_owned(),
-                    "tokio=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                    format!("buffers={}", level),
-                ]
-                .join(","),
-                #[cfg(not(feature = "tokio-console"))]
                 level => [
                     format!("vector={}", level),
                     format!("codec={}", level),
