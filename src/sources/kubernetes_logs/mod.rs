@@ -39,7 +39,7 @@ use crate::{
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventsReceived, StreamClosedError,
     },
-    kubernetes::handle_watch_stream,
+    kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer, TaskTransform},
@@ -234,6 +234,9 @@ impl Source {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
+        // If the user passed a custom Kubeconfig use it, otherwise
+        // we attempt to load the local kubec-config, followed by the
+        // in-cluster environment variables
         let client_config = match &config.kube_config_file {
             Some(kc) => {
                 ClientConfig::from_custom_kubeconfig(
@@ -317,11 +320,7 @@ impl Source {
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
-        tokio::spawn(handle_watch_stream(
-            pod_store_w,
-            pod_watcher,
-            delay_deletion,
-        ));
+        tokio::spawn(custom_reflector(pod_store_w, pod_watcher, delay_deletion));
 
         // -----------------------------------------------------------------
 
@@ -330,7 +329,7 @@ impl Source {
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
-        tokio::spawn(handle_watch_stream(ns_store_w, ns_watcher, delay_deletion));
+        tokio::spawn(custom_reflector(ns_store_w, ns_watcher, delay_deletion));
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
@@ -449,30 +448,6 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
-        // {
-        //     let (slot, shutdown) = lifecycle.add();
-        //     let fut =
-        //         util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
-        //             Ok(()) => info!(message = "Reflector process completed gracefully."),
-        //             Err(error) => emit!(&KubernetesLifecycleError {
-        //                 error,
-        //                 message: "Reflector process exited with an error."
-        //             }),
-        //         });
-        //     slot.bind(Box::pin(fut));
-        // }
-        // {
-        //     let (slot, shutdown) = lifecycle.add();
-        //     let fut =
-        //         util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
-        //             Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-        //             Err(error) => emit!(&KubernetesLifecycleError {
-        //                 error,
-        //                 message: "Namespace reflector process exited with an error.",
-        //             }),
-        //         });
-        //     slot.bind(Box::pin(fut));
-        // }
         {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
