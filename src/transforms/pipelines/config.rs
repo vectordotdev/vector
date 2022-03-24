@@ -47,12 +47,18 @@ impl PipelineConfig {
         inputs: &[String],
     ) -> crate::Result<Option<InnerTopology>> {
         let mut result = InnerTopology::default();
-        // take the latest step insert at an output
-        let _last_step = self
-            .transforms
-            .last()
-            .ok_or("must specify at least one transform")?;
-        let last_name = name.join(self.transforms.len() - 1);
+        // define the name of the last output
+        let last_name = if self.transforms.is_empty() {
+            self.filter
+                .as_ref()
+                .map(|_filter| {
+                    let filter_name = name.join("filter");
+                    filter_name.join("success")
+                })
+                .ok_or_else(|| format!("mut have at least one transform or a filter"))?
+        } else {
+            name.join(self.transforms.len() - 1)
+        };
         result
             .outputs
             .push((last_name, vec![Output::default(DataType::all())]));
