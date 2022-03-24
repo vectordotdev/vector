@@ -3642,6 +3642,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68f2d64f2edebec4ce84ad108148e67e1064789bee435edc5b60ad398714a3a9"
 
 [[package]]
+name = "ipnetwork"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4088d739b183546b239688ddbc79891831df421773df95e236daf7867866d355"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4070,10 +4079,11 @@ dependencies = [
 
 [[package]]
 name = "maxminddb"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a2af4902d7569c441449f2315cb83598917b13275209529103e10c238fcf3db"
+checksum = "d04a4887cd66b92e72593360cab9de5916059b7383776a9c7b9e906008f2827b"
 dependencies = [
+ "ipnetwork",
  "log",
  "memchr",
  "serde",
