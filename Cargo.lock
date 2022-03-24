@@ -8711,7 +8711,6 @@ dependencies = [
  "tracing-core 0.1.23",
  "tracing-futures 0.2.5",
  "tracing-limit",
- "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto 0.21.1",
