@@ -180,7 +180,7 @@ It is important to note that validation happens at **boot time**, meaning once
 Vector runs, the validated sink knows how to unambiguously serialize any events
 it receives at runtime.
 
-## Semantic Fields
+### Semantic Fields
 
 It’s worth noting that the above table lists _semantic_ fields, whereas the
 schema definition lists both _event_ fields and semantic fields. This is the
