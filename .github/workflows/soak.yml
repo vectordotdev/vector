@@ -228,10 +228,10 @@ jobs:
           name: comparison-image
           path: /tmp/comparison-image.tar
 
-  soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline
+  soak:
+    name: Soak (${{ matrix.target }})
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
+    needs: [compute-soak-meta, compute-test-plan, build-image-baseline, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
@@ -270,62 +270,6 @@ jobs:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
-        run: |
-          minikube delete --all --purge
-          docker system prune --all --volumes --force
-
-  detect-erratic-baseline:
-    name: Erratic detection - baseline
-    runs-on: ubuntu-20.04
-    needs:
-      - compute-soak-meta
-      - soak-baseline
-
-    steps:
-      - name: Set up Python3
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10.2"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
-      - name: Download captures artifact
-        uses: actions/download-artifact@v2
-        with:
-          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Detect erratic
-        run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
-                                     --variant baseline \
-                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
-                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
-
-  soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
       - name: Download comparison image
         uses: actions/download-artifact@v2
         with:
@@ -361,12 +305,51 @@ jobs:
           minikube delete --all --purge
           docker system prune --all --volumes --force
 
+  detect-erratic-baseline:
+    name: Erratic detection - baseline
+    runs-on: ubuntu-20.04
+    needs:
+      - compute-soak-meta
+      - soak
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10.2"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant baseline \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
+
   detect-erratic-comparison:
     name: Erratic detection - comparison
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -405,8 +388,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -459,8 +441,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -497,8 +478,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
