@@ -116,7 +116,7 @@ impl HttpRequestBuilder {
         let mut request = builder
             .body(es_req.payload)
             .expect("Invalid http request value used");
-        // };
+
         if let Some(credentials_provider) = &self.credentials_provider {
             sign_request(&mut request, credentials_provider, &self.region).await?;
         }
