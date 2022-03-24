@@ -121,8 +121,6 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-#[cfg(feature = "transforms-route")]
-mod route;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -289,8 +287,6 @@ pub(crate) use self::remap::*;
 pub(crate) use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub(crate) use self::rename_fields::*;
-#[cfg(feature = "transforms-route")]
-pub(crate) use self::route::*;
 #[cfg(feature = "transforms-sample")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
