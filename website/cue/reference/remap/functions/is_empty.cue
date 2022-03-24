@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_empty: {
 	category: "Type"
 	description: """
-		Check if the object, array, or string is empty.
+		Check if the object, array, or string has a length of 0.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check."#
 			required:    true
 			type: ["object", "array", "string"]
 		},

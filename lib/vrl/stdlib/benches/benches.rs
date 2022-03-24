@@ -683,17 +683,17 @@ bench_function! {
 
     non_empty_array {
         args: func_args![value: value!([1, 2, 3])],
-        want: Ok(true),
+        want: Ok(false),
     }
 
     empty_object {
         args: func_args![value: value!({})],
-        want: Ok(value!(true)),
+        want: Ok(true),
     }
 
     non_empty_object {
         args: func_args![value: value!({"foo": "bar"})],
-        want: Ok(value!(false)),
+        want: Ok(false),
     }
 
     string {
