@@ -53,7 +53,7 @@ pub(super) mod process {
     pub trait Process {
         /// Prepares input for serialization. This can be a useful step to interpolate
         /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
+        fn prepare<R: Read>(&self, input: R, format: Format) -> Result<(String, Vec<String>), Vec<String>>;
 
         /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
         fn load<R: std::io::Read, T>(
@@ -64,7 +64,7 @@ pub(super) mod process {
         where
             T: serde::de::DeserializeOwned,
         {
-            let (value, warnings) = self.prepare(input)?;
+            let (value, warnings) = self.prepare(input, format)?;
 
             format::deserialize(&value, format).map(|builder| (builder, warnings))
         }

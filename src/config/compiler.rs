@@ -58,7 +58,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         transforms,
         tests,
         provider: _,
-        secret: _,
+        secret,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks) {
@@ -114,6 +114,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             transforms,
             tests,
             expansions,
+            secret,
         };
 
         config.propagate_acknowledgements()?;

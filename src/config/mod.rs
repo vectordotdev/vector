@@ -109,6 +109,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
+    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 impl Config {

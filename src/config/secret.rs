@@ -1,17 +1,62 @@
 use std::collections::HashMap;
 
 use futures::executor;
+use indexmap::IndexMap;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time::Duration};
 use typetag::serde;
+
+use super::{format, ComponentKey, Format};
 
 #[typetag::serde(tag = "type")]
 pub trait SecretBackend: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn retrieve(&mut self, secret_keys: Vec<String>) -> crate::Result<HashMap<String, String>>;
 }
 
+#[derive(Deserialize, Serialize, Debug, Default)]
+struct SecretBackendConfigBuilder {
+    #[serde(default)]
+    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+}
+
+pub fn interpolate(input: &str, format: Format) -> (String, Vec<String>) {
+    let keys = collect_keys(input);
+    if keys.is_empty() {
+        debug!("No secret placeholder found, skipping secret resolution.");
+        return (input.to_owned(), Vec::new());
+    }
+    debug!("{:#?}", keys);
+    let secret_backends = format::deserialize::<SecretBackendConfigBuilder>(input, format);
+    match secret_backends {
+        Err(e) => {
+            return (input.to_owned(), e);
+        }
+        Ok(s) => {
+            return (input.to_owned(), Vec::new());
+        }
+    }
+}
+
+fn collect_keys(input: &str) -> HashMap<&str, Vec<&str>> {
+    let re = Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap();
+    let mut keys: HashMap<&str, Vec<&str>> = HashMap::new();
+    re.captures_iter(input).for_each(|cap| {
+        if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
+            if let Some(keys) = keys.get_mut(backend.as_str()) {
+                keys.push(key.as_str());
+            } else {
+                keys.insert(backend.as_str(), vec![key.as_str()]);
+            }
+        }
+    });
+    keys
+}
+
+///////////
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ExecBackend {
+struct ExecBackend {
     pub command: Vec<String>,
     #[serde(default = "default_timeout_secs")]
     pub timeout: u64,

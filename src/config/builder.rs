@@ -88,6 +88,7 @@ impl From<Config> for ConfigBuilder {
             sinks,
             transforms,
             tests,
+            secret,
             ..
         } = config;
 
@@ -117,6 +118,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             provider: None,
             tests,
+            secret,
         }
     }
 }

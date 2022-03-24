@@ -1,8 +1,8 @@
 use super::{deserialize_table, loader, prepare_input};
 use super::{ComponentHint, Process};
 use crate::config::{
-    ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    ComponentKey, ConfigBuilder, EnrichmentTableOuter, Format, SinkOuter, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use std::io::Read;
@@ -22,8 +22,8 @@ impl ConfigBuilderLoader {
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
-        prepare_input(input)
+    fn prepare<R: Read>(&self, input: R, format: Format) -> Result<(String, Vec<String>), Vec<String>> {
+        prepare_input(input, format)
     }
 
     /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.
