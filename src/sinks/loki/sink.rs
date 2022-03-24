@@ -380,8 +380,10 @@ where
         // out_of_order_action's that require a complete ordering are limited to building 1 request
         // at a time
         let request_builder_concurrency = match self.out_of_order_action {
-            OutOfOrderAction::Accept => NonZeroUsize::new(50),
-            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => NonZeroUsize::new(1),
+            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                NonZeroUsize::new(1).expect("static")
+            }
         };
 
         let sink = input
@@ -410,10 +412,7 @@ where
                     None
                 }
             })
-            .request_builder(
-                NonZeroUsize::new(request_builder_concurrency),
-                self.request_builder,
-            )
+            .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
