@@ -346,7 +346,7 @@ fn handle(
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
 
-            emit!(&BytesSent {
+            emit!(BytesSent {
                 byte_size: body_size,
                 protocol: "http",
             });
@@ -406,13 +406,13 @@ impl PrometheusExporter {
                             &metrics,
                         );
 
-                        emit!(&EventsSent {
+                        emit!(EventsSent {
                             count,
                             byte_size,
                             output: None
                         });
 
-                        emit!(&PrometheusServerRequestComplete {
+                        emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
                         });
 

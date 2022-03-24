@@ -5,6 +5,58 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
+fn parse_klog(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let message = String::from_utf8_lossy(&bytes);
+    let mut log: BTreeMap<String, Value> = BTreeMap::new();
+    let captures = REGEX_KLOG
+        .captures(&message)
+        .ok_or("failed parsing klog message")?;
+    if let Some(level) = captures.name("level").map(|capture| capture.as_str()) {
+        let level = match level {
+            "I" => Ok("info"),
+            "W" => Ok("warning"),
+            "E" => Ok("error"),
+            "F" => Ok("fatal"),
+            _ => Err(format!(r#"unrecognized log level "{}""#, level)),
+        }?;
+
+        log.insert("level".into(), Value::Bytes(level.to_owned().into()));
+    }
+    if let Some(timestamp) = captures.name("timestamp").map(|capture| capture.as_str()) {
+        let month = captures.name("month").map(|capture| capture.as_str());
+        let year = resolve_year(month);
+        log.insert(
+            "timestamp".into(),
+            Value::Timestamp(
+                Utc.datetime_from_str(&format!("{}{}", year, timestamp), "%Y%m%d %H:%M:%S%.f")
+                    .map_err(|error| {
+                        format!(r#"failed parsing timestamp {}: {}"#, timestamp, error)
+                    })?,
+            ),
+        );
+    }
+    if let Some(id) = captures.name("id").map(|capture| capture.as_str()) {
+        log.insert(
+            "id".into(),
+            Value::Integer(id.parse().map_err(|_| "failed parsing id")?),
+        );
+    }
+    if let Some(file) = captures.name("file").map(|capture| capture.as_str()) {
+        log.insert("file".into(), Value::Bytes(file.to_owned().into()));
+    }
+    if let Some(line) = captures.name("line").map(|capture| capture.as_str()) {
+        log.insert(
+            "line".into(),
+            Value::Integer(line.parse().map_err(|_| "failed parsing line")?),
+        );
+    }
+    if let Some(message) = captures.name("message").map(|capture| capture.as_str()) {
+        log.insert("message".into(), Value::Bytes(message.to_owned().into()));
+    }
+    Ok(log.into())
+}
+
 static REGEX_KLOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r#"(?x)                                                        # Ignore whitespace and comments in the regex expression.
@@ -62,6 +114,11 @@ impl Function for ParseKlog {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_klog(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,64 +128,8 @@ struct ParseKlogFn {
 
 impl Expression for ParseKlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let message = String::from_utf8_lossy(&bytes);
-
-        let mut log: BTreeMap<String, Value> = BTreeMap::new();
-
-        let captures = REGEX_KLOG
-            .captures(&message)
-            .ok_or("failed parsing klog message")?;
-
-        if let Some(level) = captures.name("level").map(|capture| capture.as_str()) {
-            let level = match level {
-                "I" => Ok("info"),
-                "W" => Ok("warning"),
-                "E" => Ok("error"),
-                "F" => Ok("fatal"),
-                _ => Err(format!(r#"unrecognized log level "{}""#, level)),
-            }?;
-
-            log.insert("level".into(), Value::Bytes(level.to_owned().into()));
-        }
-
-        if let Some(timestamp) = captures.name("timestamp").map(|capture| capture.as_str()) {
-            let month = captures.name("month").map(|capture| capture.as_str());
-            let year = resolve_year(month);
-            log.insert(
-                "timestamp".into(),
-                Value::Timestamp(
-                    Utc.datetime_from_str(&format!("{}{}", year, timestamp), "%Y%m%d %H:%M:%S%.f")
-                        .map_err(|error| {
-                            format!(r#"failed parsing timestamp {}: {}"#, timestamp, error)
-                        })?,
-                ),
-            );
-        }
-
-        if let Some(id) = captures.name("id").map(|capture| capture.as_str()) {
-            log.insert(
-                "id".into(),
-                Value::Integer(id.parse().map_err(|_| "failed parsing id")?),
-            );
-        }
-
-        if let Some(file) = captures.name("file").map(|capture| capture.as_str()) {
-            log.insert("file".into(), Value::Bytes(file.to_owned().into()));
-        }
-
-        if let Some(line) = captures.name("line").map(|capture| capture.as_str()) {
-            log.insert(
-                "line".into(),
-                Value::Integer(line.parse().map_err(|_| "failed parsing line")?),
-            );
-        }
-
-        if let Some(message) = captures.name("message").map(|capture| capture.as_str()) {
-            log.insert("message".into(), Value::Bytes(message.to_owned().into()));
-        }
-
-        Ok(log.into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_klog(bytes)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

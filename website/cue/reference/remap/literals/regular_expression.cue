@@ -12,7 +12,7 @@ remap: literals: regular_expression: {
 
 	examples: [
 		#"r'^Hello, World!$'"#,
-		#"r'^Hello, World!$'i"#,
+		#"r'(?i)^Hello, World!$'"#,
 		#"r'^\d{4}-\d{2}-\d{2}$'"#,
 		#"r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'"#,
 	]

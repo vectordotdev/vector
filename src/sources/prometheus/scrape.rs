@@ -245,7 +245,7 @@ fn prometheus(
                     .and_then(|response| async move {
                         let (header, body) = response.into_parts();
                         let body = hyper::body::to_bytes(body).await?;
-                        emit!(&BytesReceived {
+                        emit!(BytesReceived {
                             byte_size: body.len(),
                             protocol: "http"
                         });
@@ -258,7 +258,7 @@ fn prometheus(
 
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(&PrometheusRequestCompleted {
+                                emit!(PrometheusRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
@@ -267,7 +267,7 @@ fn prometheus(
 
                                 match parser::parse_text(&body) {
                                     Ok(events) => {
-                                        emit!(&PrometheusEventsReceived {
+                                        emit!(PrometheusEventsReceived {
                                             byte_size: events.size_of(),
                                             count: events.len(),
                                             uri: url.clone()
@@ -337,7 +337,7 @@ fn prometheus(
                                                 endpoint = %url,
                                             );
                                         }
-                                        emit!(&PrometheusParseError {
+                                        emit!(PrometheusParseError {
                                             error,
                                             url: url.clone(),
                                             body,
@@ -356,14 +356,14 @@ fn prometheus(
                                         endpoint = %url,
                                     );
                                 }
-                                emit!(&PrometheusHttpResponseError {
+                                emit!(PrometheusHttpResponseError {
                                     code: header.status,
                                     url: url.clone(),
                                 });
                                 None
                             }
                             Err(error) => {
-                                emit!(&PrometheusHttpError {
+                                emit!(PrometheusHttpError {
                                     error,
                                     url: url.clone(),
                                 });
@@ -383,7 +383,7 @@ fn prometheus(
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }

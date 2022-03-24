@@ -138,7 +138,7 @@ where
     // in the tests if we don't work on our own copy.
     let mut args = args.clone();
     let mut result = BTreeMap::new();
-    let context = FunctionCompileContext::new(Default::default());
+    let mut context = FunctionCompileContext::new(Default::default());
     let params = function.parameters();
     let function_arguments: Vec<(&'static str, Option<FunctionArgument>)> = args.clone().into();
 
@@ -148,9 +148,12 @@ where
             .unwrap_or(None)
             .map(Expr::from);
 
-        if let Some(arg) =
-            function.compile_argument(&function_arguments, &context, param.keyword, arg.as_ref())?
-        {
+        if let Some(arg) = function.compile_argument(
+            &function_arguments,
+            &mut context,
+            param.keyword,
+            arg.as_ref(),
+        )? {
             result.insert(param.keyword, arg);
         }
     }

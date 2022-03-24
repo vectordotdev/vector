@@ -10,6 +10,11 @@ use nom::{
 };
 use vrl::prelude::*;
 
+fn parse_aws_alb_log(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    parse_log(&String::from_utf8_lossy(&bytes))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
 
@@ -46,6 +51,11 @@ impl Function for ParseAwsAlbLog {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_aws_alb_log(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -61,9 +71,8 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        parse_log(&String::from_utf8_lossy(&bytes))
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_alb_log(bytes)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

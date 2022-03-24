@@ -70,7 +70,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
     ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
@@ -82,13 +82,7 @@ pub trait Function: Send + Sync + fmt::Debug {
         &self,
         _ctx: &mut Context,
         _args: &mut VmArgumentList,
-    ) -> Result<Value, ExpressionError> {
-        Err(ExpressionError::Error {
-            message: "unimplemented".to_string(),
-            labels: Vec::new(),
-            notes: Vec::new(),
-        })
-    }
+    ) -> Result<Value, ExpressionError>;
 }
 
 // -----------------------------------------------------------------------------

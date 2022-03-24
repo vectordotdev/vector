@@ -128,7 +128,7 @@ async fn run(
         let metrics = controller.capture_metrics();
         let count = metrics.len();
         let byte_size = metrics.size_of();
-        emit!(&EventsReceived { count, byte_size });
+        emit!(EventsReceived { count, byte_size });
 
         let batch = metrics.into_iter().map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
@@ -157,7 +157,7 @@ async fn run(
         });
 
         if let Err(error) = out.send_batch(batch).await {
-            emit!(&StreamClosedError { error, count });
+            emit!(StreamClosedError { error, count });
             return Err(());
         }
     }

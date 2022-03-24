@@ -264,7 +264,7 @@ impl TransformOutputs {
                 .expect("mismatched outputs")
                 .send(primary)
                 .await;
-            emit(&EventsSent {
+            emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(DEFAULT_OUTPUT),
@@ -275,7 +275,7 @@ impl TransformOutputs {
             let byte_size = buf.size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await;
-            emit(&EventsSent {
+            emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(key.as_ref()),

@@ -10,11 +10,8 @@ pub struct EventsReceived {
 }
 
 impl InternalEvent for EventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!("events_in_total", self.count as u64);
         counter!(
