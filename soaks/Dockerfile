@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # TARGET
 #
 FROM docker.io/debian:bullseye-slim@sha256:b0d53c872fd640c2af2608ba1e693cfc7dedea30abcd8f584b23d583ec6dadc7
-RUN apt-get update && apt-get -y install zlib1g
+RUN apt-get update && apt-get -y install zlib1g ca-certificates
 COPY --from=builder /vector/vector /usr/bin/vector
 VOLUME /var/lib/vector/
 
