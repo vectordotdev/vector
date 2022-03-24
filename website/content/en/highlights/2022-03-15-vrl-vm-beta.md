@@ -14,7 +14,7 @@ As part of our performance improvements in Vector, we have developed a new Virtu
 running VRL programs.
 
 In our soak tests we are getting performance improvements of between 10-15% depending on
-the VRL that is being run.
+the VRL program that is being run.
 
 ## Opting in
 
@@ -74,9 +74,7 @@ taken and which node to execute next. The tree is walked in this manner until th
 reaches a node that has no further nodes to execute.
 
 There are a number of advantages to running a program this way. It is fast to develop and the
-code is easy to maintain and debug since each node manages it's own state. Also, especially
-since it is developed in Rust, the code is quite safe with little opportunity for undefined
-behaviour to creep in.
+code is easy to maintain and debug since each node manages its own state.
 
 However, when it comes to performance there are a number of issues. Each node can take up a
 significant amount of memory - especially with large VRL programs. This causes particular
