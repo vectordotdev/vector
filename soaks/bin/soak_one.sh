@@ -30,7 +30,7 @@ display_usage() {
 
 BUILD_IMAGE="true"
 REPLICAS=3
-TOTAL_SAMPLES=200
+TOTAL_SAMPLES=180
 WARMUP_SECONDS=30
 
 while [[ $# -gt 0 ]]; do
