@@ -4,9 +4,10 @@ use std::{
 };
 
 use http::Request;
-use hyper::{Body, StatusCode};
+use hyper::{header::LOCATION, Body, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
+use url::{ParseError, Url};
 
 use super::{
     load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
@@ -121,7 +122,9 @@ struct PipelinesAttributes<'a> {
 enum ReportingError {
     Http(HttpError),
     StatusCode(StatusCode),
+    EndpointError(ParseError),
     TooManyRedirects,
+    InvalidRedirectUrl,
 }
 
 impl Display for ReportingError {
@@ -131,9 +134,11 @@ impl Display for ReportingError {
             Self::StatusCode(status) => {
                 write!(f, "Request was unsuccessful: {}", status)
             }
+            Self::EndpointError(err) => write!(f, "{}", err),
             Self::TooManyRedirects => {
                 write!(f, "Too many redirects from the server")
             }
+            Self::InvalidRedirectUrl => write!(f, "Server responded with an invalid redirect URL"),
         }
     }
 }
@@ -231,14 +236,10 @@ pub async fn try_attach(
     // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
     // of `max_retries`.
     for _ in 0..datadog.max_retries {
-        match report_serialized_config_to_datadog(&client, || {
-            build_request(&endpoint, &auth, &payload)
-        })
-        .await
-        {
+        match report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload).await {
             Ok(()) => {
                 info!(
-                    "Vector config {} successfully reported to {}",
+                    "Vector config {} successfully reported to {}.",
                     &config_version, DATADOG_REPORTING_PRODUCT
                 );
                 break;
@@ -246,7 +247,7 @@ pub async fn try_attach(
             Err(err) => {
                 error!(
                     err = ?err.to_string(),
-                    "Could not report Vector config to {}", DATADOG_REPORTING_PRODUCT
+                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
                 );
 
                 if let ReportingError::StatusCode(status) = err {
@@ -270,7 +271,7 @@ pub async fn try_attach(
 
         // If we're at this point, there was an error that was deemed non-fatal, so retry.
         info!(
-            "Retrying config reporting to {} in {} seconds",
+            "Retrying config reporting to {} in {} seconds.",
             DATADOG_REPORTING_PRODUCT, datadog.retry_interval_secs
         );
 
@@ -353,11 +354,11 @@ fn get_reporting_endpoint(site: Option<&String>, configuration_key: &str) -> Str
 
 /// Build a POST request for reporting a Vector config to Datadog Pipelines.
 fn build_request<'a>(
-    endpoint: &'a str,
+    endpoint: &Url,
     auth: &'a PipelinesAuth,
     payload: &'a PipelinesVersionPayload,
 ) -> Request<Body> {
-    Request::post(endpoint)
+    Request::post(endpoint.to_string())
         .header("DD-API-KEY", auth.api_key)
         .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
@@ -370,22 +371,34 @@ fn build_request<'a>(
 }
 
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
-async fn report_serialized_config_to_datadog(
-    client: &HttpClient,
-    request_fn: impl Fn() -> Request<Body>,
+async fn report_serialized_config_to_datadog<'a>(
+    client: &'a HttpClient,
+    endpoint: &'a str,
+    auth: &'a PipelinesAuth<'a>,
+    payload: &'a PipelinesVersionPayload<'a>,
 ) -> Result<(), ReportingError> {
-    info!("Attempting to report configuration to Datadog Pipelines");
+    info!("Attempting to report configuration to Datadog Pipelines.");
+
+    let mut endpoint = Url::parse(endpoint).map_err(ReportingError::EndpointError)?;
 
     // Follow redirection responses a maximum of one time.
     for _ in 0..=1 {
-        let response = client
-            .send(request_fn())
-            .await
-            .map_err(ReportingError::Http)?;
-
-        let status = response.status();
+        let req = build_request(&endpoint, auth, payload);
+        let res = client.send(req).await.map_err(ReportingError::Http)?;
+        let status = res.status();
 
         if status.is_redirection() {
+            // A `Location` header could contain a relative path. To guard against that, we'll
+            // join the location to the original URL to get a new absolute path.
+            endpoint = endpoint
+                .join(
+                    res.headers()
+                        .get(LOCATION)
+                        .ok_or(ReportingError::InvalidRedirectUrl)?
+                        .to_str()
+                        .map_err(|_| ReportingError::InvalidRedirectUrl)?,
+                )
+                .map_err(ReportingError::EndpointError)?;
             continue;
         } else if status.is_success() {
             return Ok(());
