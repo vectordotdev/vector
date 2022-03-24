@@ -540,10 +540,12 @@ fn build_outputs(
             }
         }
 
-        outputs
-            .entry(output.extract_from.clone())
-            .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
-            .or_insert(vec![conditions]);
+        for from in output.extract_from.clone().into_vec() {
+            outputs
+                .entry(from)
+                .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
+                .or_insert(vec![conditions.clone()]);
+        }
     }
 
     if errors.is_empty() {

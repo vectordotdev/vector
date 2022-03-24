@@ -368,17 +368,24 @@ impl TestDefinition<String> {
         let outputs = outputs
             .into_iter()
             .filter_map(|old| {
-                if let Some(output_id) = output_map.get(&old.extract_from) {
+                let mut outputs = Vec::new();
+                for from in old.extract_from.into_vec() {
+                    if let Some(output_id) = output_map.get(&from) {
+                        outputs.push(output_id.clone());
+                    } else {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                            name, from
+                        ));
+                    }
+                }
+                if outputs.is_empty() {
+                    None
+                } else {
                     Some(TestOutput {
-                        extract_from: output_id.clone(),
+                        extract_from: outputs.into(),
                         conditions: old.conditions,
                     })
-                } else {
-                    errors.push(format!(
-                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                        name, old.extract_from
-                    ));
-                    None
                 }
             })
             .collect();
@@ -425,7 +432,14 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: old.extract_from.to_string(),
+                extract_from: match old.extract_from {
+                    OneOrMany::One(value) => value.to_string().into(),
+                    OneOrMany::Many(values) => values
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                        .into(),
+                },
                 conditions: old.conditions,
             })
             .collect();
@@ -462,6 +476,34 @@ pub struct TestInput {
     pub metric: Option<Metric>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(list) => list,
+        }
+    }
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        Self::One(value)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Many(value)
+    }
+}
+
 fn default_test_input_type() -> String {
     "raw".to_string()
 }
@@ -469,7 +511,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
-    pub extract_from: T,
+    pub extract_from: OneOrMany<T>,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
