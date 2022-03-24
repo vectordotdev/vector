@@ -30,8 +30,8 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, ProxyConfig,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{
@@ -184,7 +184,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy).await?;
+        let source = Source::new(self, &cx.globals, &cx.key).await?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -229,7 +229,6 @@ impl Source {
         config: &Config,
         globals: &GlobalOptions,
         key: &ComponentKey,
-        _proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);

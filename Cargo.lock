@@ -2429,17 +2429,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
-name = "evmap"
-version = "10.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e3ea06a83f97d3dc2eb06e51e7a729b418f0717a5558a5c870e3d5156dc558d"
-dependencies = [
- "hashbag",
- "slab",
- "smallvec",
-]
-
-[[package]]
 name = "exitcode"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3032,12 +3021,6 @@ name = "hash_hasher"
 version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74721d007512d0cb3338cd20f0654ac913920061a4c4d0d8708edb3f2a698c0c"
-
-[[package]]
-name = "hashbag"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "461d126adae37fcc356c78b4c46966ac5dca1d41244e617af36bd4e09c7673d3"
 
 [[package]]
 name = "hashbrown"
@@ -8726,7 +8709,6 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "vector"
 version = "0.21.0"
 dependencies = [
- "ahash",
  "approx",
  "arc-swap",
  "assert_cmd",
@@ -8770,7 +8752,6 @@ dependencies = [
  "dyn-clone",
  "encoding_rs",
  "enrichment",
- "evmap",
  "exitcode",
  "fakedata",
  "file-source",
@@ -8822,7 +8803,6 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "ordered-float",
- "parking_lot 0.12.0",
  "percent-encoding",
  "pin-project 1.0.10",
  "portpicker",
