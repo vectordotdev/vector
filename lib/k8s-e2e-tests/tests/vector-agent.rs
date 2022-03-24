@@ -1,4 +1,3 @@
-use core::array::IntoIter;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
@@ -493,10 +492,13 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(
                 pod_namespace.clone(),
-                Some(BTreeMap::from_iter(IntoIter::new([
-                    ("label3".to_string(), "foobar".to_string()),
-                    ("label4".to_string(), "fizzbuzz".to_string()),
-                ]))),
+                Some(BTreeMap::from_iter(
+                    [
+                        ("label3".to_string(), "foobar".to_string()),
+                        ("label4".to_string(), "fizzbuzz".to_string()),
+                    ]
+                    .into_iter(),
+                )),
             ),
         )?)
         .await?;

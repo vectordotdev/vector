@@ -119,7 +119,7 @@ impl Function for Replace {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let with = args.required("with");
-        let count = args.optional("count").unwrap_or(value!(-1));
+        let count = args.optional("count").unwrap_or_else(|| value!(-1));
 
         replace(value, with, count, pattern)
     }
