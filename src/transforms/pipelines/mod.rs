@@ -108,6 +108,15 @@ impl PipelinesConfig {
     }
 }
 
+impl PipelinesConfig {
+    fn validate_nesting(&self) -> crate::Result<()> {
+        let parents = &[self.transform_type()].into_iter().collect::<HashSet<_>>();
+        self.logs.validate_nesting(&parents)?;
+        self.metrics.validate_nesting(&parents)?;
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "pipelines")]
 impl TransformConfig for PipelinesConfig {
@@ -120,6 +129,7 @@ impl TransformConfig for PipelinesConfig {
         name: &ComponentKey,
         inputs: &[String],
     ) -> crate::Result<Option<InnerTopology>> {
+        self.validate_nesting()?;
         let router_name = name.join("type_router");
         let mut result = InnerTopology {
             inner: Default::default(),

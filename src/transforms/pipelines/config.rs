@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use vector_core::transform::{InnerTopology, InnerTopologyTransform};
 
 use crate::{
@@ -120,6 +121,22 @@ impl EventTypeConfig {
     #[allow(dead_code)] // for some small subset of feature flags this code is dead
     pub(crate) const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
         &self.pipelines
+    }
+}
+
+impl EventTypeConfig {
+    pub(super) fn validate_nesting(&self, parents: &HashSet<&'static str>) -> Result<(), String> {
+        for (name, pipeline) in self.pipelines.iter() {
+            for (index, transform) in pipeline.transforms.iter().enumerate() {
+                if !transform.nestable(parents) {
+                    return Err(format!(
+                        "the transform {} in pipeline {:?} cannot be nested in {:?}",
+                        index, name, parents
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 }
 
