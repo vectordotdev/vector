@@ -22,6 +22,7 @@ In order to run a soak locally you will need:
 * terraform
 * python-pandas
 * python-numpy
+* python-tabulate
 
 The CPU and RAM requirements are currently hard-coded but might be made
 flexible, possibly on a per-soak basis.
