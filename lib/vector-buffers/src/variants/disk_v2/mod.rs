@@ -135,13 +135,7 @@
 //! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
 
-use std::{
-    error::Error,
-    marker::PhantomData,
-    num::NonZeroU64,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{error::Error, marker::PhantomData, num::NonZeroU64, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};

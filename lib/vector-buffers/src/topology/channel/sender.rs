@@ -48,7 +48,7 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub async fn send(&mut self, item: T) -> Result<(), ()> {
+    async fn send(&mut self, item: T) -> Result<(), ()> {
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
             Self::DiskV1(writer) => {
@@ -60,18 +60,12 @@ where
 
                 if let Err(e) = writer.write_record(item).await {
                     // Can't really do much except panic here. :sweat:
-                    panic!(
-                        "writer hit unrecoverable error during write: {}",
-                        e.to_string()
-                    );
+                    panic!("writer hit unrecoverable error during write: {}", e);
                 }
 
                 if let Err(e) = writer.flush().await {
                     // Can't really do much except panic here. :sweat:
-                    panic!(
-                        "writer hit unrecoverable error during flush: {}",
-                        e.to_string()
-                    );
+                    panic!("writer hit unrecoverable error during flush: {}", e);
                 }
 
                 Ok(())
@@ -79,7 +73,7 @@ where
         }
     }
 
-    pub async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
+    async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
@@ -94,10 +88,7 @@ where
                         None => {
                             if let Err(e) = writer.flush().await {
                                 // Can't really do much except panic here. :sweat:
-                                panic!(
-                                    "writer hit unrecoverable error during flush: {}",
-                                    e.to_string()
-                                );
+                                panic!("writer hit unrecoverable error during flush: {}", e);
                             }
                             Ok(None)
                         }
@@ -105,17 +96,14 @@ where
                     },
                     Err(e) => {
                         // Can't really do much except panic here. :sweat:
-                        panic!(
-                            "writer hit unrecoverable error during write: {}",
-                            e.to_string()
-                        );
+                        panic!("writer hit unrecoverable error during write: {}", e);
                     }
                 }
             }
         }
     }
 
-    pub async fn flush(&mut self) -> Result<(), ()> {
+    async fn flush(&mut self) -> Result<(), ()> {
         match self {
             Self::InMemory(_) => Ok(()),
             Self::DiskV1(writer) => {
@@ -127,10 +115,7 @@ where
 
                 if let Err(e) = writer.flush().await {
                     // Can't really do much except panic here. :sweat:
-                    panic!(
-                        "writer hit unrecoverable error during flush: {}",
-                        e.to_string()
-                    );
+                    panic!("writer hit unrecoverable error during flush: {}", e);
                 }
 
                 Ok(())
@@ -251,7 +236,11 @@ impl<T: Bufferable> BufferSender<T> {
                 let mut base_sent = true;
                 if let Some(old_item) = self.base.try_send(item).await? {
                     base_sent = false;
-                    self.overflow.as_mut().unwrap().send(old_item).await?;
+                    self.overflow
+                        .as_mut()
+                        .expect("overflow must exist")
+                        .send(old_item)
+                        .await?;
                 }
                 base_sent
             }

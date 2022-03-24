@@ -122,31 +122,29 @@ where
             }
 
             // Try to decode a record from our buffered reads.
-            match self.decode_next_record() {
-                Some((key, item_bytes, decode_result)) => {
-                    trace!(?key, item_bytes, "Got record decode attempt.");
-                    match decode_result {
-                        Ok(item) => {
-                            self.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
-                            return Some(item);
-                        }
-                        Err(error) => {
-                            error!(%error, "Error deserializing event.");
-                            self.track_unacked_read(key.0, None, item_bytes);
-                        }
+            if let Some((key, item_bytes, decode_result)) = self.decode_next_record() {
+                trace!(?key, item_bytes, "Got record decode attempt.");
+                match decode_result {
+                    Ok(item) => {
+                        self.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
+                        return Some(item);
+                    }
+                    Err(error) => {
+                        error!(%error, "Error deserializing event.");
+                        self.track_unacked_read(key.0, None, item_bytes);
                     }
                 }
-                None => {
-                    if Arc::strong_count(&self.db) == 1 {
-                        // There are no writers left
-                        return None;
-                    } else {
-                        // We have no more buffered reads, and we always make sure to do a read if our
-                        // internal buffer is empty, so if we're here, it means we're caught up and need to
-                        // wait for the writer to write some records.
-                        self.read_waker.notified().await;
-                    }
+            } else {
+                if Arc::strong_count(&self.db) == 1 {
+                    // There are no writers left, and we've consumed all remaining items in the
+                    // buffer, so we need to signal to this to caller by returning `None`.
+                    return None;
                 }
+
+                // We have no more buffered reads, and we always make sure to do a read if our
+                // internal buffer is empty, so if we're here, it means we're caught up and need to
+                // wait for the writer to write some records.
+                self.read_waker.notified().await;
             }
         }
     }

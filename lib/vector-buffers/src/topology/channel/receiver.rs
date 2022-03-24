@@ -54,7 +54,7 @@ impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
-    pub async fn next(&mut self) -> Option<T> {
+    async fn next(&mut self) -> Option<T> {
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
             ReceiverAdapter::DiskV1(reader) => reader.next().await,
@@ -158,7 +158,6 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 
     pub fn into_stream(self) -> BufferReceiverStream<T> {
-        info!("Converting receiver into stream.");
         BufferReceiverStream::new(self)
     }
 }
@@ -168,6 +167,7 @@ enum StreamState<T: Bufferable> {
     Polling,
     Closed(BufferReceiver<T>),
 }
+
 pub struct BufferReceiverStream<T: Bufferable> {
     state: StreamState<T>,
     recv_fut: ReusableBoxFuture<'static, (Option<T>, BufferReceiver<T>)>,

@@ -93,6 +93,11 @@ impl<T: Bufferable> LimitedSender<T> {
     }
 
     /// Sends an item into the channel.
+    ///
+    /// # Errors
+    ///
+    /// If the receiver has disconnected (does not exist anymore), then `Err(SendError)` be returned
+    /// with the given `item`.
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
         let permits_required = self.get_required_permits_for_item(&item);
@@ -117,6 +122,13 @@ impl<T: Bufferable> LimitedSender<T> {
     }
 
     /// Attempts to send an item into the channel.
+    ///
+    /// # Errors
+    ///
+    /// If the receiver has disconnected (does not exist anymore), then
+    /// `Err(TrySendError::Disconnected)` be returned with the given `item`. If the channel has
+    /// insufficient capacity for the item, then `Err(TrySendError::InsufficientCapacity)` will be
+    /// returned with the given `item`.
     pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting.
         let permits_required = self.get_required_permits_for_item(&item);

@@ -136,7 +136,6 @@ impl RunningTopology {
         let reporter = async move {
             loop {
                 interval.tick().await;
-                info!("Shutdown reporter tick.");
 
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_key, handles| {
