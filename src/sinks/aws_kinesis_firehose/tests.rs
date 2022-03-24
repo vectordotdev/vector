@@ -35,7 +35,6 @@ async fn check_batch_size() {
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
@@ -64,7 +63,6 @@ async fn check_batch_events() {
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
