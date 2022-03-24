@@ -174,9 +174,12 @@ pub async fn build_pieces(
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
+                trace!("Source pump starting.");
                 while let Some(array) = rx.next().await {
+                    trace!("Forwarding item from source pump to fanout.");
                     fanout.send(array).await;
                 }
+                trace!("Source pump finished.");
                 Ok(TaskOutput::Source)
             };
 

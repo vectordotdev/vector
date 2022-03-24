@@ -656,6 +656,8 @@ impl RunningTopology {
 
         if let Some(inputs) = inputs {
             for input in inputs {
+                trace!(component = %key, fanout_id = %input, "Removing component input from fanout.");
+
                 if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
                     let _ = output.send(ControlMessage::Remove(key.clone()));
@@ -699,6 +701,8 @@ impl RunningTopology {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
         for input in inputs {
+            trace!(component = %key, fanout_id = %input, "Adding component input to fanout.");
+
             // This can only fail if we are disconnected, which is a valid situation.
             let _ = self
                 .outputs
@@ -733,12 +737,16 @@ impl RunningTopology {
 
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {
+                trace!(component = %key, fanout_id = %input, "Removing component input from fanout.");
+
                 // This can only fail if we are disconnected, which is a valid situation.
                 let _ = output.send(ControlMessage::Remove(key.clone()));
             }
         }
 
         for input in inputs_to_add {
+            trace!(component = %key, fanout_id = %input, "Adding component input to fanout.");
+
             // This can only fail if we are disconnected, which is a valid situation.
             let _ = self
                 .outputs
@@ -747,7 +755,9 @@ impl RunningTopology {
                 .send(ControlMessage::Add(key.clone(), tx.clone()));
         }
 
-        for &input in inputs_to_replace {
+        for input in inputs_to_replace {
+            trace!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
+
             // This can only fail if we are disconnected, which is a valid situation.
             let _ = self
                 .outputs
@@ -772,6 +782,8 @@ impl RunningTopology {
         let old_inputs = sink_inputs.or(trans_inputs).unwrap();
 
         for input in old_inputs {
+            trace!(component = %key, fanout_id = %input, "Removing component input from fanout.");
+
             // This can only fail if we are disconnected, which is a valid
             // situation.
             let _ = self

@@ -147,7 +147,7 @@ where
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
 
-        self.read_waker.notify_waiters();
+        self.read_waker.notify_one();
     }
 }
 

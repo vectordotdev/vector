@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use super::{ComponentKey, Config};
 
+#[derive(Debug)]
 pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
@@ -34,6 +35,7 @@ impl ConfigDiff {
     }
 }
 
+#[derive(Debug)]
 pub struct Difference {
     pub to_remove: HashSet<ComponentKey>,
     pub to_change: HashSet<ComponentKey>,

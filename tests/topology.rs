@@ -14,7 +14,7 @@ use tokio::time::{sleep, Duration};
 use vector::{
     config::{Config, SinkOuter},
     event::{into_event_stream, Event, EventArray, EventContainer},
-    test_util::start_topology,
+    test_util::{start_topology, trace_init},
     topology,
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
@@ -316,44 +316,9 @@ async fn topology_remove_one_transform() {
 
 #[tokio::test]
 async fn topology_swap_source() {
-    let (mut in1, source1) = source();
-    let (out1v1, sink1v1) = sink(10);
+    trace_init();
 
-    let mut config = Config::builder();
-    config.add_source("in1", source1);
-    config.add_sink("out1", &["in1"], sink1v1);
-
-    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
-
-    let (mut in2, source2) = source();
-    let (out1v2, sink1v2) = sink(10);
-
-    let mut config = Config::builder();
-    config.add_source("in2", source2);
-    config.add_sink("out1", &["in2"], sink1v2);
-
-    assert!(topology
-        .reload_config_and_respawn(config.build().unwrap())
-        .await
-        .unwrap());
-
-    let event1 = Event::from("this");
-    let event2 = Event::from("that");
-
-    let h_out1v1 = tokio::spawn(out1v1.flat_map(into_event_stream).collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.flat_map(into_event_stream).collect::<Vec<_>>());
-    in1.send_event(event1.clone()).await.unwrap_err();
-    in2.send_event(event2.clone()).await.unwrap();
-    topology.stop().await;
-    let res1v1 = h_out1v1.await.unwrap();
-    let res1v2 = h_out1v2.await.unwrap();
-
-    assert_eq!(Vec::<Event>::new(), res1v1);
-    assert_eq!(vec![event2], res1v2);
-}
-
-#[tokio::test]
-async fn topology_swap_sink() {
+    // Add source #1 as `in1`, and sink #1 as `out1`, with sink #1 attached to `in1`:
     let (mut in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -363,10 +328,64 @@ async fn topology_swap_sink() {
 
     let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
+    // Now, create sink #2 and replace `out2` with it, and add source #2 as `in2`, attached to `out1`:
+    let (mut in2, source2) = source();
     let (out2, sink2) = sink(10);
 
     let mut config = Config::builder();
-    config.add_source("in1", source().1);
+    config.add_source("in2", source2);
+    config.add_sink("out1", &["in2"], sink2);
+
+    assert!(topology
+        .reload_config_and_respawn(config.build().unwrap())
+        .await
+        .unwrap());
+
+    // Send an event into both source #1 and source #2:
+    let event1 = Event::from("this");
+    let event2 = Event::from("that");
+
+    let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
+    let h_out2 = tokio::spawn(out2.flat_map(into_event_stream).collect::<Vec<_>>());
+    in1.send_event(event1.clone()).await.unwrap_err();
+    in2.send_event(event2.clone()).await.unwrap();
+
+    // Drop the inputs to the two sources, which will ensure they drain all items and stop
+    // themselves, and also fully stop the topology:
+    drop(in1);
+    drop(in2);
+    topology.stop().await;
+
+    let res1 = h_out1.await.unwrap();
+    let res2 = h_out2.await.unwrap();
+
+    // We should see that despite replacing a sink of the same name, sending to source #1 -- which
+    // the sink at `out1` was initially connected to -- does not send to either sink #1 or sink #2,
+    // as we've removed it from the topology prior to the sends.
+    assert_eq!(Vec::<Event>::new(), res1);
+    assert_eq!(vec![event2], res2);
+}
+
+#[tokio::test]
+async fn topology_swap_sink() {
+    trace_init();
+
+    // Add source #1 as `in1`, and sink #1 as `out1`, with sink #1 attached to `in1`:
+    let (mut in1, source1) = source();
+    let (out1, sink1) = sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], sink1);
+
+    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    // Now, create source #2 and replace `in1` with it, and add sink #2 as `out2`, attached to `in1`:
+    let (mut in2, source2) = source();
+    let (out2, sink2) = sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source2);
     config.add_sink("out2", &["in1"], sink2);
 
     assert!(topology
@@ -374,55 +393,90 @@ async fn topology_swap_sink() {
         .await
         .unwrap());
 
+    // Send an event into both source #1 and source #2:
     let event = Event::from("this");
     let h_out1 = tokio::spawn(out1.flat_map(into_event_stream).collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.flat_map(into_event_stream).collect::<Vec<_>>());
     in1.send_event(event.clone()).await.unwrap();
+    in2.send_event(event.clone()).await.unwrap();
+
+    // Drop the inputs to the two sources, which will ensure they drain all items and stop
+    // themselves, and also fully stop the topology:
+    drop(in1);
+    drop(in2);
     topology.stop().await;
 
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
 
+    // We should see that despite source #1 initially being attached, the event we sent to it does
+    // not make it to sink #2 as it were logically attached to `in1`, which we swapped from source
+    // #1 over to source #2:
     assert_eq!(Vec::<Event>::new(), res1);
     assert_eq!(vec![event], res2);
 }
 
 #[tokio::test]
 async fn topology_swap_transform() {
+    trace_init();
+
+    // Add source #1 as `in1`, transform #1 as `t1`, and sink #1 as `out1`, with transform #1
+    // attached to `in1` and sink #1 attached to `t1`:
     let (mut in1, source1) = source();
     let transform1 = transform(" transformed", 0.0);
-    let (out1v1, sink1v1) = sink(10);
+    let (out1, sink1) = sink(10);
 
     let mut config = Config::builder();
     config.add_source("in1", source1);
     config.add_transform("t1", &["in1"], transform1);
-    config.add_sink("out1", &["t1"], sink1v1);
+    config.add_sink("out1", &["t1"], sink1);
 
     let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
+    // Now, create source #2 and replace `in1` with it, add transform #2 as `t2`, attached to `in1`,
+    // and add sink #2 as `out1`, attached to `t2`:
+    let (mut in2, source2) = source();
     let transform2 = transform(" replaced", 0.0);
-    let (out1v2, sink1v2) = sink(10);
+    let (out2, sink2) = sink(10);
 
     let mut config = Config::builder();
-    config.add_source("in1", source().1);
+    config.add_source("in1", source2);
     config.add_transform("t2", &["in1"], transform2);
-    config.add_sink("out1", &["t2"], sink1v2);
+    config.add_sink("out1", &["t2"], sink2);
 
     assert!(topology
         .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
-    let event = Event::from("this");
-    let h_out1v1 = tokio::spawn(out1v1.flat_map(into_message_stream).collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.flat_map(into_message_stream).collect::<Vec<_>>());
-    in1.send_event(event.clone()).await.unwrap();
-    topology.stop().await;
-    let res1v1 = h_out1v1.await.unwrap();
-    let res1v2 = h_out1v2.await.unwrap();
+    // Send an event into both source #1 and source #2:
+    let event1 = Event::from("this");
+    let event2 = Event::from("that");
 
-    assert_eq!(Vec::<String>::new(), res1v1);
-    assert_eq!(vec!["this replaced"], res1v2);
+    let h_out1 = tokio::spawn(out1.flat_map(into_message_stream).collect::<Vec<_>>());
+    let h_out2 = tokio::spawn(out2.flat_map(into_message_stream).collect::<Vec<_>>());
+    in1.send_event(event1.clone()).await.unwrap();
+    in2.send_event(event2.clone()).await.unwrap();
+
+    // Drop the inputs to the two sources, which will ensure they drain all items and stop
+    // themselves, and also fully stop the topology:
+    drop(in1);
+    drop(in2);
+    topology.stop().await;
+
+    let res1 = h_out1.await.unwrap();
+    let res2 = h_out2.await.unwrap();
+
+    // We should see that since source #1 and #2 were the same, despite both being added as
+    // `in1`, that source #1 was not rebuilt, so the item sent to source #1 was the item that got
+    // transformed.
+    //
+    // Additionally, we should see that since sink #1 was replaced with sink #2, since they were
+    // attached to different transforms, despite being themselves added both as `out1`, that
+    // transform #2/sink #2 were used in the end, not transform #1/sink #1, thus giving us "this
+    // replaced" instead of "this transformed" or "that ...".
+    assert_eq!(Vec::<String>::new(), res1);
+    assert_eq!(vec!["this replaced"], res2);
 }
 
 #[ignore] // TODO: issue #2186
@@ -646,6 +700,8 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
 
 #[tokio::test]
 async fn topology_disk_buffer_flushes_on_idle() {
+    trace_init();
+
     let tmpdir = tempfile::tempdir().expect("no tmpdir");
     let event = Event::from("foo");
 

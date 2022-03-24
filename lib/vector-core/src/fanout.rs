@@ -154,6 +154,7 @@ impl Fanout {
 
         // Nothing to send if we have no sender.
         if self.senders.is_empty() {
+            trace!("No senders present.");
             return;
         }
 
@@ -203,6 +204,7 @@ impl Fanout {
                     // All in-flight sends have completed, so return sinks to the base collection.
                     // We extend instead of assign here because other sinks could have been added
                     // while the send was in-flight.
+                    trace!("Sent item to fanout.");
                     break;
                 }
             }

@@ -16,17 +16,17 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{future, stream::BoxStream, FutureExt, Stream, StreamExt};
+use futures::{stream::BoxStream, FutureExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use tracing::{error, info};
+use tokio::sync::oneshot;
+use tracing::{error, info, trace};
 use vector::{
     config::{
         AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
         SourceContext, TransformConfig, TransformContext,
     },
     event::{
-        into_event_stream,
         metric::{self, MetricData, MetricValue},
         Event, EventArray, EventContainer, Value,
     },
@@ -170,30 +170,34 @@ impl SourceConfig for MockSourceConfig {
     async fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
-        let recv = wrapped.lock().unwrap().take().unwrap();
+        let mut recv = wrapped.lock().unwrap().take().unwrap();
         let shutdown = cx.shutdown;
         let mut out = cx.out;
-        Ok(Box::pin(async move {
-            let mut stream = recv
-                .into_stream()
-                .take_until(shutdown)
-                .inspect(move |array| {
-                    if let Some(counter) = &event_counter {
-                        counter.fetch_add(array.len(), Ordering::Relaxed);
-                    }
-                })
-                .flat_map(into_event_stream);
 
-            match out.send_event_stream(&mut stream).await {
-                Ok(()) => {
-                    info!("Finished sending.");
-                    Ok(())
-                }
-                Err(error) => {
-                    error!(message = "Error sending in sink..", %error);
-                    Err(())
+        Ok(Box::pin(async move {
+            tokio::pin!(shutdown);
+
+            loop {
+                tokio::select! {
+                    biased;
+
+                    Some(array) = recv.next() => {
+                        if let Some(counter) = &event_counter {
+                            counter.fetch_add(array.len(), Ordering::Relaxed);
+                        }
+
+                        if let Err(e) = out.send_event(array).await {
+                            error!(message = "Error sending in sink..", %e);
+                            return Err(())
+                        }
+                    },
+
+                    _ = &mut shutdown => break,
                 }
             }
+
+            info!("Finished sending.");
+            Ok(())
         }))
     }
 
@@ -367,16 +371,25 @@ enum HealthcheckError {
 #[typetag::serialize(name = "mock")]
 impl SinkConfig for MockSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+        // If this sink is set to not be healthy, just send the healthcheck error immediately over
+        // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
+        // started running, so that tests can request the topology be healthy before proceeding.
+        let (tx, rx) = oneshot::channel();
+
+        let health_tx = if self.healthy {
+            Some(tx)
+        } else {
+            let _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
+            None
+        };
+
         let sink = MockSink {
             acker: cx.acker(),
             sink: self.sink.clone(),
+            health_tx,
         };
 
-        let healthcheck = if self.healthy {
-            future::ok(())
-        } else {
-            future::err(HealthcheckError::Unhealthy.into())
-        };
+        let healthcheck = async move { rx.await.unwrap() };
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
@@ -401,21 +414,31 @@ impl SinkConfig for MockSinkConfig {
 struct MockSink {
     acker: Acker,
     sink: Mode,
+    health_tx: Option<oneshot::Sender<vector::Result<()>>>,
 }
 
 #[async_trait]
 impl StreamSink<Event> for MockSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        trace!("Mock sink running.");
+
         match self.sink {
             Mode::Normal(mut sink) => {
+                if let Some(tx) = self.health_tx.take() {
+                    let _ = tx.send(Ok(()));
+                }
+
                 // We have an inner sink, so forward the input normally
                 while let Some(event) = input.next().await {
+                    trace!("Received event.");
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
 
                     self.acker.ack(1);
                 }
+
+                info!("Finished receiving.");
             }
             Mode::Dead => {
                 // Simulate a dead sink and never poll the input
