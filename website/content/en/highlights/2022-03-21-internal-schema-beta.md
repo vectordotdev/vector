@@ -151,7 +151,7 @@ source = '''
   .timestamp_ms = to_unix_timestamp(.timestamp, unit: "milliseconds")
 '''
 ```
-## Schema Requirements
+### Schema Requirements
 
 The second part of this feature is the concept of schema requirements.
 
