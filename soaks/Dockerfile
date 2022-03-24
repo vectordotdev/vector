@@ -2,10 +2,6 @@
 # VECTOR BUILDER
 #
 FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37dbfed4d4059dcdf5114a5596e8ca9b5ef494f3 as builder
-# Smoke test, ensure image has the background bits we need before going through
-# an expensive release build.
-RUN ["/usr/local/bin/lading", "--help"]
-RUN ["/usr/local/bin/mold", "--version"]
 WORKDIR vector
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
