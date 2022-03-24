@@ -21,6 +21,11 @@ const HELM_VALUES_EXISTING_CONFIGMAP: &str = indoc! {r#"
     existingConfigMaps:
     - vector-agent-config
     dataDir: /vector-data-dir
+    service:
+      ports:
+      - name: prom-exporter
+        port: 9090
+        protocol: TCP
 "#};
 
 const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
