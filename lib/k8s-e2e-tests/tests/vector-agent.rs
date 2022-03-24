@@ -21,6 +21,7 @@ const HELM_VALUES_EXISTING_CONFIGMAP: &str = indoc! {r#"
     role: "Agent"
     existingConfigMaps:
     - vector-agent-config
+    dataDir: /vector-data-dir
 "#};
 
 const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
