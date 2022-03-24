@@ -346,7 +346,7 @@ impl BufferConfig {
         }
 
         builder
-            .build(span)
+            .build(buffer_id, span)
             .await
             .context(FailedToBuildTopologySnafu)
     }

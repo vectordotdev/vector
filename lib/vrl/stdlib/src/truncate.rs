@@ -91,7 +91,7 @@ impl Function for Truncate {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let limit = args.required("limit");
-        let ellipsis = args.optional("ellipsis").unwrap_or(value!(false));
+        let ellipsis = args.optional("ellipsis").unwrap_or_else(|| value!(false));
 
         truncate(value, limit, ellipsis)
     }
