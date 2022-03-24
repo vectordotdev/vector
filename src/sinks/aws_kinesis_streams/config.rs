@@ -1,18 +1,19 @@
-use std::{convert::TryInto, num::NonZeroU64};
+use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
+use aws_sdk_kinesis::types::SdkError;
+use std::num::NonZeroU64;
 
+use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
+use aws_smithy_client::erase::DynConnector;
+use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
-use rusoto_core::RusotoError;
-use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 
 use super::service::KinesisResponse;
+use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    aws::{
-        rusoto,
-        rusoto::{AwsAuthentication, RegionOrEndpoint},
-    },
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::{
@@ -25,14 +26,15 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsOptions,
 };
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeStream failed: {}", source))]
     DescribeStreamFailed {
-        source: RusotoError<rusoto_kinesis::DescribeStreamError>,
+        source: SdkError<DescribeStreamError>,
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -41,6 +43,37 @@ enum HealthcheckError {
         stream_name
     ))]
     NoMatchingStreamName { stream_name: String },
+}
+
+pub struct KinesisClientBuilder;
+
+impl ClientBuilder for KinesisClientBuilder {
+    type ConfigBuilder = aws_sdk_kinesis::config::Builder;
+    type Client = KinesisClient;
+
+    fn create_config_builder(
+        credentials_provider: SharedCredentialsProvider,
+    ) -> Self::ConfigBuilder {
+        Self::ConfigBuilder::new().credentials_provider(credentials_provider)
+    }
+
+    fn with_endpoint_resolver(
+        builder: Self::ConfigBuilder,
+        endpoint: Endpoint,
+    ) -> Self::ConfigBuilder {
+        builder.endpoint_resolver(endpoint)
+    }
+
+    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
+        builder.region(region)
+    }
+
+    fn client_from_conf_conn(
+        builder: Self::ConfigBuilder,
+        connector: DynConnector,
+    ) -> Self::Client {
+        Self::Client::from_conf_conn(builder.build(), connector)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -67,8 +100,6 @@ pub struct KinesisSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -83,15 +114,20 @@ impl KinesisSinkConfig {
     async fn healthcheck(self, client: KinesisClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
-        let req = client.describe_stream(DescribeStreamInput {
-            stream_name: stream_name.clone(),
-            exclusive_start_shard_id: None,
-            limit: Some(1),
-        });
+        let describe_result = client
+            .describe_stream()
+            .stream_name(stream_name.clone())
+            .set_exclusive_start_shard_id(None)
+            .limit(1)
+            .send()
+            .await;
 
-        match req.await {
+        match describe_result {
             Ok(resp) => {
-                let name = resp.stream_description.stream_name;
+                let name = resp
+                    .stream_description
+                    .and_then(|x| x.stream_name)
+                    .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
                 } else {
@@ -102,15 +138,15 @@ impl KinesisSinkConfig {
         }
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
-        let region = (&self.region).try_into()?;
-
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(KinesisClient::new_with_client(client, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
+        create_client::<KinesisClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+            &self.tls,
+        )
+        .await
     }
 }
 
@@ -118,14 +154,14 @@ impl KinesisSinkConfig {
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
-        let region = self.region.clone().try_into()?;
+        let region = self.region.region();
         let service = ServiceBuilder::new()
             .settings(request_settings, KinesisRetryLogic)
             .service(KinesisService {
@@ -177,14 +213,16 @@ impl GenerateConfig for KinesisSinkConfig {
 struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = RusotoError<PutRecordsError>;
+    type Error = SdkError<PutRecordsError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
-            error => rusoto::is_retriable_error(error),
+        if let SdkError::ServiceError { err, raw: _ } = error {
+            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = err.kind {
+                return true;
+            }
         }
+        is_retriable_error(error)
     }
 }
 

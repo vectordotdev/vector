@@ -407,7 +407,7 @@ impl Source {
         let events = events.flatten();
         let events = events.map(move |line| {
             let byte_size = line.text.len();
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size,
                 protocol: "http",
             });
@@ -419,14 +419,14 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(&KubernetesLogsEventsReceived {
+            emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event.size_of(),
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
 
             if file_info.is_none() {
-                emit!(&KubernetesLogsEventAnnotationError { event: &event });
+                emit!(KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -434,7 +434,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(&KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
                 }
             }
@@ -458,7 +458,7 @@ impl Source {
             let fut =
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Reflector process completed gracefully."),
-                    Err(error) => emit!(&KubernetesLifecycleError {
+                    Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Reflector process exited with an error."
                     }),
@@ -470,7 +470,7 @@ impl Source {
             let fut =
                 util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-                    Err(error) => emit!(&KubernetesLifecycleError {
+                    Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Namespace reflector process exited with an error.",
                     }),
@@ -482,7 +482,7 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(&KubernetesLifecycleError {
+                    Err(error) => emit!(KubernetesLifecycleError {
                         message: "File server exited with an error.",
                         error,
                     }),
@@ -499,11 +499,11 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => emit!(&StreamClosedError {
+                    Ok(Err(error)) => emit!(StreamClosedError {
                         error,
                         count: events_count
                     }),
-                    Err(error) => emit!(&KubernetesLifecycleError {
+                    Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Event processing loop timed out during the shutdown.",
                     }),

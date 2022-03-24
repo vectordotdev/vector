@@ -100,7 +100,7 @@ where
                 match request {
                     Err(e) => {
                         let (message, error_code, dropped_events) = e.into_parts();
-                        emit!(&DatadogMetricsEncodingError {
+                        emit!(DatadogMetricsEncodingError {
                             message,
                             error_code,
                             dropped_events,

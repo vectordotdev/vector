@@ -106,7 +106,7 @@ fn encode_event(
         .and_then(|t| {
             t.render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("process"),
                         drop_event: false,

@@ -128,7 +128,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(&ParserConversionError { name, error });
+                                        emit!(ParserConversionError { name, error });
                                         None
                                     }
                                 }
@@ -137,7 +137,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(&ParserMatchError { value });
+                emit!(ParserMatchError { value });
                 None
             }
         }
@@ -252,7 +252,7 @@ impl FunctionTransform for RegexParser {
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(&ParserMatchError { value });
+                    emit!(ParserMatchError { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -274,7 +274,7 @@ impl FunctionTransform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field.as_str());
                         } else {
-                            emit!(&ParserTargetExistsError { target_field });
+                            emit!(ParserTargetExistsError { target_field });
                             output.push(event);
                             return;
                         }
@@ -294,7 +294,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         }
 
         if !self.drop_failed {

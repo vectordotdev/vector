@@ -454,7 +454,7 @@ where
                 let status = result_status(result);
                 finalizers.update_status(status);
                 if status == EventStatus::Delivered {
-                    emit!(&EventsSent {
+                    emit!(EventsSent {
                         count,
                         byte_size,
                         output: None

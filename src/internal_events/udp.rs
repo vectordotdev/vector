@@ -7,11 +7,8 @@ use vector_core::internal_event::InternalEvent;
 pub struct UdpSocketConnectionEstablished;
 
 impl InternalEvent for UdpSocketConnectionEstablished {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Connected.");
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_established_total", 1, "mode" => "udp");
     }
 }
@@ -25,11 +22,8 @@ impl<E> InternalEvent for UdpSocketConnectionFailed<E>
 where
     E: std::error::Error,
 {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Unable to connect.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
@@ -40,11 +34,8 @@ pub struct UdpSocketError {
 }
 
 impl InternalEvent for UdpSocketError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "UDP socket error.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_errors_total", 1, "mode" => "udp");
     }
 }
@@ -56,7 +47,7 @@ pub struct UdpSendIncomplete {
 }
 
 impl InternalEvent for UdpSendIncomplete {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Could not send all data in one UDP packet; dropping some data.",
             data_size = self.data_size,
@@ -64,9 +55,6 @@ impl InternalEvent for UdpSendIncomplete {
             dropped = self.data_size - self.sent,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_send_errors_total", 1, "mode" => "udp");
     }
 }

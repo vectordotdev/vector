@@ -154,8 +154,12 @@ impl Expression for Assignment {
         self.variant.type_def(state)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        self.variant.compile_to_vm(vm)
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        self.variant.compile_to_vm(vm, state)
     }
 }
 
@@ -405,11 +409,15 @@ where
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         match self {
             Variant::Single { target, expr } => {
                 // Compile the expression which will leave the result at the top of the stack.
-                expr.compile_to_vm(vm)?;
+                expr.compile_to_vm(vm, state)?;
 
                 vm.write_opcode(OpCode::SetPath);
 
@@ -425,7 +433,7 @@ where
                 default,
             } => {
                 // Compile the expression which will leave the result at the top of the stack.
-                expr.compile_to_vm(vm)?;
+                expr.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::SetPathInfallible);
 
                 // Write the target for the `Ok` path.

@@ -115,7 +115,7 @@ impl ElasticsearchCommonMode {
             Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -135,7 +135,7 @@ impl ElasticsearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(&TemplateRenderingError {
+                        emit!(TemplateRenderingError {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,

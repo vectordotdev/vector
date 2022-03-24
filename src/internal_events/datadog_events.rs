@@ -7,7 +7,7 @@ pub struct DatadogEventsProcessed {
 }
 
 impl InternalEvent for DatadogEventsProcessed {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
