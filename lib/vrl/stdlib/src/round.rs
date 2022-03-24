@@ -76,7 +76,7 @@ impl Function for Round {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
-        let precision = args.optional("precision").unwrap_or(value!(0));
+        let precision = args.optional("precision").unwrap_or_else(|| value!(0));
 
         round(precision, value)
     }

@@ -12,7 +12,7 @@ use vector_common::internal_event::emit;
 
 use crate::{
     internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped},
-    WhenFull,
+    spawn_named, WhenFull,
 };
 
 #[derive(Clone, Debug)]
@@ -177,55 +177,55 @@ impl BufferUsage {
         handle
     }
 
-    pub fn install(self) {
+    pub fn install(self, buffer_id: &str) {
         let span = self.span;
         let stages = self.stages;
 
-        tokio::spawn(
-            async move {
-                let mut interval = interval(Duration::from_secs(2));
-                loop {
-                    interval.tick().await;
+        let task = async move {
+            let mut interval = interval(Duration::from_secs(2));
+            loop {
+                interval.tick().await;
 
-                    for stage in &stages {
-                        let max_size_bytes = match stage.max_size_bytes.load(Ordering::Relaxed) {
-                            0 => None,
-                            n => Some(n),
-                        };
+                for stage in &stages {
+                    let max_size_bytes = match stage.max_size_bytes.load(Ordering::Relaxed) {
+                        0 => None,
+                        n => Some(n),
+                    };
 
-                        let max_size_events = match stage.max_size_events.load(Ordering::Relaxed) {
-                            0 => None,
-                            n => Some(n),
-                        };
+                    let max_size_events = match stage.max_size_events.load(Ordering::Relaxed) {
+                        0 => None,
+                        n => Some(n),
+                    };
 
-                        emit(BufferCreated {
+                    emit(BufferCreated {
+                        idx: stage.idx,
+                        max_size_bytes,
+                        max_size_events,
+                    });
+
+                    emit(BufferEventsReceived {
+                        idx: stage.idx,
+                        count: stage.received_event_count.swap(0, Ordering::Relaxed),
+                        byte_size: stage.received_byte_size.swap(0, Ordering::Relaxed),
+                    });
+
+                    emit(BufferEventsSent {
+                        idx: stage.idx,
+                        count: stage.sent_event_count.swap(0, Ordering::Relaxed),
+                        byte_size: stage.sent_byte_size.swap(0, Ordering::Relaxed),
+                    });
+
+                    if let Some(dropped_event_count) = &stage.dropped_event_count {
+                        emit(EventsDropped {
                             idx: stage.idx,
-                            max_size_bytes,
-                            max_size_events,
+                            count: dropped_event_count.swap(0, Ordering::Relaxed),
                         });
-
-                        emit(BufferEventsReceived {
-                            idx: stage.idx,
-                            count: stage.received_event_count.swap(0, Ordering::Relaxed),
-                            byte_size: stage.received_byte_size.swap(0, Ordering::Relaxed),
-                        });
-
-                        emit(BufferEventsSent {
-                            idx: stage.idx,
-                            count: stage.sent_event_count.swap(0, Ordering::Relaxed),
-                            byte_size: stage.sent_byte_size.swap(0, Ordering::Relaxed),
-                        });
-
-                        if let Some(dropped_event_count) = &stage.dropped_event_count {
-                            emit(EventsDropped {
-                                idx: stage.idx,
-                                count: dropped_event_count.swap(0, Ordering::Relaxed),
-                            });
-                        }
                     }
                 }
             }
-            .instrument(span.or_current()),
-        );
+        };
+
+        let task_name = format!("buffer usage reporter ({})", buffer_id);
+        spawn_named(task.instrument(span.or_current()), task_name.as_str());
     }
 }
