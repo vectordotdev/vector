@@ -261,7 +261,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 6 \
+                                  --replicas 4 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
@@ -347,7 +347,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 6 \
+                                  --replicas 4 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
