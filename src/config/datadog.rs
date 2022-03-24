@@ -21,6 +21,7 @@ static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
+const DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -177,7 +178,10 @@ pub async fn try_attach(
         _ => return Err(PipelinesError::MissingApiKey),
     };
 
-    info!("Datadog API key provided. Integration with Datadog Observability Pipelines is enabled.");
+    info!(
+        "Datadog API key provided. Integration with {} is enabled.",
+        DATADOG_REPORTING_PRODUCT
+    );
 
     // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
     let config_version = config.version.as_ref().expect("Config should be versioned");
@@ -228,15 +232,15 @@ pub async fn try_attach(
         {
             Ok(()) => {
                 info!(
-                    "Vector config {} successfully reported to Datadog Observability Pipelines",
-                    &config_version
+                    "Vector config {} successfully reported to {}",
+                    &config_version, DATADOG_REPORTING_PRODUCT
                 );
                 break;
             }
             Err(err) => {
                 error!(
-                    message = "Could not report Vector config to Datadog Observability Pipelines",
-                    err = ?err.to_error_string()
+                    err = ?err.to_error_string(),
+                    "Could not report Vector config to {}", DATADOG_REPORTING_PRODUCT
                 );
 
                 if let ReportingError::StatusCode(status) = err {
@@ -260,8 +264,8 @@ pub async fn try_attach(
 
         // If we're at this point, there was an error that was deemed non-fatal, so retry.
         info!(
-            "Retrying config reporting to Datadog Observability Pipelines in {} seconds",
-            datadog.retry_interval_secs
+            "Retrying config reporting to {} in {} seconds",
+            DATADOG_REPORTING_PRODUCT, datadog.retry_interval_secs
         );
 
         // Sleep for the user-provided interval before retrying.
@@ -351,7 +355,10 @@ fn build_request<'a>(
         .header("DD-API-KEY", auth.api_key)
         .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
-        .expect("couldn't create Datadog Pipelines HTTP request. Please report")
+        .expect(&format!(
+            "couldn't create {} HTTP request. Please report",
+            DATADOG_REPORTING_PRODUCT
+        ))
 }
 
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
