@@ -213,7 +213,6 @@ pub(crate) use self::geoip::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
-    feature = "sinks-http",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
     feature = "sources-aws_ecs_metrics",
