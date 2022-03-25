@@ -440,6 +440,7 @@ jobs:
                                          --warmup-seconds 30 \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
+                                         --mean-drift-percentage 7 \
                                          --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
       - uses: actions/upload-artifact@v2
         with:
@@ -490,6 +491,7 @@ jobs:
           ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
+                                         --mean-drift-percentage 7 \
                                          --p-value 0.1
 
   plot-analysis:
