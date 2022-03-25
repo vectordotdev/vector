@@ -13,6 +13,6 @@ pub fn create_disk_v1_acker(ack_counter: &Arc<AtomicUsize>, read_waker: &Arc<Not
 
     Acker::segmented(move |amount: usize| {
         counter.fetch_add(amount, Ordering::Relaxed);
-        notifier.notify_waiters();
+        notifier.notify_one();
     })
 }

@@ -337,7 +337,6 @@ async fn handle_stream<T>(
                         source.handle_events(&mut events, host.clone());
                         match out.send_batch(events).await {
                             Ok(_) => {
-                                info!("Sent events, waiting on acknowledgements if configured...");
                                 let ack = match receiver {
                                     None => TcpSourceAck::Ack,
                                     Some(receiver) =>
@@ -355,7 +354,6 @@ async fn handle_stream<T>(
                                             }
                                         }
                                 };
-                                info!("Got acknowledgement response (or no-op)!");
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {

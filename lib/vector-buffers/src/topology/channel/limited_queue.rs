@@ -207,8 +207,7 @@ impl<T: Send + 'static> LimitedReceiver<T> {
 
             // We're not closed, so we need to wait for a writer to tell us they made some
             // progress.  This might end up being a spurious wakeup since `Notify` will
-            // store up to one wakeup that gets consumed by the next call to `poll_notify`,
-            // but alas.
+            // store a wake-up if there are no waiters, but oh well.
             self.inner.read_waker.notified().await;
         }
     }

@@ -34,6 +34,8 @@ impl fmt::Debug for ControlMessage {
     }
 }
 
+// TODO: We should really wrap this in a custom type that has dedicated methods for each operation
+// so that high-lever components don't need to do the raw channel sends, etc.
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
@@ -63,7 +65,7 @@ impl Fanout {
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders.insert(id, Some(Sender::idle(sink)));
+        self.senders.insert(id, Some(Sender::new(sink)));
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -80,7 +82,7 @@ impl Fanout {
                 // paused or consumed when the `SendGroup` was created), otherwise an invalid
                 // sequence of control operations has been applied.
                 assert!(
-                    sender.replace(Sender::idle(sink)).is_none(),
+                    sender.replace(Sender::new(sink)).is_none(),
                     "Replacing existing sink is not valid: {id}"
                 );
             }
@@ -192,7 +194,7 @@ impl Fanout {
                             send_group.remove(&id);
                         },
                         Some(ControlMessage::Replace(id, Some(sink))) => {
-                            send_group.replace(&id, Sender::idle(sink));
+                            send_group.replace(&id, Sender::new(sink));
                         },
                         Some(ControlMessage::Replace(id, None)) => {
                             send_group.pause(&id);
@@ -271,7 +273,7 @@ impl<'a> SendGroup<'a> {
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(
             self.senders
-                .insert(id.clone(), Some(Sender::idle(sink)))
+                .insert(id.clone(), Some(Sender::new(sink)))
                 .is_none(),
             "Adding duplicate output id to fanout: {id}"
         );
@@ -358,7 +360,7 @@ struct Sender {
 }
 
 impl Sender {
-    fn idle(inner: BufferSender<EventArray>) -> Self {
+    fn new(inner: BufferSender<EventArray>) -> Self {
         Self { inner, input: None }
     }
 

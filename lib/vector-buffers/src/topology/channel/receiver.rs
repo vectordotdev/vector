@@ -78,7 +78,6 @@ where
 pub struct BufferReceiver<T: Bufferable> {
     base: ReceiverAdapter<T>,
     overflow: Option<Box<BufferReceiver<T>>>,
-    //strategy: PollStrategy,
     instrumentation: Option<BufferUsageHandle>,
 }
 
@@ -88,7 +87,6 @@ impl<T: Bufferable> BufferReceiver<T> {
         Self {
             base,
             overflow: None,
-            //strategy: PollStrategy::default(),
             instrumentation: None,
         }
     }
@@ -98,7 +96,6 @@ impl<T: Bufferable> BufferReceiver<T> {
         Self {
             base,
             overflow: Some(Box::new(overflow)),
-            //strategy: PollStrategy::default(),
             instrumentation: None,
         }
     }

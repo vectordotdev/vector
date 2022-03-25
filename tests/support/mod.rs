@@ -20,7 +20,7 @@ use futures::{stream::BoxStream, FutureExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::sync::oneshot;
-use tracing::{error, info, trace};
+use tracing::{error, info};
 use vector::{
     config::{
         AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
@@ -434,8 +434,6 @@ struct MockSink {
 #[async_trait]
 impl StreamSink<Event> for MockSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        trace!("Mock sink running.");
-
         match self.sink {
             Mode::Normal(mut sink) => {
                 if let Some(tx) = self.health_tx.take() {
@@ -444,15 +442,12 @@ impl StreamSink<Event> for MockSink {
 
                 // We have an inner sink, so forward the input normally
                 while let Some(event) = input.next().await {
-                    trace!("Received event.");
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
 
                     self.acker.ack(1);
                 }
-
-                info!("Finished receiving.");
             }
             Mode::Dead => {
                 // Simulate a dead sink and never poll the input

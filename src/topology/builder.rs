@@ -176,12 +176,11 @@ pub async fn build_pieces(
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
-                trace!("Source pump starting.");
+                debug!("Source pump starting.");
                 while let Some(array) = rx.next().await {
-                    trace!("Forwarding item from source pump to fanout.");
                     fanout.send(array).await;
                 }
-                trace!("Source pump finished.");
+                debug!("Source pump finished.");
                 Ok(TaskOutput::Source)
             };
 
@@ -350,7 +349,10 @@ pub async fn build_pieces(
             };
             let buffer_span = error_span!(
                 "sink",
+                component_kind = "sink",
                 component_id = %key.id(),
+                component_type = typetag,
+                component_name = %key.id(),
                 buffer_type = buffer_type,
             );
             let buffer = sink
