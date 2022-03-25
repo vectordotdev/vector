@@ -400,7 +400,7 @@ jobs:
       - test-mac
       - test-windows
       - test-vrl
-      - check-component-features
+      - check-features
       - checks
     runs-on: ubuntu-20.04
     steps:
