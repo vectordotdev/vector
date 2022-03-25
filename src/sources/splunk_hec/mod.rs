@@ -207,7 +207,11 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
 
         warp::post()
-            .and(path!("event").or(path!("event" / "1.0")))
+            .and(
+                path!("event")
+                    .or(path!("event" / "1.0"))
+                    .or(warp::path::end()),
+            )
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
@@ -1307,6 +1311,25 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+        assert!(event.metadata().splunk_hec_token().is_none());
+    }
+
+    #[tokio::test]
+    async fn root() {
+        let message = r#"{ "event": { "message": "root"} }"#;
+        let (source, address) = source(None).await;
+
+        assert_eq!(200, post(address, "services/collector", message).await);
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()[log_schema().message_key()], "root".into());
         assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
