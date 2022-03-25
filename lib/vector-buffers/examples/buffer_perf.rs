@@ -277,7 +277,7 @@ where
         .expect("should not fail to to add variant to builder");
 
     builder
-        .build(Span::none())
+        .build(String::from("buffer_perf"), Span::none())
         .await
         .expect("build should not fail")
 }

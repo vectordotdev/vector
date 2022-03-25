@@ -1,3 +1,0 @@
-worker_threads: 1
-binding_addr: "0.0.0.0:8080"
-prometheus_addr: "0.0.0.0:9090"
