@@ -301,15 +301,15 @@ jobs:
           cargo install cargo-workspaces --version 0.2.32
       - name: List workspaces
         run: |
-          cargo workspaces list --all --json
+          cargo workspaces list --all --json | jq '.[].name' | jq --slurp '{"package": .}'
 
   check-features:
-    name: Check Features ${{ matrix.name }} - Linux
+    name: Check Features ${{ matrix.package }} - Linux
     runs-on: [linux, test-runner]
     needs: [changes, compute-check-features-matrix]
     if: ${{ needs.changes.outputs.source == 'true' }}
     strategy:
-      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.stdout ) }}
     steps:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
@@ -317,7 +317,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-hack
       - name: check features
-        run: make check-features PACKAGE=${{ matrix.name }}
+        run: make check-features PACKAGE=${{ matrix.package }}
 
   check-msrv:
     name: Check minimum supported Rust version
