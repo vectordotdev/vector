@@ -12,6 +12,7 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
+use crate::tls::{MaybeTlsSettings, TlsConfig};
 use crate::{
     common::datadog::get_base_domain,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -118,6 +119,7 @@ pub struct DatadogMetricsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+    tls: Option<TlsConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -189,7 +191,11 @@ impl DatadogMetricsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
+        let client = HttpClient::new(tls_settings, proxy)?;
         Ok(client)
     }
 
