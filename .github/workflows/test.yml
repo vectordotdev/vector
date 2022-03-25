@@ -292,7 +292,7 @@ jobs:
     name: Compute check features matrix
     runs-on: ubuntu-20.04
     outputs:
-      matrix: ${{ steps.list-workspaces.outputs.stdout }}
+      matrix: ${{ steps.list-workspaces.outputs.packages }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -301,7 +301,8 @@ jobs:
           cargo install cargo-workspaces --version 0.2.32
       - name: List workspaces
         run: |
-          cargo workspaces list --all --json | jq '.[].name' | jq --slurp '{"package": .}'
+          packages="$(cargo workspaces list --all --json | jq '.[].name' | jq --slurp '{\"package\": .}' --compact-output)"
+          echo "::set-output name=packages::$packages"
 
   check-features:
     name: Check Features ${{ matrix.package }} - Linux
@@ -309,7 +310,7 @@ jobs:
     needs: [changes, compute-check-features-matrix]
     if: ${{ needs.changes.outputs.source == 'true' }}
     strategy:
-      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.stdout ) }}
+      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.packages ) }}
     steps:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
