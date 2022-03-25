@@ -266,17 +266,18 @@ configuration: {
 						command: {
 							description: """
 								The command to be run, plus any arguments required. It shall comply with the
-								[Datadog Agent executable API](\(\urls.datadog_agent_exec_api)).
+								[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
 								"""
 							required: true
-							type: array: {
-								examples: [["/path/to/get-secret", "-s"]]
-								items: type: string: {}
+							common:   true
+							type: array: items: type: string: {
+								examples: ["/path/to/get-secret", "-s"]
 							}
 						}
-						timeout {
+						timeout: {
 							description: "The amount of time Vector will wait for the command to complete."
 							required:    false
+							common:      false
 							type: uint: {
 								default: 5
 								unit:    "seconds"
