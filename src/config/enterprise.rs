@@ -266,8 +266,8 @@ pub async fn try_attach(
                             //
                             // A fatal error is currently determined to be one of the following:
                             //
-                            // - 4xx class of status code
-                            if status.is_client_error() {
+                            // - 4xx class of status code (429 excepted; treated as a retry).
+                            if status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS {
                                 if datadog.exit_on_fatal_error {
                                     return Err(PipelinesError::FatalCouldNotReportConfig);
                                 } else {
