@@ -209,7 +209,7 @@ pub struct SqsMessageProcessingSucceeded<'a> {
 
 impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
     fn emit(self) {
-        trace!(message = "Processed SQS message succeededly.", message_id = %self.message_id);
+        trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
         counter!("sqs_message_processing_succeeded_total", 1);
     }
 }

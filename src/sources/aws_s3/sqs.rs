@@ -303,6 +303,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
+                    println!("PRocessing err: {:?}", err);
                     emit!(SqsMessageProcessingError {
                         message_id: &message_id,
                         error: &err,
@@ -328,6 +329,7 @@ impl IngestorProcess {
 
                     if let Some(failed_entries) = &result.failed {
                         if !failed_entries.is_empty() {
+                            println!("Failed entries: {:?}", failed_entries);
                             emit!(SqsMessageDeletePartialError {
                                 entries: result.failed.unwrap_or_default()
                             });
@@ -335,6 +337,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
+                    println!("Failed err: {:?}", err);
                     emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
@@ -371,6 +374,7 @@ impl IngestorProcess {
             });
         }
 
+        // event_name: S3EventName { kind: "Put", name: "ObjectCreated" }
         if s3_event.event_name.kind != "ObjectCreated" {
             emit!(SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
@@ -391,7 +395,7 @@ impl IngestorProcess {
             });
         }
 
-        let object = self
+        let object_result = self
             .state
             .s3_client
             .get_object()
@@ -402,7 +406,9 @@ impl IngestorProcess {
             .context(GetObjectSnafu {
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
-            })?;
+            });
+
+        let object = object_result?;
 
         let metadata = object.metadata;
         let timestamp = object
@@ -565,25 +571,25 @@ impl IngestorProcess {
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
-struct S3Event {
-    records: Vec<S3EventRecord>,
+pub struct S3Event {
+    pub records: Vec<S3EventRecord>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct S3EventRecord {
-    event_version: S3EventVersion,
-    event_source: String,
-    aws_region: String,
-    event_name: S3EventName,
+pub struct S3EventRecord {
+    pub event_version: S3EventVersion,
+    pub event_source: String,
+    pub aws_region: String,
+    pub event_name: S3EventName,
 
-    s3: S3Message,
+    pub s3: S3Message,
 }
 
 #[derive(Clone, Debug)]
-struct S3EventVersion {
-    major: u64,
-    minor: u64,
+pub struct S3EventVersion {
+    pub major: u64,
+    pub minor: u64,
 }
 
 impl From<S3EventVersion> for semver::Version {
@@ -631,9 +637,9 @@ impl Serialize for S3EventVersion {
 }
 
 #[derive(Clone, Debug)]
-struct S3EventName {
-    kind: String,
-    name: String,
+pub struct S3EventName {
+    pub kind: String,
+    pub name: String,
 }
 
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#supported-notification-event-types
@@ -672,30 +678,30 @@ impl Serialize for S3EventName {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&format!("{}:{}", self.name, self.kind))
+        serializer.serialize_str(&format!("{}:{}", self.kind, self.name))
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct S3Message {
-    bucket: S3Bucket,
-    object: S3Object,
+pub struct S3Message {
+    pub bucket: S3Bucket,
+    pub object: S3Object,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct S3Bucket {
-    name: String,
+pub struct S3Bucket {
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct S3Object {
+pub struct S3Object {
     // S3ObjectKeys are URL encoded
     // https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html
     #[serde(with = "urlencoded_string")]
-    key: String,
+    pub key: String,
 }
 
 mod urlencoded_string {

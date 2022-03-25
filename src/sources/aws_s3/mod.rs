@@ -6,6 +6,7 @@ use aws_sdk_cloudwatch::{Endpoint, Region};
 use aws_sdk_s3::types::ByteStream;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
+use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -146,21 +147,6 @@ impl AwsS3Config {
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
     ) -> crate::Result<sqs::Ingestor> {
-        // let region: Region = (&self.region).try_into().context(RegionParseSnafu {})?;
-
-        // let client = rusoto::client(None, proxy).with_context(|_| ClientSnafu {})?;
-        // let creds: Arc<rusoto::AwsCredentialsProvider> = self
-        //     .auth
-        //     .build(&region, self.assume_role.clone())
-        //     .context(CredentialsSnafu {})?
-        //     .into();
-
-        // let s3_client = S3Client::new_with(
-        //     client.clone(),
-        //     Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
-        //     region.clone(),
-        // );
-
         let region = self
             .region
             .region()
@@ -182,12 +168,6 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
-                // let sqs_client = SqsClient::new_with(
-                //     client.clone(),
-                //     Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
-                //     region.clone(),
-                // );
-
                 let sqs_client = create_client::<SqsClientBuilder>(
                     &self.auth,
                     Some(region.clone()),
@@ -238,20 +218,17 @@ async fn s3_object_decoder(
     content_type: Option<&str>,
     mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    let _first = if let Some(first) = body.next().await {
+    let first = if let Some(first) = body.next().await {
         first
     } else {
         return Box::new(tokio::io::empty());
     };
 
-    let r = tokio::io::BufReader::new(
-        // rusoto_s3::StreamingBody::new(stream::iter(Some(first)).chain(body)).into_async_read(),
-        StreamReader::new(body.map_err(|e| std::io::Error::new(ErrorKind::Other, e))),
-    );
-
-    // let r = unim
-
-    // body.
+    let r = tokio::io::BufReader::new(StreamReader::new(
+        stream::iter(Some(first))
+            .chain(body)
+            .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
+    ));
 
     let compression = match compression {
         Auto => {
@@ -385,20 +362,20 @@ mod integration_tests {
     use std::fs::File;
     use std::io::{self, BufRead};
     use std::path::Path;
+    use std::time::Duration;
 
-    use aws_sdk_s3::model::{Event, NotificationConfiguration, QueueConfiguration};
     use aws_sdk_s3::types::ByteStream;
-    use aws_sdk_s3::{Client as S3Client, Endpoint, Region};
+    use aws_sdk_s3::Client as S3Client;
+    use aws_sdk_sqs::model::QueueAttributeName;
     use aws_sdk_sqs::Client as SqsClient;
     use pretty_assertions::assert_eq;
-    use rusoto_s3::S3;
-    use tokio::time::Duration;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::aws::aws_sdk::create_client;
     use crate::aws::{AwsAuthentication, RegionOrEndpoint};
     use crate::common::sqs::SqsClientBuilder;
     use crate::config::ProxyConfig;
+    use crate::sources::aws_s3::sqs::S3Event;
     use crate::sources::aws_s3::S3ClientBuilder;
     use crate::{
         config::{SourceConfig, SourceContext},
@@ -590,7 +567,7 @@ mod integration_tests {
             ..Default::default()
         }
     }
-
+    //
     // puts an object and asserts that the logs it gets back match
     async fn test_event(
         key: Option<String>,
@@ -607,13 +584,13 @@ mod integration_tests {
         let sqs = sqs_client().await;
 
         let queue = create_queue(&sqs).await;
-        let bucket = create_bucket(&s3, &queue).await;
+        let bucket = create_bucket(&s3).await;
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         let config = config(&queue, multiline);
 
-        // tokio::time::sleep(Duration::from_secs(2)).await;
-        let put_object_result = s3
-            .put_object()
+        s3.put_object()
             .bucket(bucket.clone())
             .key(key.clone())
             .body(ByteStream::from(payload))
@@ -623,28 +600,63 @@ mod integration_tests {
             .await
             .expect("Could not put object");
 
-        // let region = ;
+        let sqs_client = sqs_client().await;
 
-        // let old_s3 = rusoto_s3::S3Client::new(rusoto_core::Region::Custom {
-        //     name: "us-east-1".to_owned(),
-        //     endpoint: s3_address(),
-        // });
-        //
-        // old_s3
-        //     .put_object(rusoto_s3::PutObjectRequest {
-        //         bucket: bucket.clone(),
-        //         key: key.clone(),
-        //         body: Some(rusoto_core::ByteStream::from(payload)),
-        //         content_type: content_type.map(|t| t.to_owned()),
-        //         content_encoding: content_encoding.map(|t| t.to_owned()),
-        //         ..Default::default()
-        //     })
-        //     .await
-        //     .expect("Could not put object");
+        let mut s3_event: S3Event = serde_json::from_str(
+            r#"
+{
+   "Records":[
+      {
+         "eventVersion":"2.1",
+         "eventSource":"aws:s3",
+         "awsRegion":"us-east-1",
+         "eventTime":"2022-03-24T19:43:00.548Z",
+         "eventName":"ObjectCreated:Put",
+         "userIdentity":{
+            "principalId":"AWS:ARNOTAREALIDD4:user.name"
+         },
+         "requestParameters":{
+            "sourceIPAddress":"136.56.73.213"
+         },
+         "responseElements":{
+            "x-amz-request-id":"ZX6X98Q6NM9NQTP3",
+            "x-amz-id-2":"ESLLtyT4N5cAPW+C9EXwtaeEWz6nq7eCA6txjZKlG2Q7xp2nHXQI69Od2B0PiYIbhUiX26NrpIQPV0lLI6js3nVNmYo2SWBs"
+         },
+         "s3":{
+            "s3SchemaVersion":"1.0",
+            "configurationId":"asdfasdf",
+            "bucket":{
+               "name":"bucket-name",
+               "ownerIdentity":{
+                  "principalId":"A3PEG170DF9VNQ"
+               },
+               "arn":"arn:aws:s3:::nfox-testing-vector"
+            },
+            "object":{
+               "key":"test-log.txt",
+               "size":33,
+               "eTag":"c981ce6672c4251048b0b834e334007f",
+               "sequencer":"00623CC9C47AB5634C"
+            }
+         }
+      }
+   ]
+}
+        "#,
+        )
+        .unwrap();
 
-        // println!("Put object result: {:?}", put_object_result);
+        s3_event.records[0].s3.bucket.name = bucket.clone();
+        s3_event.records[0].s3.object.key = key.clone();
 
-        assert_eq!(count_messages(&sqs, &queue).await, 1);
+        // send SQS message (this is usually sent by S3 itself when an object is uploaded)
+        let _send_message_output = sqs_client
+            .send_message()
+            .queue_url(queue.clone())
+            .message_body(serde_json::to_string(&s3_event).unwrap())
+            .send()
+            .await
+            .unwrap();
 
         let (tx, rx) = SourceSender::new_test_finalize(status);
         let cx = SourceContext::new_test(tx, None);
@@ -665,12 +677,15 @@ mod integration_tests {
         }
 
         // Make sure the SQS message is deleted
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let expected_messages = match status {
-            Errored => 1,
-            _ => 0,
+        match status {
+            Errored => {
+                // need to wait up to the visibility timeout before it will be counted again
+                assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+            }
+            _ => {
+                assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
+            }
         };
-        assert_eq!(count_messages(&sqs, &queue).await, expected_messages);
     }
 
     /// creates a new SQS queue
@@ -682,36 +697,35 @@ mod integration_tests {
         let res = client
             .create_queue()
             .queue_name(queue_name.clone())
+            .attributes(QueueAttributeName::VisibilityTimeout, "2")
             .send()
             .await
             .expect("Could not create queue");
-        // tokio::time::sleep(Duration::from_secs(2)).await;
 
         res.queue_url.expect("no queue url")
     }
 
     /// count the number of messages in a SQS queue
-    async fn count_messages(client: &SqsClient, queue: &str) -> usize {
-        // tokio::time::sleep(Duration::from_secs(2)).await;
+    async fn count_messages(client: &SqsClient, queue: &str, wait_time_seconds: i32) -> usize {
         let sqs_result = client
             .receive_message()
             .queue_url(queue)
             .visibility_timeout(0)
+            .wait_time_seconds(wait_time_seconds)
             .send()
             .await
             .unwrap();
 
-        println!("SQS result: {:?}", sqs_result);
         sqs_result
             .messages
             .map(|messages| messages.len())
             .unwrap_or(0)
     }
 
-    /// creates a new bucket with notifications to given SQS queue
+    /// creates a new S3 bucket
     ///
     /// returns the bucket name
-    async fn create_bucket(client: &S3Client, queue_name: &str) -> String {
+    async fn create_bucket(client: &S3Client) -> String {
         let bucket_name = uuid::Uuid::new_v4().to_string();
 
         client
@@ -720,26 +734,6 @@ mod integration_tests {
             .send()
             .await
             .expect("Could not create bucket");
-        // tokio::time::sleep(Duration::from_secs(2)).await;
-
-        client
-            .put_bucket_notification_configuration()
-            .bucket(bucket_name.clone())
-            .set_expected_bucket_owner(None)
-            .notification_configuration(
-                NotificationConfiguration::builder()
-                    .queue_configurations(
-                        QueueConfiguration::builder()
-                            .set_events(Some(vec![Event::from("s3:ObjectCreated:*")]))
-                            .queue_arn(format!("arn:aws:sqs:us-east-1:000000000000:{}", queue_name))
-                            .build(),
-                    )
-                    .build(),
-            )
-            .send()
-            .await
-            .expect("Could not create bucket notification");
-        // tokio::time::sleep(Duration::from_secs(2)).await;
 
         bucket_name
     }
