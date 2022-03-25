@@ -297,10 +297,6 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 .PHONY: test
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
-# https://github.com/vectordotdev/vector/issues/11762
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
@@ -328,6 +324,7 @@ test-integration: test-integration-eventstoredb_metrics test-integration-fluent 
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-shutdown
 
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
@@ -340,6 +337,7 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-nats
@@ -350,10 +348,6 @@ ifeq ($(AUTOSPAWN), true)
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
-# https://github.com/vectordotdev/vector/issues/11762
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
@@ -364,6 +358,7 @@ tests/data/dnstap/socket:
 
 .PHONY: test-integration-dnstap
 test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-dnstap-cleanup
@@ -373,6 +368,7 @@ test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
@@ -382,21 +378,9 @@ endif
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
 	@scripts/test-e2e-kubernetes.sh
 
-.PHONY: test-shutdown
-test-shutdown: ## Runs shutdown tests
-	make test-integration-shutdown
-	make test-shutdown-cleanup
-
-test-shutdown-cleanup:
-	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
-
 .PHONY: test-cli
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
-# https://github.com/vectordotdev/vector/issues/11762
-ifneq ($(OPERATING_SYSTEM), Windows)
-	@scripts/upload-test-results.sh
-endif
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -639,10 +623,6 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 .PHONY: test-vrl
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
-
-.PHONY: check-stdlib-features
-check-stdlib-features: ## Ensure VRL stdlib features build
-	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
 
 ##@ Utility
 

@@ -159,7 +159,11 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        let outputs = transform.inner.outputs(&schema::Definition::empty());
+        let definition = schema::Definition::empty();
+        if let Err(errs) = transform.inner.validate(&definition) {
+            errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
+        }
+        let outputs = transform.inner.outputs(&definition);
         if outputs
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))

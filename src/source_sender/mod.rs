@@ -190,7 +190,7 @@ impl Inner {
         let byte_size = events.size_of();
         let count = events.len();
         self.inner.send(events).await?;
-        emit!(&EventsSent {
+        emit!(EventsSent {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
@@ -232,7 +232,7 @@ impl Inner {
                     byte_size += this_size;
                 }
                 Err(error) => {
-                    emit!(&EventsSent {
+                    emit!(EventsSent {
                         count,
                         byte_size,
                         output: Some(self.output.as_ref()),
@@ -242,7 +242,7 @@ impl Inner {
             }
         }
 
-        emit!(&EventsSent {
+        emit!(EventsSent {
             count,
             byte_size,
             output: Some(self.output.as_ref()),

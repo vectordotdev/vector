@@ -170,7 +170,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(&crate::internal_events::TemplateRenderingError {
+                emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,
@@ -254,7 +254,7 @@ impl HttpSink for LogdnaConfig {
             .as_millis();
 
         query.append_pair("hostname", &key.hostname);
-        query.append_pair("now", &format!("{}", now));
+        query.append_pair("now", &now.to_string());
 
         if let Some(mac) = &self.mac {
             query.append_pair("mac", mac);

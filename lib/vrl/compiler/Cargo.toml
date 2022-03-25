@@ -16,7 +16,7 @@ value = { path = "../../value" }
 bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"
-dyn-clone = "1.0.4"
+dyn-clone = "1.0.5"
 lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"

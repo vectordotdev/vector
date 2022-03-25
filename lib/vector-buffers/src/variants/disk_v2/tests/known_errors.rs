@@ -426,7 +426,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
     });
 
     let parent = trace_span!("writer_detects_when_last_record_has_scrambled_archive_data");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -536,7 +536,7 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
     });
 
     let parent = trace_span!("writer_detects_when_last_record_has_invalid_checksum");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -609,7 +609,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
     });
 
     let parent = trace_span!("writer_detects_when_last_record_wasnt_flushed");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -678,7 +678,7 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
 
     let parent =
         trace_span!("writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]

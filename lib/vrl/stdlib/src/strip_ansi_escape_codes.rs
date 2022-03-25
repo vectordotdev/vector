@@ -1,6 +1,15 @@
 use bytes::Bytes;
 use vrl::prelude::*;
 
+fn strip_ansi_escape_codes(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    strip_ansi_escapes::strip(&bytes)
+        .map(Bytes::from)
+        .map(Value::from)
+        .map(Into::into)
+        .map_err(|e| e.to_string().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct StripAnsiEscapeCodes;
 
@@ -31,6 +40,11 @@ impl Function for StripAnsiEscapeCodes {
 
         Ok(Box::new(StripAnsiEscapeCodesFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        strip_ansi_escape_codes(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,13 +54,9 @@ struct StripAnsiEscapeCodesFn {
 
 impl Expression for StripAnsiEscapeCodesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
 
-        strip_ansi_escapes::strip(&bytes)
-            .map(Bytes::from)
-            .map(Value::from)
-            .map(Into::into)
-            .map_err(|e| e.to_string().into())
+        strip_ansi_escape_codes(bytes)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -78,8 +78,8 @@ async fn run(
     while let Some(mut log) = rx.next().await {
         let byte_size = log.size_of();
         // This event doesn't emit any log
-        emit!(&InternalLogsBytesReceived { byte_size });
-        emit!(&InternalLogsEventsReceived {
+        emit!(InternalLogsBytesReceived { byte_size });
+        emit!(InternalLogsEventsReceived {
             count: 1,
             byte_size,
         });
@@ -91,7 +91,7 @@ async fn run(
         log.try_insert(log_schema().timestamp_key(), Utc::now());
         if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(&StreamClosedError { error, count: 1 });
+            emit!(StreamClosedError { error, count: 1 });
             return Err(());
         }
     }

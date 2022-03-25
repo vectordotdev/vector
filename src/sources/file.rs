@@ -346,7 +346,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(&FileBytesReceived {
+                emit!(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
@@ -396,13 +396,17 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_event_stream(&mut messages).instrument(span).await });
+        tokio::spawn(async move {
+            out.send_event_stream(&mut messages)
+                .instrument(span.or_current())
+                .await
+        });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(&FileOpen { count: 0 });
+            emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -462,7 +466,7 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> LogEvent {
-    emit!(&FileEventsReceived {
+    emit!(FileEventsReceived {
         count: 1,
         file: &file,
         byte_size: line.len(),

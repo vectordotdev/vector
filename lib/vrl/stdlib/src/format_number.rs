@@ -1,6 +1,85 @@
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use vrl::prelude::*;
 
+fn format_number(
+    value: Value,
+    scale: Option<Value>,
+    grouping_separator: Option<Value>,
+    decimal_separator: Option<Value>,
+) -> Resolved {
+    let value: Decimal = match value {
+        Value::Integer(v) => v.into(),
+        Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::integer() | Kind::float(),
+            }
+            .into())
+        }
+    };
+    let scale = match scale {
+        Some(expr) => Some(expr.try_integer()?),
+        None => None,
+    };
+    let grouping_separator = match grouping_separator {
+        Some(expr) => Some(expr.try_bytes()?),
+        None => None,
+    };
+    let decimal_separator = match decimal_separator {
+        Some(expr) => expr.try_bytes()?,
+        None => ".".into(),
+    };
+    // Split integral and fractional part of float.
+    let mut parts = value
+        .to_string()
+        .split('.')
+        .map(ToOwned::to_owned)
+        .collect::<Vec<String>>();
+    debug_assert!(parts.len() <= 2);
+    // Manipulate fractional part based on configuration.
+    match scale {
+        Some(i) if i == 0 => parts.truncate(1),
+        Some(i) => {
+            let i = i as usize;
+
+            if parts.len() == 1 {
+                parts.push("".to_owned())
+            }
+
+            if i > parts[1].len() {
+                for _ in 0..i - parts[1].len() {
+                    parts[1].push('0')
+                }
+            } else {
+                parts[1].truncate(i)
+            }
+        }
+        None => {}
+    }
+    // Manipulate integral part based on configuration.
+    if let Some(sep) = grouping_separator.as_deref() {
+        let sep = String::from_utf8_lossy(sep);
+        let start = parts[0].len() % 3;
+
+        let positions: Vec<usize> = parts[0]
+            .chars()
+            .skip(start)
+            .enumerate()
+            .map(|(i, _)| i)
+            .filter(|i| i % 3 == 0)
+            .collect();
+
+        for (i, pos) in positions.iter().enumerate() {
+            parts[0].insert_str(pos + (i * sep.len()) + start, &sep);
+        }
+    }
+    // Join results, using configured decimal separator.
+    Ok(parts
+        .join(&String::from_utf8_lossy(&decimal_separator[..]))
+        .into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct FormatNumber;
 
@@ -60,6 +139,15 @@ impl Function for FormatNumber {
             result: Ok("4_672,4"),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let scale = args.optional("scale");
+        let decimal_separator = args.optional("decimal_separator");
+        let grouping_separator = args.optional("grouping_separator");
+
+        format_number(value, scale, grouping_separator, decimal_separator)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -72,85 +160,24 @@ struct FormatNumberFn {
 
 impl Expression for FormatNumberFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value: Decimal = match self.value.resolve(ctx)? {
-            Value::Integer(v) => v.into(),
-            Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::integer() | Kind::float(),
-                }
-                .into())
-            }
-        };
+        let value = self.value.resolve(ctx)?;
+        let scale = self
+            .scale
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let grouping_separator = self
+            .grouping_separator
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let decimal_separator = self
+            .decimal_separator
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let scale = match &self.scale {
-            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
-            None => None,
-        };
-
-        let grouping_separator = match &self.grouping_separator {
-            Some(expr) => Some(expr.resolve(ctx)?.try_bytes()?),
-            None => None,
-        };
-
-        let decimal_separator = match &self.decimal_separator {
-            Some(expr) => expr.resolve(ctx)?.try_bytes()?,
-            None => ".".into(),
-        };
-
-        // Split integral and fractional part of float.
-        let mut parts = value
-            .to_string()
-            .split('.')
-            .map(ToOwned::to_owned)
-            .collect::<Vec<String>>();
-
-        debug_assert!(parts.len() <= 2);
-
-        // Manipulate fractional part based on configuration.
-        match scale {
-            Some(i) if i == 0 => parts.truncate(1),
-            Some(i) => {
-                let i = i as usize;
-
-                if parts.len() == 1 {
-                    parts.push("".to_owned())
-                }
-
-                if i > parts[1].len() {
-                    for _ in 0..i - parts[1].len() {
-                        parts[1].push('0')
-                    }
-                } else {
-                    parts[1].truncate(i)
-                }
-            }
-            None => {}
-        }
-
-        // Manipulate integral part based on configuration.
-        if let Some(sep) = grouping_separator.as_deref() {
-            let sep = String::from_utf8_lossy(sep);
-            let start = parts[0].len() % 3;
-
-            let positions: Vec<usize> = parts[0]
-                .chars()
-                .skip(start)
-                .enumerate()
-                .map(|(i, _)| i)
-                .filter(|i| i % 3 == 0)
-                .collect();
-
-            for (i, pos) in positions.iter().enumerate() {
-                parts[0].insert_str(pos + (i * sep.len()) + start, &sep);
-            }
-        }
-
-        // Join results, using configured decimal separator.
-        Ok(parts
-            .join(&String::from_utf8_lossy(&decimal_separator[..]))
-            .into())
+        format_number(value, scale, grouping_separator, decimal_separator)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

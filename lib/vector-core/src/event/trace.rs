@@ -35,10 +35,12 @@ impl TraceEvent {
         self.0.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         Self(self.0.with_batch_notifier(batch))
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         Self(self.0.with_batch_notifier_option(batch))
     }

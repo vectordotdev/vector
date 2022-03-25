@@ -41,7 +41,7 @@ impl TransformConfig for SplitConfig {
 
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)
-            .map_err(|error| format!("{}", error))?;
+            .map_err(|error| error.to_string())?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
@@ -119,7 +119,7 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.as_str(), value);
                     }
                     Err(error) => {
-                        emit!(&ParserConversionError { name, error });
+                        emit!(ParserConversionError { name, error });
                     }
                 }
             }
@@ -127,7 +127,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(self.field.as_str());
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);

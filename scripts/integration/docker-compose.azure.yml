@@ -1,10 +1,11 @@
+version: "3"
+
 services:
   local-azure-blob:
     image: mcr.microsoft.com/azure-storage/azurite:3.11.0
     command: azurite --blobHost 0.0.0.0 --loose
     volumes:
       - /var/run:/var/run
-
   runner:
     build:
       context: ${PWD}
@@ -14,7 +15,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -34,8 +36,6 @@ services:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

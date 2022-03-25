@@ -113,7 +113,7 @@ where
 
             stdin.consume(len);
 
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: len,
                 protocol: "none"
             });
@@ -131,7 +131,7 @@ where
             while let Some(result) = stream.next().await {
                 match result {
                     Ok((events, _byte_size)) => {
-                        emit!(&StdinEventsReceived {
+                        emit!(StdinEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
                         });
@@ -170,7 +170,7 @@ where
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }

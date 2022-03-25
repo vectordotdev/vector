@@ -5,6 +5,16 @@ use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vector_common::TimeZone;
 use vrl::prelude::*;
 
+pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
+    let message = value.try_bytes_utf8_lossy()?;
+    let timezone = match ctx.timezone() {
+        TimeZone::Local => None,
+        TimeZone::Named(tz) => Some(*tz),
+    };
+    let parsed = syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
+    Ok(message_to_value(parsed))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
 
@@ -55,16 +65,7 @@ impl Function for ParseSyslog {
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
-        let message = value.try_bytes_utf8_lossy()?;
-
-        let timezone = match ctx.timezone() {
-            TimeZone::Local => None,
-            TimeZone::Named(tz) => Some(*tz),
-        };
-        let parsed =
-            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
-
-        Ok(message_to_value(parsed))
+        parse_syslog(value, ctx)
     }
 }
 
@@ -76,16 +77,8 @@ pub(crate) struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let message = value.try_bytes_utf8_lossy()?;
 
-        let timezone = match ctx.timezone() {
-            TimeZone::Local => None,
-            TimeZone::Named(tz) => Some(*tz),
-        };
-        let parsed =
-            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
-
-        Ok(message_to_value(parsed))
+        parse_syslog(value, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
@@ -106,6 +106,7 @@ impl<T> TopologyBuilder<T> {
     /// explaining the issue.
     pub async fn build(
         self,
+        buffer_id: String,
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
@@ -190,7 +191,7 @@ impl<T> TopologyBuilder<T> {
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
         // buffer stages.
-        buffer_usage.install();
+        buffer_usage.install(buffer_id.as_str());
 
         Ok((sender, receiver, acker))
     }
@@ -210,7 +211,7 @@ where
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     pub async fn standalone_memory(
-        max_events: usize,
+        max_events: NonZeroUsize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop(when_full);
@@ -246,7 +247,7 @@ where
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     #[cfg(test)]
     pub async fn standalone_memory_test(
-        max_events: usize,
+        max_events: NonZeroUsize,
         when_full: WhenFull,
         usage_handle: BufferUsageHandle,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
@@ -287,11 +288,16 @@ mod tests {
         WhenFull,
     };
 
+    use std::num::NonZeroUsize;
+
     #[tokio::test]
     async fn single_stage_topology_block() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
-        let result = builder.build(Span::none()).await;
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
@@ -301,8 +307,11 @@ mod tests {
     #[tokio::test]
     async fn single_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
-        let result = builder.build(Span::none()).await;
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropNewest,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
@@ -312,8 +321,11 @@ mod tests {
     #[tokio::test]
     async fn single_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
-        let result = builder.build(Span::none()).await;
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Overflow,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
             r => panic!("unexpected build result: {:?}", r),
@@ -323,9 +335,15 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_block() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
-        let result = builder.build(Span::none()).await;
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -335,9 +353,15 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
-        let result = builder.build(Span::none()).await;
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::DropNewest,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -347,10 +371,16 @@ mod tests {
     #[tokio::test]
     async fn two_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<u64>::default();
-        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
-        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Overflow,
+        );
+        builder.stage(
+            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            WhenFull::Block,
+        );
 
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
