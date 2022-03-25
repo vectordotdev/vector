@@ -34,7 +34,6 @@ is_kubectl_context_kind() {
   return 1
 }
 
-
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.
@@ -95,7 +94,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
 
     # Build docker image.
-    docker build --build-arg RUST_VERSION=${RUST_VERSION} --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
+    docker build --build-arg RUST_VERSION="${RUST_VERSION}" --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
