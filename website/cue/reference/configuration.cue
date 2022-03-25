@@ -249,6 +249,44 @@ configuration: {
 			}
 		}
 
+		secret: {
+			common:      false
+			description: """
+				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
+				in Vector config. Currently, only the exec backend is supported. Multiple backend can be configured. To signify
+				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
+				will then be replaced by the secret retrieve from the relevant backend.
+				"""
+			required:    false
+			type: object: options: {
+				exec: {
+					required:    true
+					description: "Run a local command to retrieve secrets."
+					type: object: options: {
+						command: {
+							description: """
+								The command to be run, plus any arguments required. It shall comply with the
+								[Datadog Agent executable API](\(\urls.datadog_agent_exec_api)).
+								"""
+							required: true
+							type: array: {
+								examples: [["/path/to/get-secret", "-s"]]
+								items: type: string: {}
+							}
+						}
+						timeout {
+							description: "The amount of time Vector will wait for the command to complete."
+							required:    false
+							type: uint: {
+								default: 5
+								unit:    "seconds"
+							}
+						}
+					}
+				}
+			}
+		}
+
 		timezone: {
 			common:      false
 			description: """

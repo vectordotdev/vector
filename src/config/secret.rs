@@ -226,5 +226,16 @@ mod test {
         assert_eq!(keys.len(), 2);
         assert!(keys.contains_key("first_backend"));
         assert!(keys.contains_key("second_backend"));
+
+        let first_backend_keys = keys.get("first_backend").unwrap();
+        assert_eq!(first_backend_keys.len(), 3);
+        assert!(first_backend_keys.contains(&"secret_key".into()));
+        assert!(first_backend_keys.contains(&"another_secret_key".into()));
+        assert!(first_backend_keys.contains(&"a_third.secret_key".into()));
+
+        let second_backend_keys = keys.get("second_backend").unwrap();
+        assert_eq!(second_backend_keys.len(), 2);
+        assert!(second_backend_keys.contains(&"secret_key".into()));
+        assert!(second_backend_keys.contains(&"secret.key".into()));
     }
 }
