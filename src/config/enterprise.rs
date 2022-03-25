@@ -6,7 +6,10 @@ use std::{
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use serde::{Deserialize, Serialize};
-use tokio::time::{sleep, Duration};
+use tokio::{
+    select,
+    time::{sleep, Duration},
+};
 use url::{ParseError, Url};
 
 use super::{
@@ -16,6 +19,7 @@ use super::{
 use crate::{
     common::datadog::get_api_base_endpoint,
     http::{HttpClient, HttpError},
+    signal::{SignalRx, SignalTo},
     sinks::datadog::metrics::DatadogMetricsConfig,
     sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
@@ -85,6 +89,7 @@ pub enum PipelinesError {
     Disabled,
     MissingApiKey,
     FatalCouldNotReportConfig,
+    Interrupt,
 }
 
 /// Holds data required to authorize a request to the Datadog OP reporting endpoint.
@@ -170,6 +175,7 @@ impl<'a> PipelinesVersionPayload<'a> {
 pub async fn try_attach(
     config: &mut Config,
     config_paths: &[ConfigPath],
+    mut signal_rx: SignalRx,
 ) -> Result<(), PipelinesError> {
     // Only valid if a [datadog] section is present in config.
     let datadog = match config.enterprise.as_ref() {
@@ -236,33 +242,39 @@ pub async fn try_attach(
     // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
     // of `max_retries`.
     for _ in 0..datadog.max_retries {
-        match report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload).await {
-            Ok(()) => {
-                info!(
-                    "Vector config {} successfully reported to {}.",
-                    &config_version, DATADOG_REPORTING_PRODUCT
-                );
-                break;
-            }
-            Err(err) => {
-                error!(
-                    err = ?err.to_string(),
-                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                );
+        select! {
+            biased;
+            Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
+            report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
+                match report {
+                    Ok(()) => {
+                        info!(
+                            "Vector config {} successfully reported to {}.",
+                            &config_version, DATADOG_REPORTING_PRODUCT
+                        );
+                        break;
+                    }
+                    Err(err) => {
+                        error!(
+                            err = ?err.to_string(),
+                            "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                        );
 
-                if let ReportingError::StatusCode(status) = err {
-                    // If the error is 'fatal', and the user has elected to exit on fatal errors,
-                    // return control back upstream.
-                    //
-                    // A fatal error is currently determined to be one of the following:
-                    //
-                    // - 4xx class of status code
-                    if status.is_client_error() {
-                        if datadog.exit_on_fatal_error {
-                            return Err(PipelinesError::FatalCouldNotReportConfig);
-                        } else {
-                            // Otherwise, break out of the loop, to avoid hitting the same error.
-                            break;
+                        if let ReportingError::StatusCode(status) = err {
+                            // If the error is 'fatal', and the user has elected to exit on fatal errors,
+                            // return control back upstream.
+                            //
+                            // A fatal error is currently determined to be one of the following:
+                            //
+                            // - 4xx class of status code
+                            if status.is_client_error() {
+                                if datadog.exit_on_fatal_error {
+                                    return Err(PipelinesError::FatalCouldNotReportConfig);
+                                } else {
+                                    // Otherwise, break out of the loop, to avoid hitting the same error.
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

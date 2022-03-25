@@ -183,7 +183,7 @@ impl Application {
                 #[cfg(feature = "enterprise")]
                 // Augment config to enable observability within Datadog, if applicable.
                 if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::enterprise::try_attach(&mut config, &config_paths).await
+                    config::enterprise::try_attach(&mut config, &config_paths, signal_rx).await
                 {
                     return Err(exitcode::UNAVAILABLE);
                 }
@@ -271,7 +271,7 @@ impl Application {
 
                                         #[cfg(feature = "enterprise")]
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                            config::enterprise::try_attach(&mut new_config, &config_paths).await
+                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_rx).await
                                         {
                                             break SignalTo::Shutdown;
                                         }
@@ -319,7 +319,7 @@ impl Application {
                                     #[cfg(feature = "enterprise")]
                                     // Augment config to enable observability within Datadog, if applicable.
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                        config::enterprise::try_attach(&mut new_config, &config_paths).await
+                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_rx).await
                                     {
                                         break SignalTo::Shutdown;
                                     }
