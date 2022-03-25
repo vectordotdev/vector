@@ -291,8 +291,6 @@ jobs:
   compute-check-features-matrix:
     name: Compute check features matrix
     runs-on: ubuntu-20.04
-    needs: [changes]
-    if: ${{ needs.changes.outputs.source == 'true' }}
     outputs:
       matrix: ${{ steps.list-workspaces.outputs.stdout }}
     steps:
