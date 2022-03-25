@@ -353,6 +353,7 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -372,6 +373,17 @@ impl TestDefinition<String> {
                 for from in old.extract_from.into_vec() {
                     if let Some(output_id) = output_map.get(&from) {
                         outputs.push(output_id.clone());
+                    } else if let Some(expanded) = expansions.get(&from) {
+                        for expanded_from in expanded {
+                            if let Some(output_id) = output_map.get(expanded_from) {
+                                outputs.push(output_id.clone());
+                            } else {
+                                errors.push(format!(
+                                    r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                                    name, from
+                                ));
+                            }
+                        }
                     } else {
                         errors.push(format!(
                             r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
@@ -476,11 +488,24 @@ pub struct TestInput {
     pub metric: Option<Metric>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
+}
+
+impl<T: ToString> OneOrMany<T> {
+    pub fn stringify(&self) -> OneOrMany<String> {
+        match self {
+            Self::One(value) => value.to_string().into(),
+            Self::Many(values) => values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
 }
 
 impl<T> OneOrMany<T> {

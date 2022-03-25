@@ -108,7 +108,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .collect();
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&graph, &str_expansions))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
