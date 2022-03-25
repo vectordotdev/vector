@@ -295,7 +295,11 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
             // We've been instructed to drop the next item.
             SendState::DropNext => {
                 if let Some(instrumentation) = this.instrumentation.as_ref() {
-                    if let Some((item_count, _)) = item_sizing {
+                    if let Some((item_count, item_size)) = item_sizing {
+                        instrumentation.increment_received_event_count_and_byte_size(
+                            item_count as u64,
+                            item_size as u64,
+                        );
                         instrumentation.try_increment_dropped_event_count(item_count as u64);
                     }
                 }

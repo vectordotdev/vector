@@ -225,7 +225,7 @@ async fn test_buffer_metrics_drop_newest() {
     assert_send_ok_with_capacities(&mut tx, 2, Some(0), None).await;
 
     let snapshot = handle.snapshot();
-    assert_eq!(2, snapshot.received_event_count);
+    assert_eq!(3, snapshot.received_event_count);
     assert_eq!(0, snapshot.sent_event_count);
     assert_eq!(Some(1), snapshot.dropped_event_count);
 
@@ -235,7 +235,7 @@ async fn test_buffer_metrics_drop_newest() {
     assert_eq!(results, vec![7, 8]);
 
     let snapshot = handle.snapshot();
-    assert_eq!(2, snapshot.received_event_count);
+    assert_eq!(3, snapshot.received_event_count);
     assert_eq!(2, snapshot.sent_event_count);
     assert_eq!(Some(1), snapshot.dropped_event_count);
 }
