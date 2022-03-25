@@ -443,7 +443,7 @@ check-all: check-version check-examples check-features
 check-all: check-scripts
 
 .PHONY: check-features
-check-features: ## Check that all component features are setup properly
+check-features: ## Check that all features are setup properly
 ifdef PACKAGE
 	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --package $(PACKAGE) --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
 else
