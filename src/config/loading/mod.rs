@@ -14,7 +14,8 @@ use config_builder::ConfigBuilderLoader;
 use loader::process::Process;
 
 use super::{
-    builder::ConfigBuilder, format, secret, validation, vars, Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, secret, validation, vars, Config, ConfigPath, Format,
+    FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -243,7 +244,10 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R, format: Format) -> Result<(String, Vec<String>), Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(
+    mut input: R,
+    format: Format,
+) -> Result<(String, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -255,18 +259,9 @@ pub fn prepare_input<R: std::io::Read>(mut input: R, format: Format) -> Result<(
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    /*
-    let mut e = secret::ExecBackend {
-        command: vec!["/Users/pierre.rognant/tmp/sample".into()],
-        timeout: 5,
-    };
-    let res = e.retrieve(vec!["a_key".into()]);
-    warn!("res == {:#?}", res);*/
     let (vars_interpolated, mut warnings) = vars::interpolate(&source_string, &vars);
     let (secret_interpolated, secret_warnings) = secret::interpolate(&vars_interpolated, format);
-
     warnings.extend(secret_warnings);
-
     Ok((secret_interpolated, warnings))
 }
 

@@ -22,7 +22,11 @@ impl ConfigBuilderLoader {
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&self, input: R, format: Format) -> Result<(String, Vec<String>), Vec<String>> {
+    fn prepare<R: Read>(
+        &self,
+        input: R,
+        format: Format,
+    ) -> Result<(String, Vec<String>), Vec<String>> {
         prepare_input(input, format)
     }
 
