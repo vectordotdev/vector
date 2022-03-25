@@ -124,6 +124,8 @@ pub struct MockSourceConfig {
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
     data_type: Option<DataType>,
+    #[serde(skip)]
+    force_shutdown: bool,
     // something for serde to use, so we can trigger rebuilds
     data: Option<String>,
 }
@@ -134,6 +136,7 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
             data_type: Some(DataType::all()),
+            force_shutdown: false,
             data: None,
         }
     }
@@ -143,6 +146,7 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
             data_type: Some(DataType::all()),
+            force_shutdown: false,
             data: Some(data.into()),
         }
     }
@@ -155,12 +159,17 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
             data_type: Some(DataType::all()),
+            force_shutdown: false,
             data: None,
         }
     }
 
     pub fn set_data_type(&mut self, data_type: DataType) {
         self.data_type = Some(data_type)
+    }
+
+    pub fn set_force_shutdown(&mut self, force_shutdown: bool) {
+        self.force_shutdown = force_shutdown;
     }
 }
 
@@ -171,15 +180,20 @@ impl SourceConfig for MockSourceConfig {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let shutdown = cx.shutdown;
+        let shutdown1 = cx.shutdown.clone();
+        let shutdown2 = cx.shutdown;
         let mut out = cx.out;
+        let force_shutdown = self.force_shutdown;
 
         Ok(Box::pin(async move {
-            tokio::pin!(shutdown);
+            tokio::pin!(shutdown1);
+            tokio::pin!(shutdown2);
 
             loop {
                 tokio::select! {
                     biased;
+
+                    _ = &mut shutdown1, if force_shutdown => break,
 
                     Some(array) = recv.next() => {
                         if let Some(counter) = &event_counter {
@@ -192,7 +206,7 @@ impl SourceConfig for MockSourceConfig {
                         }
                     },
 
-                    _ = &mut shutdown => break,
+                    _ = &mut shutdown2, if !force_shutdown => break,
                 }
             }
 

@@ -223,8 +223,9 @@ mod test {
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
-        time::{Duration, Instant},
+        time::{timeout, Duration, Instant},
     };
+
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -499,37 +500,39 @@ mod test {
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
         components::init_test();
-        // It's important that the buffer be large enough that the TCP source doesn't have
-        // to block trying to forward its input into the Sender because the channel is full,
-        // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = SourceSender::new_with_buffer(10_000);
-        let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
+        // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
+        // the source doesn't block on sending the events downstream, otherwise if it was blocked on
+        // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
+        // shutdown.
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
 
-        // Start TCP Source
-        let server = SocketConfig::from({
-            let mut config = TcpConfig::from_address(addr.into());
-            config.set_shutdown_timeout_secs(1);
-            config
-        })
-        .build(cx)
-        .await
-        .unwrap();
-        let source_handle = tokio::spawn(server);
+        let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
+        let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
+        let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
 
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_shutdown_timeout_secs(1);
+        let source_task = SocketConfig::from(source_config)
+            .build(source_cx)
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        let source_handle = tokio::spawn(source_task);
         wait_for_tcp(addr).await;
 
+        // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
+        // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
+        // it down, exercising the logic we have to ensure timely shutdown even under load:
         let message = random_string(512);
         let message_bytes = Bytes::from(message.clone() + "\n");
 
-        let cx = SinkContext::new_test();
-        let encode_event = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
-        let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
+        let sink_cx = SinkContext::new_test();
+        let encoder = move |_event| Some(message_bytes.clone());
+        let sink_config = TcpSinkConfig::from_address(addr.to_string());
+        let (sink, _healthcheck) = sink_config.build(sink_cx, encoder).unwrap();
 
-        // Spawn future that keeps sending lines to the TCP source forever.
         tokio::spawn(async move {
             let input = stream::repeat(())
                 .map(move |_| Event::new_empty_log().into())
@@ -537,29 +540,35 @@ mod test {
             sink.run(input).await.unwrap();
         });
 
-        // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let events = collect_n_limited(rx, 100)
+        // Now with our sink running, feeding events to the source, collect 100 event arrays from
+        // the source and make sure each event within them matches the single message we repeatedly
+        // sent via the sink:
+        let events = collect_n_limited(source_rx, 100)
             .await
             .into_iter()
-            .flat_map(EventContainer::into_events)
             .collect::<Vec<_>>();
         assert_eq!(100, events.len());
-        for event in events {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                message.clone().into()
-            );
+
+        let message_key = log_schema().message_key();
+        let expected_message = message.clone().into();
+        for event in events.into_iter().flat_map(EventContainer::into_events) {
+            assert_eq!(event.as_log()[message_key], expected_message);
         }
 
+        // Check that we're emitting the expected metrics and so on:
         SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
 
-        let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
-        let shutdown_success = shutdown_complete.await;
-        assert!(shutdown_success);
+        // Now trigger shutdown on the source and ensure that it shuts down before or at the
+        // deadline, and make sure the source task actually finished as well:
+        let shutdown_timeout_limit = Duration::from_secs(10);
+        let deadline = Instant::now() + shutdown_timeout_limit;
+        let shutdown_complete = shutdown.shutdown_source(&source_key, deadline);
 
-        // Ensure that the source has actually shut down.
-        let _ = source_handle.await.unwrap();
+        let shutdown_result = timeout(shutdown_timeout_limit, shutdown_complete).await;
+        assert_eq!(shutdown_result, Ok(true));
+
+        let source_result = source_handle.await.expect("source task should not panic");
+        assert_eq!(source_result, Ok(()));
     }
 
     //////// UDP TESTS ////////

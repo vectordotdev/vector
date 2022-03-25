@@ -209,7 +209,6 @@ impl Inner {
     {
         let mut stream = events.ready_chunks(CHUNK_SIZE);
         while let Some(events) = stream.next().await {
-            println!("got items");
             self.send_batch(events.into_iter()).await?;
         }
         Ok(())

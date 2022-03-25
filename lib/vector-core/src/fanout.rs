@@ -106,6 +106,8 @@ impl Fanout {
     ///
     /// This method should not be used if there is an active `SendGroup` being processed.
     fn apply_control_message(&mut self, message: ControlMessage) {
+        trace!("Processing control message outside of send: {:?}", message);
+
         match message {
             ControlMessage::Add(id, sink) => self.add(id, sink),
             ControlMessage::Remove(id) => self.remove(&id),
@@ -178,6 +180,8 @@ impl Fanout {
                 biased;
 
                 maybe_msg = self.control_channel.recv(), if control_channel_open => {
+                    trace!("Processing control message inside of send: {:?}", maybe_msg);
+
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
@@ -374,6 +378,7 @@ mod tests {
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use value::Value;
     use vector_buffers::{
         topology::{
             builder::TopologyBuilder,
@@ -515,7 +520,7 @@ mod tests {
         let event = event.into_log();
         event
             .get("message")
-            .and_then(|v| v.as_bytes())
+            .and_then(Value::as_bytes)
             .and_then(|b| String::from_utf8(b.to_vec()).ok())
             .expect("must be valid log event with `message` field")
     }

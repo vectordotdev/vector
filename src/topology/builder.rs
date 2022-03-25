@@ -151,6 +151,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
+        debug!(component = %key, "Building new source.");
+
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
 
@@ -270,6 +272,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        debug!(component = %key, "Building new transform.");
+
         let mut schema_definitions = HashMap::new();
         let merged_definition = if config.schema.enabled {
             schema::merged_definition(&transform.inputs, config, &mut definition_cache)
@@ -328,6 +332,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
+        debug!(component = %key, "Building new sink");
+
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;

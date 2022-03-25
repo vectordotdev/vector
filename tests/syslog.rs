@@ -13,7 +13,6 @@ use sinks::{
 #[cfg(unix)]
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::BytesCodec;
-use tracing::info;
 use vector::{
     config, sinks,
     sources::syslog::{Mode, SyslogConfig},
