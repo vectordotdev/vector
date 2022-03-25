@@ -159,7 +159,6 @@ where
                 .accept_stream_limited(max_connections)
                 .take_until(shutdown_clone)
                 .for_each(move |(connection, tcp_connection_permit)| {
-                    info!("got new tcp conn");
                     let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
