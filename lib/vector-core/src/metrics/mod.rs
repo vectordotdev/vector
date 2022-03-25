@@ -141,7 +141,7 @@ impl Controller {
             });
         });
 
-        // Add alias `processed_events_total` for `component_sent_events_total`.
+        // Add aliases for deprecated metrics
         for i in 0..metrics.len() {
             let metric = &metrics[i];
             match metric.name() {
