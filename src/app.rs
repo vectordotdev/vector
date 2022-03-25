@@ -183,7 +183,12 @@ impl Application {
                 #[cfg(feature = "enterprise")]
                 // Augment config to enable observability within Datadog, if applicable.
                 if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::enterprise::try_attach(&mut config, &config_paths, signal_rx).await
+                    config::enterprise::try_attach(
+                        &mut config,
+                        &config_paths,
+                        signal_handler.subscribe(),
+                    )
+                    .await
                 {
                     return Err(exitcode::UNAVAILABLE);
                 }
@@ -262,7 +267,7 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Some(signal) = signal_rx.recv() => {
+                    Ok(signal) = signal_rx.recv() => {
                         match signal {
                             SignalTo::ReloadFromConfigBuilder(config_builder) => {
                                 match config_builder.build().map_err(handle_config_errors) {
@@ -271,7 +276,7 @@ impl Application {
 
                                         #[cfg(feature = "enterprise")]
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_rx).await
+                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                         {
                                             break SignalTo::Shutdown;
                                         }
@@ -319,7 +324,7 @@ impl Application {
                                     #[cfg(feature = "enterprise")]
                                     // Augment config to enable observability within Datadog, if applicable.
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_rx).await
+                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                     {
                                         break SignalTo::Shutdown;
                                     }

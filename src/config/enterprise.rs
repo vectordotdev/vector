@@ -244,7 +244,7 @@ pub async fn try_attach(
     for _ in 0..datadog.max_retries {
         select! {
             biased;
-            Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
+            Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
             report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
                 match report {
                     Ok(()) => {
