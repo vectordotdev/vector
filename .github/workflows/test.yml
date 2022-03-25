@@ -69,7 +69,7 @@ jobs:
               - ".cargo/**"
               - 'Cargo.toml'
               - 'Cargo.lock'
-              - 'rust-toolchain'
+              - 'rust-toolchain.toml'
               - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
