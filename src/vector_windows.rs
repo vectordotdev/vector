@@ -376,7 +376,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
-                        while let Err(_) = signal_tx.try_send(SignalTo::Shutdown) {}
+                        while let Err(_) = signal_tx.send(SignalTo::Shutdown) {}
                         ServiceControlHandlerResult::NoError
                     }
 
