@@ -301,7 +301,7 @@ jobs:
           cargo install cargo-workspaces --version 0.2.32
       - name: List workspaces
         run: |
-          packages="$(cargo workspaces list --all --json | jq '.[].name' | jq --slurp '{\"package\": .}' --compact-output)"
+          packages="$(cargo workspaces list --all --json | jq '.[].name' | jq --slurp '{"package": .}' --compact-output)"
           echo "::set-output name=packages::$packages"
 
   check-features:
