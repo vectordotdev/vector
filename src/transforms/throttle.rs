@@ -134,7 +134,7 @@ where
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
-                                                    emit!(&TemplateRenderingError {
+                                                    emit!(TemplateRenderingError {
                                                         error,
                                                         field: Some("key_field"),
                                                         drop_event: false,
@@ -149,9 +149,9 @@ where
                                             }
                                             _ => {
                                                 if let Some(key) = key {
-                                                  emit!(&ThrottleEventDiscarded{key})
+                                                  emit!(ThrottleEventDiscarded{key})
                                                 } else {
-                                                  emit!(&ThrottleEventDiscarded{key: "None".to_string()})
+                                                  emit!(ThrottleEventDiscarded{key: "None".to_string()})
                                                 }
                                             }
                                         }

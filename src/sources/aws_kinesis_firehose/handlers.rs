@@ -42,7 +42,7 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: bytes.len(),
             protocol: "http",
         });
@@ -51,7 +51,7 @@ pub async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count: events.len(),
                         byte_size: events.size_of(),
                     });
@@ -80,7 +80,7 @@ pub async fn firehose(
 
                     let count = events.len();
                     if let Err(error) = out.send_batch(events).await {
-                        emit!(&StreamClosedError {
+                        emit!(StreamClosedError {
                             error: error.clone(),
                             count,
                         });
@@ -158,7 +158,7 @@ fn decode_record(
             match infer::get(&buf) {
                 Some(filetype) => match filetype.mime_type() {
                     "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(&AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
                             compression: Compression::Gzip,
                             error
                         });

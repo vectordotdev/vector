@@ -134,7 +134,7 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: msg.data.len(),
             protocol: "tcp",
         });
@@ -143,7 +143,7 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&NatsEventsReceived {
+                    emit!(NatsEventsReceived {
                         byte_size: events.size_of(),
                         count
                     });
@@ -159,7 +159,7 @@ async fn nats_source(
                     });
 
                     out.send_batch(events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {

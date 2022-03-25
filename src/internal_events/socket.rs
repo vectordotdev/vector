@@ -29,16 +29,13 @@ pub struct SocketEventsReceived {
 }
 
 impl InternalEvent for SocketEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
             mode = self.mode.as_str()
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64, "mode" => self.mode.as_str());
         counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
         // deprecated
@@ -55,11 +52,8 @@ pub struct SocketEventsSent {
 }
 
 impl InternalEvent for SocketEventsSent {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_sent_events_total", self.count as u64, "mode" => self.mode.as_str());
         counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
         // deprecated
@@ -76,7 +70,7 @@ pub struct SocketReceiveError<'a> {
 
 #[cfg(feature = "codecs")]
 impl<'a> InternalEvent for SocketReceiveError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error receiving data.",
             error = %self.error,
@@ -85,9 +79,6 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
             stage = error_stage::RECEIVING,
             mode = %self.mode.as_str(),
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "receiving_data",

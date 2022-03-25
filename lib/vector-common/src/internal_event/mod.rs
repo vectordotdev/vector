@@ -6,47 +6,44 @@ pub use bytes_sent::BytesSent;
 pub use events_received::EventsReceived;
 pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
 
-pub trait InternalEvent {
-    fn emit_logs(&self) {}
-    fn emit_metrics(&self) {}
+pub trait InternalEvent: Sized {
+    fn emit(self) {}
 
     // Optional for backwards compat until all events implement this
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         None
     }
 }
 
 // Sets the name of an event if it doesn't have one
-pub struct DefaultName<'a, 'b, E> {
-    pub name: &'a str,
-    pub event: &'b E,
+pub struct DefaultName<E> {
+    pub name: &'static str,
+    pub event: E,
 }
 
-impl<'a, 'b, E> InternalEvent for DefaultName<'a, 'b, E>
+impl<E> InternalEvent for DefaultName<E>
 where
     E: InternalEvent,
 {
-    fn emit_logs(&self) {
-        self.event.emit_logs();
+    fn emit(self) {
+        self.event.emit();
     }
-    fn emit_metrics(&self) {
-        self.event.emit_metrics();
-    }
-    fn name(&self) -> Option<&str> {
+
+    fn name(&self) -> Option<&'static str> {
         Some(self.event.name().unwrap_or(self.name))
     }
 }
 
 #[cfg(any(test, feature = "test"))]
-pub fn emit(event: &impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
-    if let Some(name) = event.name() {
+pub fn emit(event: impl InternalEvent) {
+    let name = event.name();
+    event.emit();
+    if let Some(name) = name {
         super::event_test_util::record_internal_event(name);
     }
 }
+
 #[cfg(not(any(test, feature = "test")))]
-pub fn emit(event: &impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
+pub fn emit(event: impl InternalEvent) {
+    event.emit();
 }
