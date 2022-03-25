@@ -111,8 +111,8 @@ impl PipelinesConfig {
 impl PipelinesConfig {
     fn validate_nesting(&self) -> crate::Result<()> {
         let parents = &[self.transform_type()].into_iter().collect::<HashSet<_>>();
-        self.logs.validate_nesting(&parents)?;
-        self.metrics.validate_nesting(&parents)?;
+        self.logs.validate_nesting(parents)?;
+        self.metrics.validate_nesting(parents)?;
         Ok(())
     }
 }

@@ -56,7 +56,7 @@ impl PipelineConfig {
                     let filter_name = name.join("filter");
                     filter_name.join("success")
                 })
-                .ok_or_else(|| format!("mut have at least one transform or a filter"))?
+                .ok_or_else(|| "mut have at least one transform or a filter".to_string())?
         } else {
             name.join(self.transforms.len() - 1)
         };
