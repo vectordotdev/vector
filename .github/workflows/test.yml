@@ -288,18 +288,38 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make test-vrl
 
-  check-component-features:
-    name: Component Features - Linux
-    runs-on: [linux, test-runner]
-    needs: changes
+  compute-check-features-matrix:
+    name: Compute check features matrix
+    runs-on: ubuntu-20.04
+    needs: [changes]
     if: ${{ needs.changes.outputs.source == 'true' }}
+    outputs:
+      matrix: ${{ steps.list-workspaces.outputs.stdout }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Install cargo-workspaces
+        run: |
+          cargo install cargo-workspaces --version 0.2.32
+      - name: List workspaces
+        run: |
+          cargo workspaces list --all --json
+
+  check-features:
+    name: Check Features ${{ matrix.name }} - Linux
+    runs-on: [linux, test-runner]
+    needs: [changes, compute-check-features-matrix]
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    strategy:
+      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-hack
-      - run: make check-component-features
+      - name: check features
+        run: make check-features PACKAGE=${{ matrix.name }}
 
   check-msrv:
     name: Check minimum supported Rust version
