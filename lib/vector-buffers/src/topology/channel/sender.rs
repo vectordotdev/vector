@@ -63,11 +63,6 @@ where
                     panic!("writer hit unrecoverable error during write: {}", e);
                 }
 
-                if let Err(e) = writer.flush().await {
-                    // Can't really do much except panic here. :sweat:
-                    panic!("writer hit unrecoverable error during flush: {}", e);
-                }
-
                 Ok(())
             }
         }
