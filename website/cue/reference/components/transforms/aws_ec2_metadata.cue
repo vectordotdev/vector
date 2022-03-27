@@ -107,6 +107,15 @@ components: transforms: aws_ec2_metadata: {
 	output: logs: log: {
 		description: "Log event enriched with EC2 metadata"
 		fields: {
+			"account-id": {
+				description: "The `account-id` that launched the EC2 instance."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["123456789"]
+				}
+			}
 			"ami-id": {
 				description: "The `ami-id` that the current EC2 instance is using."
 				required:    true

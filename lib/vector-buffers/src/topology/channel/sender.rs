@@ -211,47 +211,35 @@ impl<T: Bufferable> BufferSender<T> {
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        let sent_to_base = match self.when_full {
-            WhenFull::Block => {
-                self.base.send(item).await?;
-                true
-            }
-            WhenFull::DropNewest => match self.base.try_send(item).await? {
-                Some(_) => {
-                    if let Some(instrumentation) = self.instrumentation.as_ref() {
-                        if let Some((item_count, _)) = item_sizing {
-                            instrumentation.try_increment_dropped_event_count(item_count as u64);
-                        }
-                    }
-                    false
-                }
-                None => true,
+        let mut sent_to_base = true;
+        let mut was_dropped = false;
+        match self.when_full {
+            WhenFull::Block => self.base.send(item).await?,
+            WhenFull::DropNewest => if let Some(_) = self.base.try_send(item).await? {
+                was_dropped = true;
             },
-            WhenFull::Overflow => {
-                let mut base_sent = true;
-                if let Some(old_item) = self.base.try_send(item).await? {
-                    base_sent = false;
-                    self.overflow
-                        .as_mut()
-                        .expect("overflow must exist")
-                        .send(old_item)
-                        .await?;
-                }
-                base_sent
+            WhenFull::Overflow => if let Some(item) = self.base.try_send(item).await? {
+                sent_to_base = false;
+                self.overflow
+                    .as_mut()
+                    .expect("overflow must exist")
+                    .send(item)
+                    .await?;
             }
         };
 
-        if sent_to_base {
+        if let Some(instrumentation) = self.instrumentation.as_ref() {
             if let Some((item_count, item_size)) = item_sizing {
-                // Only update our instrumentation if _we_ got the item, not the overflow.
-                let handle = self
-                    .instrumentation
-                    .as_ref()
-                    .expect("item_size can't be present without instrumentation");
-                handle.increment_received_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                );
+                if sent_to_base {
+                    instrumentation.increment_received_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
+                }
+
+                if was_dropped {
+                    instrumentation.try_increment_dropped_event_count(item_count as u64); 
+                }
             }
         }
 
