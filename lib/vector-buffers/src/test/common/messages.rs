@@ -177,7 +177,7 @@ impl FixedEncodable for UndecodableRecord {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct MultiEventRecord(pub u32);
 
 impl MultiEventRecord {
