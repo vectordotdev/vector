@@ -87,7 +87,7 @@ impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
         counter!(
             "component_errors_total", 1,
             "error_code" => "delete_socket_file",
-            "error_type" => error_type::CONNECTION_FAILED,
+            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }
