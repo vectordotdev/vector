@@ -2,8 +2,8 @@ use std::convert::TryInto;
 use std::io::ErrorKind;
 
 use async_compression::tokio::bufread;
-use aws_sdk_cloudwatch::{Endpoint, Region};
 use aws_sdk_s3::types::ByteStream;
+use aws_sdk_s3::{Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
@@ -14,10 +14,11 @@ use tokio_util::io::StreamReader;
 
 use super::util::MultilineConfig;
 use crate::aws::aws_sdk::{create_client, ClientBuilder};
+use crate::aws::RegionOrEndpoint;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
-    aws::{auth::AwsAuthentication, rusoto::RegionOrEndpoint},
+    aws::auth::AwsAuthentication,
     config::{
         AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
         SourceDescription,
