@@ -568,7 +568,7 @@ mod integration_tests {
             ..Default::default()
         }
     }
-    //
+
     // puts an object and asserts that the logs it gets back match
     async fn test_event(
         key: Option<String>,

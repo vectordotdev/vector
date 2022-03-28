@@ -303,7 +303,6 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    println!("PRocessing err: {:?}", err);
                     emit!(SqsMessageProcessingError {
                         message_id: &message_id,
                         error: &err,
@@ -329,7 +328,6 @@ impl IngestorProcess {
 
                     if let Some(failed_entries) = &result.failed {
                         if !failed_entries.is_empty() {
-                            println!("Failed entries: {:?}", failed_entries);
                             emit!(SqsMessageDeletePartialError {
                                 entries: result.failed.unwrap_or_default()
                             });
@@ -337,7 +335,6 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    println!("Failed err: {:?}", err);
                     emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
                         error: err,
@@ -374,7 +371,6 @@ impl IngestorProcess {
             });
         }
 
-        // event_name: S3EventName { kind: "Put", name: "ObjectCreated" }
         if s3_event.event_name.kind != "ObjectCreated" {
             emit!(SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
