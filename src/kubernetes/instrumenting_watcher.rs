@@ -55,13 +55,13 @@ where
                                 item
                             })
                             .map_err(|error| {
-                                emit!(internal_events::WatchStreamFailed { error: &error });
+                                emit!(internal_events::WatchStreamError { error: &error });
                                 error
                             })
                     })) as BoxStream<'static, _>
                 })
                 .map_err(|error| {
-                    emit!(internal_events::WatchRequestInvocationFailed { error: &error });
+                    emit!(internal_events::WatchRequestInvocationError { error: &error });
                     error
                 })
         }))
