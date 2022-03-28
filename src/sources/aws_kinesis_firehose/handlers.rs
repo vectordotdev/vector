@@ -2,6 +2,7 @@ use std::{io::Read, sync::Arc};
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -15,14 +16,13 @@ use super::{
     Compression,
 };
 use crate::{
-    codecs,
+    codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
         StreamClosedError,
     },
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -32,7 +32,7 @@ pub async fn firehose(
     source_arn: String,
     request: FirehoseRequest,
     compression: Compression,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     acknowledgements: bool,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {

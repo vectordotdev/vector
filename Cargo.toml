@@ -68,6 +68,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/codecs",
   "lib/enrichment",
   "lib/vector-buffers",
   "lib/vector-common",
@@ -100,6 +101,7 @@ members = [
 
 [dependencies]
 # Internal libs
+codecs = { path = "lib/codecs", default-features = false, optional = true }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
@@ -109,12 +111,12 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value", optional = true }
-vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
-vrl-cli = { path = "lib/vrl/cli", optional = true }
+vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
+vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-stream = "0.3.3"
@@ -180,7 +182,7 @@ rmp-serde = { version = "1.0.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.9", default-features = false, features = ["std"]  }
+prost = { version = "0.9", default-features = false, features = ["std"] }
 
 # GCP
 goauth = { version = "0.11.1", default-features = false, optional = true }
@@ -250,7 +252,6 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.3", default-features = false, optional = true }
 maxminddb = { version = "0.22.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
-memchr = { version = "2.4", default-features = false, optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
@@ -273,7 +274,7 @@ regex = { version = "1.5.5", default-features = false, features = ["std", "perf"
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.7", default-features = false, features = ["serde", "std"], optional = true }
-smallvec = { version = "1", optional = true, features = ["union"] }
+smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.0", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
@@ -282,7 +283,6 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
@@ -416,9 +416,6 @@ protobuf-build = ["tonic-build", "prost-build"]
 enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
-# Codecs
-codecs = ["value", "smallvec", "memchr"]
-
 # Sources
 sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
@@ -492,7 +489,7 @@ sources-socket = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-ut
 sources-splunk_hec = ["sources-utils-tls", "roaring"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/net", "codecs"]
 sources-stdin = ["codecs", "tokio-util/io"]
-sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose", "codecs"]
+sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "codecs", "codecs/syslog"]
 sources-utils-http-auth = ["sources-utils-http-error"]
 sources-utils-http-encoding = ["snap", "sources-utils-http-error"]
 sources-utils-http-error = []

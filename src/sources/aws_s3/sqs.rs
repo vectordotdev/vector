@@ -2,6 +2,7 @@ use std::{cmp, future::ready, panic, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use codecs::{decoding::FramingError, CharacterDelimitedDecoder};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,7 +23,6 @@ use aws_types::region::Region;
 
 use crate::tls::TlsOptions;
 use crate::{
-    codecs::{decoding::FramingError, CharacterDelimitedDecoder},
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{

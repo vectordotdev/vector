@@ -1,8 +1,10 @@
 use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{LinesCodec, LinesCodecError};
+use tracing::trace;
 
 use super::BoxedFramingError;
 
@@ -11,7 +13,7 @@ use super::BoxedFramingError;
 pub struct OctetCountingDecoderConfig {
     #[serde(
         default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
     /// Options for the octet counting decoder.
     pub octet_counting: OctetCountingDecoderOptions,
@@ -32,7 +34,7 @@ impl OctetCountingDecoderConfig {
 #[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 

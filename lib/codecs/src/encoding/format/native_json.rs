@@ -1,8 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-
-use crate::{event::Event, schema};
+use vector_core::{event::Event, schema};
 
 /// Config used to build a `NativeJsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -25,7 +24,7 @@ impl NativeJsonSerializerConfig {
 pub struct NativeJsonSerializer;
 
 impl Encoder<Event> for NativeJsonSerializer {
-    type Error = crate::Error;
+    type Error = vector_core::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();

@@ -2,6 +2,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
+use tracing::{trace, warn};
 
 use super::BoxedFramingError;
 
@@ -30,12 +31,12 @@ impl CharacterDelimitedDecoderConfig {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
-    #[serde(with = "crate::serde::ascii_char")]
+    #[serde(with = "vector_core::serde::ascii_char")]
     delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 

@@ -1,11 +1,8 @@
 #![deny(missing_docs)]
 
 use super::{validate_fields, EncodingConfiguration, TimestampFormat};
-use crate::{
-    codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
-    event::Event,
-    serde::skip_serializing_if_default,
-};
+use crate::{event::Event, serde::skip_serializing_if_default};
+use codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig};
 use core::fmt::Debug;
 use lookup::lookup_v2::OwnedPath;
 use serde::{Deserialize, Deserializer, Serialize};

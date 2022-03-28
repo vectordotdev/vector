@@ -1,13 +1,11 @@
-use std::convert::TryInto;
-
+use super::Deserializer;
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use std::convert::TryInto;
 use value::Kind;
-
-use super::Deserializer;
-use crate::{config::log_schema, event::Event, schema};
+use vector_core::{config::log_schema, event::Event, schema};
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -52,7 +50,7 @@ impl JsonDeserializer {
 }
 
 impl Deserializer for JsonDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {
@@ -94,7 +92,7 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::log_schema;
+    use vector_core::config::log_schema;
 
     #[test]
     fn deserialize_json() {

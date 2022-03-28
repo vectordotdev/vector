@@ -2,18 +2,18 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
+    NewlineDelimitedDecoderConfig,
+};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio_util::codec::Decoder;
+use tokio_util::codec::Decoder as _;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
-        NewlineDelimitedDecoderConfig,
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext, SourceDescription,
@@ -86,7 +86,7 @@ struct SimpleHttpSource {
     headers: Vec<String>,
     query_parameters: Vec<String>,
     path_key: String,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl HttpSource for SimpleHttpSource {
@@ -243,14 +243,14 @@ mod tests {
 
     use super::SimpleHttpConfig;
     use crate::{
-        codecs::{
-            decoding::{DeserializerConfig, FramingConfig},
-            BytesDecoderConfig, JsonDeserializerConfig,
-        },
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
         test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         SourceSender,
+    };
+    use codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        BytesDecoderConfig, JsonDeserializerConfig,
     };
 
     #[test]

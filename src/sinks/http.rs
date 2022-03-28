@@ -1,6 +1,11 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
+use codecs::encoding::{
+    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
+    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    RawMessageSerializerConfig, Serializer, SerializerConfig,
+};
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -11,14 +16,10 @@ use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::Encoder;
+use tokio_util::codec::Encoder as _;
 
 use crate::{
-    codecs::{
-        encoding::{self, FramingConfig, SerializerConfig},
-        CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializerConfig,
-        NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
-    },
+    codecs::Encoder,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
@@ -143,7 +144,7 @@ struct HttpSink {
     pub auth: Option<Auth>,
     pub compression: Compression,
     pub transformer: Transformer,
-    pub encoder: encoding::Encoder,
+    pub encoder: Encoder,
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     pub request: RequestConfig,
 }
@@ -157,7 +158,7 @@ fn default_sink(encoding: Encoding) -> HttpSink {
         .0
         .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
     let serializer = encoding.1;
-    let encoder = encoding::Encoder::new(framing, serializer);
+    let encoder = Encoder::new(framing, serializer);
 
     HttpSink {
         uri: Default::default(),
@@ -196,7 +197,7 @@ impl SinkConfig for HttpSinkConfig {
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
         let serializer = encoding.1;
-        let encoder = encoding::Encoder::new(framing, serializer);
+        let encoder = Encoder::new(framing, serializer);
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
@@ -244,7 +245,7 @@ impl SinkConfig for HttpSinkConfig {
 }
 
 pub struct HttpSinkEventEncoder {
-    encoder: encoding::Encoder,
+    encoder: Encoder,
     transformer: Transformer,
 }
 
@@ -286,7 +287,8 @@ impl util::http::HttpSink for HttpSink {
         let uri: Uri = self.uri.uri.clone();
 
         let content_type = {
-            use encoding::{Framer::*, Serializer::*};
+            use Framer::*;
+            use Serializer::*;
             match (self.encoder.serializer(), self.encoder.framer()) {
                 (RawMessage(_), _) => Some("text/plain"),
                 (Json(_), NewlineDelimited(_)) => {
