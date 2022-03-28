@@ -14,7 +14,7 @@ pub struct DockerLogsEventsReceived<'a> {
 impl<'a> InternalEvent for DockerLogsEventsReceived<'a> {
     fn emit(self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = 1,
             byte_size = %self.byte_size,
             container_id = %self.container_id
