@@ -10,7 +10,7 @@ use snafu::Snafu;
 use vector_core::stream::BatcherSettings;
 
 use super::EncodedEvent;
-use crate::{event::EventFinalizers, internal_events::LargeEventDropped};
+use crate::{event::EventFinalizers, internal_events::LargeEventDroppedError};
 
 // * Provide sensible sink default 10 MB with 1s timeout. Don't allow chaining builder methods on
 //   that.
@@ -295,7 +295,7 @@ impl<B> Default for BatchSettings<B> {
 }
 
 pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
-    emit!(LargeEventDropped { length, max_length });
+    emit!(LargeEventDroppedError { length, max_length });
     PushResult::Ok(false)
 }
 
