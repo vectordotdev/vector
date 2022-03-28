@@ -20,14 +20,11 @@ mod aws_ec2_metadata;
 mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
 mod batch;
-mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
 mod common;
@@ -36,8 +33,6 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sinks-datadog_events")]
-mod datadog_events;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
@@ -179,20 +174,12 @@ pub(crate) use self::aws_ec2_metadata::*;
 pub(crate) use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub(crate) use self::aws_kinesis_streams::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
-#[cfg(feature = "sinks-blackhole")]
-pub(crate) use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub(crate) use self::concat::*;
-#[cfg(feature = "sinks-console")]
-pub(crate) use self::console::*;
-#[cfg(feature = "sinks-datadog_events")]
-pub(crate) use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
@@ -226,7 +213,6 @@ pub(crate) use self::geoip::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
-    feature = "sinks-http",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
     feature = "sources-aws_ecs_metrics",
