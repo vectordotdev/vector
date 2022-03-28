@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::time::Duration;
 
 use http::{

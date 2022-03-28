@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::fmt::Debug;
 
 use metrics::counter;

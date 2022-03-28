@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::{io::Error, path::Path};
 
 use metrics::counter;

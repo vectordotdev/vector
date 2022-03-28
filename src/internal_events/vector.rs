@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use prost::DecodeError;
