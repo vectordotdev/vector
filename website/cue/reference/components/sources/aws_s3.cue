@@ -12,7 +12,7 @@ components: sources: aws_s3: components._aws & {
 				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
-			}}
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_s3
