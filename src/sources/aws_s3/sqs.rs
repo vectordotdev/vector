@@ -48,12 +48,12 @@ pub(super) struct Config {
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
-    pub(super) poll_secs: i32,
+    pub(super) poll_secs: u32,
 
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
-    pub(super) visibility_timeout_secs: i32,
+    pub(super) visibility_timeout_secs: u32,
 
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
@@ -69,11 +69,11 @@ pub(super) struct Config {
     pub(super) tls_options: Option<TlsOptions>,
 }
 
-const fn default_poll_secs() -> i32 {
+const fn default_poll_secs() -> u32 {
     15
 }
 
-const fn default_visibility_timeout_secs() -> i32 {
+const fn default_visibility_timeout_secs() -> u32 {
     300
 }
 
@@ -94,6 +94,7 @@ pub(super) enum IngestorNewError {
     },
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 pub enum ProcessingError {
     #[snafu(display(
@@ -179,9 +180,9 @@ impl Ingestor {
             multiline,
 
             queue_url: config.queue_url,
-            poll_secs: config.poll_secs,
+            poll_secs: config.poll_secs as i32,
             client_concurrency: config.client_concurrency,
-            visibility_timeout_secs: config.visibility_timeout_secs,
+            visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
         });
 

@@ -151,7 +151,7 @@ impl AwsS3Config {
         let region = self
             .region
             .region()
-            .ok_or_else(|| CreateSqsIngestorError::RegionMissing)?;
+            .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
         let endpoint = self
             .region
