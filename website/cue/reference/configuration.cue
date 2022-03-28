@@ -269,9 +269,9 @@ configuration: {
 								[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
 								"""
 							required:    true
-							common:      true
-							type: array: items: type: string: {
-								examples: ["/path/to/get-secret", "-s"]
+							type: array: {
+								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
+								items: type: string: {}
 							}
 						}
 						timeout: {
