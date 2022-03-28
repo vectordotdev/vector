@@ -63,6 +63,7 @@ pub struct RouteConfig {
     route: IndexMap<String, AnyCondition>,
 }
 
+#[cfg(feature = "transforms-pipelines")]
 impl RouteConfig {
     pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
         Self { route }
