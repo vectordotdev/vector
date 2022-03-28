@@ -4,9 +4,13 @@
 #![deny(missing_docs)]
 
 mod json;
+mod native;
+mod native_json;
 mod raw_message;
 
 pub use json::{JsonSerializer, JsonSerializerConfig};
+pub use native::{NativeSerializer, NativeSerializerConfig};
+pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 
 use crate::event::Event;
