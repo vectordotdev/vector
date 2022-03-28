@@ -1,6 +1,7 @@
 use crate::{
     assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, SizedRecord}, variants::disk_v1::tests::create_default_buffer_v1_with_max_buffer_size,
+    test::common::{with_temp_dir, SizedRecord},
+    variants::disk_v1::tests::create_default_buffer_v1_with_max_buffer_size,
 };
 
 #[tokio::test]
@@ -15,8 +16,9 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             //
             // The sizes are different so that we can assert that we got back the expected record at
             // each read we perform.
-            let (mut writer, reader, _) = create_default_buffer_v1_with_max_buffer_size(data_dir.clone(), 100);
-			let first_write_size = 92;
+            let (mut writer, reader, _) =
+                create_default_buffer_v1_with_max_buffer_size(data_dir.clone(), 100);
+            let first_write_size = 92;
             let second_write_size = 96;
 
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
@@ -26,8 +28,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             // itself.  We do need this write to be big enough to exceed the total buffer size
             // limit, though.
             let first_record = SizedRecord(first_write_size);
-            let first_write_result = writer
-                .try_send(first_record);
+            let first_write_result = writer.try_send(first_record);
             assert_eq!(first_write_result, None);
             writer.flush();
 
@@ -35,8 +36,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             // buffer size limit handily with the first write we did, but since it's a fallible
             // write attempt, it can already tell that the write will not fit anyways:
             let record = SizedRecord(second_write_size);
-            let second_write_result = writer
-				.try_send(record.clone());
+            let second_write_result = writer.try_send(record.clone());
 
             assert_eq!(second_write_result, Some(record));
         }

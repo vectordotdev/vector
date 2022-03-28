@@ -62,7 +62,8 @@ where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
-    let max_buffer_size = NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
+    let max_buffer_size =
+        NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
     let (writer, reader, acker) = open(
         data_dir.as_ref(),

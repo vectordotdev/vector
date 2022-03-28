@@ -181,10 +181,7 @@ async fn initial_size_correct_with_multievents() {
                 .iter()
                 .map(EventCount::event_count)
                 .sum::<usize>();
-            let expected_bytes = input_items
-                .iter()
-                .map(MultiEventRecord::encoded_size)
-                .sum::<usize>();
+            let expected_bytes = input_items.iter().map(|e| e.encoded_size()).sum::<usize>();
 
             // Write a bunch of records so the buffer has events when we reload it.
             for item in input_items {

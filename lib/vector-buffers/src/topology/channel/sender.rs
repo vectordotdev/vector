@@ -215,16 +215,20 @@ impl<T: Bufferable> BufferSender<T> {
         let mut was_dropped = false;
         match self.when_full {
             WhenFull::Block => self.base.send(item).await?,
-            WhenFull::DropNewest => if let Some(_) = self.base.try_send(item).await? {
-                was_dropped = true;
-            },
-            WhenFull::Overflow => if let Some(item) = self.base.try_send(item).await? {
-                sent_to_base = false;
-                self.overflow
-                    .as_mut()
-                    .expect("overflow must exist")
-                    .send(item)
-                    .await?;
+            WhenFull::DropNewest => {
+                if self.base.try_send(item).await?.is_some() {
+                    was_dropped = true;
+                }
+            }
+            WhenFull::Overflow => {
+                if let Some(item) = self.base.try_send(item).await? {
+                    sent_to_base = false;
+                    self.overflow
+                        .as_mut()
+                        .expect("overflow must exist")
+                        .send(item)
+                        .await?;
+                }
             }
         };
 
@@ -238,7 +242,7 @@ impl<T: Bufferable> BufferSender<T> {
                 }
 
                 if was_dropped {
-                    instrumentation.try_increment_dropped_event_count(item_count as u64); 
+                    instrumentation.try_increment_dropped_event_count(item_count as u64);
                 }
             }
         }

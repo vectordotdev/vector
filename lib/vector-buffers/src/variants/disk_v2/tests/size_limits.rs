@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use tokio::time::timeout;
-use tokio_test::{assert_pending, task::spawn, assert_ready};
+use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
 
 use super::{
@@ -416,5 +416,6 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             let second_write_result = assert_ready!(second_record_write.poll());
             assert_eq!(second_write_result, Some(SizedRecord(second_write_size)));
         }
-    }).await
+    })
+    .await;
 }

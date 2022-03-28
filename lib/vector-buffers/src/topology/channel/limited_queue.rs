@@ -265,9 +265,7 @@ mod tests {
         let msg = 42;
 
         // Create our send and receive futures.
-        let mut send = spawn(async {
-            tx.send(msg).await
-        });
+        let mut send = spawn(async { tx.send(msg).await });
 
         let mut recv = spawn(async { rx.next().await });
 
@@ -296,9 +294,7 @@ mod tests {
         let msg2 = 43;
 
         // Create our send and receive futures.
-        let mut send1 = spawn(async {
-            tx.send(msg1).await
-        });
+        let mut send1 = spawn(async { tx.send(msg1).await });
 
         let mut recv1 = spawn(async { rx.next().await });
 
@@ -320,9 +316,7 @@ mod tests {
         assert!(recv1.is_woken());
 
         // Now trigger a second send, which should block as there's no available capacity.
-        let mut send2 = spawn(async {
-            tx.send(msg2).await
-        });
+        let mut send2 = spawn(async { tx.send(msg2).await });
 
         assert!(!send2.is_woken());
         assert_pending!(send2.poll());
@@ -394,9 +388,7 @@ mod tests {
         assert!(recv1.is_woken());
 
         // Now trigger a second send that has four events, and needs to wait for two receives to happen.
-        let mut send2 = spawn(async {
-            tx.send(msgs[3]).await
-        });
+        let mut send2 = spawn(async { tx.send(msgs[3]).await });
 
         assert!(!send2.is_woken());
         assert_pending!(send2.poll());
@@ -451,9 +443,7 @@ mod tests {
         let msg = 42;
 
         // Create our send and receive futures.
-        let mut send = spawn(async {
-            tx.send(msg).await
-        });
+        let mut send = spawn(async { tx.send(msg).await });
 
         let mut recv = spawn(async { rx.next().await });
 
@@ -523,9 +513,7 @@ mod tests {
         let msg = MultiEventRecord(2);
 
         // Create our send and receive futures.
-        let mut send = spawn(async {
-            tx.send(msg).await
-        });
+        let mut send = spawn(async { tx.send(msg).await });
 
         let mut recv = spawn(async { rx.next().await });
 
@@ -558,9 +546,7 @@ mod tests {
         let msg2 = MultiEventRecord(3);
 
         // Create our send future.
-        let mut send = spawn(async {
-            tx.send(msg1).await
-        });
+        let mut send = spawn(async { tx.send(msg1).await });
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -573,9 +559,7 @@ mod tests {
 
         // Now we'll trigger another send which has an oversized item.  It shouldn't be able to send
         // until all permits are available.
-        let mut send2 = spawn(async {
-            tx.send(msg2).await
-        });
+        let mut send2 = spawn(async { tx.send(msg2).await });
 
         assert!(!send2.is_woken());
         assert_pending!(send2.poll());

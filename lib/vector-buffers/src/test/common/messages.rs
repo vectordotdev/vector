@@ -181,7 +181,7 @@ impl FixedEncodable for UndecodableRecord {
 pub(crate) struct MultiEventRecord(pub u32);
 
 impl MultiEventRecord {
-    pub fn encoded_size(&self) -> usize {
+    pub fn encoded_size(self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
     }
 }
