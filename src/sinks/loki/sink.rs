@@ -50,7 +50,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -65,11 +65,11 @@ impl Partitioner for KeyPartitioner {
 struct RecordPartitioner;
 
 impl Partitioner for RecordPartitioner {
-    type Item = LokiRecord;
-    type Key = PartitionKey;
+    type Item = Option<FilteredRecord>;
+    type Key = Option<PartitionKey>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.partition.clone()
+        item.as_ref().map(|inner| inner.partition())
     }
 }
 
@@ -131,7 +131,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        emit!(&LokiEventsProcessed {
+        emit!(LokiEventsProcessed {
             byte_size: payload.len(),
         });
         let compression = self.compression();
@@ -178,7 +178,7 @@ impl EventEncoder {
             for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(&field);
+                        event.as_mut_log().remove(field.as_str());
                     }
                 }
             }
@@ -223,7 +223,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -235,6 +235,41 @@ impl EventEncoder {
             partition,
             finalizers,
         }
+    }
+}
+
+struct FilteredRecord {
+    pub rewritten: bool,
+    pub inner: LokiRecord,
+}
+
+impl FilteredRecord {
+    pub const fn rewritten(inner: LokiRecord) -> Self {
+        Self {
+            rewritten: true,
+            inner,
+        }
+    }
+
+    pub const fn valid(inner: LokiRecord) -> Self {
+        Self {
+            rewritten: false,
+            inner,
+        }
+    }
+
+    pub fn partition(&self) -> PartitionKey {
+        self.inner.partition.clone()
+    }
+}
+
+impl ByteSizeOf for FilteredRecord {
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
+    }
+
+    fn size_of(&self) -> usize {
+        self.inner.size_of()
     }
 }
 
@@ -253,28 +288,25 @@ impl RecordFilter {
 }
 
 impl RecordFilter {
-    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<LokiRecord> {
+    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<FilteredRecord> {
         if let Some(latest) = self.timestamps.get_mut(&record.partition) {
             if record.event.timestamp < *latest {
                 match self.out_of_order_action {
-                    OutOfOrderAction::Drop => {
-                        emit!(&LokiOutOfOrderEventDropped);
-                        None
-                    }
+                    OutOfOrderAction::Drop => None,
                     OutOfOrderAction::RewriteTimestamp => {
-                        emit!(&LokiOutOfOrderEventRewritten);
                         record.event.timestamp = *latest;
-                        Some(record)
+                        Some(FilteredRecord::rewritten(record))
                     }
+                    OutOfOrderAction::Accept => Some(FilteredRecord::valid(record)),
                 }
             } else {
                 *latest = record.event.timestamp;
-                Some(record)
+                Some(FilteredRecord::valid(record))
             }
         } else {
             self.timestamps
                 .insert(record.partition.clone(), record.event.timestamp);
-            Some(record)
+            Some(FilteredRecord::valid(record))
         }
     }
 }
@@ -323,11 +355,30 @@ impl LokiSink {
 
         let sink = input
             .map(|event| encoder.encode_event(event))
-            .filter_map(|record| {
-                let res = filter.filter_record(record);
-                async { res }
-            })
+            .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner::default(), self.batch_settings)
+            .filter_map(|(partition, batch)| async {
+                if let Some(partition) = partition {
+                    let mut count: usize = 0;
+                    let result = batch
+                        .into_iter()
+                        .flatten()
+                        .map(|event| {
+                            if event.rewritten {
+                                count += 1;
+                            }
+                            event.inner
+                        })
+                        .collect::<Vec<_>>();
+                    if count > 0 {
+                        emit!(LokiOutOfOrderEventRewritten { count });
+                    }
+                    Some((partition, result))
+                } else {
+                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    None
+                }
+            })
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {

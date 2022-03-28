@@ -76,7 +76,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&DemoLogsEventProcessed);
+        emit!(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -153,7 +153,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: 0,
             protocol: "none",
         });
@@ -165,7 +165,7 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count,
                         byte_size: events.size_of()
                     });
@@ -180,7 +180,7 @@ async fn demo_logs_source(
                         event
                     });
                     out.send_batch(events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {
@@ -264,20 +264,17 @@ impl SourceConfig for DemoLogsCompatConfig {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{poll, StreamExt};
+    use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{
-        config::log_schema, event::Event, shutdown::ShutdownSignal, source_sender::ReceiverStream,
-        SourceSender,
-    };
+    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> ReceiverStream<Event> {
+    async fn runit(config: &str) -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
         let decoder =

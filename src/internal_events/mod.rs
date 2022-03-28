@@ -22,7 +22,7 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
@@ -112,7 +112,7 @@ mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 mod pulsar;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -121,8 +121,6 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-#[cfg(feature = "transforms-route")]
-mod route;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -183,7 +181,7 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 #[cfg(feature = "sinks-blackhole")]
 pub(crate) use self::blackhole::*;
@@ -279,7 +277,7 @@ pub(crate) use self::postgresql_metrics::*;
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
-#[cfg(feature = "sinks-redis")]
+#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
@@ -289,8 +287,6 @@ pub(crate) use self::remap::*;
 pub(crate) use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub(crate) use self::rename_fields::*;
-#[cfg(feature = "transforms-route")]
-pub(crate) use self::route::*;
 #[cfg(feature = "transforms-sample")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
@@ -336,7 +332,7 @@ pub(crate) use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
+        vector_core::internal_event::emit(vector_core::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })

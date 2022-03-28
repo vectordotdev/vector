@@ -294,8 +294,8 @@
     insert_at = "remap_quoted_path"
     type = "log"
     [tests.input.log_fields]
-      "a.b\\.c" = "bar"
-      "d\\.e" = "baz"
+      "a.\"b.c\"" = "bar"
+      "\"d.e\"" = "baz"
   [[tests.outputs]]
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]

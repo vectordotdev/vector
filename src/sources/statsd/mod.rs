@@ -159,7 +159,7 @@ pub(crate) struct StatsdDeserializer;
 
 impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             protocol: "udp",
             byte_size: bytes.len(),
         });
@@ -169,14 +169,14 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                emit!(&EventsReceived {
+                emit!(EventsReceived {
                     count: 1,
                     byte_size: event.size_of(),
                 });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecordError {
+                emit!(StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -192,7 +192,7 @@ async fn statsd_udp(
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -217,11 +217,11 @@ async fn statsd_udp(
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if let Err(error) = out.send_batch(events).await {
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                 }
             }
             Err(error) => {
-                emit!(&StatsdSocketError::read(error));
+                emit!(StatsdSocketError::read(error));
             }
         }
     }
@@ -265,7 +265,7 @@ mod test {
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
-    use crate::{series, test_util::metrics::AbsoluteMetricState};
+    use crate::{event::into_event_stream, series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -333,6 +333,7 @@ mod test {
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
         let (tx, rx) = SourceSender::new_with_buffer(4096);
+        let rx = rx.flat_map(into_event_stream);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)

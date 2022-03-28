@@ -108,6 +108,24 @@ pub enum Framer {
     Boxed(BoxedFramer),
 }
 
+impl From<CharacterDelimitedEncoder> for Framer {
+    fn from(encoder: CharacterDelimitedEncoder) -> Self {
+        Self::CharacterDelimited(encoder)
+    }
+}
+
+impl From<NewlineDelimitedEncoder> for Framer {
+    fn from(encoder: NewlineDelimitedEncoder) -> Self {
+        Self::NewlineDelimited(encoder)
+    }
+}
+
+impl From<BoxedFramer> for Framer {
+    fn from(encoder: BoxedFramer) -> Self {
+        Self::Boxed(encoder)
+    }
+}
+
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
@@ -208,6 +226,16 @@ impl Encoder {
     pub const fn new(framer: Framer, serializer: Serializer) -> Self {
         Self { framer, serializer }
     }
+
+    /// Get the framer.
+    pub const fn framer(&self) -> &Framer {
+        &self.framer
+    }
+
+    /// Get the serializer.
+    pub const fn serializer(&self) -> &Serializer {
+        &self.serializer
+    }
 }
 
 impl tokio_util::codec::Encoder<Event> for Encoder {
@@ -222,13 +250,13 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
         self.serializer
             .encode(item, &mut payload)
             .map_err(|error| {
-                emit!(&EncoderSerializeFailed { error: &error });
+                emit!(EncoderSerializeFailed { error: &error });
                 Error::SerializingError(error)
             })?;
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
-            emit!(&EncoderFramingFailed { error: &error });
+            emit!(EncoderFramingFailed { error: &error });
             Error::FramingError(error)
         })?;
 

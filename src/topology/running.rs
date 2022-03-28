@@ -18,6 +18,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
+    spawn_named,
     topology::{
         build_or_log_errors, builder,
         builder::Pieces,
@@ -426,7 +427,14 @@ impl RunningTopology {
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(key) {
-                    let tx = self.inputs.remove(key).unwrap();
+                    // We clone instead of removing here because otherwise the input will be
+                    // missing for the rest of the reload process, which violates the assumption
+                    // that all previous inputs for components not being removed are still
+                    // available. It's simpler to allow the "old" input to stick around and be
+                    // replaced (even though that's basically a no-op since we're reusing the same
+                    // buffer) than it is to pass around info about which sinks are having their
+                    // buffers reused and treat them differently at other stages.
+                    let tx = self.inputs.get(key).unwrap().clone();
                     let (rx, acker) = match buffer {
                         TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
                         _ => unreachable!(),
@@ -471,7 +479,7 @@ impl RunningTopology {
         }
 
         for key in &diff.transforms.to_change {
-            self.replace_inputs(key, new_pieces, diff).await;
+            self.replace_inputs(key, new_pieces).await;
         }
 
         for key in &diff.transforms.to_add {
@@ -480,7 +488,7 @@ impl RunningTopology {
 
         // Sinks
         for key in &diff.sinks.to_change {
-            self.replace_inputs(key, new_pieces, diff).await;
+            self.replace_inputs(key, new_pieces).await;
         }
 
         for key in &diff.sinks.to_add {
@@ -579,8 +587,9 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task);
+        let task_name = format!(">> {} ({})", task.typetag(), task.id());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -596,8 +605,9 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task);
+        let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.or_current());
+        let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -613,8 +623,9 @@ impl RunningTopology {
             // maintained for compatibility
             component_name = %task.id(),
         );
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
-        let spawned = tokio::spawn(task);
+        let task_name = format!("{} ({}) >>", task.typetag(), task.id());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone().or_current());
+        let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
@@ -623,9 +634,10 @@ impl RunningTopology {
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
+        let source_task =
+            handle_errors(source_task, self.abort_tx.clone()).instrument(span.or_current());
         self.source_tasks
-            .insert(key.clone(), tokio::spawn(source_task));
+            .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
     fn remove_outputs(&mut self, key: &ComponentKey) {
@@ -663,10 +675,7 @@ impl RunningTopology {
                     // Sink may have been removed with the new config so it may not
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
-                        let _ = output.send(ControlMessage::Add(
-                            sink_key.clone(),
-                            Box::pin(input.clone()),
-                        ));
+                        let _ = output.send(ControlMessage::Add(sink_key.clone(), input.clone()));
                     }
                 }
             }
@@ -675,10 +684,8 @@ impl RunningTopology {
                     // Transform may have been removed with the new config so it may
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
-                        let _ = output.send(ControlMessage::Add(
-                            transform_key.clone(),
-                            Box::pin(input.clone()),
-                        ));
+                        let _ =
+                            output.send(ControlMessage::Add(transform_key.clone(), input.clone()));
                     }
                 }
             }
@@ -696,7 +703,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
+                .send(ControlMessage::Add(key.clone(), tx.clone()));
         }
 
         self.inputs.insert(key.clone(), tx);
@@ -706,12 +713,7 @@ impl RunningTopology {
             .map(|trigger| self.detach_triggers.insert(key.clone(), trigger.into()));
     }
 
-    async fn replace_inputs(
-        &mut self,
-        key: &ComponentKey,
-        new_pieces: &mut builder::Pieces,
-        diff: &ConfigDiff,
-    ) {
+    async fn replace_inputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
         let sink_inputs = self.config.sinks.get(key).map(|s| &s.inputs);
@@ -725,24 +727,8 @@ impl RunningTopology {
         let new_inputs = inputs.iter().collect::<HashSet<_>>();
 
         let inputs_to_remove = &old_inputs - &new_inputs;
-        let mut inputs_to_add = &new_inputs - &old_inputs;
-        let replace_candidates = old_inputs.intersection(&new_inputs);
-        let mut inputs_to_replace = HashSet::new();
-
-        // If the source component of an input was also rebuilt, we need to send an add message
-        // instead of a replace message.
-        for input in replace_candidates {
-            if diff
-                .sources
-                .changed_and_added()
-                .chain(diff.transforms.changed_and_added())
-                .any(|key| key == &input.component)
-            {
-                inputs_to_add.insert(input);
-            } else {
-                inputs_to_replace.insert(input);
-            }
-        }
+        let inputs_to_add = &new_inputs - &old_inputs;
+        let inputs_to_replace = old_inputs.intersection(&new_inputs);
 
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get_mut(input) {
@@ -757,7 +743,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())));
+                .send(ControlMessage::Add(key.clone(), tx.clone()));
         }
 
         for &input in inputs_to_replace {
@@ -766,10 +752,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(
-                    key.clone(),
-                    Some(Box::pin(tx.clone())),
-                ));
+                .send(ControlMessage::Replace(key.clone(), Some(tx.clone())));
         }
 
         self.inputs.insert(key.clone(), tx);

@@ -23,7 +23,7 @@ use crate::{
         },
         util::{
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -173,12 +173,15 @@ impl SinkConfig for InfluxDbLogsConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for InfluxDbLogsSink {
-    type Input = BytesMut;
-    type Output = BytesMut;
+struct InfluxDbLogsEncoder {
+    protocol_version: ProtocolVersion,
+    measurement: String,
+    tags: HashSet<String>,
+    encoding: EncodingConfig<Encoding>,
+}
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
         let mut event = event.into_log();
         event.insert("metric_type", "logs".to_string());
         self.encoding.apply_rules(&mut event);
@@ -214,6 +217,22 @@ impl HttpSink for InfluxDbLogsSink {
         };
 
         Some(output)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for InfluxDbLogsSink {
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = InfluxDbLogsEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        InfluxDbLogsEncoder {
+            protocol_version: self.protocol_version,
+            measurement: self.measurement.clone(),
+            tags: self.tags.clone(),
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
@@ -280,10 +299,7 @@ mod tests {
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
-            util::{
-                http::HttpSink,
-                test::{build_test_server_status, load_sink},
-            },
+            util::test::{build_test_server_status, load_sink},
         },
         test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
@@ -333,8 +349,9 @@ mod tests {
             ["metric_type", "host"].to_vec(),
         );
         sink.encoding.except_fields = Some(vec!["host".into()]);
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event.clone()).unwrap();
+        let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -344,7 +361,8 @@ mod tests {
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
         sink.encoding.except_fields = Some(vec!["metric_type".into()]);
-        let bytes = sink.encode_event(event.clone()).unwrap();
+        let mut encoder = sink.build_encoder();
+        let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
         let line_protocol = split_line_protocol(string);
         assert_eq!(
@@ -373,8 +391,9 @@ mod tests {
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -417,8 +436,9 @@ mod tests {
             "vector",
             ["source_type", "host", "metric_type"].to_vec(),
         );
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -456,8 +476,9 @@ mod tests {
             "vector",
             ["metric_type"].to_vec(),
         );
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -493,8 +514,9 @@ mod tests {
             "vector",
             ["metric_type"].to_vec(),
         );
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -530,8 +552,9 @@ mod tests {
             "vector",
             ["as_a_tag", "not_exists_field", "source_type", "metric_type"].to_vec(),
         );
+        let mut encoder = sink.build_encoder();
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -642,7 +665,7 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{}", i), format!("value{}", i));
+            event.insert(format!("key{}", i).as_str(), format!("value{}", i));
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
             event.insert("timestamp", timestamp);
@@ -692,7 +715,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(format!("{}", (i + 1) * 1000000000), line_protocol.3);
+        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
     }
 
     fn create_sink(

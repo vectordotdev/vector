@@ -141,7 +141,7 @@ impl FunctionTransform for Concat {
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 
         for substring in self.items.iter() {
-            if let Some(value) = event.as_log().get(&substring.source) {
+            if let Some(value) = event.as_log().get(substring.source.as_str()) {
                 let b = value.coerce_to_bytes();
                 let start = match substring.start {
                     None => 0,
@@ -164,7 +164,7 @@ impl FunctionTransform for Concat {
                     }
                 };
                 if start >= end {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "start >= end",
                         source: substring.source.as_ref(),
                         start,
@@ -174,7 +174,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if start > b.len() {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "start > len",
                         source: substring.source.as_ref(),
                         start,
@@ -184,7 +184,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if end > b.len() {
-                    emit!(&ConcatSubstringError {
+                    emit!(ConcatSubstringError {
                         condition: "end > len",
                         source: substring.source.as_ref(),
                         start,
@@ -195,7 +195,7 @@ impl FunctionTransform for Concat {
                 }
                 content_vec.push(b.slice(start..end));
             } else {
-                emit!(&ConcatSubstringSourceMissing {
+                emit!(ConcatSubstringSourceMissing {
                     source: substring.source.as_ref()
                 });
             }
@@ -203,7 +203,7 @@ impl FunctionTransform for Concat {
 
         let content = content_vec.join(self.joiner.as_bytes());
         event.as_mut_log().insert(
-            self.target.clone(),
+            self.target.as_str(),
             Value::from(String::from_utf8_lossy(&content).to_string()),
         );
 

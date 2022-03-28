@@ -11,7 +11,7 @@ import pathlib
 
 np.seterr(all='raise')
 
-parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser = argparse.ArgumentParser(description='Plot throughput results from soak run')
 parser.add_argument('--capture-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--output-dir', type=str, help='the directory to search for capture files')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
@@ -46,11 +46,15 @@ for exp in bytes_written.experiment.unique():
     plt.savefig(os.path.join(args.output_dir, "{}/samples.png".format(exp)), dpi=200)
     plt.close()
 
-    sns.displot(data=data,
-                hue="run_id",
-                col="variant",
-                multiple="dodge",
-                x="bytes/second per core",
-                kde=True)
-    plt.savefig(os.path.join(args.output_dir, "{}/histogram.png".format(exp)), dpi=200)
+    try:
+        sns.displot(data=data,
+                    hue="run_id",
+                    col="variant",
+                    multiple="dodge",
+                    x="bytes/second per core",
+                    kde=True)
+        plt.savefig(os.path.join(args.output_dir, "{}/histogram.png".format(exp)), dpi=200)
+    except np.linalg.LinAlgError:
+        print("ERROR: histogram plotting failed, skipping")
+
     plt.close()

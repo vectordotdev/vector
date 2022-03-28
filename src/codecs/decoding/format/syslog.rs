@@ -56,7 +56,7 @@ pub struct SyslogDeserializer;
 impl Deserializer for SyslogDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes).map_err(|error| {
-            emit!(&SyslogConvertUtf8Error { error });
+            emit!(SyslogConvertUtf8Error { error });
             error
         })?;
         let line = line.trim();
@@ -123,7 +123,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     for element in parsed.structured_data.into_iter() {
         for (name, value) in element.params() {
             let key = format!("{}.{}", element.id, name);
-            log.insert(key, value);
+            log.insert(key.as_str(), value);
         }
     }
 }

@@ -33,7 +33,7 @@ impl SinkConfig for BlackholeConfig {
         let sink = BlackholeSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input(&self) -> Input {

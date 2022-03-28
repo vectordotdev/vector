@@ -32,7 +32,7 @@ fn benchmark_kind_display(c: &mut Criterion) {
         let kind = parameter.kind();
 
         group.bench_with_input(BenchmarkId::from_parameter(param), &kind, |b, kind| {
-            b.iter(|| format!("{}", kind))
+            b.iter(|| kind.to_string())
         });
     }
 }

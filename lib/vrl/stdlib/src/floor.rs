@@ -2,6 +2,26 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
+fn floor(precision: Option<Value>, value: Value) -> Resolved {
+    let precision = match precision {
+        Some(value) => value.try_integer()?,
+        None => 0,
+    };
+    match value {
+        Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+            *f,
+            precision,
+            f64::floor,
+        ))),
+        value @ Value::Integer(_) => Ok(value),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float() | Kind::integer(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Floor;
 
@@ -44,6 +64,13 @@ impl Function for Floor {
             result: Ok("9.0"),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let precision = args.optional("precision");
+
+        floor(precision, value)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -54,24 +81,14 @@ struct FloorFn {
 
 impl Expression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = match &self.precision {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 0,
-        };
+        let precision = self
+            .precision
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let value = self.value.resolve(ctx)?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
-                *f,
-                precision,
-                f64::floor,
-            ))),
-            value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::float() | Kind::integer(),
-            }
-            .into()),
-        }
+        floor(precision, value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

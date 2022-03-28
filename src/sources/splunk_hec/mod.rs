@@ -107,7 +107,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(&SplunkHecRequestReceived {
+                        emit!(SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -207,7 +207,11 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
 
         warp::post()
-            .and(path!("event").or(path!("event" / "1.0")))
+            .and(
+                path!("event")
+                    .or(path!("event" / "1.0"))
+                    .or(warp::path::end()),
+            )
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
@@ -226,7 +230,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -280,7 +284,7 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(&EventsReceived {
+                            emit!(EventsReceived {
                                 count: events.len(),
                                 byte_size: events.size_of(),
                             });
@@ -327,7 +331,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -349,7 +353,7 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         );
 
-                        let res = out.send(event).await;
+                        let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
@@ -571,7 +575,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                     }
 
                     for (key, value) in object {
-                        log.insert(key, value);
+                        log.insert(key.as_str(), value);
                     }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -589,7 +593,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             for (key, value) in object {
-                log.insert(key, value);
+                log.insert(key.as_str(), value);
             }
         }
 
@@ -660,7 +664,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(&SplunkHecRequestBodyInvalidError {
+                emit!(SplunkHecRequestBodyInvalidError {
                     error: error.into()
                 });
                 Some(Err(
@@ -769,7 +773,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(&SplunkHecRequestBodyInvalidError { error });
+                emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -807,7 +811,7 @@ fn raw_event(
         event.add_batch_notifier(batch);
     }
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         count: 1,
         byte_size: event.size_of(),
     });
@@ -916,7 +920,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(&SplunkHecRequestError { error });
+        emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
                 response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)
@@ -1307,6 +1311,25 @@ mod tests {
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+        assert!(event.metadata().splunk_hec_token().is_none());
+    }
+
+    #[tokio::test]
+    async fn root() {
+        let message = r#"{ "event": { "message": "root"} }"#;
+        let (source, address) = source(None).await;
+
+        assert_eq!(200, post(address, "services/collector", message).await);
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()[log_schema().message_key()], "root".into());
         assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(

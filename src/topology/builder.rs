@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
     future::ready,
+    num::NonZeroUsize,
     sync::{Arc, Mutex},
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryFutureExt};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt};
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
@@ -27,7 +28,6 @@ use vector_core::{
 
 use super::{
     fanout::{self, Fanout},
-    ready_events::ReadyEventsExt,
     schema,
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -40,6 +40,7 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     SourceSender,
 };
@@ -48,6 +49,8 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
 pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+
+pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
@@ -150,21 +153,33 @@ pub async fn build_pieces(
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
 
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_id = %key.id(),
+            component_type = %source.inner.source_type(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
         for output in source_outputs {
-            let rx = builder.add_output(output.clone());
+            let mut rx = builder.add_output(output.clone());
 
-            let (fanout, control) = Fanout::new();
+            let (mut fanout, control) = Fanout::new();
             let pump = async move {
-                rx.map(EventArray::from).map(Ok).forward(fanout).await?;
+                while let Some(array) = rx.next().await {
+                    fanout.send(array).await;
+                }
                 Ok(TaskOutput::Source)
             };
 
-            pumps.push(pump);
+            pumps.push(pump.instrument(span.clone()));
             controls.insert(
                 OutputId {
                     component: key.clone(),
@@ -183,7 +198,7 @@ pub async fn build_pieces(
         let pump = async move {
             let mut handles = Vec::new();
             for pump in pumps {
-                handles.push(tokio::spawn(pump));
+                handles.push(spawn_named(pump, task_name.as_ref()));
             }
             for handle in handles {
                 handle.await.expect("join error")?;
@@ -292,7 +307,8 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = TopologyBuilder::standalone_memory(100, WhenFull::Block).await;
+        let (input_tx, input_rx) =
+            TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block).await;
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
@@ -379,7 +395,7 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(&EventsReceived {
+                        emit!(EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
                         })
@@ -570,7 +586,7 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: events.len(),
             byte_size: events.size_of(),
         });
@@ -591,8 +607,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(INLINE_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -606,16 +621,11 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
-        // try to balance out the increased overhead of spawning tasks
-        const CONCURRENT_BATCH_SIZE: usize = 1024;
-
         let mut input_rx = self
             .input_rx
             .take()
             .expect("can't run runner twice")
-            .filter(move |events| ready(filter_events_type(events, self.input_type)))
-            .ready_events(CONCURRENT_BATCH_SIZE);
+            .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -675,34 +685,33 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (fanout, control) = Fanout::new();
+    let (mut fanout, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(input_rx);
 
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
         .inspect(|events| {
-            emit!(&EventsReceived {
+            emit!(EventsReceived {
                 count: events.len(),
                 byte_size: events.size_of(),
             })
         });
-    let transform = t
+    let stream = t
         .transform(Box::pin(filtered))
         .inspect(|events: &EventArray| {
-            emit!(&EventsSent {
+            emit!(EventsSent {
                 count: events.len(),
                 byte_size: events.size_of(),
                 output: None,
             });
-        })
-        .map(Ok)
-        .forward(fanout)
-        .boxed()
-        .map_ok(|_| {
-            debug!("Finished.");
-            TaskOutput::Transform
         });
+    let transform = async move {
+        fanout.send_stream(stream).await;
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
+    }
+    .boxed();
 
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);

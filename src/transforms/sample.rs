@@ -121,7 +121,7 @@ impl FunctionTransform for Sample {
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field))
+            .and_then(|key_field| event.as_log().get(key_field.as_str()))
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -138,7 +138,7 @@ impl FunctionTransform for Sample {
                 .insert("sample_rate", self.rate.to_string());
             output.push(event);
         } else {
-            emit!(&SampleEventDiscarded);
+            emit!(SampleEventDiscarded);
         }
     }
 }
@@ -159,6 +159,7 @@ mod tests {
     fn condition_contains(key: &str, needle: &str) -> Condition {
         VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+            runtime: Default::default(),
         }
         .build(&Default::default())
         .unwrap()

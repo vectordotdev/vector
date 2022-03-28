@@ -252,7 +252,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(&SyslogUdpReadError { error });
+                        emit!(SyslogUdpReadError { error });
                         None
                     }
                 }
@@ -260,7 +260,7 @@ pub fn udp(
         })
         .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())

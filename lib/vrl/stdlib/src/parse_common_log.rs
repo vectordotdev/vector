@@ -4,6 +4,24 @@ use vrl::prelude::*;
 
 use crate::log_util;
 
+fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Resolved {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => "%d/%b/%Y:%T %z".to_owned(),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let captures = log_util::REGEX_APACHE_COMMON_LOG
+        .captures(&message)
+        .ok_or("failed parsing common log line")?;
+    log_util::log_fields(
+        &log_util::REGEX_APACHE_COMMON_LOG,
+        &captures,
+        &timestamp_format,
+        ctx.timezone(),
+    )
+    .map_err(Into::into)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseCommonLog;
 
@@ -62,6 +80,13 @@ impl Function for ParseCommonLog {
             }),
         }]
     }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let timestamp_format = args.optional("timestamp_format");
+
+        parse_common_log(value, timestamp_format, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,26 +98,13 @@ struct ParseCommonLogFn {
 impl Expression for ParseCommonLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let captures = log_util::REGEX_APACHE_COMMON_LOG
-            .captures(&message)
-            .ok_or("failed parsing common log line")?;
-
-        log_util::log_fields(
-            &log_util::REGEX_APACHE_COMMON_LOG,
-            &captures,
-            &timestamp_format,
-            ctx.timezone(),
-        )
-        .map_err(Into::into)
+        parse_common_log(bytes, timestamp_format, ctx)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

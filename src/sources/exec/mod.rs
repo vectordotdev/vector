@@ -264,14 +264,14 @@ async fn run_scheduled(
         match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailedError {
+                    emit!(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(error) => {
-                emit!(&ExecTimeoutError {
+                emit!(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                     error,
@@ -309,7 +309,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailedError {
+                        emit!(ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -331,7 +331,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailedError {
+            emit!(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -386,37 +386,20 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, _byte_size), stream)) = receiver.recv().await {
-        emit!(&ExecEventsReceived {
-            count: events.len(),
+    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+        let count = events.len();
+        emit!(ExecEventsReceived {
+            count,
             command: config.command_line().as_str(),
             byte_size: events.size_of(),
         });
 
-        let total_count = events.len();
-        let mut processed_count = 0;
-
-        for mut event in events {
-            handle_event(
-                &config,
-                &hostname,
-                &Some(stream.to_string()),
-                pid,
-                &mut event,
-            );
-
-            match out.send(event).await {
-                Ok(_) => {
-                    processed_count += 1;
-                }
-                Err(error) => {
-                    emit!(&StreamClosedError {
-                        count: total_count - processed_count,
-                        error,
-                    });
-                    break 'send;
-                }
-            }
+        for event in &mut events {
+            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
+        }
+        if let Err(error) = out.send_batch(events).await {
+            emit!(StreamClosedError { count, error });
+            break;
         }
     }
 
@@ -445,7 +428,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(&ExecCommandExecuted {
+    emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,

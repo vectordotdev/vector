@@ -73,7 +73,11 @@ impl Expression for Abort {
         TypeDef::null().infallible()
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         match &self.message {
             None => {
                 // If there is no message, just write a Null to the stack which
@@ -82,7 +86,7 @@ impl Expression for Abort {
                 vm.write_opcode(OpCode::Constant);
                 vm.write_primitive(nullidx);
             }
-            Some(message) => message.compile_to_vm(vm)?,
+            Some(message) => message.compile_to_vm(vm, state)?,
         }
 
         vm.write_opcode(OpCode::Abort);

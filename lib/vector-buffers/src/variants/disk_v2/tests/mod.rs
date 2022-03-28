@@ -1,14 +1,57 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    io::{self, Cursor},
+    path::Path,
+    sync::Arc,
+};
 
-use super::{Buffer, DiskBufferConfig, Ledger, Reader, Writer};
+use async_trait::async_trait;
+use tokio::io::DuplexStream;
+
+use super::{
+    io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
+    Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
+};
 use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable, WhenFull};
+
+type FilesystemUnderTest = ProductionFilesystem;
 
 mod acknowledgements;
 mod basic;
 mod invariants;
 mod known_errors;
+mod model;
 mod record;
 mod size_limits;
+
+#[async_trait]
+impl AsyncFile for DuplexStream {
+    async fn metadata(&self) -> io::Result<Metadata> {
+        Ok(Metadata { len: 0 })
+    }
+
+    async fn sync_all(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AsyncFile for Cursor<Vec<u8>> {
+    async fn metadata(&self) -> io::Result<Metadata> {
+        Ok(Metadata { len: 0 })
+    }
+
+    async fn sync_all(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl ReadableMemoryMap for Vec<u8> {}
+
+impl WritableMemoryMap for Vec<u8> {
+    fn flush(&self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 #[macro_export]
 macro_rules! assert_buffer_is_empty {
@@ -125,12 +168,19 @@ macro_rules! set_data_file_length {
 
 pub(crate) async fn create_default_buffer_v2<P, R>(
     data_dir: P,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir).build();
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -139,12 +189,20 @@ where
 
 pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
     data_dir: P,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>, BufferUsageHandle)
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+    BufferUsageHandle,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir).build();
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
     let (writer, reader, acker, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
@@ -155,14 +213,21 @@ where
 pub(crate) async fn create_buffer_v2_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
     // We override `max_buffer_size` directly because otherwise `build` has built-in logic that
     // ensures it is a minimum size related to the data file size limit, etc.
-    let mut config = DiskBufferConfig::from_path(data_dir).build();
+    let mut config = DiskBufferConfigBuilder::from_path(data_dir)
+        .build()
+        .expect("creating buffer should not fail");
     config.max_buffer_size = max_buffer_size;
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
@@ -174,14 +239,20 @@ where
 pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir)
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_record_size(max_record_size)
-        .build();
+        .build()
+        .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)
@@ -192,14 +263,44 @@ where
 pub(crate) async fn create_buffer_v2_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
-) -> (Writer<R>, Reader<R>, Acker, Arc<Ledger>)
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let config = DiskBufferConfig::from_path(data_dir)
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
-        .build();
+        .build()
+        .expect("creating buffer should not fail");
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+
+    Buffer::from_config_inner(config, usage_handle)
+        .await
+        .expect("should not fail to create buffer")
+}
+
+pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
+    data_dir: P,
+    write_buffer_size: usize,
+) -> (
+    Writer<R, FilesystemUnderTest>,
+    Reader<R, FilesystemUnderTest>,
+    Acker,
+    Arc<Ledger<FilesystemUnderTest>>,
+)
+where
+    P: AsRef<Path>,
+    R: Bufferable,
+{
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .write_buffer_size(write_buffer_size)
+        .build()
+        .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
 
     Buffer::from_config_inner(config, usage_handle)

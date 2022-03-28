@@ -10,7 +10,7 @@ pub struct AnsiStripperFieldMissingError<'a> {
 }
 
 impl InternalEvent for AnsiStripperFieldMissingError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(
             message = "Field does not exist.",
             field = %self.field,
@@ -19,9 +19,6 @@ impl InternalEvent for AnsiStripperFieldMissingError<'_> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => FIELD_MISSING,
@@ -41,7 +38,7 @@ pub struct AnsiStripperFieldInvalidError<'a> {
 }
 
 impl InternalEvent for AnsiStripperFieldInvalidError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Field value must be a string.",
             field = %self.field,
@@ -50,9 +47,6 @@ impl InternalEvent for AnsiStripperFieldInvalidError<'_> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => EXPECTED_STRING,
@@ -73,7 +67,7 @@ pub struct AnsiStripperError<'a> {
 }
 
 impl InternalEvent for AnsiStripperError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Could not strip ANSI escape sequences.",
             field = %self.field,
@@ -83,9 +77,6 @@ impl InternalEvent for AnsiStripperError<'_> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => COULDNT_STRIP,

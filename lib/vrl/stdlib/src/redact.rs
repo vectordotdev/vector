@@ -96,6 +96,56 @@ impl Function for Redact {
             redactor,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("filters", Some(expr)) => {
+                let filters = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    }
+                })?;
+                let filters = filters
+                    .try_array()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    })?
+                    .into_iter()
+                    .map(|value| {
+                        value.clone().try_into().map_err(|error| {
+                            vrl::function::Error::InvalidArgument {
+                                keyword: "filters",
+                                value,
+                                error,
+                            }
+                        })
+                    })
+                    .collect::<std::result::Result<Vec<Filter>, vrl::function::Error>>()?;
+
+                Ok(Some(Box::new(filters) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let redactor = Redactor::Full;
+        let filters = args
+            .required_any("filters")
+            .downcast_ref::<Vec<Filter>>()
+            .unwrap();
+
+        Ok(redact(value, filters, &redactor))
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -137,8 +187,10 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
 impl Expression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let filters = &self.filters;
+        let redactor = &self.redactor;
 
-        Ok(redact(value, &self.filters, &self.redactor))
+        Ok(redact(value, filters, redactor))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

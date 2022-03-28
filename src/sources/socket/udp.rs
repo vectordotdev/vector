@@ -112,13 +112,13 @@ pub fn udp(
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
                         let error = codecs::decoding::Error::FramingError(error.into());
-                        emit!(&SocketReceiveError {
+                        emit!(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error
                         })
                     })?;
 
-                    emit!(&BytesReceived { byte_size, protocol: "udp" });
+                    emit!(BytesReceived { byte_size, protocol: "udp" });
 
                     let payload = buf.split_to(byte_size);
 
@@ -128,7 +128,7 @@ pub fn udp(
                         match result {
                             Ok((mut events, _byte_size)) => {
                                 let count = events.len();
-                                emit!(&SocketEventsReceived {
+                                emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
                                     byte_size: events.size_of(),
                                     count,
@@ -140,14 +140,14 @@ pub fn udp(
                                     if let Event::Log(ref mut log) = event {
                                         log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
                                         log.try_insert(log_schema().timestamp_key(), now);
-                                        log.try_insert(host_key.clone(), address.to_string());
+                                        log.try_insert(host_key.as_str(), address.to_string());
                                     }
                                 }
 
                                 tokio::select!{
                                     result = out.send_batch(events) => {
                                         if let Err(error) = result {
-                                            emit!(&StreamClosedError { error, count });
+                                            emit!(StreamClosedError { error, count });
                                             return Ok(())
                                         }
                                     }

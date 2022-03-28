@@ -201,6 +201,21 @@ impl Expression for Op {
                 }
             }
 
+            // ... % ...
+            Rem => {
+                // Division is infallible if the rhs is a literal normal float or integer.
+                match self.rhs.as_value() {
+                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
+                        Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
+                        Value::Float(_) => TypeDef::float().fallible(),
+                        Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
+                        Value::Integer(_) => TypeDef::integer().fallible(),
+                        _ => TypeDef::float().add_integer().fallible(),
+                    },
+                    _ => TypeDef::float().add_integer().fallible(),
+                }
+            }
+
             // "bar" + ...
             // ... + "bar"
             Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
@@ -216,7 +231,7 @@ impl Expression for Op {
             // 1.0 - ...
             // 1.0 * ...
             // 1.0 % ...
-            Add | Sub | Mul | Rem if lhs_def.is_float() || rhs_def.is_float() => lhs_def
+            Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
                 .fallible_unless(K::integer().or_float())
                 .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::float()),
@@ -225,7 +240,7 @@ impl Expression for Op {
             // 1 - 1
             // 1 * 1
             // 1 % 1
-            Add | Sub | Mul | Rem if lhs_def.is_integer() && rhs_def.is_integer() => {
+            Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
                 lhs_def.merge_deep(rhs_def).with_kind(K::integer())
             }
 
@@ -247,90 +262,107 @@ impl Expression for Op {
                 .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
-            // ... % ...
-            Sub | Rem => lhs_def
+            Sub => lhs_def
                 .merge_deep(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        self.lhs.compile_to_vm(vm)?;
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
+        self.lhs.compile_to_vm(vm, state)?;
+
+        let err_jump = if self.opcode != ast::Opcode::Err {
+            // For all Ops other than the Err op, we want to jump to the end of
+            // the statement if the lhs results in an error.
+            Some(vm.emit_jump(OpCode::JumpIfErr))
+        } else {
+            None
+        };
 
         // Note, not all opcodes want the RHS evaluated straight away, so we
         // only compile the rhs in each branch as necessary.
         match self.opcode {
             ast::Opcode::Mul => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Multiply);
             }
             ast::Opcode::Div => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Divide);
             }
             ast::Opcode::Add => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Add);
             }
             ast::Opcode::Sub => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Subtract);
             }
             ast::Opcode::Rem => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Rem);
             }
             ast::Opcode::Or => {
                 // Or is rewritten as an if statement to allow short circuiting.
                 let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
                 vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::And => {
                 // And is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfFalse);
-                vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm)?;
+                // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
+                // replace it with False
+                let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
+                self.rhs.compile_to_vm(vm, state)?;
+                vm.write_opcode(OpCode::And);
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Err => {
                 // Err is rewritten as an if statement to allow short circuiting
                 let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
                 vm.write_opcode(OpCode::ClearError);
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Ne => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::NotEqual);
             }
             ast::Opcode::Eq => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Equal);
             }
             ast::Opcode::Ge => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::GreaterEqual);
             }
             ast::Opcode::Gt => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Greater);
             }
             ast::Opcode::Le => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::LessEqual);
             }
             ast::Opcode::Lt => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Less);
             }
             ast::Opcode::Merge => {
-                self.rhs.compile_to_vm(vm)?;
+                self.rhs.compile_to_vm(vm, state)?;
                 vm.write_opcode(OpCode::Merge);
             }
         };
+
+        if let Some(err_jump) = err_jump {
+            vm.patch_jump(err_jump);
+        }
         Ok(())
     }
 }
@@ -577,6 +609,11 @@ mod tests {
         remainder_integer {
             expr: |_| op(Rem, 5, 5),
             want: TypeDef::integer().infallible(),
+        }
+
+        remainder_integer_zero {
+            expr: |_| op(Rem, 5, 0),
+            want: TypeDef::integer().fallible(),
         }
 
         remainder_float {
