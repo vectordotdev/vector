@@ -85,7 +85,7 @@ while [[ $# -gt 0 ]]; do
           shift # past value
           ;;
       --replicas)
-          REPLICAS=$(($2 - 1))
+          REPLICAS=$2
           shift # past argument
           shift # past value
           ;;

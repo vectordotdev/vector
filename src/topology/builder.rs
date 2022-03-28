@@ -42,6 +42,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    utilization::wrap,
     SourceSender,
 };
 
@@ -150,6 +151,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
+        debug!(component = %key, "Building new source.");
+
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
 
@@ -173,9 +176,11 @@ pub async fn build_pieces(
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
+                debug!("Source pump starting.");
                 while let Some(array) = rx.next().await {
                     fanout.send(array).await;
                 }
+                debug!("Source pump finished.");
                 Ok(TaskOutput::Source)
             };
 
@@ -266,6 +271,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        debug!(component = %key, "Building new transform.");
+
         let mut schema_definitions = HashMap::new();
         let merged_definition = if config.schema.enabled {
             schema::merged_definition(&transform.inputs, config, &mut definition_cache)
@@ -324,6 +331,8 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
+        debug!(component = %key, "Building new sink");
+
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
@@ -355,7 +364,7 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream()))), acker),
             }
         };
 
@@ -389,7 +398,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = crate::utilization::wrap(rx);
+            let mut rx = wrap(rx);
 
             sink.run(
                 rx.by_ref()
@@ -607,6 +616,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
@@ -625,6 +635,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
@@ -687,7 +698,7 @@ fn build_task_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    let input_rx = crate::utilization::wrap(input_rx);
+    let input_rx = crate::utilization::wrap(input_rx.into_stream());
 
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))

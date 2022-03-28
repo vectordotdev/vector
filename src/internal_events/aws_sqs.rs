@@ -27,8 +27,6 @@ impl InternalEvent for AwsSqsEventsSent<'_> {
         );
         counter!("component_sent_events_total", 1);
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
-        // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -51,7 +49,6 @@ impl InternalEvent for SqsS3EventsReceived {
         );
         // deprecated
         counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

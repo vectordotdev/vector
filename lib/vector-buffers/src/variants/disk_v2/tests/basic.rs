@@ -168,7 +168,7 @@ async fn initial_size_correct_with_multievents() {
             // Technically, we aggregate the bytes written value from each write, but we also want
             // to verify that is accurate, so we record each record by hand to make sure our totals
             // are identical:
-            let expected_bytes = stream::iter(input_items.iter().cloned())
+            let expected_bytes = stream::iter(input_items.iter().copied())
                 .filter_map(|record| async move {
                     let mut record_writer =
                         RecordWriter::new(Cursor::new(Vec::new()), 0, 16_384, u64::MAX, usize::MAX);
