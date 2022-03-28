@@ -24,6 +24,7 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
+const ACCOUNT_ID_KEY: &str = "account-id";
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
 const INSTANCE_ID_KEY: &str = "instance-id";
@@ -100,6 +101,7 @@ struct MetadataKey {
 
 #[derive(Debug)]
 struct Keys {
+    account_id_key: MetadataKey,
     ami_id_key: MetadataKey,
     availability_zone_key: MetadataKey,
     instance_id_key: MetadataKey,
@@ -338,6 +340,10 @@ impl MetadataClient {
 
         // Fetch all resources, _then_ add them to the state map.
         if let Some(document) = self.get_document().await? {
+            if self.fields.contains(ACCOUNT_ID_KEY) {
+                new_state.push((self.keys.account_id_key.clone(), document.account_id.into()));
+            }
+
             if self.fields.contains(AMI_ID_KEY) {
                 new_state.push((self.keys.ami_id_key.clone(), document.image_id.into()));
             }
@@ -506,6 +512,7 @@ fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
 impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
         Keys {
+            account_id_key: create_key(namespace, ACCOUNT_ID_KEY),
             ami_id_key: create_key(namespace, AMI_ID_KEY),
             availability_zone_key: create_key(namespace, AVAILABILITY_ZONE_KEY),
             instance_id_key: create_key(namespace, INSTANCE_ID_KEY),
@@ -591,6 +598,10 @@ mod integration_tests {
                 "i-096fba6d03d36d262",
             ),
             (
+                vec![OwnedSegment::field(ACCOUNT_ID_KEY)].into(),
+                "071959437513",
+            ),
+            (
                 vec![OwnedSegment::field(AMI_ID_KEY)].into(),
                 "ami-05f27d4d6770a43d2",
             ),
@@ -616,6 +627,7 @@ mod integration_tests {
             (LOCAL_IPV4_KEY, "192.1.1.2"),
             (LOCAL_HOSTNAME_KEY, "mock-hostname"),
             (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+            (ACCOUNT_ID_KEY, "071959437513"),
             (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
             (INSTANCE_TYPE_KEY, "t2.micro"),
             (REGION_KEY, "us-east-1"),
@@ -650,8 +662,12 @@ mod integration_tests {
     async fn enrich_log() {
         trace_init();
 
+        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+
         let transform = make_transform(Ec2Metadata {
             endpoint: Some(ec2_metadata_address()),
+            fields: Some(fields),
             ..Default::default()
         })
         .await;
@@ -678,8 +694,12 @@ mod integration_tests {
     async fn enrich_metric() {
         trace_init();
 
+        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+
         let transform = make_transform(Ec2Metadata {
             endpoint: Some(ec2_metadata_address()),
+            fields: Some(fields),
             ..Default::default()
         })
         .await;

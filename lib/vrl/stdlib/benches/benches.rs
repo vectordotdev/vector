@@ -51,6 +51,7 @@ criterion_group!(
               ipv6_to_ipv4,
               is_array,
               is_boolean,
+              is_empty,
               is_float,
               is_integer,
               is_null,
@@ -669,6 +670,35 @@ bench_function! {
     boolean {
         args: func_args![value: true],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_empty => vrl_stdlib::IsEmpty;
+
+    empty_array {
+        args: func_args![value: value!([])],
+        want: Ok(true),
+    }
+
+    non_empty_array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    empty_object {
+        args: func_args![value: value!({})],
+        want: Ok(true),
+    }
+
+    non_empty_object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+
+    string {
+        args: func_args![value: "foo"],
+        want: Ok(false),
     }
 }
 

@@ -1,6 +1,5 @@
 use std::{num::NonZeroU64, path::Path};
 
-use futures::StreamExt;
 use tokio_test::{assert_pending, task::spawn};
 use tracing::{Metadata, Span};
 
@@ -15,6 +14,7 @@ mod acknowledgements;
 mod basic;
 mod event_count;
 mod naming;
+mod size_limits;
 
 // Default of 1GB.
 const DEFAULT_DISK_BUFFER_V1_SIZE_BYTES: NonZeroU64 =
@@ -54,6 +54,28 @@ where
     (writer, reader, acker, usage_handle)
 }
 
+pub(crate) fn create_default_buffer_v1_with_max_buffer_size<P, R>(
+    data_dir: P,
+    max_buffer_size: u64,
+) -> (Writer<R>, Reader<R>, Acker)
+where
+    P: AsRef<Path>,
+    R: Bufferable + Clone,
+{
+    let max_buffer_size =
+        NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
+    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let (writer, reader, acker) = open(
+        data_dir.as_ref(),
+        "disk_buffer_v1",
+        max_buffer_size,
+        usage_handle,
+    )
+    .expect("should not fail to create buffer");
+
+    (writer, reader, acker)
+}
+
 async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
     tokio::time::advance(FLUSH_INTERVAL).await;
 
@@ -68,7 +90,7 @@ async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
                 .build()
                 .with_name("flush")
                 .with_parent_name(parent_name)
-                .was_closed_at_least(2)
+                .was_closed()
                 .finalize()
         });
 

@@ -79,6 +79,7 @@ scopes:
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
   - apt platform # Anything `apt` platform related
+  - arm platform # Anything `arm` platform related
   - arm64 platform # Anything `arm64` platform related
   - centos platform # Anything `centos` platform related
   - debian platform # Anything `debian` platform related

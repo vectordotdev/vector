@@ -24,7 +24,6 @@ impl InternalEvent for VectorEventReceived {
         );
         // deprecated
         counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

@@ -103,15 +103,13 @@ async fn ensure_queue(queue_name: String) {
         None
     };
 
-    if let Err(error) = client
+    client
         .create_queue()
         .set_attributes(attributes)
         .queue_name(queue_name)
         .send()
         .await
-    {
-        println!("Unable to check the queue {:?}", error);
-    }
+        .expect("unable to create queue");
 }
 
 async fn get_queue_url(queue_name: String) -> String {
