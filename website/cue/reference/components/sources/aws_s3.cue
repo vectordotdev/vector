@@ -10,7 +10,8 @@ components: sources: aws_s3: components._aws & {
 			tls: {
 				enabled:                true
 				can_enable:             true
-				can_verify_certificate: true
+				can_verify_certificate: false
+				can_verify_hostname:    false
 				enabled_default:        false
 			}
 			checkpoint: enabled: false
