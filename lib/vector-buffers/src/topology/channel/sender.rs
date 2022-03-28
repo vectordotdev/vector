@@ -1,126 +1,127 @@
-use std::{
-    fmt, mem,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::sync::Arc;
 
-use futures::{ready, Sink};
-use pin_project::pin_project;
+use async_recursion::async_recursion;
+use tokio::sync::Mutex;
 
 use super::limited_queue::LimitedSender;
-use crate::{buffer_usage_data::BufferUsageHandle, Bufferable, WhenFull};
+use crate::{
+    buffer_usage_data::BufferUsageHandle,
+    variants::{
+        disk_v1,
+        disk_v2::{self, ProductionFilesystem},
+    },
+    Bufferable, WhenFull,
+};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum SendState {
-    // This sender should drop the next item it receives.
-    DropNext,
-    // The base sender is ready to be sent an item.
-    BaseReady,
-    // The overflow sender is ready to be sent an item.
-    OverflowReady,
-    // Default state.
-    Idle,
+/// Adapter for papering over various sender backends.
+#[derive(Clone, Debug)]
+pub enum SenderAdapter<T: Bufferable> {
+    /// The in-memory channel buffer.
+    InMemory(LimitedSender<T>),
+
+    /// The disk v1 buffer.
+    DiskV1(disk_v1::Writer<T>),
+
+    /// The disk v2 buffer.
+    DiskV2(Arc<Mutex<disk_v2::Writer<T, ProductionFilesystem>>>),
 }
 
-impl SendState {
-    fn is_ready(self) -> bool {
-        matches!(self, SendState::BaseReady | SendState::OverflowReady)
+impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
+    fn from(v: LimitedSender<T>) -> Self {
+        Self::InMemory(v)
     }
 }
 
-// Some type-level tomfoolery to have a trait that represents a `Sink` that can be cloned.
-/// A [`Sink`] that can be cloned.
-///
-/// Required due to limitations around using non-auto traits in trait signatures.  If your [`Sink`]
-/// implementation is also `Clone`, then you are covered by the blanket trait implementation.
-pub trait CloneableSink<Item, E>: Sink<Item, Error = E> + Send + dyn_clone::DynClone {}
+impl<T: Bufferable> From<disk_v1::Writer<T>> for SenderAdapter<T> {
+    fn from(v: disk_v1::Writer<T>) -> Self {
+        Self::DiskV1(v)
+    }
+}
 
-impl<T, Item, E> CloneableSink<Item, E> for T where T: Sink<Item, Error = E> + Send + Clone {}
-
-dyn_clone::clone_trait_object!(<T, E> CloneableSink<T, E>);
-
-/// Adapter for papering over various sender backends by providing a [`Sink`] interface.
-#[pin_project(project = ProjectedSenderAdapter)]
-pub enum SenderAdapter<T> {
-    /// A sender that uses an in-memory channel.
-    Channel(LimitedSender<T>),
-
-    /// A sender that provides its own [`Sink`] implementation.
-    Opaque(Pin<Box<dyn CloneableSink<T, ()>>>),
+impl<T: Bufferable> From<disk_v2::Writer<T, ProductionFilesystem>> for SenderAdapter<T> {
+    fn from(v: disk_v2::Writer<T, ProductionFilesystem>) -> Self {
+        Self::DiskV2(Arc::new(Mutex::new(v)))
+    }
 }
 
 impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub fn channel(tx: LimitedSender<T>) -> Self {
-        SenderAdapter::Channel(tx)
+    async fn send(&mut self, item: T) -> Result<(), ()> {
+        match self {
+            Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
+            Self::DiskV1(writer) => {
+                writer.send(item).await;
+                Ok(())
+            }
+            Self::DiskV2(writer) => {
+                let mut writer = writer.lock().await;
+
+                if let Err(e) = writer.write_record(item).await {
+                    // Can't really do much except panic here. :sweat:
+                    panic!("writer hit unrecoverable error during write: {}", e);
+                }
+
+                Ok(())
+            }
+        }
     }
 
-    pub fn opaque<S>(inner: S) -> Self
-    where
-        S: CloneableSink<T, ()> + 'static,
-    {
-        SenderAdapter::Opaque(Box::pin(inner))
+    async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
+        match self {
+            Self::InMemory(tx) => tx
+                .try_send(item)
+                .map(|()| None)
+                .or_else(|e| Ok(Some(e.into_inner()))),
+            Self::DiskV1(writer) => Ok(writer.try_send(item)),
+            Self::DiskV2(writer) => {
+                let mut writer = writer.lock().await;
+
+                match writer.try_write_record(item).await {
+                    Ok(item) => match item {
+                        None => {
+                            if let Err(e) = writer.flush().await {
+                                // Can't really do much except panic here. :sweat:
+                                panic!("writer hit unrecoverable error during flush: {}", e);
+                            }
+                            Ok(None)
+                        }
+                        Some(item) => Ok(Some(item)),
+                    },
+                    Err(e) => {
+                        // Can't really do much except panic here. :sweat:
+                        panic!("writer hit unrecoverable error during write: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    async fn flush(&mut self) -> Result<(), ()> {
+        match self {
+            Self::InMemory(_) => Ok(()),
+            Self::DiskV1(writer) => {
+                writer.flush();
+                Ok(())
+            }
+            Self::DiskV2(writer) => {
+                let mut writer = writer.lock().await;
+
+                if let Err(e) = writer.flush().await {
+                    // Can't really do much except panic here. :sweat:
+                    panic!("writer hit unrecoverable error during flush: {}", e);
+                }
+
+                Ok(())
+            }
+        }
     }
 
     pub fn capacity(&self) -> Option<usize> {
         match self {
-            Self::Channel(tx) => Some(tx.available_capacity()),
-            Self::Opaque(_) => None,
-        }
-    }
-}
-
-impl<T> Clone for SenderAdapter<T> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Channel(tx) => Self::Channel(tx.clone()),
-            Self::Opaque(sink) => Self::Opaque(sink.clone()),
-        }
-    }
-}
-
-impl<T> fmt::Debug for SenderAdapter<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Channel(_) => f.debug_tuple("inner").field(&"Channel").finish(),
-            Self::Opaque(_) => f.debug_tuple("inner").field(&"Opaque").finish(),
-        }
-    }
-}
-
-impl<T> Sink<T> for SenderAdapter<T>
-where
-    T: Bufferable,
-{
-    type Error = ();
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => tx.poll_ready(cx).map_err(|_| ()),
-            ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_ready(cx),
-        }
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => tx.start_send(item).map_err(|_| ()),
-            ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().start_send(item),
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => tx.poll_flush(cx).map_err(|_| ()),
-            ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_flush(cx),
-        }
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.project() {
-            ProjectedSenderAdapter::Channel(tx) => tx.poll_close(cx).map_err(|_| ()),
-            ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_close(cx),
+            Self::InMemory(tx) => Some(tx.available_capacity()),
+            Self::DiskV1(_) | Self::DiskV2(_) => None,
         }
     }
 }
@@ -141,29 +142,26 @@ where
 /// accept the event.  In "drop newest" mode, any event being sent when the channel is full will be
 /// dropped and proceed no further. In "overflow" mode, events will be sent to another buffer
 /// sender.  Callers can specify the overflow sender to use when constructing their buffers initially.
-#[pin_project]
-#[derive(Debug)]
-pub struct BufferSender<T> {
-    #[pin]
+///
+/// TODO: We should eventually rework `BufferSender`/`BufferReceiver` so that they contain a vector
+/// of the fields we already have here, but instead of cascading via calling into `overflow`, we'd
+/// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
+/// `SenderAdapter` instances instead... which would let us get rid of the boxing and
+/// `#[async_recursion]` stuff.
+#[derive(Clone, Debug)]
+pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
-    base_flush: bool,
-    #[pin]
     overflow: Option<Box<BufferSender<T>>>,
-    overflow_flush: bool,
-    state: SendState,
     when_full: WhenFull,
     instrumentation: Option<BufferUsageHandle>,
 }
 
-impl<T> BufferSender<T> {
+impl<T: Bufferable> BufferSender<T> {
     /// Creates a new [`BufferSender`] wrapping the given channel sender.
     pub fn new(base: SenderAdapter<T>, when_full: WhenFull) -> Self {
         Self {
             base,
-            base_flush: false,
             overflow: None,
-            overflow_flush: false,
-            state: SendState::Idle,
             when_full,
             instrumentation: None,
         }
@@ -173,10 +171,7 @@ impl<T> BufferSender<T> {
     pub fn with_overflow(base: SenderAdapter<T>, overflow: BufferSender<T>) -> Self {
         Self {
             base,
-            base_flush: false,
             overflow: Some(Box::new(overflow)),
-            overflow_flush: false,
-            state: SendState::Idle,
             when_full: WhenFull::Overflow,
             instrumentation: None,
         }
@@ -190,9 +185,6 @@ impl<T> BufferSender<T> {
     pub fn switch_to_overflow(&mut self, overflow: BufferSender<T>) {
         self.overflow = Some(Box::new(overflow));
         self.when_full = WhenFull::Overflow;
-        self.state = SendState::Idle;
-        self.base_flush = false;
-        self.overflow_flush = false;
     }
 
     /// Configures this sender to instrument the items passing through it.
@@ -211,160 +203,60 @@ impl<T: Bufferable> BufferSender<T> {
     pub(crate) fn get_overflow_ref(&self) -> Option<&BufferSender<T>> {
         self.overflow.as_ref().map(AsRef::as_ref)
     }
-}
 
-impl<T> Clone for BufferSender<T> {
-    fn clone(&self) -> Self {
-        Self {
-            base: self.base.clone(),
-            base_flush: false,
-            overflow: self.overflow.clone(),
-            overflow_flush: false,
-            state: SendState::Idle,
-            when_full: self.when_full,
-            instrumentation: self.instrumentation.clone(),
-        }
-    }
-}
-
-impl<T: Bufferable> Sink<T> for BufferSender<T> {
-    type Error = ();
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-
-        // For whatever reason, the caller is calling `poll_ready` again after a successful previous
-        // call.  Since we already know we're ready, and `start_send` has not yet been called, we
-        // can simply short circuit here and return that we're (still) ready.
-        if this.state.is_ready() {
-            return Poll::Ready(Ok(()));
-        }
-
-        let (result, next_state) = match this.base.poll_ready(cx) {
-            Poll::Ready(result) => match result {
-                // We reserved a sending slot in the base channel.
-                Ok(()) => (Poll::Ready(Ok(())), SendState::BaseReady),
-                // Base sender's underlying channel is closed.
-                Err(e) => (Poll::Ready(Err(e)), SendState::Idle),
-            },
-            // Our base sender was not able to immediately reserve a sending slot.
-            Poll::Pending => match this.when_full {
-                // We need to block.  Nothing else to do, as the base sender will notify us when
-                // there's capacity to do the send.
-                WhenFull::Block => (Poll::Pending, SendState::Idle),
-                // We need to drop the next item.  We have to wait until the caller hands it over to
-                // us in order to drop it, though, so we pretend we're ready and mark ourselves to
-                // drop the next item when `start_send` is called.
-                WhenFull::DropNewest => (Poll::Ready(Ok(())), SendState::DropNext),
-                // We're supposed to overflow.  Quickly check to make sure we even have an overflow
-                // sender configured, and then figure out if the overflow sender can actually accept
-                // a send at the moment.
-                WhenFull::Overflow => match this.overflow.as_pin_mut() {
-                    None => panic!("overflow mode set, but no overflow sender present"),
-                    Some(overflow) => match overflow.poll_ready(cx) {
-                        // Our overflow sender is ready for sending, so we mark ourselves so we know
-                        // which sender to write to when `start_send` is called next.
-                        Poll::Ready(result) => match result {
-                            Ok(()) => (Poll::Ready(Ok(())), SendState::OverflowReady),
-                            Err(e) => (Poll::Ready(Err(e)), SendState::Idle),
-                        },
-                        // Our overflow sender is not ready, either, so there's nothing else to do
-                        // here except wait for a wakeup from either the base sender or overflow sender.
-                        Poll::Pending => (Poll::Pending, SendState::Idle),
-                    },
-                },
-            },
-        };
-
-        *this.state = next_state;
-        result
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let this = self.project();
-        let item_sizing = this
+    #[async_recursion]
+    pub async fn send(&mut self, item: T) -> Result<(), ()> {
+        let item_sizing = self
             .instrumentation
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        match mem::replace(this.state, SendState::Idle) {
-            // Sender isn't ready at all.
-            SendState::Idle => panic!(
-                "`start_send` should not be called unless `poll_ready` returned successfully"
-            ),
-            // We've been instructed to drop the next item.
-            SendState::DropNext => {
-                if let Some(instrumentation) = this.instrumentation.as_ref() {
-                    if let Some((item_count, item_size)) = item_sizing {
-                        instrumentation.increment_received_event_count_and_byte_size(
-                            item_count as u64,
-                            item_size as u64,
-                        );
-                        instrumentation.try_increment_dropped_event_count(item_count as u64);
-                    }
+        let mut sent_to_base = true;
+        let mut was_dropped = false;
+        match self.when_full {
+            WhenFull::Block => self.base.send(item).await?,
+            WhenFull::DropNewest => {
+                if self.base.try_send(item).await?.is_some() {
+                    was_dropped = true;
                 }
-                Ok(())
             }
-            // Base is ready, so send the item there.
-            SendState::BaseReady => {
-                let result = this.base.start_send(item);
-                if result.is_ok() {
-                    *this.base_flush = true;
+            WhenFull::Overflow => {
+                if let Some(item) = self.base.try_send(item).await? {
+                    sent_to_base = false;
+                    self.overflow
+                        .as_mut()
+                        .expect("overflow must exist")
+                        .send(item)
+                        .await?;
+                }
+            }
+        };
 
-                    // NOTE: This is potentially a smol lie because we haven't yet actually accepted
-                    // the item yet in some cases, due to needing to buffer it temporarily to ensure
-                    // we have room for it, since `poll_ready` gives us no way to know the item size
-                    // ahead of time.
-                    if let Some((item_count, item_size)) = item_sizing {
-                        // Only update our instrumentation if _we_ got the item, not the overflow.
-                        let handle = this
-                            .instrumentation
-                            .as_ref()
-                            .expect("item_size can't be present without instrumentation");
-                        handle.increment_received_event_count_and_byte_size(
-                            item_count as u64,
-                            item_size as u64,
-                        );
-                    }
+        if let Some(instrumentation) = self.instrumentation.as_ref() {
+            if let Some((item_count, item_size)) = item_sizing {
+                if sent_to_base {
+                    instrumentation.increment_received_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
                 }
-                result
-            }
-            // Overflow is ready, so send the item there.
-            SendState::OverflowReady => {
-                let result = this.overflow.as_pin_mut().unwrap().start_send(item);
-                if result.is_ok() {
-                    *this.overflow_flush = true;
+
+                if was_dropped {
+                    instrumentation.try_increment_dropped_event_count(item_count as u64);
                 }
-                result
             }
         }
+
+        Ok(())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-
-        if *this.base_flush {
-            ready!(this.base.poll_flush(cx))?;
-            *this.base_flush = false;
+    #[async_recursion]
+    pub async fn flush(&mut self) -> Result<(), ()> {
+        self.base.flush().await?;
+        if let Some(overflow) = self.overflow.as_mut() {
+            overflow.flush().await?;
         }
 
-        if *this.overflow_flush {
-            ready!(this.overflow.as_pin_mut().unwrap().poll_flush(cx))?;
-            *this.overflow_flush = false;
-        }
-
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-
-        if let Some(overflow) = this.overflow.as_pin_mut() {
-            ready!(overflow.poll_close(cx))?;
-        }
-
-        ready!(this.base.poll_flush(cx))?;
-
-        Poll::Ready(Ok(()))
+        Ok(())
     }
 }

@@ -14,7 +14,7 @@ use crate::{
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
-pub trait IntoBuffer<T> {
+pub trait IntoBuffer<T: Bufferable> {
     /// Gets whether or not this buffer stage provides its own instrumentation, or if it should be
     /// instrumented from the outside.
     ///
@@ -57,17 +57,17 @@ pub enum TopologyError {
     StackedAcks,
 }
 
-struct TopologyStage<T> {
+struct TopologyStage<T: Bufferable> {
     untransformed: Box<dyn IntoBuffer<T>>,
     when_full: WhenFull,
 }
 
 /// Builder for constructing buffer topologies.
-pub struct TopologyBuilder<T> {
+pub struct TopologyBuilder<T: Bufferable> {
     stages: Vec<TopologyStage<T>>,
 }
 
-impl<T> TopologyBuilder<T> {
+impl<T: Bufferable> TopologyBuilder<T> {
     /// Adds a new stage to the buffer topology.
     ///
     /// The "when full" behavior can be optionally configured here.  If no behavior is specified,
@@ -197,10 +197,7 @@ impl<T> TopologyBuilder<T> {
     }
 }
 
-impl<T> TopologyBuilder<T>
-where
-    T: Bufferable,
-{
+impl<T: Bufferable> TopologyBuilder<T> {
     /// Creates a memory-only buffer topology.
     ///
     /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
@@ -271,7 +268,7 @@ where
     }
 }
 
-impl<T> Default for TopologyBuilder<T> {
+impl<T: Bufferable> Default for TopologyBuilder<T> {
     fn default() -> Self {
         Self { stages: Vec::new() }
     }
