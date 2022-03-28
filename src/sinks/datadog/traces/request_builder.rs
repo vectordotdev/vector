@@ -194,7 +194,7 @@ impl DatadogTracesEncoder {
         let mut encoded_payloads = Vec::new();
         let payload = DatadogTracesEncoder::trace_into_payload(key, &events);
         let encoded_payload = payload.encode_to_vec();
-        // This may happen exceptionnally
+        // This may happen exceptionally
         if encoded_payload.len() > self.max_size {
             warn!("Maximum payload size exceeded.");
             let n_chunks: usize = (encoded_payload.len() / self.max_size) + 1;
