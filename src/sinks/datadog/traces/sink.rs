@@ -18,6 +18,7 @@ use vector_core::{
 use super::service::TraceApiRequest;
 use crate::{
     config::SinkContext,
+    internal_events::DatadogTracesEncodingError,
     sinks::{
         datadog::traces::{
             config::DatadogTracesEndpoint, request_builder::DatadogTracesRequestBuilder,
@@ -101,8 +102,11 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (error, _dropped_events) = e.into_parts();
-                        error!("Failed to build Datadog Traces request: {:?}.", error);
+                        let (message, dropped_events) = e.into_parts();
+                        emit!(DatadogTracesEncodingError {
+                            message,
+                            dropped_events,
+                        });
                         None
                     }
                     Ok(req) => Some(req),
