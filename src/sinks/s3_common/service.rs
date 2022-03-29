@@ -16,7 +16,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::internal_events::AwsSdkBytesSent;
+use crate::internal_events::AwsBytesSent;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -148,7 +148,7 @@ impl Service<S3Request> for S3Service {
                 .await;
 
             result.map(|_inner| {
-                emit!(AwsSdkBytesSent {
+                emit!(AwsBytesSent {
                     byte_size: request_size,
                     region,
                 });

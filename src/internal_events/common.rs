@@ -63,13 +63,13 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
 }
 
 #[cfg(feature = "aws-core")]
-pub struct AwsSdkBytesSent {
+pub struct AwsBytesSent {
     pub byte_size: usize,
     pub region: Option<aws_types::region::Region>,
 }
 
 #[cfg(feature = "aws-core")]
-impl InternalEvent for AwsSdkBytesSent {
+impl InternalEvent for AwsBytesSent {
     fn emit(self) {
         trace!(
             message = "Bytes sent.",
