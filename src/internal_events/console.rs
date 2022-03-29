@@ -2,17 +2,6 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ConsoleEventProcessed {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for ConsoleEventProcessed {
-    fn emit(self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct ConsoleFieldNotFound<'a> {
     pub missing_field: &'a str,
 }

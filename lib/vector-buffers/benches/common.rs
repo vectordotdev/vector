@@ -1,7 +1,6 @@
 use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
-use futures::{Sink, SinkExt, Stream, StreamExt};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
 use metrics_util::{layers::Layer, DebuggingRecorder};
 use tracing::Span;
@@ -145,32 +144,26 @@ pub fn init_instrumentation() {
 // reads it from the buffer.
 //
 
-pub async fn wtr_measurement<S1, S2, const N: usize>(
-    mut sink: S1,
-    mut stream: S2,
+pub async fn wtr_measurement<const N: usize>(
+    mut sender: BufferSender<Message<N>>,
+    mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
-) where
-    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
-    S2: Stream<Item = Message<N>> + Send + Unpin,
-{
+) {
     for msg in messages.into_iter() {
-        sink.send(msg).await.unwrap();
+        sender.send(msg).await.unwrap();
     }
-    drop(sink);
+    drop(sender);
 
-    while stream.next().await.is_some() {}
+    while receiver.next().await.is_some() {}
 }
 
-pub async fn war_measurement<S1, S2, const N: usize>(
-    mut sink: S1,
-    mut stream: S2,
+pub async fn war_measurement<const N: usize>(
+    mut sender: BufferSender<Message<N>>,
+    mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
-) where
-    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
-    S2: Stream<Item = Message<N>> + Send + Unpin,
-{
+) {
     for msg in messages.into_iter() {
-        sink.send(msg).await.unwrap();
-        let _ = stream.next().await.unwrap();
+        sender.send(msg).await.unwrap();
+        let _ = receiver.next().await.unwrap();
     }
 }

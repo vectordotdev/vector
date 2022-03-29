@@ -17,7 +17,6 @@ use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     event::{EventArray, EventContainer},
-    internal_events::BlackholeEventReceived,
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
@@ -90,9 +89,6 @@ impl StreamSink<EventArray> for BlackholeSink {
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(BlackholeEventReceived {
-                byte_size: message_len
-            });
             emit!(EventsSent {
                 count: events.len(),
                 byte_size: message_len,

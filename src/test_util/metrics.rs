@@ -69,6 +69,16 @@ impl<N: MetricNormalize> Extend<Event> for MetricState<N> {
     }
 }
 
+impl<N: MetricNormalize + Default> FromIterator<Event> for MetricState<N> {
+    fn from_iter<T: IntoIterator<Item = Event>>(iter: T) -> Self {
+        let mut state = MetricState::default();
+        for event in iter.into_iter() {
+            state.merge(event.into_metric());
+        }
+        state
+    }
+}
+
 impl<N> From<N> for MetricState<N> {
     fn from(normalizer: N) -> Self {
         Self {
