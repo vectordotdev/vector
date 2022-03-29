@@ -67,10 +67,10 @@ impl DriverResponse for S3Response {
     }
 }
 
-/// Wrapper for the Rusoto S3 client.
+/// Wrapper for the AWS SDK S3 client.
 ///
 /// Provides a `tower::Service`-compatible wrapper around the native
-/// `rusoto_s3::S3Client`, allowing it to be composed within a Tower "stack",
+/// AWS SDK S3 Client, allowing it to be composed within a Tower "stack",
 /// such that we can easily and transparently provide retries, concurrency
 /// limits, rate limits, and more.
 #[derive(Clone)]

@@ -28,7 +28,7 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
             // Certain 400-level responses will contain an error code indicating that the request
             // should be retried. Since we don't retry 400-level responses by default, we'll look
             // for these specifically before falling back to more general heuristics. Because AWS
-            // services use a mix of XML and JSON response bodies and Rusoto doesn't give us
+            // services use a mix of XML and JSON response bodies and the AWS SDK doesn't give us
             // a parsed representation, we resort to a simple string match.
             //
             // S3: RequestTimeout
