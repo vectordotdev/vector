@@ -1,19 +1,21 @@
-use std::{collections::HashMap, convert::TryFrom};
+use aws_sigv4::http_request::{SignableRequest, SigningSettings};
+use aws_sigv4::SigningParams;
+use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
+use aws_types::region::Region;
+use bytes::Bytes;
+use std::collections::HashMap;
+use std::time::SystemTime;
 
 use http::{StatusCode, Uri};
-use hyper::Body;
-use rusoto_core::Region;
-use rusoto_signature::SignedRequest;
 use snafu::ResultExt;
 
 use super::{InvalidHostSnafu, Request};
 use crate::{
-    aws::{rusoto, rusoto::region_from_endpoint},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            encoder::ElasticsearchEncoder, finish_signer, ElasticsearchAuth,
-            ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
+            encoder::ElasticsearchEncoder, ElasticsearchAuth, ElasticsearchCommonMode,
+            ElasticsearchConfig, ParseError,
         },
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
@@ -29,22 +31,22 @@ use crate::{
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
-    pub authorization: Option<Auth>,
-    pub credentials: Option<rusoto::AwsCredentialsProvider>,
+    pub http_auth: Option<Auth>,
+    pub aws_auth: Option<SharedCredentialsProvider>,
     pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
     pub mode: ElasticsearchCommonMode,
     pub doc_type: String,
     pub suppress_type_name: bool,
     pub tls_settings: TlsSettings,
     pub compression: Compression,
-    pub region: Region,
+    pub region: Option<Region>,
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
 }
 
 impl ElasticsearchCommon {
-    pub fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
+    pub async fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.endpoint);
         let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
@@ -65,17 +67,17 @@ impl ElasticsearchCommon {
             _ => None,
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
-        let authorization = authorization.choose_one(&uri.auth)?;
+        let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
         let region = match &config.aws {
-            Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&base_url)?,
+            Some(region) => region.region(),
+            None => None,
         };
 
-        let credentials = match &config.auth {
+        let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
-            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
+            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.credentials_provider().await?),
         };
 
         let compression = config.compression;
@@ -116,11 +118,11 @@ impl ElasticsearchCommon {
         );
 
         Ok(Self {
-            authorization,
+            http_auth,
             base_url,
             bulk_uri,
             compression,
-            credentials,
+            aws_auth,
             doc_type,
             suppress_type_name: config.suppress_type_name,
             encoding: config.encoding,
@@ -133,37 +135,45 @@ impl ElasticsearchCommon {
         })
     }
 
-    pub fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
-        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
-        request.set_hostname(uri.host().map(|host| host.into()));
-        if use_params {
-            for (key, value) in &self.query_params {
-                request.add_param(key, value);
-            }
-        }
-        request
-    }
-
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 
-        match &self.credentials {
-            None => {
-                if let Some(authorization) = &self.authorization {
-                    builder = authorization.apply_builder(builder);
-                }
-            }
-            Some(credentials_provider) => {
-                let mut signer = self.signed_request("GET", builder.uri_ref().unwrap(), false);
-                builder = finish_signer(&mut signer, credentials_provider, builder).await?;
-            }
+        if let Some(authorization) = &self.http_auth {
+            builder = authorization.apply_builder(builder);
         }
-        let request = builder.body(Body::empty())?;
-        let response = client.send(request).await?;
+        let mut request = builder.body(Bytes::new())?;
+
+        if let Some(credentials_provider) = &self.aws_auth {
+            sign_request(&mut request, credentials_provider, &self.region).await?;
+        }
+        let response = client.send(request.map(hyper::Body::from)).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),
             status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
         }
     }
+}
+
+pub async fn sign_request(
+    request: &mut http::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: &Option<Region>,
+) -> crate::Result<()> {
+    let signable_request = SignableRequest::from(&*request);
+    let credentials = credentials_provider.provide_credentials().await?;
+    let signing_params = SigningParams::builder()
+        .access_key(credentials.access_key_id())
+        .secret_key(credentials.secret_access_key())
+        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
+        .service_name("es")
+        .time(SystemTime::now())
+        .settings(SigningSettings::default())
+        .build()?;
+
+    let (signing_instructions, _signature) =
+        aws_sigv4::http_request::sign(signable_request, &signing_params)?.into_parts();
+    signing_instructions.apply_to_request(request);
+
+    Ok(())
 }

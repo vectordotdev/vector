@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
 
+use crate::aws::RegionOrEndpoint;
 use crate::{
-    aws::rusoto::RegionOrEndpoint,
     config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
@@ -296,7 +296,7 @@ impl DataStreamConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticsearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self).await?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -319,11 +319,11 @@ impl SinkConfig for ElasticsearchConfig {
         let http_request_builder = HttpRequestBuilder {
             bulk_uri: common.bulk_uri,
             http_request_config: self.request.clone(),
-            http_auth: common.authorization,
+            http_auth: common.http_auth,
             query_params: common.query_params,
             region: common.region,
             compression: self.compression,
-            credentials_provider: common.credentials,
+            credentials_provider: common.aws_auth,
         };
 
         let service = ServiceBuilder::new()
@@ -341,7 +341,7 @@ impl SinkConfig for ElasticsearchConfig {
             id_key_field: self.id_key.clone(),
         };
 
-        let common = ElasticsearchCommon::parse_config(self)?;
+        let common = ElasticsearchCommon::parse_config(self).await?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
         let stream = VectorSink::from_event_streamsink(sink);
