@@ -25,8 +25,8 @@ the following configuration:
 ```yaml
 [...]
 sources:
-  otlp_traces:
-    type: opentelemetry_traces
+  otlp:
+    type: opentelemetry
     address: "[::]:8081"
     mode: grpc
 
@@ -40,7 +40,7 @@ transforms:
         key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
         set_dd_api_key(key) # this does not exists yet
       inputs:
-        - otlp_traces
+        - otlp.traces
 
 sinks:
   dd_trace:
@@ -83,9 +83,9 @@ and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to c
 
 ### Traces normalization/format enforcement
 
-For cross format operation like `opentelemetry_traces` source to `datadog_traces` sinks or the opposite (Datadog to
-OpenTelemetry) trace standardization is require so between sinks/sources traces will follow one single universal
-representation, there is two major possible approach:
+For cross format operation like `opentelemetry` source `traces` output to `datadog_traces` sinks or the opposite
+(Datadog to OpenTelemetry) trace standardization is require so between sinks/sources traces will follow one single
+universal representation, there is two major possible approach:
 
   1. Stick to a `LogEvent` based representation and leverage [Vector event schema][schema-work]
   2. Move traces away from their current representation (as LogEvent) and build a new container based on a set of
@@ -243,12 +243,12 @@ N/A
 
 ### In scope
 
-- `opentelemetry_traces` source, with both http and grpc support
-- Support `opentelemetry_traces` source to `datadog_traces` sink forwarding by dealing with:
+- `opentelemetry` source, with both http and grpc support, decoding traces only, but with provision for other datatypes and emitting traces on a named output `traces`
+- Support `opentelemetry` source to `datadog_traces` sink forwarding by dealing with:
   - Traces normalization to a single format inside Vector
   - Conversion to/from this format in all traces sources/sinks
-- APM stats computation logic, with an implementation for the `opentelemetry_traces` sources, applicable for all traces
-  sources
+- APM stats computation logic, with an implementation for the `opentelemetry` sources, applicable for all traces
+  sources. It will come with a knob to turn it on/off.
 
 ### Out of scope
 
@@ -268,24 +268,25 @@ N/A
 
 ```yaml
 sources:
-  otlp_traces:
-    type: opentelemetry_traces
+  otlp:
+    type: opentelemetry
     address: "[::]:8081"
     mode: grpc
+    traces_stats: true
 
 sinks:
   dd_trace:
     type: datadog_traces
     default_api_key: 12345678abcdef
     inputs:
-     - otlp_traces
+     - otlp.traces
 ```
 
 And it should just work.
 
 ### Implementation
 
-- `opentelemetry_traces` or simply `opentelemetry` sources:
+-  An `opentelemetry` sources with a named ouptut `traces` (future extension would cover `metrics` then `logs` ):
   - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
     use the [offical gRPC service definitions][otlp-grpc-def].
   - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
@@ -332,8 +333,6 @@ N/A
 
 ## Outstanding Questions
 
-- Do we want to have a single `opentelemetry` source with names output or multiple sources for Opentelemetry metrics and
-  Opentelemetry logs, this is more a user experience discussion as this doesn't have big implementation impact.
 - APM stats computation:
   - Either in all traces sources (to be done for each source, except for the `datadog_agent` sources where APM stats may
     be decoded from received payloads) - likely to be the preferred solution
@@ -344,14 +343,15 @@ N/A
 ## Plan Of Attack
 
 - [ ] Implement traces normalisation/schema
-- [ ] `opentelemetry_traces`, grpc mode
-- [ ] `opentelemetry_traces`, http mode
+- [ ] `opentelemetry`, grpc mode
+- [ ] `opentelemetry`, http mode
 - [ ] APM stats computation
 
 ## Future Improvements
 
 - Transforms / complete VRL coverage of traces, later helpers to manipulate traces or isolate outliers
-- OpenTelemtry trace sink
+- OpenTelemtry traces sink
+- Add metrics then log to the `opentelemetry` source.
 
 [otlp-dd-exporter]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/64a87c1/exporter/datadogexporter
 [otlp-traces-with-dd-agent]: https://docs.datadoghq.com/tracing/setup_overview/open_standards/#otlp-ingest-in-datadog-agent
