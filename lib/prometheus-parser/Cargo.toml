@@ -13,7 +13,7 @@ indexmap = "~1.8.0"
 nom = "7.1.1"
 num_enum = "0.5.7"
 prost = "0.9"
-prost-types = "0.9"
+prost-types = "0.10"
 snafu = { version = "0.7" }
 vector_common = { path = "../vector-common", features = ["btreemap"] }
 
