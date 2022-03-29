@@ -207,6 +207,8 @@ pub enum SubCommand {
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
+
+    Migrate(migrate::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]
