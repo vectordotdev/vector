@@ -41,6 +41,7 @@ transforms:
         set_dd_api_key(key) # this does not exists yet
       inputs:
         - otlp.traces
+        - otlp.traces_stats
 
 sinks:
   dd_trace:
@@ -280,6 +281,7 @@ sinks:
     default_api_key: 12345678abcdef
     inputs:
      - otlp.traces
+     - otlp.traces_stats
 ```
 
 And it should just work.
@@ -309,7 +311,11 @@ And it should just work.
     Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
     computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on
     the [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
-  - Where the APM stats computations is still under discusion, see [outstanding questions](#outstanding-questions)
+  - Following the named outputs feature, an `apm_stats` output could be envisionned, this would make the APM flow
+    explicit and allow another metrics sinks to just tap APM stats.
+  - The previous point also implies that the APM stats computation would happend in the source, the code should be
+    fairly generic as APM stats computation would logically takes the normalised traces as input.
+
 
 ## Rationale
 
@@ -333,11 +339,6 @@ N/A
 
 ## Outstanding Questions
 
-- APM stats computation:
-  - Either in all traces sources (to be done for each source, except for the `datadog_agent` sources where APM stats may
-    be decoded from received payloads) - likely to be the preferred solution
-  - Either in a transform like `traces_to_metrics`
-  - Or in the `datadog_traces` sources
 - The extend of transforms support and VRL (at least condition evaluation)
 
 ## Plan Of Attack
