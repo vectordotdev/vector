@@ -109,6 +109,20 @@ components: sources: prometheus_scrape: {
 				default: false
 			}
 		}
+		query: {
+			common: false
+			description: """
+				Custom parameters for the scrape request query string.
+				One or more values for the same parameter key can be provided.
+				The parameters provided in this option are appended to any parameters manually provided in the `endpoints` option.
+				This option is specially useful when scraping the `/federate` endpoint.
+				"""
+			required: false
+			type: object: {
+				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
+				options: {}
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${PROMETHEUS_PASSWORD}"
 			username_example: "${PROMETHEUS_USERNAME}"

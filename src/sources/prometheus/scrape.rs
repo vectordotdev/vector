@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     future::ready,
     time::{Duration, Instant},
 };
@@ -51,6 +52,7 @@ struct PrometheusScrapeConfig {
     endpoint_tag: Option<String>,
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
+    query: Option<HashMap<String, Vec<String>>>,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
 }
@@ -75,6 +77,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
+            query: None,
             tls: None,
             auth: None,
         })
@@ -90,6 +93,37 @@ impl SourceConfig for PrometheusScrapeConfig {
             .endpoints
             .iter()
             .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
+            .map(|r| {
+                if let Ok(uri) = r {
+                    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+                    if let Some(query) = uri.query() {
+                        for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
+                            serializer.append_pair(&k, &v);
+                        }
+                    };
+                    if let Some(query) = &self.query {
+                        for (k, l) in query {
+                            for v in l {
+                                serializer.append_pair(&k, &v);
+                            }
+                        }
+                    };
+                    let mut builder = http::Uri::builder();
+                    if let Some(scheme) = uri.scheme() {
+                        builder = builder.scheme(scheme.clone());
+                    };
+                    if let Some(authority) = uri.authority() {
+                        builder = builder.authority(authority.clone());
+                    };
+                    builder = builder.path_and_query(match serializer.finish() {
+                        query if !query.is_empty() => format!("{}?{}", uri.path(), query),
+                        _ => uri.path().to_string(),
+                    });
+                    Ok(builder.build().expect("error building URI"))
+                } else {
+                    r
+                }
+            })
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
         Ok(prometheus(
@@ -131,6 +165,7 @@ struct PrometheusCompatConfig {
     endpoint_tag: Option<String>,
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
+    query: Option<HashMap<String, Vec<String>>>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     tls: Option<TlsOptions>,
@@ -148,6 +183,7 @@ impl SourceConfig for PrometheusCompatConfig {
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
             honor_labels: self.honor_labels,
+            query: self.query.clone(),
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
@@ -431,6 +467,7 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
+            query: None,
             auth: None,
             tls: None,
         };
@@ -484,6 +521,7 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
+            query: None,
             auth: None,
             tls: None,
         };
@@ -526,6 +564,75 @@ mod test {
                 metric.tag_value("exported_endpoint"),
                 Some(String::from("http://example.com"))
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_request_query() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").and(warp::query::raw()).map(|query| {
+            format!(
+                r#"
+                    promhttp_metric_handler_requests_total{{query="{}"}} 100 1612411516789
+                "#,
+                query
+            )
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let query = HashMap::from([
+            ("key1".to_string(), vec!["val2".to_string()]),
+            (
+                "key2".to_string(),
+                vec!["val1".to_string(), "val2".to_string()],
+            ),
+        ]);
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            query: Some(query.clone()),
+            auth: None,
+            tls: None,
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        tokio::spawn(source);
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<_> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+
+        for metric in metrics {
+            if let Some(q) = metric.tag_value("query") {
+                // note: request query has keys in arbitrary order
+                let mut parsed_query: HashMap<String, Vec<String>> = HashMap::new();
+                for (k, v) in url::form_urlencoded::parse(q.as_bytes()) {
+                    parsed_query
+                        .entry(k.to_string())
+                        .or_insert(Vec::new())
+                        .push(v.to_string());
+                }
+                for (k, l) in &query {
+                    assert!(parsed_query.contains_key(k));
+                    assert_eq!(parsed_query[k].clone().sort(), l.clone().sort());
+                }
+            }
         }
     }
 
@@ -583,6 +690,7 @@ mod test {
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
+                query: None,
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
@@ -670,6 +778,7 @@ mod integration_tests {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
+            query: None,
             auth: None,
             tls: None,
         };
