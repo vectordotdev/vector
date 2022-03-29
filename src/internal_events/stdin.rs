@@ -23,6 +23,5 @@ impl InternalEvent for StdinEventsReceived {
         );
         // deprecated
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

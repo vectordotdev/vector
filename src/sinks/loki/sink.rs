@@ -22,8 +22,8 @@ use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingError,
+        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
+        TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -131,9 +131,6 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        emit!(LokiEventsProcessed {
-            byte_size: payload.len(),
-        });
         let compression = self.compression();
 
         LokiRequest {

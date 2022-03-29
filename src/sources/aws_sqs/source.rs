@@ -119,23 +119,25 @@ impl SqsSource {
             drop(batch); // Drop last reference to batch acknowledgement finalizer
             emit!(AwsSqsBytesReceived { byte_size });
             let count = events.len();
-            if let Err(error) = out.send_batch(events).await {
-                emit!(StreamClosedError { error, count });
-            }
 
-            if self.delete_message {
-                if let Some(receiver) = batch_receiver {
-                    let client = self.client.clone();
-                    let queue_url = self.queue_url.clone();
-                    tokio::spawn(async move {
-                        let batch_status = receiver.await;
-                        if batch_status == BatchStatus::Delivered {
-                            delete_messages(&client, &receipts_to_ack, &queue_url).await;
+            match out.send_batch(events).await {
+                Ok(()) => {
+                    if self.delete_message {
+                        if let Some(receiver) = batch_receiver {
+                            let client = self.client.clone();
+                            let queue_url = self.queue_url.clone();
+                            tokio::spawn(async move {
+                                let batch_status = receiver.await;
+                                if batch_status == BatchStatus::Delivered {
+                                    delete_messages(&client, &receipts_to_ack, &queue_url).await;
+                                }
+                            });
+                        } else {
+                            delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
                         }
-                    });
-                } else {
-                    delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
+                    }
                 }
+                Err(error) => emit!(StreamClosedError { error, count }),
             }
         }
     }
