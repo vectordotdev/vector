@@ -292,8 +292,8 @@ jobs:
       - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: |
-        setvc (vcvars)
-        make test
+          setvc (vcvars)
+          make test
 
   test-vrl:
     name: VRL - Linux
