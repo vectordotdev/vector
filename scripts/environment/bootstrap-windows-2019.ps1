@@ -7,3 +7,5 @@ if ($env:CI -ne $null) {
 }
 
 rustup run stable cargo install cargo-nextest --version 0.9.8
+
+Install-Module -Name VCVars -Scope CurrentUser

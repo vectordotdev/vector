@@ -291,6 +291,8 @@ jobs:
       - uses: actions/checkout@v3
       - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
+      - name: Setup environment for Visual Studio
+        run: vcvars >> %GITHUB_ENV%
       - run: make test
 
   test-vrl:
