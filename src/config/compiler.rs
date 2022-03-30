@@ -6,6 +6,8 @@ use super::{
     builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
 };
 
+/// to handle the expansions when building the graph we need to be able to get the list of inputs
+/// that will replace a single input, as a String.
 pub(crate) fn to_string_expansions(
     input: &IndexMap<ComponentKey, Vec<ComponentKey>>,
 ) -> IndexMap<String, Vec<String>> {
