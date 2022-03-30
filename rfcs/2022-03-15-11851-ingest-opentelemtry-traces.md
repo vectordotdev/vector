@@ -29,6 +29,7 @@ sources:
     type: opentelemetry
     address: "[::]:8081"
     mode: grpc
+    traces_stats: true # Traces stats would be compliant with APM stats
 
 transforms:
   set_key:
@@ -40,8 +41,8 @@ transforms:
         key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
         set_dd_api_key(key) # this does not exists yet
       inputs:
-        - otlp.traces
-        - otlp.traces_stats
+       - otlp.traces # Would exclusively emit traces
+       - otlp.traces_stats # Would exclusively emit metrics
 
 sinks:
   dd_trace:
@@ -68,12 +69,65 @@ A completely different usecase is traces sampling, but it cover two major variat
 - Outliers isolation, this would mean keeping some traces based on some advanced criteria, like execution time above
   p99, this would require comparison against histogram / sketches.
 
-Another valuable identified usecase is the ability to provide seemless conversion between any kind of Vector supported
+Another valuable identified usecase is the ability to provide seamless conversion between any kind of Vector supported
 traces, this means that the Vector internal traces representation shall be flexible enough to acomodate conversion
 to/from any trace format in sources and sinks that work with traces. Given the traction from the Opentelemetry project,
 and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to cover most usecases.
 
-**Key requirements that can be extracted from the aforementioned usecases**:
+## Cross cutting concerns
+
+N/A
+
+## Scope
+
+### In scope
+
+- `opentelemetry` source, with both http and grpc support, decoding traces only, but with provision for other datatypes and emitting traces on a named output `traces`
+- Support `opentelemetry` source to `datadog_traces` sink forwarding by dealing with:
+  - Traces normalization to a single format inside Vector
+  - Conversion to/from this format in all traces sources/sinks
+- APM stats computation logic, with an implementation for the `opentelemetry` sources, applicable for all traces
+  sources. It will come with a knob to turn it on/off.
+
+### Out of scope
+
+N/A
+
+## Pain
+
+- Avoid complex setup when ingesting traces, ultimately pointing every tracing lib directly to Vector should just work
+  out-of-the-box with minimal config.
+
+## Proposal
+
+### User Experience
+
+- User would point OpenTelemetry tracing lib directly to a local Vector deployement
+- Vector would be configured with a minimal config looking like:
+
+```yaml
+sources:
+  otlp:
+    type: opentelemetry
+    address: "[::]:8081"
+    mode: grpc
+    traces_stats: true # Traces stats would be compliant with APM stats
+
+sinks:
+  dd_trace:
+    type: datadog_traces
+    default_api_key: 12345678abcdef
+    inputs:
+     - otlp.traces # Would exclusively emit traces
+     - otlp.traces_stats # Would exclusively emit metrics
+```
+
+And it should just work.
+
+### Implementation
+
+Based on the [usecases](#usecases) previously detailed the implementation will we can extract the following
+top-level requirements:
 
 - A Vector trace event shall only contain data relative to one single trace, i.e. traces sources shall create one event
   for each indivual trace ID and its associated spans and metadata.
@@ -82,11 +136,22 @@ and the fact that it [comes with a variety of fields][otlp-trace-proto-def] to c
   - Avoid destructive manipulation by transforms and keep traces object fully functionnal even after heavy modifications
     while flowing throw the topology
 
-### Traces normalization/format enforcement
+#### Source structure
+
+A new `opentelemetry` source sources with a named ouptut `traces` (future extension would cover `metrics` then `logs`):
+- The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
+  use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accept, this should be
+  relatively easy to extend it to support metrics and logs gRPC services.
+- HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
+  payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
+  All the expected behaviours regarding the kind of requests/responses code and sequence are clearly defined as well
+  as the default URL path (`/v1/traces` for traces, demuxing `/v1/metrics` and `/v1/logs` later should not be a problem).
+
+#### Traces normalization/format enforcement
 
 For cross format operation like `opentelemetry` source `traces` output to `datadog_traces` sinks or the opposite
 (Datadog to OpenTelemetry) trace standardization is require so between sinks/sources traces will follow one single
-universal representation, there is two major possible approach:
+universal representation, there is two major possible approaches:
 
   1. Stick to a `LogEvent` based representation and leverage [Vector event schema][schema-work]
   2. Move traces away from their current representation (as LogEvent) and build a new container based on a set of
@@ -236,86 +301,27 @@ Datadog `trace-agent` format. This is not the purpose of this RFC, and with the 
 supported on both sides working on better interoperability on that particular common ground would likely be a better
 option.
 
-## Cross cutting concerns
+**Conclusion**: the implementation will stay around [./lib/vector-core/src/event/trace.rs][current-trace-in-vector], it
+will borrow most of the OpenTelemetry to allow straightforward trace conversion to the newer Vector internal
+representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog intake and the `trace agen`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for efficiency and convenience.
+Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
+be adressed separately. As an interim measure few fields may be exposed (At least trace ID & trace-wide tags), the spans
+list will not be exposed initially.
 
-N/A
+#### APM stats computation
 
-## Scope
+The APM stats computation can be seen as a generic way to compute some statistics on a trace flow, thus the following
+way forward is suggested:
 
-### In scope
-
-- `opentelemetry` source, with both http and grpc support, decoding traces only, but with provision for other datatypes and emitting traces on a named output `traces`
-- Support `opentelemetry` source to `datadog_traces` sink forwarding by dealing with:
-  - Traces normalization to a single format inside Vector
-  - Conversion to/from this format in all traces sources/sinks
-- APM stats computation logic, with an implementation for the `opentelemetry` sources, applicable for all traces
-  sources. It will come with a knob to turn it on/off.
-
-### Out of scope
-
-N/A
-
-## Pain
-
-- Avoid complex setup when ingesting traces, ultimately pointing every tracing lib directly to Vector should just work
-  out-of-the-box with minimal config.
-
-## Proposal
-
-### User Experience
-
-- User would point OpenTelemtry tracing lib directly to a local Vector deployement
-- Vector would be configured with a minimal config looking like:
-
-```yaml
-sources:
-  otlp:
-    type: opentelemetry
-    address: "[::]:8081"
-    mode: grpc
-    traces_stats: true
-
-sinks:
-  dd_trace:
-    type: datadog_traces
-    default_api_key: 12345678abcdef
-    inputs:
-     - otlp.traces
-     - otlp.traces_stats
-```
-
-And it should just work.
-
-### Implementation
-
--  An `opentelemetry` sources with a named ouptut `traces` (future extension would cover `metrics` then `logs` ):
-  - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
-    use the [offical gRPC service definitions][otlp-grpc-def].
-  - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
-    payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
-    All the expected behaviours regarding the kind of requests/responses code and sequence are clearly defined as well
-    as the default URL path (`/v1/traces` for traces).
-- Internal traces representation/normalization, two options are opened see [outstanding
-  questions](#outstanding-questions), but the consensus is leaning towards a new dedicated container that would:
-  - Move away from from the current implementation that relies on `LogEvent` to a dedicated container, the
-    implementation will stay  in [./lib/vector-core/src/event/trace.rs][current-trace-in-vector]
-  - Borrow most of its semantic from the Opentelemetry Traces format, the `TraceEvent` would then evolve toward a
-    concrete dedicated container and contains a slice of spans, the span being directly inspired by the Opentelemtry
-    specification.
-  - Some top-level information (Like trace ID, trace-wide tags/metrics, the original format)
-  - Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should
-    probably be adressed separately. As an interim measure few fields may be exposed (like trace ID & trace-wide
-    tags).
-- APM stats computation:
-  - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
-    Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
-    computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on
-    the [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
-  - Following the named outputs feature, an `apm_stats` output could be envisionned, this would make the APM flow
-    explicit and allow another metrics sinks to just tap APM stats.
-  - The previous point also implies that the APM stats computation would happend in the source, the code should be
-    fairly generic as APM stats computation would logically takes the normalised traces as input.
-
+- Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
+  Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
+  computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on the
+  [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
+- Following the named outputs logic, an `apm_stats` output could be envisionned, this would make the APM stats flow
+  explicit and allow another metrics sinks to just tap APM stats as APM stats would be plain Vector metrics.
+- The previous point also implies that the APM stats computation would happend in the source, the code should be fairly
+  generic as APM stats computation would logically takes the normalised traces as input.
+- The computation will be optional with a relevant configuration flag.
 
 ## Rationale
 
@@ -324,7 +330,10 @@ And it should just work.
 
 ## Drawbacks
 
-N/A
+Adopting an internal trace representation based on OpenTelemetry seems well suited for application that involves remote
+submission and processing. However for other traces formats a bit far from the OpenTelemetry format, like the
+[CTF][common-trace-format], that can also be emitted while the traced application is running, may not fit very well into
+an OpenTelemetry-based representation.
 
 ## Prior Art
 
@@ -372,3 +381,4 @@ N/A
 [otlp-and-other-formats]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/internal/coreinternal/tracetranslator/protospan_translation.go#L21-L31
 [current-trace-in-vector]: https://github.com/vectordotdev/vector/blob/b6edb0203f684f67f8934da948cdf2bdd78d5236/lib/vector-core/src/event/trace.rs
 [otlp-rust]: https://github.com/open-telemetry/opentelemetry-rust
+[common-trace-format]: https://diamon.org/ctf/#specification
