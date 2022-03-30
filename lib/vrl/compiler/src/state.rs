@@ -1,10 +1,7 @@
 use anymap::AnyMap;
 use std::collections::HashMap;
 
-use value::{
-    kind::{Collection, Field, Index},
-    Kind,
-};
+use value::Kind;
 
 use crate::{expression::assignment, parser::ast::Ident, Value};
 

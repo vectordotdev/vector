@@ -14,7 +14,7 @@ datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
 lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
-vector_common = { path = "../../vector-common", default-features = false, optional = true }
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"], optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -55,7 +55,6 @@ ctr = { version = "0.9.1", optional = true }
 cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
 cfb-mode = { version = "0.8.1", optional = true }
 ofb = { version = "0.6.1", optional = true }
-
 
 [dev-dependencies]
 anyhow = "1"
