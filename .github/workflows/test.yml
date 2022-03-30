@@ -252,7 +252,7 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: [test-runner, windows]
+    runs-on: [windows, test-runner]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
