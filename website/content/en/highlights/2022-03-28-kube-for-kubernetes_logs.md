@@ -7,7 +7,7 @@ pr_numbers: [11714]
 release: "0.21.0"
 hide_on_release_notes: false
 badges:
-  type: enhancement,breaking change
+  type: breaking change
 ---
 
 Our `kubernetes_logs` source has been updated to use [`kube-rs`](https://kube.rs/)
