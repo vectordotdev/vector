@@ -36,7 +36,7 @@ result = [foo]
   result = push(result, bar)
 
   # nested blocks
-  { 
+  {
     bar = 8
 
     # undefined variable
