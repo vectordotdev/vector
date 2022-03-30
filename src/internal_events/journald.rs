@@ -17,7 +17,6 @@ impl InternalEvent for JournaldEventsReceived {
             self.byte_size as u64
         );
         counter!("events_in_total", self.count as u64); // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
     }
 }
 

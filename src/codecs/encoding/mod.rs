@@ -5,7 +5,8 @@ pub mod format;
 pub mod framing;
 
 pub use format::{
-    BoxedSerializer, JsonSerializer, JsonSerializerConfig, RawMessageSerializer,
+    BoxedSerializer, JsonSerializer, JsonSerializerConfig, NativeJsonSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
     RawMessageSerializerConfig,
 };
 pub use framing::{
@@ -149,6 +150,10 @@ pub enum SerializerConfig {
     Json,
     /// Configures the `RawMessageSerializer`.
     RawMessage,
+    /// Configures the `NativeSerializer`.
+    Native,
+    /// Configures the `NativeJsonSerializer`.
+    NativeJson,
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
@@ -171,6 +176,10 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
+            SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),
+            SerializerConfig::NativeJson => {
+                Serializer::NativeJson(NativeJsonSerializerConfig.build())
+            }
         }
     }
 
@@ -179,6 +188,8 @@ impl SerializerConfig {
         match self {
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+            SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
+            SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
         }
     }
 }
@@ -190,6 +201,10 @@ pub enum Serializer {
     Json(JsonSerializer),
     /// Uses a `RawMessageSerializer` for deserialization.
     RawMessage(RawMessageSerializer),
+    /// Uses a `NativeSerializer` for deserialization.
+    Native(NativeSerializer),
+    /// Uses a `NativeJsonSerializer` for deserialization.
+    NativeJson(NativeJsonSerializer),
 }
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
@@ -199,6 +214,8 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
         match self {
             Serializer::Json(serializer) => serializer.encode(item, dst),
             Serializer::RawMessage(serializer) => serializer.encode(item, dst),
+            Serializer::Native(serializer) => serializer.encode(item, dst),
+            Serializer::NativeJson(serializer) => serializer.encode(item, dst),
         }
     }
 }

@@ -18,24 +18,17 @@ use std::convert::TryFrom;
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
-use http::{
-    header::{HeaderName, HeaderValue},
-    uri::InvalidUri,
-    Request,
-};
-use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
-use rusoto_signature::SignedRequest;
+use http::{uri::InvalidUri, Request};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 
+use crate::aws::AwsAuthentication;
 use crate::{
-    aws::rusoto::{self, AwsAuthentication},
     config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
 };
-// use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
@@ -165,36 +158,8 @@ pub enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not generate AWS credentials: {:?}", source))]
-    AwsCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateParseError },
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
-}
-
-async fn finish_signer(
-    signer: &mut SignedRequest,
-    credentials_provider: &rusoto::AwsCredentialsProvider,
-    mut builder: http::request::Builder,
-) -> crate::Result<http::request::Builder> {
-    let credentials = credentials_provider
-        .credentials()
-        .await
-        .context(AwsCredentialsGenerateFailedSnafu)?;
-
-    signer.sign(&credentials);
-
-    for (name, values) in signer.headers() {
-        let header_name = name
-            .parse::<HeaderName>()
-            .expect("Could not parse header name.");
-        for value in values {
-            let header_value =
-                HeaderValue::from_bytes(value).expect("Could not parse header value.");
-            builder = builder.header(&header_name, header_value);
-        }
-    }
-
-    Ok(builder)
 }
