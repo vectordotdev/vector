@@ -284,12 +284,11 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    runs-on: windows-test-runner
+    runs-on: [test-runner, windows]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - name: make test
         run: |
