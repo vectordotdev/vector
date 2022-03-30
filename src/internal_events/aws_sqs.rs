@@ -215,12 +215,15 @@ pub struct SqsMessageDeletePartialError {
 #[cfg(feature = "sources-aws_s3")]
 impl InternalEvent for SqsMessageDeletePartialError {
     fn emit(self) {
+        let message_ids = self
+            .entries
+            .iter()
+            .map(|x| format!("{}/{}", x.id, x.code))
+            .collect::<Vec<_>>()
+            .join(", ");
         error!(
             message = "Deletion of SQS message(s) failed.",
-            message_ids = %self.entries.iter()
-                .map(|x| format!("{}/{}", x.id, x.code))
-                .collect::<Vec<_>>()
-                .join(", "),
+            message_ids = %message_ids,
             error_code = "failed_deleting_some_sqs_messages",
             error_type = error_type::ACKNOWLEDGMENT_FAILED,
             stage = error_stage::PROCESSING,
@@ -246,12 +249,15 @@ pub struct SqsMessageDeleteBatchError<E> {
 #[cfg(feature = "sources-aws_s3")]
 impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteBatchError<E> {
     fn emit(self) {
+        let message_ids = self
+            .entries
+            .iter()
+            .map(|x| x.id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         error!(
             message = "Deletion of SQS message(s) failed.",
-            message_ids = %self.entries.iter()
-                .map(|x| x.id.to_string())
-                .collect::<Vec<_>>()
-                .join(", "),
+            message_ids = %message_ids,
             error = %self.error,
             error_code = "failed_deleting_all_sqs_messages",
             error_type = error_type::ACKNOWLEDGMENT_FAILED,

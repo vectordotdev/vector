@@ -175,10 +175,7 @@ pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
 impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
     fn emit(self) {
         error!(
-            message = r#"
-                Docker engine is not using either the `jsonfile` or `journald`
-                logging driver. Please enable one of these logging drivers
-                to get logs from the Docker daemon."#,
+            message = "Docker engine is not using either the `jsonfile` or `journald` logging driver. Please enable one of these logging drivers to get logs from the Docker daemon.",
             error = ?self.error,
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,

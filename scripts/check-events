@@ -85,6 +85,7 @@ class Event
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
+      logs_should_have('error')
       counters_must_include('component_errors_total', ['error_type', 'stage'])
     end
 
@@ -134,6 +135,12 @@ class Event
 
     def append(report)
       @reports.append(report)
+    end
+
+    def logs_should_have(level)
+      if @logs.find_index { |type, message, parameters| type == level }.nil?
+        @reports.append("This event MUST log with level #{level}.")
+      end
     end
 
     def counters_must_include(name, required_tags)
@@ -201,14 +208,14 @@ Find.find('.') do |path|
         block.scan(/
                     (trace|debug|info|warn|error)! # The log type
                     \(\s*(?:message\s*=\s*)? # Skip any leading "message =" bit
-                    "([^({)][^("]+)" # The log message text
+                    (?:"([^({)][^("]+)"|([^,]+)) # The log message text
                     ([^;]*?) # Match the parameter list
                     \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
-                   /mx) do |type, message, parameters|
+                   /mx) do |type, raw_message, var_message, parameters|
           parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
                          .map { |assignment, simple| assignment or simple }
 
-          $all_events[event_name].add_log(type, message, parameters)
+          $all_events[event_name].add_log(type, raw_message, parameters)
         end
       end
     end
