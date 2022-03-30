@@ -143,10 +143,6 @@ mod source {
                 "file" => self.file.to_owned(),
             );
             counter!(
-                "processed_bytes_total", self.byte_size as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
                 "component_received_events_total", self.count as u64,
                 "file" => self.file.to_owned(),
             );

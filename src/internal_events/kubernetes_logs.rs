@@ -24,10 +24,6 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 counter!("component_received_events_total", 1, "pod_name" => name.to_owned());
                 counter!("component_received_event_bytes_total", self.byte_size as u64, "pod_name" => name.to_owned());
                 counter!("events_in_total", 1, "pod_name" => name.to_owned());
-                counter!(
-                    "processed_bytes_total", self.byte_size as u64,
-                    "pod_name" => name.to_owned()
-                );
             }
             None => {
                 counter!("component_received_events_total", 1);
@@ -36,7 +32,6 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                     self.byte_size as u64
                 );
                 counter!("events_in_total", 1);
-                counter!("processed_bytes_total", self.byte_size as u64);
             }
         }
     }

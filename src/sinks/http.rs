@@ -24,7 +24,6 @@ use crate::{
     },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::HttpEventEncoded,
     sinks::util::{
         self,
         encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
@@ -255,10 +254,6 @@ impl HttpEventEncoder<BytesMut> for HttpSinkEventEncoder {
 
         let mut body = BytesMut::new();
         self.encoder.encode(event, &mut body).ok()?;
-
-        emit!(HttpEventEncoded {
-            byte_size: body.len(),
-        });
 
         Some(body)
     }

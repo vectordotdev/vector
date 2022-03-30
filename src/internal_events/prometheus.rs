@@ -37,10 +37,6 @@ impl InternalEvent for PrometheusEventsReceived {
             "events_in_total", self.count as u64,
             "uri" => self.uri.to_string(),
         );
-        counter!(
-            "processed_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_string(),
-        );
     }
 }
 

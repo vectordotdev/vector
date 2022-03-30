@@ -40,7 +40,6 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
-
     pub tls: Option<TlsOptions>,
 }
 

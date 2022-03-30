@@ -119,7 +119,7 @@ pub trait WritableMemoryMap: ReadableMemoryMap {
 /// A normal filesystem used for production operations.
 ///
 /// Uses Tokio's `File` for asynchronous file reading/writing, and `memmap2` for memory-mapped files.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ProductionFilesystem;
 
 #[async_trait]

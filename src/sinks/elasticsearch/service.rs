@@ -1,3 +1,5 @@
+use aws_types::credentials::SharedCredentialsProvider;
+use aws_types::region::Region;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -6,20 +8,15 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{header::HeaderName, Response, Uri};
-use hyper::{header::HeaderValue, service::Service, Body, Request};
-use rusoto_core::{
-    credential::{AwsCredentials, ProvideAwsCredentials},
-    signature::{SignedRequest, SignedRequestPayload},
-    Region,
-};
+use http::{Response, Uri};
+use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
 use vector_core::{
     buffers::Ackable, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
 };
 
+use crate::sinks::elasticsearch::sign_request;
 use crate::{
-    aws::rusoto::AwsCredentialsProvider,
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
     internal_events::ElasticsearchResponseError,
@@ -88,11 +85,11 @@ impl ElasticsearchService {
 pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub query_params: HashMap<String, String>,
-    pub region: Region,
+    pub region: Option<Region>,
     pub compression: Compression,
     pub http_request_config: RequestConfig,
     pub http_auth: Option<Auth>,
-    pub credentials_provider: Option<AwsCredentialsProvider>,
+    pub credentials_provider: Option<SharedCredentialsProvider>,
 }
 
 impl HttpRequestBuilder {
@@ -102,84 +99,30 @@ impl HttpRequestBuilder {
     ) -> Result<Request<Bytes>, crate::Error> {
         let mut builder = Request::post(&self.bulk_uri);
 
-        let request = if let Some(credentials_provider) = &self.credentials_provider {
-            let mut request = self.create_signed_request("POST", &self.bulk_uri, true);
-            let aws_credentials = credentials_provider.credentials().await?;
+        builder = builder.header("Content-Type", "application/x-ndjson");
 
-            request.add_header("Content-Type", "application/x-ndjson");
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
+        }
 
-            if let Some(ce) = self.compression.content_encoding() {
-                request.add_header("Content-Encoding", ce);
-            }
+        for (header, value) in &self.http_request_config.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
 
-            for (header, value) in &self.http_request_config.headers {
-                request.add_header(header, value);
-            }
+        if let Some(auth) = &self.http_auth {
+            builder = auth.apply_builder(builder);
+        }
 
-            request.set_payload(Some(es_req.payload));
-            builder = sign_request(&mut request, &aws_credentials, builder);
+        let mut request = builder
+            .body(es_req.payload)
+            .expect("Invalid http request value used");
 
-            // The SignedRequest ends up owning the body, so we have
-            // to play games here
-            let body = request.payload.take().unwrap();
-            match body {
-                SignedRequestPayload::Buffer(body) => {
-                    builder.body(body).expect("Invalid http request value used")
-                }
-                _ => unreachable!(),
-            }
-        } else {
-            builder = builder.header("Content-Type", "application/x-ndjson");
+        if let Some(credentials_provider) = &self.credentials_provider {
+            sign_request(&mut request, credentials_provider, &self.region).await?;
+        }
 
-            if let Some(ce) = self.compression.content_encoding() {
-                builder = builder.header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.http_request_config.headers {
-                builder = builder.header(&header[..], &value[..]);
-            }
-
-            if let Some(auth) = &self.http_auth {
-                builder = auth.apply_builder(builder);
-            }
-
-            builder
-                .body(es_req.payload)
-                .expect("Invalid http request value used")
-        };
         Ok(request)
     }
-
-    fn create_signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
-        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
-        request.set_hostname(uri.host().map(|host| host.into()));
-        if use_params {
-            for (key, value) in &self.query_params {
-                request.add_param(key, value);
-            }
-        }
-        request
-    }
-}
-
-fn sign_request(
-    request: &mut SignedRequest,
-    credentials: &AwsCredentials,
-    mut builder: http::request::Builder,
-) -> http::request::Builder {
-    request.sign(credentials);
-
-    for (name, values) in request.headers() {
-        let header_name = name
-            .parse::<HeaderName>()
-            .expect("Could not parse header name.");
-        for value in values {
-            let header_value =
-                HeaderValue::from_bytes(value).expect("Could not parse header value.");
-            builder = builder.header(&header_name, header_value);
-        }
-    }
-    builder
 }
 
 pub struct ElasticsearchResponse {

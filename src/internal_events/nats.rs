@@ -24,7 +24,6 @@ impl InternalEvent for NatsEventsReceived {
         );
         // deprecated
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -36,7 +35,7 @@ pub struct NatsEventSendSuccess {
 impl InternalEvent for NatsEventSendSuccess {
     fn emit(self) {
         trace!(message = "Processed one event.");
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("component_sent_bytes_total", self.byte_size as u64);
     }
 }
 
