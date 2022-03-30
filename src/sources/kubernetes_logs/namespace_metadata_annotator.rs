@@ -2,15 +2,12 @@
 
 #![deny(missing_docs)]
 
-use evmap::ReadHandle;
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use kube::runtime::reflector::{store::Store, ObjectRef};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    event::{Event, LogEvent},
-    kubernetes as k8s,
-};
+use crate::event::{Event, LogEvent};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -28,16 +25,13 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with namespace metadata.
 pub struct NamespaceMetadataAnnotator {
-    namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
+    namespace_state_reader: Store<Namespace>,
     fields_spec: FieldsSpec,
 }
 
 impl NamespaceMetadataAnnotator {
     /// Create a new [`NamespaceMetadataAnnotator`].
-    pub fn new(
-        namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
-        fields_spec: FieldsSpec,
-    ) -> Self {
+    pub const fn new(namespace_state_reader: Store<Namespace>, fields_spec: FieldsSpec) -> Self {
         Self {
             namespace_state_reader,
             fields_spec,
@@ -50,9 +44,9 @@ impl NamespaceMetadataAnnotator {
     /// The event has to have a [`POD_NAMESPACE`] field set.
     pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
-        let guard = self.namespace_state_reader.get(pod_namespace)?;
-        let entry = guard.get_one()?;
-        let namespace: &Namespace = entry.as_ref();
+        let obj = ObjectRef::<Namespace>::new(pod_namespace);
+        let resource = self.namespace_state_reader.get(&obj)?;
+        let namespace: &Namespace = resource.as_ref();
 
         annotate_from_metadata(log, &self.fields_spec, &namespace.metadata);
         Some(())
