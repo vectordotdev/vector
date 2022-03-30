@@ -368,22 +368,31 @@ impl TestDefinition<String> {
 
         let outputs = outputs
             .into_iter()
-            .filter_map(|old| {
+            .map(|old| {
+                let TestOutput {
+                    extract_from,
+                    conditions,
+                } = old;
+
+                let extract_from = extract_from
+                    .into_vec()
+                    .into_iter()
+                    .flat_map(|from| {
+                        if let Some(expanded) = expansions.get(&from) {
+                            expanded.to_vec()
+                        } else {
+                            vec![from]
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                (extract_from, conditions)
+            })
+            .filter_map(|(extract_from, conditions)| {
                 let mut outputs = Vec::new();
-                for from in old.extract_from.into_vec() {
+                for from in extract_from {
                     if let Some(output_id) = output_map.get(&from) {
                         outputs.push(output_id.clone());
-                    } else if let Some(expanded) = expansions.get(&from) {
-                        for expanded_from in expanded {
-                            if let Some(output_id) = output_map.get(expanded_from) {
-                                outputs.push(output_id.clone());
-                            } else {
-                                errors.push(format!(
-                                    r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                                    name, from
-                                ));
-                            }
-                        }
                     } else {
                         errors.push(format!(
                             r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
@@ -396,7 +405,7 @@ impl TestDefinition<String> {
                 } else {
                     Some(TestOutput {
                         extract_from: outputs.into(),
-                        conditions: old.conditions,
+                        conditions,
                     })
                 }
             })
