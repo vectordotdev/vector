@@ -3,8 +3,6 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use std::net::SocketAddr;
-
 use codecs::NewlineDelimitedDecoderConfig;
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +43,8 @@ impl SocketConfig {
         tcp_config.into()
     }
 
-    pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
+    #[cfg(test)]
+    pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
 }
@@ -126,6 +125,7 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
+                    config.port_key().clone(),
                     config.receive_buffer_bytes(),
                     decoder,
                     cx.shutdown,
@@ -278,12 +278,16 @@ mod test {
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
-        send_lines(addr, vec!["test".to_owned()].into_iter())
+        let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
             .await
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[log_schema().host_key()],
+            addr.ip().to_string().into()
+        );
+        assert_eq!(event.as_log()["port"], addr.port().to_string().into());
 
         SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
@@ -704,6 +708,7 @@ mod test {
             events[0].as_log()[log_schema().host_key()],
             from.ip().to_string().into()
         );
+        assert_eq!(events[0].as_log()["port"], from.port().to_string().into());
     }
 
     #[tokio::test]
