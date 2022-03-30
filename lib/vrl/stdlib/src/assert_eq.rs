@@ -1,5 +1,23 @@
 use vrl::{diagnostic::Note, prelude::*};
 
+fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
+    if left == right {
+        Ok(true.into())
+    } else if let Some(message) = message {
+        let message = message.try_bytes_utf8_lossy()?.into_owned();
+        Err(ExpressionError::Error {
+            message: message.clone(),
+            labels: vec![],
+            notes: vec![Note::UserErrorMessage(message)],
+        })
+    } else {
+        Err(ExpressionError::from(format!(
+            "assertion failed: {} == {}",
+            left, right
+        )))
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct AssertEq;
 
@@ -66,6 +84,14 @@ impl Function for AssertEq {
             message,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let left = args.required("left");
+        let right = args.required("right");
+        let message = args.optional("message");
+
+        assert_eq(left, right, message)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,32 +105,9 @@ impl Expression for AssertEqFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let left = self.left.resolve(ctx)?;
         let right = self.right.resolve(ctx)?;
+        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?;
 
-        if left == right {
-            Ok(true.into())
-        } else {
-            let message = self
-                .message
-                .as_ref()
-                .map(|m| {
-                    m.resolve(ctx)
-                        .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
-                })
-                .transpose()?;
-
-            if let Some(message) = message {
-                Err(ExpressionError::Error {
-                    message: message.clone(),
-                    labels: vec![],
-                    notes: vec![Note::UserErrorMessage(message)],
-                })
-            } else {
-                Err(ExpressionError::from(format!(
-                    "assertion failed: {} == {}",
-                    left, right
-                )))
-            }
-        }
+        assert_eq(left, right, message)
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {

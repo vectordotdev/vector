@@ -2,6 +2,10 @@ use std::net::SocketAddr;
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
@@ -9,11 +13,7 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DeserializerConfig, FramingConfig},
-        Decoder,
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     internal_events::{
@@ -21,7 +21,7 @@ use crate::{
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::{util::StreamDecodingError, Source},
+    sources::Source,
     udp, SourceSender,
 };
 
@@ -112,13 +112,13 @@ pub fn udp(
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
                         let error = codecs::decoding::Error::FramingError(error.into());
-                        emit!(&SocketReceiveError {
+                        emit!(SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error
                         })
                     })?;
 
-                    emit!(&BytesReceived { byte_size, protocol: "udp" });
+                    emit!(BytesReceived { byte_size, protocol: "udp" });
 
                     let payload = buf.split_to(byte_size);
 
@@ -128,7 +128,7 @@ pub fn udp(
                         match result {
                             Ok((mut events, _byte_size)) => {
                                 let count = events.len();
-                                emit!(&SocketEventsReceived {
+                                emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
                                     byte_size: events.size_of(),
                                     count,
@@ -147,7 +147,7 @@ pub fn udp(
                                 tokio::select!{
                                     result = out.send_batch(events) => {
                                         if let Err(error) = result {
-                                            emit!(&StreamClosedError { error, count });
+                                            emit!(StreamClosedError { error, count });
                                             return Ok(())
                                         }
                                     }

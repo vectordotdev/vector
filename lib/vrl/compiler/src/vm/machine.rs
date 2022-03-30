@@ -173,7 +173,14 @@ impl Vm {
     /// If the constant already exists, the position of that element is returned without adding
     /// the value again.
     pub fn add_constant(&mut self, object: Value) -> usize {
-        match self.values.iter().position(|value| value == &object) {
+        // We need to do a specific match for types with `Float`s since the default
+        // implementation for `Eq` on Value type truncates the float values in the comparison.
+        // `lossy_eq` doesn't work either since that allows you to compare `Integer` against
+        // `Float`, which wouldn't work here.
+        match self.values.iter().position(|value| match (value, &object) {
+            (Value::Float(lhs), Value::Float(rhs)) => lhs == rhs,
+            (lhs, rhs) => lhs == rhs,
+        }) {
             None => {
                 self.values.push(object);
                 self.values.len() - 1
@@ -310,6 +317,8 @@ impl Vm {
                         let rhs = state.pop_stack()?;
                         let lhs = state.pop_stack()?;
                         state.stack.push((!lhs.eq_lossy(&rhs)).into());
+                    } else {
+                        state.pop_stack()?;
                     }
                 }
                 OpCode::Equal => {
@@ -317,6 +326,8 @@ impl Vm {
                         let rhs = state.pop_stack()?;
                         let lhs = state.pop_stack()?;
                         state.stack.push(lhs.eq_lossy(&rhs).into());
+                    } else {
+                        state.pop_stack()?;
                     }
                 }
                 OpCode::Pop => {
@@ -343,6 +354,7 @@ impl Vm {
                 }
                 OpCode::JumpIfTruthy => {
                     // If the value at the top of the stack is true, jump by the given amount.
+                    // Used by OR operations.
                     let jump = state.next_primitive()?;
                     if is_truthy(state.peek_stack()?) {
                         state.instruction_pointer += jump;
@@ -350,11 +362,9 @@ impl Vm {
                 }
                 OpCode::JumpAndSwapIfFalsey => {
                     // If the value at the top of the stack is true, jump by the given amount.
+                    // Used by AND operations.
                     let jump = state.next_primitive()?;
-                    if state.error.is_some() {
-                        // Break out if we are in an error.
-                        state.instruction_pointer += jump;
-                    } else if !is_truthy(state.peek_stack()?) {
+                    if !is_truthy(state.peek_stack()?) {
                         state.pop_stack()?;
                         state.push_stack(Value::Boolean(false));
                         state.instruction_pointer += jump;
@@ -579,6 +589,12 @@ where
             Ok(value) => state.stack.push(value),
             Err(err) => state.error = Some(err.into()),
         }
+    } else {
+        // If we are in error, we need to pop the stack to remove the lhs
+        // value from the stack.
+        // (If the lhs had errored, a Jump will have already been evoked to jump
+        // past the binary op.)
+        state.pop_stack()?;
     }
 
     Ok(())

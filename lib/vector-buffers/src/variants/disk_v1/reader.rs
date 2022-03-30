@@ -1,19 +1,15 @@
 use std::{
     collections::VecDeque,
     fmt,
-    future::Future,
     marker::PhantomData,
-    pin::Pin,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll, Waker},
     time::Duration,
 };
 
 use bytes::Bytes;
-use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
@@ -21,8 +17,7 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use parking_lot::Mutex;
-use tokio::{task::JoinHandle, time::Instant};
+use tokio::{sync::Notify, task::JoinHandle, time::Instant};
 
 use super::Key;
 use crate::{
@@ -64,10 +59,10 @@ pub struct Reader<T> {
     pub(crate) delete_offset: usize,
     /// Reader is notified by Writers through this Waker.
     /// Shared with Writers.
-    pub(crate) write_notifier: Arc<AtomicWaker>,
+    pub(crate) read_waker: Arc<Notify>,
     /// Writers blocked by disk being full.
     /// Shared with Writers.
-    pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    pub(crate) write_waker: Arc<Notify>,
     /// Size of unread events in bytes.
     /// Shared with Writers.
     pub(crate) current_size: Arc<AtomicU64>,
@@ -93,100 +88,67 @@ pub struct Reader<T> {
     pub(crate) phantom: PhantomData<T>,
 }
 
-impl<T> Stream for Reader<T>
+impl<T> Reader<T>
 where
     T: Bufferable,
 {
-    type Item = T;
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
+    pub async fn next(&mut self) -> Option<T> {
+        loop {
+            // Check for any pending acknowledgements which may make a read eligible to finally be
+            // deleted from the buffer entirely.
+            self.try_flush();
 
-    #[cfg_attr(test, instrument(skip(self, cx), level = "debug"))]
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
+            // If we have no buffered items, do a read from LevelDB.
+            if self.buffer.is_empty() {
+                debug!("Internal buffer empty, trying to read more from LevelDB.");
 
-        // If there's no value at or beyond `read_offset`, we return `Poll::Pending` and rely on
-        // `Writer` using `self.write_notifier` to wake this task up after the next write.
-        this.write_notifier.register(cx.waker());
+                let db = Arc::clone(&self.db);
+                let read_offset = self.read_offset;
+                let handle = tokio::task::spawn_blocking(move || {
+                    db.iter(ReadOptions::new())
+                        .from(&Key(read_offset))
+                        .take(1000)
+                        .collect::<Vec<_>>()
+                });
 
-        // Check for any pending acknowledgements which may make a read eligible to finally be
-        // deleted from the buffer entirely.
-        this.try_flush();
-
-        if this.buffer.is_empty() {
-            // This will usually complete instantly, but in the case of a large
-            // queue (or a fresh launch of the app), this will have to go to
-            // disk.
-            loop {
-                match this.pending_read.take() {
-                    None => {
-                        // We have no pending read in-flight, so queue one up.
-                        let db = Arc::clone(&this.db);
-                        let read_offset = this.read_offset;
-                        let handle = tokio::task::spawn_blocking(move || {
-                            db.iter(ReadOptions::new())
-                                .from(&Key(read_offset))
-                                .take(1000)
-                                .collect::<Vec<_>>()
-                        });
-
-                        // Store the handle, and let the loop come back around.
-                        this.pending_read = Some(handle);
+                match handle.await {
+                    Ok(items) => {
+                        trace!(batch_size = items.len(), "LevelDB read completed.");
+                        self.buffer.extend(items);
                     }
-                    Some(mut handle) => match Pin::new(&mut handle).poll(cx) {
-                        Poll::Ready(r) => {
-                            match r {
-                                Ok(items) => {
-                                    trace!(batch_size = items.len(), "LevelDB read completed.");
-                                    this.buffer.extend(items);
-                                }
-                                Err(error) => error!(%error, "Error during read."),
-                            }
-
-                            this.pending_read = None;
-
-                            break;
-                        }
-                        Poll::Pending => {
-                            this.pending_read = Some(handle);
-                            return Poll::Pending;
-                        }
-                    },
+                    Err(error) => error!(%error, "Error during read."),
                 }
             }
 
-            // If we've broke out of the loop, our read has completed.
-            this.pending_read = None;
-        }
-
-        if let Some((key, item_bytes, decode_result)) = this.decode_next_record() {
-            trace!(?key, item_bytes, "Got record decode attempt.");
-            match decode_result {
-                Ok(item) => {
-                    this.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
-                    Poll::Ready(Some(item))
+            // Try to decode a record from our buffered reads.
+            if let Some((key, item_bytes, decode_result)) = self.decode_next_record() {
+                trace!(?key, item_bytes, "Got record decode attempt.");
+                match decode_result {
+                    Ok(item) => {
+                        self.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
+                        return Some(item);
+                    }
+                    Err(error) => {
+                        error!(%error, "Error deserializing event.");
+                        self.track_unacked_read(key.0, None, item_bytes);
+                    }
                 }
-                Err(error) => {
-                    error!(%error, "Error deserializing event.");
-
-                    this.track_unacked_read(key.0, None, item_bytes);
-                    Pin::new(this).poll_next(cx)
+            } else {
+                if Arc::strong_count(&self.db) == 1 {
+                    // There are no writers left, and we've consumed all remaining items in the
+                    // buffer, so we need to signal to this to caller by returning `None`.
+                    return None;
                 }
+
+                // We have no more buffered reads, and we always make sure to do a read if our
+                // internal buffer is empty, so if we're here, it means we're caught up and need to
+                // wait for the writer to write some records.
+                self.read_waker.notified().await;
             }
-        } else if Arc::strong_count(&this.db) == 1 {
-            // There are no writers left
-            Poll::Ready(None)
-        } else {
-            Poll::Pending
         }
     }
-}
 
-impl<T> Drop for Reader<T> {
-    fn drop(&mut self) {
-        self.flush();
-    }
-}
-
-impl<T: Bufferable> Reader<T> {
     /// Decodes the next buffered record, if one is available.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     fn decode_next_record(&mut self) -> Option<(Key, usize, Result<T, T::DecodeError>)> {
@@ -322,9 +284,7 @@ impl<T> Reader<T> {
 
             // Now that we've actually deleted some items, notify any blocked writers that progress
             // has been made so they can continue writing.
-            for task in self.blocked_write_tasks.lock().drain(..) {
-                task.wake();
-            }
+            self.write_waker.notify_waiters();
         }
 
         // Attempt to run a compaction if we've met the criteria to trigger one.
@@ -371,14 +331,20 @@ impl<T> Reader<T> {
     }
 }
 
+impl<T> Drop for Reader<T> {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+
 impl<T: Bufferable> fmt::Debug for Reader<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Reader")
             .field("read_offset", &self.read_offset)
             .field("compacted_offset", &self.compacted_offset)
             .field("delete_offset", &self.delete_offset)
-            .field("write_notifier", &self.write_notifier)
-            .field("blocked_write_tasks", &self.blocked_write_tasks)
+            .field("read_waker", &self.read_waker)
+            .field("write_waker", &self.write_waker)
             .field("current_size", &self.current_size)
             .field("ack_counter", &self.ack_counter)
             .field("uncompacted_size", &self.uncompacted_size)

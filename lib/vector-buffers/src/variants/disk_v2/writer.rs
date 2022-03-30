@@ -850,6 +850,12 @@ where
         Ok(())
     }
 
+    fn is_buffer_full(&self) -> bool {
+        let total_buffer_size = self.ledger.get_total_buffer_size();
+        let max_buffer_size = self.config.max_buffer_size;
+        total_buffer_size >= max_buffer_size
+    }
+
     /// Ensures this writer is ready to attempt writer the next record.
     #[instrument(skip(self), level = "debug")]
     async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
@@ -857,15 +863,13 @@ where
         loop {
             // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
             // wait for the reader to signal that they've made some progress.
-            let total_buffer_size = self.ledger.get_total_buffer_size();
-            let max_buffer_size = self.config.max_buffer_size;
-            if total_buffer_size < max_buffer_size {
+            if !self.is_buffer_full() {
                 break;
             }
 
             trace!(
-                total_buffer_size,
-                max_buffer_size,
+                total_buffer_size = self.ledger.get_total_buffer_size(),
+                max_buffer_size = self.config.max_buffer_size,
                 "Buffer size limit reached. Waiting for reader progress."
             );
 
@@ -1005,6 +1009,23 @@ where
             debug!("Target data file is still present and not yet processed. Waiting for reader.");
             self.ledger.wait_for_reader().await;
         }
+    }
+
+    /// Attempts to write a record.
+    ///
+    /// If the buffer is currently full, the original record will be immediately returned.
+    /// Otherwise, a write will be executed, which will run to completion, and `None` will be returned.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred while writing the record, an error variant will be returned describing
+    /// the error.
+    pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
+        if self.is_buffer_full() {
+            return Ok(Some(record));
+        }
+
+        self.write_record(record).await.map(|_| None)
     }
 
     /// Writes a record.

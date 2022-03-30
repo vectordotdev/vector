@@ -454,7 +454,7 @@ where
                 let status = result_status(result);
                 finalizers.update_status(status);
                 if status == EventStatus::Delivered {
-                    emit!(&EventsSent {
+                    emit!(EventsSent {
                         count,
                         byte_size,
                         output: None
@@ -467,7 +467,7 @@ where
                 // ignore for now.
                 let _ = tx.send((seqno, batch_size));
             })
-            .instrument(info_span!("request", %request_id))
+            .instrument(info_span!("request", %request_id).or_current())
             .boxed()
     }
 

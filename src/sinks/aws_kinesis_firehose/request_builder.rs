@@ -1,7 +1,8 @@
+use aws_sdk_firehose::model::Record;
+use aws_sdk_firehose::types::Blob;
 use std::io;
 
 use bytes::Bytes;
-use rusoto_firehose::Record;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
@@ -43,8 +44,14 @@ impl Finalizable for KinesisRequest {
 
 impl KinesisRequest {
     fn encoded_length(&self) -> usize {
+        let data_len = self
+            .record
+            .data
+            .as_ref()
+            .map(|x| x.as_ref().len())
+            .unwrap_or(0);
         // data is simply base64 encoded, quoted, and comma separated
-        (self.record.data.len() + 2) / 3 * 4 + 3
+        (data_len + 2) / 3 * 4 + 3
     }
 }
 
@@ -87,7 +94,7 @@ impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
         KinesisRequest {
-            record: Record { data },
+            record: Record::builder().data(Blob::new(data.as_ref())).build(),
             finalizers: metadata.finalizers,
             event_byte_size: metadata.event_byte_size,
         }

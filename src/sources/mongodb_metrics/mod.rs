@@ -125,7 +125,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
                 let count = metrics.len();
-                emit!(&MongoDbMetricsCollectCompleted {
+                emit!(MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -133,7 +133,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let metrics = metrics.into_iter().flatten();
 
                 if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -240,11 +240,11 @@ impl MongoDbMetrics {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(&MongoDbMetricsRequestError {
+                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(&MongoDbMetricsBsonParseError {
+                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -256,7 +256,7 @@ impl MongoDbMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
-        emit!(&MongoDbMetricsEventsReceived {
+        emit!(MongoDbMetricsEventsReceived {
             byte_size: metrics.size_of(),
             count: metrics.len(),
             uri: &self.endpoint,
@@ -279,7 +279,7 @@ impl MongoDbMetrics {
             .await
             .map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             protocol: "tcp",
             byte_size,
         });

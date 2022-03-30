@@ -22,8 +22,8 @@ use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingError,
+        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
+        TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -50,7 +50,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -131,9 +131,6 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        emit!(&LokiEventsProcessed {
-            byte_size: payload.len(),
-        });
         let compression = self.compression();
 
         LokiRequest {
@@ -223,7 +220,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -371,11 +368,11 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(&LokiOutOfOrderEventRewritten { count });
+                        emit!(LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(&LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
                     None
                 }
             })

@@ -68,6 +68,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/codecs",
   "lib/enrichment",
   "lib/vector-buffers",
   "lib/vector-common",
@@ -96,11 +97,11 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
-  "lib/soak"
 ]
 
 [dependencies]
 # Internal libs
+codecs = { path = "lib/codecs", default-features = false, optional = true }
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
@@ -110,16 +111,16 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value", optional = true }
-vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
-vrl-cli = { path = "lib/vrl/cli", optional = true }
+vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
+vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
-async-stream = "0.3.2"
-async-trait = "0.1.52"
+async-stream = "0.3.3"
+async-trait = "0.1.53"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.17.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -131,8 +132,7 @@ console-subscriber = { version = "0.1.3", optional = true }
 tracing = { version = "0.1.32", default-features = false }
 tracing-core = { version = "0.1.23", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
-tracing-log = { version = "0.1.2", default-features = false, features = ["log-tracer", "std"] }
-tracing-subscriber = { version = "0.3.9", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry"] }
+tracing-subscriber = { version = "0.3.9", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -142,22 +142,24 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 # AWS - Rusoto
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
-rusoto_es = { version = "0.47.0", optional = true }
-rusoto_firehose = { version = "0.47.0", optional = true }
-rusoto_kinesis = { version = "0.47.0", optional = true }
 rusoto_s3 = { version = "0.47.0", optional = true }
 rusoto_signature = { version = "0.47.0", optional = true }
 rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = { version = "0.8.0", optional = true }
-aws-types = { version = "0.8.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-sqs = { version = "0.8.0", optional = true }
-aws-sdk-cloudwatch = { version = "0.8.0", optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.8.0", optional = true }
-aws-smithy-client = { version = "0.38.0", optional = true }
-aws-smithy-http = { version = "0.38.0", optional = true }
+aws-config = { version = "0.9.0", optional = true }
+aws-types = { version = "0.9.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-s3 = { version = "0.9.0", optional = true }
+aws-sdk-sqs = { version = "0.9.0", optional = true }
+aws-sdk-cloudwatch = { version = "0.9.0", optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true }
+aws-sdk-elasticsearch = {version = "0.9.0", optional = true }
+aws-sdk-firehose = { version = "0.9.0", optional = true }
+aws-sdk-kinesis = { version = "0.9.0", optional = true }
+aws-sigv4 = { version = "0.9.0", optional = true }
+aws-smithy-client = { version = "0.39.0", optional = true }
+aws-smithy-http = { version = "0.39.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -180,7 +182,7 @@ rmp-serde = { version = "1.0.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.9", default-features = false, features = ["std"]  }
+prost = { version = "0.9", default-features = false, features = ["std"] }
 
 # GCP
 goauth = { version = "0.11.1", default-features = false, optional = true }
@@ -188,12 +190,12 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.34", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "3.0.34", default-features = false, optional = true }
+async-graphql = { version = "3.0.36", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.36", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.23.0", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.23.1", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.17.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -224,7 +226,7 @@ colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
 encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
@@ -237,7 +239,7 @@ hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.6", default-features = false }
-hyper = { version = "0.14.17", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
+hyper = { version = "0.14.18", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
@@ -248,13 +250,12 @@ k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", 
 listenfd = { version = "0.5.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.3", default-features = false, optional = true }
-maxminddb = { version = "0.21.0", default-features = false, optional = true }
+maxminddb = { version = "0.22.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
-memchr = { version = "2.4", default-features = false, optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
-nom = { version = "7.1.0", default-features = false, optional = true }
+nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
@@ -272,8 +273,8 @@ redis = { version = "0.21.5", default-features = false, features = ["connection-
 regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
-semver = { version = "1.0.6", default-features = false, features = ["serde", "std"], optional = true }
-smallvec = { version = "1", optional = true, features = ["union"] }
+semver = { version = "1.0.7", default-features = false, features = ["serde", "std"], optional = true }
+smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.0", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
@@ -282,7 +283,6 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
@@ -323,8 +323,8 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.119"
-pretty_assertions = "1.1.0"
+libc = "0.2.121"
+pretty_assertions = "1.2.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -416,9 +416,6 @@ protobuf-build = ["tonic-build", "prost-build"]
 enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
 
-# Codecs
-codecs = ["value", "smallvec", "memchr"]
-
 # Sources
 sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
@@ -463,7 +460,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "codecs"]
-sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "codecs", "async-compression"]
+sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "codecs", "async-compression", "sources-aws_sqs"]
 sources-aws_sqs = ["aws-core", "aws-sdk-sqs", "codecs"]
 sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "codecs", "value"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
@@ -492,7 +489,7 @@ sources-socket = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-ut
 sources-splunk_hec = ["sources-utils-tls", "roaring"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/net", "codecs"]
 sources-stdin = ["codecs", "tokio-util/io"]
-sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose", "codecs"]
+sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "codecs", "codecs/syslog"]
 sources-utils-http-auth = ["sources-utils-http-error"]
 sources-utils-http-encoding = ["snap", "sources-utils-http-error"]
 sources-utils-http-error = []
@@ -644,9 +641,9 @@ sinks-metrics = [
 
 sinks-aws_cloudwatch_logs = ["aws-core", "aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "aws-sdk-cloudwatch"]
-sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
-sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["base64", "md-5", "rusoto", "rusoto_s3"]
+sinks-aws_kinesis_firehose = ["aws-core", "aws-sdk-firehose"]
+sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
+sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
@@ -657,7 +654,7 @@ sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
-sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
+sinks-elasticsearch = ["aws-core", "aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
 sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
 sinks-honeycomb = []
@@ -743,7 +740,7 @@ aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
 aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
-aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
+aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "aws-sdk-elasticsearch", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]

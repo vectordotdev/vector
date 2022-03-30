@@ -93,6 +93,11 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// of events flowing through the transform.
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
 
+    /// Verifies that the provided outputs and the inner plumbing of the transform are valid.
+    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
     fn transform_type(&self) -> &'static str;
 
     /// Return true if the transform is able to be run across multiple tasks simultaneously with no

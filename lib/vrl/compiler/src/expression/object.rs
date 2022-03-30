@@ -61,7 +61,11 @@ impl Expression for Object {
         TypeDef::object(collection).with_fallibility(fallible)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         for (key, value) in &self.inner {
             // Write the key as a constant
             let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
@@ -69,7 +73,7 @@ impl Expression for Object {
             vm.write_primitive(keyidx);
 
             // Write the value
-            value.compile_to_vm(vm)?;
+            value.compile_to_vm(vm, state)?;
         }
 
         vm.write_opcode(OpCode::CreateObject);

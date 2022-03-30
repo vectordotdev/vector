@@ -212,6 +212,30 @@ async fn processed_bytes_throughputs(
     }
 }
 
+async fn errors_totals(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
+    tokio::pin! {
+        let stream = client.component_errors_totals_subscription(interval);
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_errors_totals;
+            let _ = tx
+                .send(state::EventType::ErrorsTotals(
+                    c.into_iter()
+                        .map(|c| {
+                            (
+                                ComponentKey::from(c.component_id.as_str()),
+                                c.metric.errors_total as i64,
+                            )
+                        })
+                        .collect(),
+                ))
+                .await;
+        }
+    }
+}
+
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
 pub fn subscribe(
@@ -251,9 +275,10 @@ pub fn subscribe(
         )),
         tokio::spawn(processed_bytes_throughputs(
             Arc::clone(&client),
-            tx,
+            tx.clone(),
             interval,
         )),
+        tokio::spawn(errors_totals(Arc::clone(&client), tx, interval)),
     ]
 }
 
@@ -296,7 +321,6 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         sent_events_throughput_sec: 0,
                         processed_bytes_total: d.on.processed_bytes_total(),
                         processed_bytes_throughput_sec: 0,
-
                         errors: 0,
                     },
                 ))

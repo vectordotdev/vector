@@ -23,5 +23,5 @@ indoc = "1"
 vrl-stdlib = { path = "../stdlib" }
 
 [[bench]]
-name = "vm"
+name = "runtime"
 harness = false

@@ -101,7 +101,8 @@ Vector doesn't currently support fallback values. [Issue 1692][1692] is open to 
 
 ### Missing fields
 
-If a field is missing, a blank string is inserted in its place. In that case, Vector neither errors nor drops the event nor logs anything.
+If a field is missing, an error is logged and Vector drops the event. The `component_errors_total` internal
+metric is incremented with `error_type` = `template_failed`.
 
 ### Nested fields
 

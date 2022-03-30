@@ -1,4 +1,4 @@
-use std::{error, fmt};
+use std::{error, fmt, num::NonZeroUsize};
 
 use bytes::{Buf, BufMut};
 
@@ -67,11 +67,14 @@ pub async fn build_buffer(
     let (tx, rx) = match mode {
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
-            let (overflow_sender, overflow_receiver) =
-                TopologyBuilder::standalone_memory_test(capacity, overflow_mode, handle.clone())
-                    .await;
+            let (overflow_sender, overflow_receiver) = TopologyBuilder::standalone_memory_test(
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+                overflow_mode,
+                handle.clone(),
+            )
+            .await;
             let (mut base_sender, mut base_receiver) = TopologyBuilder::standalone_memory_test(
-                capacity,
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
                 WhenFull::Overflow,
                 handle.clone(),
             )
@@ -81,7 +84,14 @@ pub async fn build_buffer(
 
             (base_sender, base_receiver)
         }
-        m => TopologyBuilder::standalone_memory_test(capacity, m, handle.clone()).await,
+        m => {
+            TopologyBuilder::standalone_memory_test(
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+                m,
+                handle.clone(),
+            )
+            .await
+        }
     };
 
     (tx, rx, handle)

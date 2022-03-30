@@ -11,6 +11,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
+use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{future, stream::BoxStream, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
@@ -30,7 +31,6 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
@@ -373,7 +373,7 @@ impl<'a> Batch<'a> {
                         }
                     }
                     Err(error) => {
-                        emit!(&JournaldInvalidRecordError {
+                        emit!(JournaldInvalidRecordError {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
@@ -388,14 +388,14 @@ impl<'a> Batch<'a> {
         drop(self.batch);
 
         if self.record_size > 0 {
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: self.record_size,
                 protocol: "journald",
             });
         }
 
         if !self.events.is_empty() {
-            emit!(&JournaldEventsReceived {
+            emit!(JournaldEventsReceived {
                 count: self.events.len(),
                 byte_size: self.events.size_of(),
             });

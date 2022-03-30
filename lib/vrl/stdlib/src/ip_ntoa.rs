@@ -2,6 +2,15 @@ use std::{convert::TryInto, net::Ipv4Addr};
 
 use vrl::prelude::*;
 
+fn ip_ntoa(value: Value) -> Resolved {
+    let i: u32 = value
+        .try_integer()?
+        .try_into()
+        .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
+
+    Ok(Ipv4Addr::from(i).to_string().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct IpNtoa;
 
@@ -36,6 +45,11 @@ impl Function for IpNtoa {
 
         Ok(Box::new(IpNtoaFn { value }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        ip_ntoa(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -45,14 +59,8 @@ struct IpNtoaFn {
 
 impl Expression for IpNtoaFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let i: u32 = self
-            .value
-            .resolve(ctx)?
-            .try_integer()?
-            .try_into()
-            .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
-
-        Ok(Ipv4Addr::from(i).to_string().into())
+        let value = self.value.resolve(ctx)?;
+        ip_ntoa(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

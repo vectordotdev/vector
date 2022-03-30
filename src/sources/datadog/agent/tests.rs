@@ -1,5 +1,4 @@
 use std::{
-    array::IntoIter,
     collections::{BTreeMap, HashMap},
     iter::FromIterator,
     net::SocketAddr,
@@ -8,6 +7,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use codecs::{
+    decoding::{Deserializer, DeserializerConfig, Framer},
+    BytesDecoder, BytesDeserializer,
+};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
@@ -17,11 +20,6 @@ use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{Deserializer, DeserializerConfig, Framer},
-        BytesDecoder, BytesDeserializer,
-    },
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
@@ -90,7 +88,7 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-        let decoder = codecs::Decoder::new(
+        let decoder = crate::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
             Deserializer::Bytes(BytesDeserializer::new()),
         );
@@ -911,8 +909,8 @@ async fn decode_traces() {
         start: 1_431_648_000_000_001i64,
         duration: 1_000_000_000i64,
         error: 404i32,
-        meta: BTreeMap::from_iter(IntoIter::new([("foo".to_string(), "bar".to_string())])),
-        metrics: BTreeMap::from_iter(IntoIter::new([("a_metrics".to_string(), 0.577f64)])),
+        meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
+        metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
         r#type: "a_type".to_string(),
     };
 

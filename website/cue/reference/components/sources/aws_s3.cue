@@ -7,7 +7,13 @@ components: sources: aws_s3: components._aws & {
 		acknowledgements: true
 		multiline: enabled: true
 		collect: {
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: false
+				can_verify_hostname:    false
+				enabled_default:        false
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_s3
