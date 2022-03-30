@@ -32,6 +32,8 @@ pub struct SqsSource {
     pub queue_url: String,
     pub decoder: Decoder,
     pub poll_secs: u32,
+    pub visibility_timeout_secs: u32,
+    pub delete_message: bool,
     pub concurrency: u32,
     pub(super) acknowledgements: bool,
 }
@@ -74,6 +76,7 @@ impl SqsSource {
             .queue_url(&self.queue_url)
             .max_number_of_messages(MAX_BATCH_SIZE)
             .wait_time_seconds(self.poll_secs as i32)
+            .visibility_timeout(self.visibility_timeout_secs as i32)
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
             .attribute_names(QueueAttributeName::Unknown(String::from("SentTimestamp")))
@@ -116,19 +119,22 @@ impl SqsSource {
             drop(batch); // Drop last reference to batch acknowledgement finalizer
             emit!(AwsSqsBytesReceived { byte_size });
             let count = events.len();
+
             match out.send_batch(events).await {
                 Ok(()) => {
-                    if let Some(receiver) = batch_receiver {
-                        let client = self.client.clone();
-                        let queue_url = self.queue_url.clone();
-                        tokio::spawn(async move {
-                            let batch_status = receiver.await;
-                            if batch_status == BatchStatus::Delivered {
-                                delete_messages(&client, &receipts_to_ack, &queue_url).await;
-                            }
-                        });
-                    } else {
-                        delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
+                    if self.delete_message {
+                        if let Some(receiver) = batch_receiver {
+                            let client = self.client.clone();
+                            let queue_url = self.queue_url.clone();
+                            tokio::spawn(async move {
+                                let batch_status = receiver.await;
+                                if batch_status == BatchStatus::Delivered {
+                                    delete_messages(&client, &receipts_to_ack, &queue_url).await;
+                                }
+                            });
+                        } else {
+                            delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
+                        }
                     }
                 }
                 Err(error) => emit!(StreamClosedError { error, count }),
