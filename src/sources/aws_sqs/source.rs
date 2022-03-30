@@ -6,6 +6,7 @@ use aws_sdk_sqs::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
+use codecs::StreamDecodingError;
 use futures::FutureExt;
 use tokio::{pin, select, time::Duration};
 use tokio_util::codec::Decoder as _;
@@ -19,7 +20,6 @@ use crate::{
         AwsSqsBytesReceived, EventsReceived, SqsMessageDeleteError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 

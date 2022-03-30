@@ -2,6 +2,10 @@ use std::net::SocketAddr;
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
@@ -9,11 +13,7 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DeserializerConfig, FramingConfig},
-        Decoder,
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     internal_events::{
@@ -21,7 +21,7 @@ use crate::{
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::{util::StreamDecodingError, Source},
+    sources::Source,
     udp, SourceSender,
 };
 

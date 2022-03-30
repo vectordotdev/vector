@@ -2,8 +2,7 @@ use bytes::BytesMut;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-
-use crate::{
+use vector_core::{
     event::{proto, Event, EventArray},
     schema,
 };
@@ -29,7 +28,7 @@ impl NativeSerializerConfig {
 pub struct NativeSerializer;
 
 impl Encoder<Event> for NativeSerializer {
-    type Error = crate::Error;
+    type Error = vector_core::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let array = EventArray::from(event);

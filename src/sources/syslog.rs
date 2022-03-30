@@ -2,10 +2,14 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
+#[cfg(unix)]
+use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;
-#[cfg(unix)]
-use codecs::Decoder;
+use codecs::{
+    decoding::{Deserializer, Framer},
+    BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -15,11 +19,6 @@ use tokio_util::udp::UdpFramed;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    codecs::{
-        self,
-        decoding::{Deserializer, Framer},
-        BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
-    },
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -190,11 +189,11 @@ struct SyslogTcpSource {
 impl TcpSource for SyslogTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
             Deserializer::Syslog(SyslogDeserializer),
         )
@@ -236,7 +235,7 @@ pub fn udp(
 
         let mut stream = UdpFramed::new(
             socket,
-            codecs::Decoder::new(
+            Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
                 Deserializer::Syslog(SyslogDeserializer),
             ),
@@ -310,10 +309,11 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 #[cfg(test)]
 mod test {
     use chrono::prelude::*;
+    use codecs::decoding::format::Deserializer;
     use vector_common::assert_event_data_eq;
 
     use super::*;
-    use crate::{codecs::decoding::format::Deserializer, config::log_schema, event::Event};
+    use crate::{config::log_schema, event::Event};
 
     fn event_from_bytes(
         host_key: &str,

@@ -1,8 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-
-use crate::{event::Event, schema};
+use vector_core::{event::Event, schema};
 
 /// Config used to build a `JsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -39,7 +38,7 @@ impl JsonSerializer {
 }
 
 impl Encoder<Event> for JsonSerializer {
-    type Error = crate::Error;
+    type Error = vector_core::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
@@ -55,9 +54,9 @@ impl Encoder<Event> for JsonSerializer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Value;
     use bytes::BytesMut;
     use vector_common::btreemap;
+    use vector_core::event::Value;
 
     #[test]
     fn serialize_json() {

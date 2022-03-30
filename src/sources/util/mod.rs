@@ -1,10 +1,5 @@
 #[cfg(any(feature = "sources-http"))]
 mod body_decoding;
-#[cfg(any(
-    all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "codecs",
-))]
-mod codecs;
 mod encoding_config;
 #[cfg(any(
     feature = "sources-file",
@@ -32,11 +27,7 @@ mod unix_stream;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
 mod wrappers;
 
-#[cfg(any(
-    all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "codecs",
-))]
-pub use codecs::StreamDecodingError;
+#[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]

@@ -1,4 +1,4 @@
-use crate::{config::log_schema, event::Event, schema};
+use vector_core::{config::log_schema, event::Event, schema};
 
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl RawMessageSerializer {
 }
 
 impl Encoder<Event> for RawMessageSerializer {
-    type Error = crate::Error;
+    type Error = vector_core::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();

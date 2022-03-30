@@ -1,4 +1,5 @@
 use bytes::{Bytes, BytesMut};
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
@@ -9,7 +10,7 @@ use super::{BoxedFramingError, CharacterDelimitedDecoder};
 pub struct NewlineDelimitedDecoderConfig {
     #[serde(
         default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
     /// Options for the newline delimited decoder.
     pub newline_delimited: NewlineDelimitedDecoderOptions,
@@ -22,7 +23,7 @@ pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 
