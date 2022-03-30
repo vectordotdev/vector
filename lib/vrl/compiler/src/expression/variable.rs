@@ -5,8 +5,9 @@ use diagnostic::{DiagnosticError, Label};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
+    state::{ExternalEnv, LocalEnv},
     vm::{self, OpCode, Vm},
-    Context, Expression, Span, State, TypeDef, Value,
+    Context, Expression, Span, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,11 +17,11 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub(crate) fn new(span: Span, ident: Ident, state: &State) -> Result<Self, Error> {
-        let value = match state.variable(&ident) {
+    pub(crate) fn new(span: Span, ident: Ident, local: &LocalEnv) -> Result<Self, Error> {
+        let value = match local.variable(&ident) {
             Some(variable) => variable.value.as_ref().cloned(),
             None => {
-                let idents = state
+                let idents = local
                     .variable_idents()
                     .map(|s| s.to_owned())
                     .collect::<Vec<_>>();
@@ -54,8 +55,8 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        state
+    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        local
             .variable(&self.ident)
             .cloned()
             .map(|d| d.type_def)
@@ -65,7 +66,7 @@ impl Expression for Variable {
     fn compile_to_vm(
         &self,
         vm: &mut Vm,
-        _state: &mut crate::state::Compiler,
+        _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         vm.write_opcode(OpCode::GetPath);
 
