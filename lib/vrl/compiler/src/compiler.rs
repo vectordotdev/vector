@@ -413,7 +413,11 @@ impl<'a> Compiler<'a> {
         FunctionArgument::new(ident, expr)
     }
 
-    fn compile_variable(&mut self, node: Node<ast::Ident>, _external: &mut ExternalEnv) -> Variable {
+    fn compile_variable(
+        &mut self,
+        node: Node<ast::Ident>,
+        _external: &mut ExternalEnv,
+    ) -> Variable {
         let (span, ident) = node.take();
 
         Variable::new(span, ident.clone(), &self.local).unwrap_or_else(|err| {
