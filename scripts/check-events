@@ -215,7 +215,9 @@ Find.find('.') do |path|
           parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
                          .map { |assignment, simple| assignment or simple }
 
-          $all_events[event_name].add_log(type, raw_message, parameters)
+          message = raw_message.nil? ? var_message : raw_message
+
+          $all_events[event_name].add_log(type, message, parameters)
         end
       end
     end
