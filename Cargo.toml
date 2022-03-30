@@ -228,7 +228,6 @@ derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.5", default-features = false }
 encoding_rs = { version = "0.8.30", features = ["serde"] }
-evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.21", default-features = false }
@@ -246,7 +245,8 @@ indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] 
 infer = { version = "0.7.0", default-features = false, optional = true}
 indoc = { version = "1.0.4", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
-k8s-openapi = { version = "0.14.0", default-features = true, features = ["api", "v1_16"], optional = true }
+k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
+kube = { version = "0.69.1", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.3", default-features = false, optional = true }
@@ -379,7 +379,7 @@ unix = ["tikv-jemallocator"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
-kubernetes = ["k8s-openapi", "evmap"]
+kubernetes = ["k8s-openapi", "kube"]
 
 docker = ["dirs-next"]
 
