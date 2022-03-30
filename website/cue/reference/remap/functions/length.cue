@@ -25,7 +25,7 @@ remap: functions: length: {
 		rules: [
 			"If `value` is an array, returns the number of elements.",
 			"If `value` is an object, returns the number of top-level keys.",
-			"If `value` is a string, retruns the number of bytes in the string.",
+			"If `value` is a string, returns the number of bytes in the string.",
 		]
 	}
 
