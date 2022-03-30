@@ -39,6 +39,16 @@ pub struct CharacterDelimitedDecoderOptions {
     max_length: Option<usize>,
 }
 
+impl CharacterDelimitedDecoderOptions {
+    #[cfg(test)]
+    pub(crate) fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+        Self {
+            delimiter,
+            max_length,
+        }
+    }
+}
+
 /// A decoder for handling bytes that are delimited by (a) chosen character(s).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {

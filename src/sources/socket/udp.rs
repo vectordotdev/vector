@@ -31,11 +31,11 @@ use crate::{
 pub struct UdpConfig {
     address: SocketAddr,
     #[serde(default = "crate::serde::default_max_length")]
-    max_length: usize,
+    pub(super) max_length: usize,
     host_key: Option<String>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default = "default_framing_message_based")]
-    framing: FramingConfig,
+    pub(super) framing: FramingConfig,
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
@@ -92,7 +92,7 @@ pub fn udp(
             .expect("Failed to bind to udp listener socket");
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes + 1) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
@@ -105,9 +105,10 @@ pub fn udp(
 
         info!(message = "Listening.", address = %address);
 
-        let mut buf = BytesMut::with_capacity(max_length);
+        // We add 1 to the max_length in order to determine if the received data has been truncated.
+        let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
-            buf.resize(max_length, 0);
+            buf.resize(max_length + 1, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
@@ -121,37 +122,52 @@ pub fn udp(
                     emit!(BytesReceived { byte_size, protocol: "udp" });
 
                     let payload = buf.split_to(byte_size);
+                    let truncated = byte_size == max_length + 1;
 
-                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
+                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
+                        let last = Pin::new(&mut stream).peek().await.is_none();
                         match result {
                             Ok((mut events, _byte_size)) => {
-                                let count = events.len();
-                                emit!(SocketEventsReceived {
-                                    mode: SocketMode::Udp,
-                                    byte_size: events.size_of(),
-                                    count,
-                                });
 
-                                let now = Utc::now();
-
-                                for event in &mut events {
-                                    if let Event::Log(ref mut log) = event {
-                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-                                        log.try_insert(log_schema().timestamp_key(), now);
-                                        log.try_insert(host_key.as_str(), address.to_string());
-                                    }
+                                if last && truncated {
+                                    // The last event in this payload was truncated, so we want to drop it.
+                                    let _ = events.pop();
+                                    warn!(
+                                        message = "Discarding frame larger than max_length.",
+                                        max_length = max_length,
+                                        internal_log_rate_secs = 30
+                                    );
                                 }
 
-                                tokio::select!{
-                                    result = out.send_batch(events) => {
-                                        if let Err(error) = result {
-                                            emit!(StreamClosedError { error, count });
-                                            return Ok(())
+                                if !events.is_empty() {
+                                    let count = events.len();
+                                    emit!(SocketEventsReceived {
+                                        mode: SocketMode::Udp,
+                                        byte_size: events.size_of(),
+                                        count,
+                                    });
+
+                                    let now = Utc::now();
+
+                                    for event in &mut events {
+                                        if let Event::Log(ref mut log) = event {
+                                            log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                            log.try_insert(log_schema().timestamp_key(), now);
+                                            log.try_insert(host_key.as_str(), address.to_string());
                                         }
                                     }
-                                    _ = &mut shutdown => return Ok(()),
+
+                                    tokio::select!{
+                                        result = out.send_batch(events) => {
+                                            if let Err(error) = result {
+                                                emit!(StreamClosedError { error, count });
+                                                return Ok(())
+                                            }
+                                        }
+                                        _ = &mut shutdown => return Ok(()),
+                                    }
                                 }
                             }
                             Err(error) => {
