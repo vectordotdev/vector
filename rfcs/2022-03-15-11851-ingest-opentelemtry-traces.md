@@ -9,14 +9,14 @@ adjustement required for future extension to other trace types.
 - `datadog_traces` sink supports emitting traces to Datadog
 - OpenTelemetry traces are already supported by Datadog:
   - Either with the [Datadog exporter][otlp-dd-exporter] using the Opentelemetry collector (without the `trace-agent`)
-  - Or with the `trace-agent` [configured to receive OpenTelemtry traces][otlp-traces-with-dd-agent] (both grpc and http
-    transport layer are supported
+  - Or with the `trace-agent` [configured to receive OpenTelemetry traces][otlp-traces-with-dd-agent] (both gRPC and HTTP
+    transport layer are supported)
 
 ### Usecases
 
 As the whole traces processing inside Vector is pretty new, documenting confirmed and most credible use cases in the
 near future will help to ensure changes will be implemented so they will be really useful to potential users. This also
-help to build something flexible enought to acomodate future needs.
+help to build something flexible enough to accommodate future needs.
 
 One identified scenario is to demux a trace flow based on some conditions that could be evaluated against any metadata
 for a single trace, a group of traces or per spans. From a config perspective this would expect to be functional with
@@ -58,7 +58,7 @@ this also involve evaluating a VRL condition on traces. The key problem here is 
 way that the user can still manipulate those easily.
 
 This however raises the case of the granularity of a single event ; for instance multiple traces can bundles into a
-single payload in both OpenTelemetry and Datadog wire format. Enabling clear processing withou ambiguity advocate for a
+single payload in both OpenTelemetry and Datadog wire format. Enabling clear processing without ambiguity advocate for a
 clear constraint that should be enforced by all future traces sources : **a single Vector event shall not hold data
 relative to more that one trace**.
 
@@ -284,7 +284,7 @@ JSON) and include the resulting value into the tags (a.k.a Meta) map.
 
 This makes the opposite conversion a bit complicated if we want it to be completely symetrical but there was already an
 [attempt][otlp-dd-trace-receiver] allow Datadog traces ingestion in the OpenTelemetry collector. While this PR was
-closee unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
+closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
 some of the OpenTelemetry contruct ends up being stored as tags or annotations in other formats.
 
 Anyway the OpenTelemtry to Datadog traces conversion is dictacted by existing implementation in both the `trace-agent`
