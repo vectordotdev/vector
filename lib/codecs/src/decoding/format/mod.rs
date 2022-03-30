@@ -7,21 +7,21 @@ mod bytes;
 mod json;
 mod native;
 mod native_json;
-#[cfg(feature = "sources-syslog")]
+#[cfg(feature = "syslog")]
 mod syslog;
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
-#[cfg(feature = "sources-syslog")]
+#[cfg(feature = "syslog")]
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
 
-use crate::event::Event;
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 use smallvec::SmallVec;
 use std::fmt::Debug;
+use vector_core::event::Event;
 
 /// Parse structured events from bytes.
 pub trait Deserializer: DynClone + Debug + Send + Sync {
@@ -31,7 +31,7 @@ pub trait Deserializer: DynClone + Debug + Send + Sync {
     /// frame can potentially hold multiple events, e.g. when parsing a JSON
     /// array. However, we optimize the most common case of emitting one event
     /// by not requiring heap allocations for it.
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>>;
+    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>>;
 }
 
 dyn_clone::clone_trait_object!(Deserializer);

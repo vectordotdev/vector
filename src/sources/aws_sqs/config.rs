@@ -1,14 +1,15 @@
 use crate::aws::aws_sdk::create_client;
+use crate::codecs::DecodingConfig;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
 
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
 use std::cmp;
 

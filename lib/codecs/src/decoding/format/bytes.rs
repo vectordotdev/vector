@@ -2,13 +2,13 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
-
-use super::Deserializer;
-use crate::{
+use vector_core::{
     config::log_schema,
     event::{Event, LogEvent},
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `BytesDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -60,7 +60,7 @@ impl BytesDeserializer {
 }
 
 impl Deserializer for BytesDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
         let mut log = LogEvent::default();
         log.insert(self.log_schema_message_key, bytes);
         Ok(smallvec![log.into()])
@@ -70,7 +70,7 @@ impl Deserializer for BytesDeserializer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::log_schema;
+    use vector_core::config::log_schema;
 
     #[test]
     fn deserialize_bytes() {

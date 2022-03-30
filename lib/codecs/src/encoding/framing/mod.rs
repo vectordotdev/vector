@@ -51,18 +51,3 @@ dyn_clone::clone_trait_object!(Framer);
 
 /// A `Box` containing a `Framer`.
 pub type BoxedFramer = Box<dyn Framer>;
-
-/// Define options for a framer and build it from the config object.
-///
-/// Implementors must annotate the struct with `#[typetag::serde(name = "...")]`
-/// to define which value should be read from the `method` key to select their
-/// implementation.
-#[typetag::serde(tag = "method")]
-pub trait FramingConfig: Debug + DynClone + Send + Sync {
-    /// Builds a framer from this configuration.
-    ///
-    /// Fails if the configuration is invalid.
-    fn build(&self) -> crate::Result<BoxedFramer>;
-}
-
-dyn_clone::clone_trait_object!(FramingConfig);
