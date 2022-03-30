@@ -5,13 +5,14 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,

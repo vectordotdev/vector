@@ -3,20 +3,23 @@ use std::{io, thread};
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    codecs::DecodingConfig,
     config::{
         log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 

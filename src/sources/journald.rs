@@ -11,6 +11,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
+use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
 use futures::{future, stream::BoxStream, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
@@ -30,7 +31,6 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,

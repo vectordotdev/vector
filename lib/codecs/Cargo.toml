@@ -1,0 +1,32 @@
+[package]
+name = "codecs"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+bytes = { version = "1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+derivative = { version = "2", default-features = false }
+dyn-clone = { version = "1", default-features = false }
+memchr = { version = "2", default-features = false }
+prost = { version = "0.9", default-features = false, features = ["std"] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = { version = "1", default-features = false }
+smallvec = { version = "1", default-features = false, features = ["union"] }
+syslog_loose = { version = "0.16", default-features = false, optional = true }
+tokio-util = { version = "0.6", default-features = false, features = ["codec"] }
+tracing = { version = "0.1", default-features = false }
+value = { path = "../value", default-features = false }
+vector_common = { path = "../vector-common", default-features = false }
+vector_core = { path = "../vector-core", default-features = false }
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false }
+indoc = { version = "1", default-features = false }
+tokio = { version = "1", features = ["test-util"] }
+pretty_assertions = "1"
+
+[features]
+syslog = ["syslog_loose"]

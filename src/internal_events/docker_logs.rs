@@ -34,10 +34,6 @@ impl<'a> InternalEvent for DockerLogsEventsReceived<'a> {
             "events_in_total", 1,
             "container_name" => self.container_name.to_owned()
         );
-        counter!(
-            "processed_bytes_total", self.byte_size as u64,
-            "container_name" => self.container_name.to_owned()
-        );
     }
 }
 

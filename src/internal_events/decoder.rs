@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DecoderFramingFailed<'a> {
-    pub error: &'a crate::codecs::decoding::BoxedFramingError,
+    pub error: &'a codecs::decoding::BoxedFramingError,
 }
 
 impl<'a> InternalEvent for DecoderFramingFailed<'a> {
@@ -27,7 +27,7 @@ impl<'a> InternalEvent for DecoderDeserializeFailed<'a> {
 
 #[derive(Debug)]
 pub struct EncoderFramingFailed<'a> {
-    pub error: &'a crate::codecs::encoding::BoxedFramingError,
+    pub error: &'a codecs::encoding::BoxedFramingError,
 }
 
 impl<'a> InternalEvent for EncoderFramingFailed<'a> {

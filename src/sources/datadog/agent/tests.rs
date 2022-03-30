@@ -7,6 +7,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use codecs::{
+    decoding::{Deserializer, DeserializerConfig, Framer},
+    BytesDecoder, BytesDeserializer,
+};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
@@ -16,11 +20,6 @@ use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{Deserializer, DeserializerConfig, Framer},
-        BytesDecoder, BytesDeserializer,
-    },
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
@@ -89,7 +88,7 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-        let decoder = codecs::Decoder::new(
+        let decoder = crate::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
             Deserializer::Bytes(BytesDeserializer::new()),
         );
