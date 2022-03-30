@@ -8,11 +8,13 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../vrl" }
-lookup_lib = {package = "lookup", path = "../../lookup" }
-datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+value = { path = "../../value", default-features = false }
+
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
-value = { path = "../../value"}
+datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"], optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -43,7 +45,6 @@ roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
 utf8-width = { version = "0.1.6", optional = true }
-vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [dev-dependencies]
 anyhow = "1"
@@ -205,7 +206,7 @@ floor = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
-get = []
+get = ["lookup_lib"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
@@ -235,7 +236,7 @@ log = ["tracing"]
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex", "lookup_lib"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
@@ -269,11 +270,11 @@ parse_user_agent = ["woothee","uaparser","once_cell"]
 parse_xml = ["roxmltree", "once_cell", "regex"]
 push = []
 redact = ["once_cell", "regex"]
-remove = ["vector_common/btreemap"]
+remove = ["vector_common/btreemap", "lookup_lib"]
 replace = ["regex"]
 reverse_dns = ["dns-lookup"]
 round = []
-set = ["vector_common/btreemap"]
+set = ["vector_common/btreemap", "lookup_lib"]
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
@@ -299,7 +300,7 @@ to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
 unique = ["indexmap"]
-unnest = []
+unnest = ["lookup_lib"]
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 
