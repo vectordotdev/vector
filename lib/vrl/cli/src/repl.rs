@@ -165,7 +165,7 @@ fn execute(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
-    let mut state = ExternalEnv::default().into();
+    let mut state = ExternalEnv::default();
 
     match vrl_runtime {
         VrlRuntime::Vm => {
