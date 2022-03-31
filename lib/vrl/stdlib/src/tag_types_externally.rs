@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use vector_common::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -120,10 +119,7 @@ fn tag_type_externally(value: Value) -> Value {
     };
 
     if let Some(key) = key {
-        (btreemap! {
-            key => value
-        })
-        .into()
+        BTreeMap::from([(key.to_owned(), value)]).into()
     } else {
         value
     }
