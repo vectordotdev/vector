@@ -33,3 +33,4 @@ VOLUME /var/lib/vector/
 RUN ["vector", "--version"]
 
 ENTRYPOINT ["/usr/bin/vector"]
+

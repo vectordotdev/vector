@@ -1,13 +1,11 @@
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DeserializerConfig, FramingConfig},
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
@@ -143,11 +141,11 @@ impl TcpConfig {
 #[derive(Debug, Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl RawTcpSource {
-    pub const fn new(config: TcpConfig, decoder: codecs::Decoder) -> Self {
+    pub const fn new(config: TcpConfig, decoder: Decoder) -> Self {
         Self { config, decoder }
     }
 }
@@ -155,7 +153,7 @@ impl RawTcpSource {
 impl TcpSource for RawTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
