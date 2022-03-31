@@ -47,7 +47,7 @@ architectures:
 ### 3. Agent Architecture
 
 The [agent architecture][agent_architecture] deploys Vector on each individual
-node for local data collection. The following requirements define suppoprt for
+node for local data collection. The following requirements define support for
 this architecture:
 
 * Architecture
@@ -66,6 +66,10 @@ this architecture:
   * SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
 
 ### 4. Aggregator Architecture
+
+The [aggregator architecture][aggregator_architecture] deploys Vector onto 
+dedicated nodes for data aggregation. The following requirements define support
+for this architecture:
 
 * Architecture
   * MUST deploy as a stateful service on dedicated nodes, Vector is the only
@@ -135,7 +139,7 @@ both the agent and aggregator separately and integrate them by default?
     * Vector's configuration directory SHOULD be read restricted to Vector's
       service account.
   * Vector's runtime
-    * Vector MUST be run under an unprivileged, deciated service account by
+    * Vector SHOULD be run under an unprivileged, deciated service account by
       default.
     * Vector's service account SHOULD NOT have the ability to overwrite Vector's
       binary or configuration files. The only directory the Vector service
@@ -145,11 +149,14 @@ both the agent and aggregator separately and integrate them by default?
 
 ## 7. Sizing & Scaling
 
-[agent_architecture]: https://www.notion.so/Agent-Architecture-3e3c9950398f4f349dff9e83ac6dea83
-[agent_architecture_design]: ...
-[default_agent_configuration]: ...
-[default_aggregator_configuration]: ...
-[hardening]: https://www.notion.so/Hardening-1fcce789ceaa4ea1ac9bc39112ee7224
-[high_availability]: https://www.notion.so/High-Availability-b2a44d37e88a4bae83677139b3979872
-[reference_architectures]: https://www.notion.so/08e711506fd446be947ce0674dfc370e?v=43ee3d19efbb4b34b55593ce9761e9bc
-[terminology_document]: ...
+[agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
+[agent_architecture_design]: TODO...
+[aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
+[default_agent_configuration]: TODO...
+[default_aggregator_configuration]: TODO...
+[hardening]: https://vector.dev/docs/setup/going-to-prod/hardening/
+[high_availability]: https://vector.dev/docs/setup/going-to-prod/high-availability/
+[reference_architectures]: https://vector.dev/docs/setup/going-to-prod/arch/
+[RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
+[terminology_document]: TODO...
+[unified_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/unified/
