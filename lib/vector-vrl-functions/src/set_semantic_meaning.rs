@@ -52,7 +52,7 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        _state: (&state::LocalEnv, &state::ExternalEnv),
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {

@@ -33,7 +33,7 @@ impl Function for GetMetadataField {
 
     fn compile(
         &self,
-        _state: (&state::LocalEnv, &state::ExternalEnv),
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
