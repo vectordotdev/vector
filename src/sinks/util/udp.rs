@@ -19,8 +19,8 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
-        UdpSocketConnectionFailed, UdpSocketError,
+        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
+        UdpSocketConnectionEstablished, UdpSocketError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -145,7 +145,7 @@ impl UdpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketConnectionFailed { error });
+                    emit!(UdpSocketConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -283,7 +283,7 @@ impl StreamSink<Event> for UdpSink {
 async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
     let sent = socket.send(buf).await?;
     if sent != buf.len() {
-        emit!(UdpSendIncomplete {
+        emit!(UdpSendIncompleteError {
             data_size: buf.len(),
             sent,
         });
