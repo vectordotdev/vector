@@ -151,7 +151,7 @@ pub fn udp(
                                         log.try_insert(host_key.as_str(), address.ip().to_string());
 
                                         if let Some(port_key) = &port_key {
-                                            log.try_insert(port_key.as_str(), address.port().to_string());
+                                            log.try_insert(port_key.as_str(), address.port());
                                         }
                                     }
                                 }

@@ -181,7 +181,7 @@ impl TcpSource for RawTcpSource {
 
                 log.try_insert(host_key, host.ip().to_string());
                 if let Some(port_key) = &self.config.port_key {
-                    log.try_insert(port_key.as_str(), host.port().to_string());
+                    log.try_insert(port_key.as_str(), host.port());
                 }
             }
         }

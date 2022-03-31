@@ -141,9 +141,25 @@ components: sources: socket: {
 	output: logs: line: {
 		description: "A single socket event."
 		fields: {
-			host:      fields._local_host
+			host: {
+				description: "The peer host IP address."
+				required:    true
+				type: string: {
+					examples: ["129.21.31.122"]
+				}
+			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			port: {
+				description: "The peer port."
+				required:    false
+				common:      true
+				type: uint: {
+					default: null
+					unit:    null
+					examples: [2838]
+				}
+			}
 		}
 	}
 
