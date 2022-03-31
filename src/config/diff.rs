@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use super::{ComponentKey, Config};
 
+#[derive(Debug)]
 pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
@@ -32,8 +33,28 @@ impl ConfigDiff {
         self.sinks.flip();
         self
     }
+
+    /// Checks whether or not the given component is present at all.
+    pub fn contains(&self, key: &ComponentKey) -> bool {
+        self.sources.contains(key) || self.transforms.contains(key) || self.sinks.contains(key)
+    }
+
+    /// Checks whether or not the given component is changed.
+    pub fn is_changed(&self, key: &ComponentKey) -> bool {
+        self.sources.is_changed(key)
+            || self.transforms.is_changed(key)
+            || self.sinks.is_changed(key)
+    }
+
+    /// Checks whether or not the given component is removed.
+    pub fn is_removed(&self, key: &ComponentKey) -> bool {
+        self.sources.is_removed(key)
+            || self.transforms.is_removed(key)
+            || self.sinks.is_removed(key)
+    }
 }
 
+#[derive(Debug)]
 pub struct Difference {
     pub to_remove: HashSet<ComponentKey>,
     pub to_change: HashSet<ComponentKey>,
@@ -71,9 +92,34 @@ impl Difference {
         }
     }
 
-    /// True if name is present in new config and either not in the old one or is different.
+    /// Checks whether or not any components are being changed or added.
+    pub fn any_changed_or_added(&self) -> bool {
+        !(self.to_change.is_empty() && self.to_add.is_empty())
+    }
+
+    /// Checks whether or not any components are being changed or removed.
+    pub fn any_changed_or_removed(&self) -> bool {
+        !(self.to_change.is_empty() && self.to_remove.is_empty())
+    }
+
+    /// Checks whether the given component is present at all.
+    pub fn contains(&self, id: &ComponentKey) -> bool {
+        self.to_add.contains(id) || self.to_change.contains(id) || self.to_remove.contains(id)
+    }
+
+    /// Checks whether the given component is present as a change or addition.
     pub fn contains_new(&self, id: &ComponentKey) -> bool {
         self.to_add.contains(id) || self.to_change.contains(id)
+    }
+
+    /// Checks whether or not the given component is changed.
+    pub fn is_changed(&self, key: &ComponentKey) -> bool {
+        self.to_change.contains(key)
+    }
+
+    /// Checks whether or not the given component is removed.
+    pub fn is_removed(&self, key: &ComponentKey) -> bool {
+        self.to_remove.contains(key)
     }
 
     fn flip(&mut self) {

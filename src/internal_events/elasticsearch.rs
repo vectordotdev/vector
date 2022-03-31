@@ -4,19 +4,6 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ElasticsearchEventEncoded {
-    pub byte_size: usize,
-    pub index: String,
-}
-
-impl InternalEvent for ElasticsearchEventEncoded {
-    fn emit(self) {
-        trace!(message = "Inserting event.", index = %self.index);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct ElasticsearchResponseError<'a> {
     response: &'a Response<bytes::Bytes>,
     message: &'static str,

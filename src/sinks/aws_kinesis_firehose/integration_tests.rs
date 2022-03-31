@@ -84,7 +84,9 @@ async fn firehose_put_records() {
         }),
         ..Default::default()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
 
     let client = reqwest::Client::builder()
         .build()

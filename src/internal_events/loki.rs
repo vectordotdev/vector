@@ -12,17 +12,6 @@ impl InternalEvent for LokiEventUnlabeled {
 }
 
 #[derive(Debug)]
-pub struct LokiEventsProcessed {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for LokiEventsProcessed {
-    fn emit(self) {
-        counter!("processed_bytes_total", self.byte_size as u64); // deprecated
-    }
-}
-
-#[derive(Debug)]
 pub struct LokiUniqueStream;
 
 impl InternalEvent for LokiUniqueStream {
