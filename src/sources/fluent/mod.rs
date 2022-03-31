@@ -1,13 +1,14 @@
 use std::io::{self, Read};
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
