@@ -1,14 +1,9 @@
 use vrl::prelude::*;
 
 fn strlen(value: Value) -> Resolved {
-    match value {
-        Value::Bytes(v) => Ok(String::from_utf8_lossy(&v).chars().count().into()),
-        value => Err(value::Error::Expected {
-            got: value.kind(),
-            expected: Kind::bytes(),
-        }
-        .into()),
-    }
+    let v = value.try_bytes()?;
+
+    Ok(String::from_utf8_lossy(&v).chars().count().into())
 }
 
 #[derive(Clone, Copy, Debug)]
