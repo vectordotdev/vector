@@ -353,8 +353,8 @@ N/A
 ## Plan Of Attack
 
 - [ ] Implement traces normalisation/schema
-- [ ] `opentelemetry`, grpc mode
-- [ ] `opentelemetry`, http mode
+- [ ] `opentelemetry` source, gRPC mode
+- [ ] `opentelemetry` source, HTTP mode
 - [ ] APM stats computation
 
 ## Future Improvements
