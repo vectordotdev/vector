@@ -18,3 +18,6 @@ rustup run stable cargo install cargo-nextest --version 0.9.8
 
 # Install some required dependencies / tools.
 choco install make strawberryperl
+
+# Update our path so that Strawberry Perl gets used for the build.
+echo "C:\Strawberry\perl\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
