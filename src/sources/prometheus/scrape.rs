@@ -97,14 +97,12 @@ impl SourceConfig for PrometheusScrapeConfig {
                 if let Ok(uri) = r {
                     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
                     if let Some(query) = uri.query() {
-                        for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
-                            serializer.append_pair(&k, &v);
-                        }
+                        serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
                     };
                     if let Some(query) = &self.query {
                         for (k, l) in query {
                             for v in l {
-                                serializer.append_pair(&k, &v);
+                                serializer.append_pair(k, v);
                             }
                         }
                     };
