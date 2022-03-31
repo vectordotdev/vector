@@ -6,6 +6,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -22,10 +26,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
@@ -34,7 +35,6 @@ use crate::{
     },
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -238,7 +238,7 @@ async fn run_scheduled(
     config: ExecConfig,
     hostname: Option<String>,
     exec_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -264,14 +264,14 @@ async fn run_scheduled(
         match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailedError {
+                    emit!(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(error) => {
-                emit!(&ExecTimeoutError {
+                emit!(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                     error,
@@ -289,7 +289,7 @@ async fn run_streaming(
     hostname: Option<String>,
     respawn_on_exit: bool,
     respawn_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -309,7 +309,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailedError {
+                        emit!(ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -331,7 +331,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailedError {
+            emit!(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -344,7 +344,7 @@ async fn run_streaming(
 async fn run_command(
     config: ExecConfig,
     hostname: Option<String>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
@@ -388,7 +388,7 @@ async fn run_command(
 
     while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
         let count = events.len();
-        emit!(&ExecEventsReceived {
+        emit!(ExecEventsReceived {
             count,
             command: config.command_line().as_str(),
             byte_size: events.size_of(),
@@ -398,7 +398,7 @@ async fn run_command(
             handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
         }
         if let Err(error) = out.send_batch(events).await {
-            emit!(&StreamClosedError { count, error });
+            emit!(StreamClosedError { count, error });
             break;
         }
     }
@@ -428,7 +428,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(&ExecCommandExecuted {
+    emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -503,7 +503,7 @@ fn handle_event(
 
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     origin: &'static str,
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
@@ -628,7 +628,7 @@ mod tests {
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let decoder = codecs::Decoder::default();
+        let decoder = crate::codecs::Decoder::default();
         let (sender, mut receiver) = channel(1024);
 
         spawn_reader_thread(reader, decoder, STDOUT, sender);

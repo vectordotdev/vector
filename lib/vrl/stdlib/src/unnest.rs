@@ -1,6 +1,48 @@
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
+fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
+    let path_path = path.path();
+    let value: Value;
+    let target: Box<&dyn Target> = match path.target() {
+        expression::Target::External => Box::new(ctx.target()) as Box<_>,
+        expression::Target::Internal(v) => {
+            let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
+            Box::new(v as &dyn Target) as Box<_>
+        }
+        expression::Target::Container(expr) => {
+            value = expr.resolve(ctx)?;
+            Box::new(&value as &dyn Target) as Box<&dyn Target>
+        }
+        expression::Target::FunctionCall(expr) => {
+            value = expr.resolve(ctx)?;
+            Box::new(&value as &dyn Target) as Box<&dyn Target>
+        }
+    };
+    let root = target
+        .target_get(&LookupBuf::root())
+        .expect("must never fail")
+        .expect("always a value");
+    let values = root
+        .get_by_path(path_path)
+        .cloned()
+        .ok_or(value::Error::Expected {
+            got: Kind::null(),
+            expected: Kind::array(Collection::any()),
+        })?
+        .try_array()?;
+    let events = values
+        .into_iter()
+        .map(|value| {
+            let mut event = root.clone();
+            event.insert_by_path(path_path, value);
+            event
+        })
+        .collect::<Vec<_>>();
+
+    Ok(Value::Array(events))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Unnest;
 
@@ -52,6 +94,40 @@ impl Function for Unnest {
 
         Ok(Box::new(UnnestFn { path }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("path", Some(expr)) => {
+                let query = match expr {
+                    expression::Expr::Query(query) => query,
+                    _ => {
+                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
+                            keyword: "path",
+                            expected: "query",
+                            expr: expr.clone(),
+                        }))
+                    }
+                };
+
+                Ok(Some(Box::new(query.clone()) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let path = args
+            .required_any("path")
+            .downcast_ref::<expression::Query>()
+            .unwrap();
+        unnest(path, ctx)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -75,49 +151,8 @@ impl UnnestFn {
 
 impl Expression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.path.path();
-
-        let value: Value;
-        let target: Box<&dyn Target> = match self.path.target() {
-            expression::Target::External => Box::new(ctx.target()) as Box<_>,
-            expression::Target::Internal(v) => {
-                let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-                Box::new(v as &dyn Target) as Box<_>
-            }
-            expression::Target::Container(expr) => {
-                value = expr.resolve(ctx)?;
-                Box::new(&value as &dyn Target) as Box<&dyn Target>
-            }
-            expression::Target::FunctionCall(expr) => {
-                value = expr.resolve(ctx)?;
-                Box::new(&value as &dyn Target) as Box<&dyn Target>
-            }
-        };
-
-        let root = target
-            .target_get(&LookupBuf::root())
-            .expect("must never fail")
-            .expect("always a value");
-
-        let values = root
-            .get_by_path(path)
-            .cloned()
-            .ok_or(value::Error::Expected {
-                got: Kind::null(),
-                expected: Kind::array(Collection::any()),
-            })?
-            .try_array()?;
-
-        let events = values
-            .into_iter()
-            .map(|value| {
-                let mut event = root.clone();
-                event.insert_by_path(path, value);
-                event
-            })
-            .collect::<Vec<_>>();
-
-        Ok(Value::Array(events))
+        let path = &self.path;
+        unnest(path, ctx)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

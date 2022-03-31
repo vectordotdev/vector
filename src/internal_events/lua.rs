@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
@@ -8,12 +8,10 @@ pub struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("lua_memory_used_bytes", self.used_memory as f64);
     }
 }
-
-pub const SCRIPT_FAILED: &str = "script_failed";
 
 #[derive(Debug)]
 pub struct LuaScriptError {
@@ -21,27 +19,25 @@ pub struct LuaScriptError {
 }
 
 impl InternalEvent for LuaScriptError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = SCRIPT_FAILED,
+            error_code = "execution",
+            error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "execution",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "execution",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -55,27 +51,24 @@ pub struct LuaBuildError {
 }
 
 impl InternalEvent for LuaBuildError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error in lua script; discarding event.",
             error = ?self.error,
-            error_type = SCRIPT_FAILED,
+            error_type = error_type::SCRIPT_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "build",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
-            "error" => self.error.to_string(),
-            "error_type" => SCRIPT_FAILED,
+            "error_code" => "build",
+            "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated

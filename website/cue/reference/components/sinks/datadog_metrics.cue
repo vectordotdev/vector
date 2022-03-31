@@ -27,7 +27,13 @@ components: sinks: datadog_metrics: {
 				timeout_secs:               60
 				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 			to: {
 				service: services.datadog_metrics
 

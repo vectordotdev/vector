@@ -1,9 +1,10 @@
+use aws_smithy_http::body::SdkBody;
+use bytes::Bytes;
 use std::{fs::File, io::Read};
 
 use chrono::Utc;
 use futures::StreamExt;
 use http::{Request, StatusCode};
-use hyper::Body;
 use serde_json::{json, Value};
 use vector_core::{
     config::log_schema,
@@ -41,37 +42,28 @@ impl ElasticsearchCommon {
             .unwrap();
         let mut builder = Request::post(&url);
 
-        if let Some(credentials_provider) = &self.credentials {
-            let mut request = self.signed_request("POST", &url, true);
-
-            if let Some(ce) = self.compression.content_encoding() {
-                request.add_header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                request.add_header(header, value);
-            }
-
-            builder = finish_signer(&mut request, credentials_provider, builder).await?;
-        } else {
-            if let Some(ce) = self.compression.content_encoding() {
-                builder = builder.header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                builder = builder.header(&header[..], &value[..]);
-            }
-
-            if let Some(auth) = &self.authorization {
-                builder = auth.apply_builder(builder);
-            }
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
         }
 
-        let request = builder.body(Body::empty())?;
+        for (header, value) in &self.request.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
+
+        if let Some(auth) = &self.http_auth {
+            builder = auth.apply_builder(builder);
+        }
+
+        let mut request = builder.body(Bytes::new())?;
+
+        if let Some(credentials_provider) = &self.aws_auth {
+            sign_request(&mut request, credentials_provider, &self.region).await?;
+        }
+
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(self.tls_settings.clone(), &proxy)
             .expect("Could not build client to flush");
-        let response = client.send(request).await?;
+        let response = client.send(request.map(SdkBody::from)).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),
@@ -104,8 +96,8 @@ async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crat
     Ok(())
 }
 
-#[test]
-fn ensure_pipeline_in_params() {
+#[tokio::test]
+async fn ensure_pipeline_in_params() {
     let index = gen_index();
     let pipeline = String::from("test-pipeline");
 
@@ -118,7 +110,9 @@ fn ensure_pipeline_in_params() {
         pipeline: Some(pipeline.clone()),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
 
     assert_eq!(common.query_params["pipeline"], pipeline);
 }
@@ -137,7 +131,9 @@ async fn structures_events_correctly() {
         compression: Compression::None,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::new_test();
@@ -303,7 +299,9 @@ async fn insert_events_in_data_stream() {
         }),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&cfg).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&cfg)
+        .await
+        .expect("Config error");
 
     create_template_index(&common, &template_index)
         .await
@@ -348,7 +346,9 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_config(config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(config)
+        .await
+        .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(

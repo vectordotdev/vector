@@ -34,6 +34,10 @@ impl FunctionArgument {
         self.parameter
     }
 
+    pub fn expr(&self) -> &Expr {
+        self.expr.inner()
+    }
+
     pub(crate) fn into_inner(self) -> Expr {
         self.expr.into_inner()
     }

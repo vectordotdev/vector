@@ -17,6 +17,7 @@ pub enum Condition {
     IsLog(is_log::IsLog),
     IsMetric(is_metric::IsMetric),
     Vrl(vrl::Vrl),
+    VrlVm(vrl::VrlVm),
     CheckFields(check_fields::CheckFields),
     DatadogSearch(datadog_search::DatadogSearchRunner),
 
@@ -34,6 +35,7 @@ impl Condition {
             Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
             Condition::Vrl(x) => x.check(e),
+            Condition::VrlVm(x) => x.check(e),
             Condition::AlwaysPass => true,
             Condition::AlwaysFail => false,
         }
@@ -49,6 +51,7 @@ impl Condition {
             Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
+            Condition::VrlVm(x) => x.check_with_context(e),
             Condition::AlwaysPass => Ok(()),
             Condition::AlwaysFail => Ok(()),
         }
@@ -109,7 +112,11 @@ pub enum AnyCondition {
 impl AnyCondition {
     pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
-            AnyCondition::String(s) => VrlConfig { source: s.clone() }.build(enrichment_tables),
+            AnyCondition::String(s) => VrlConfig {
+                source: s.clone(),
+                runtime: Default::default(),
+            }
+            .build(enrichment_tables),
             AnyCondition::Map(m) => m.build(enrichment_tables),
         }
     }
@@ -158,7 +165,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true" })"#,
+            r#"Map(VrlConfig { source: ".nork == true", runtime: Ast })"#,
             format!("{:?}", conf.condition)
         )
     }

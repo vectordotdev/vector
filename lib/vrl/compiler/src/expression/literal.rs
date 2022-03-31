@@ -87,7 +87,11 @@ impl Expression for Literal {
         type_def.infallible()
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        _state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         // Add the literal as a constant.
         let constant = vm.add_constant(self.to_value());
         vm.write_opcode(OpCode::Constant);

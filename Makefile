@@ -337,6 +337,7 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-nats
@@ -357,6 +358,7 @@ tests/data/dnstap/socket:
 
 .PHONY: test-integration-dnstap
 test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-dnstap-cleanup
@@ -366,6 +368,7 @@ test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
@@ -373,7 +376,7 @@ endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
-	@scripts/test-e2e-kubernetes.sh
+	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
@@ -620,10 +623,6 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 .PHONY: test-vrl
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
-
-.PHONY: check-stdlib-features
-check-stdlib-features: ## Ensure VRL stdlib features build
-	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
 
 ##@ Utility
 

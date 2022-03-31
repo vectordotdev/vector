@@ -101,7 +101,7 @@ pub fn render_template_string<'a>(
     template
         .render_string(event)
         .map_err(|error| {
-            emit!(&TemplateRenderingError {
+            emit!(TemplateRenderingError {
                 error,
                 field: Some(field_name),
                 drop_event: false

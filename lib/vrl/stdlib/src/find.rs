@@ -1,6 +1,17 @@
 use ::value::ValueRegex;
 use vrl::prelude::*;
 
+fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {
+    let from = match from {
+        Some(value) => value.try_integer()?,
+        None => 0,
+    } as usize;
+
+    Ok(FindFn::find(value, pattern, from)?
+        .map(|value| Value::Integer(value as i64))
+        .unwrap_or_else(|| Value::Integer(-1)))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
 
@@ -53,6 +64,14 @@ impl Function for Find {
             from,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let pattern = args.required("pattern");
+        let from = args.optional("from");
+
+        find(value, pattern, from)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -101,14 +120,13 @@ impl Expression for FindFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;
-        let from = match &self.from {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 0,
-        } as usize;
+        let from = self
+            .from
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        Ok(Self::find(value, pattern, from)?
-            .map(|value| Value::Integer(value as i64))
-            .unwrap_or_else(|| Value::Integer(-1)))
+        find(value, pattern, from)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

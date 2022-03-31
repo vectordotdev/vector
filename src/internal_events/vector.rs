@@ -11,15 +11,12 @@ pub struct VectorEventReceived {
 }
 
 impl InternalEvent for VectorEventReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = 1,
             byte_size = self.byte_size
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", 1);
         counter!(
             "component_received_event_bytes_total",
@@ -27,7 +24,6 @@ impl InternalEvent for VectorEventReceived {
         );
         // deprecated
         counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -37,19 +33,17 @@ pub struct VectorProtoDecodeError<'a> {
 }
 
 impl<'a> InternalEvent for VectorProtoDecodeError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to decode protobuf message.",
             error = ?self.error,
+            error_code = "protobuf",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
+            "error_code" => "protobuf",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

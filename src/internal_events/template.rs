@@ -9,7 +9,7 @@ pub struct TemplateRenderingError<'a> {
 }
 
 impl<'a> InternalEvent for TemplateRenderingError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
             use std::fmt::Write;
@@ -26,12 +26,8 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::TEMPLATE_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -41,7 +37,6 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         if self.drop_event {
             counter!(
                 "component_discarded_events_total", 1,
-                "error" => self.error.to_string(),
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
