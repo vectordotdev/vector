@@ -15,7 +15,10 @@ badges:
 ---
 
 
-We're thrilled to announce Vector's initial support for log schema, providing
+We're thrilled to announce Vector's initial support for log schemas, which provides
+end-to-end type safety in your pipelines using the `datadog_agent` source and
+`datadog_logs` sink; this early beta release feature will increase your runtime
+correctness and improve VRL ergonomics.
 type safety to your pipeline end-to-end for `datadog_agent` source and
 `datadog_logs` sink; this early beta release feature will increase your runtime
 correctness and improves VRL ergonomics.
