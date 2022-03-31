@@ -101,7 +101,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
         let config = BatchConfig {
             max_bytes: self.max_bytes.or(D::MAX_BYTES),
             max_events: self.max_events.or(D::MAX_EVENTS),
-            timeout_secs: self.timeout_secs.or_else(|| Some(D::TIMEOUT_SECS)),
+            timeout_secs: self.timeout_secs.or(D::TIMEOUT_SECS),
             _d: PhantomData,
             _s: PhantomData,
         };
