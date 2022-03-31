@@ -465,6 +465,15 @@ components: sinks: [Name=string]: {
 				}}
 			}
 		}
+
+		if features.exposes != _|_ {
+			if features.exposes.tls.enabled {
+				tls: configuration._tls_accept & {_args: {
+					can_verify_certificate: features.exposes.tls.can_verify_certificate
+					enabled_default:        features.exposes.tls.enabled_default
+				}}
+			}
+		}
 	}
 
 	how_it_works: {
