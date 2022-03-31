@@ -28,6 +28,15 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_poll_secs()"))]
     pub poll_secs: u32,
 
+    // restricted to u32 for safe conversion to i64 later
+    #[serde(default = "default_visibility_timeout_secs")]
+    #[derivative(Default(value = "default_visibility_timeout_secs()"))]
+    pub(super) visibility_timeout_secs: u32,
+
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub(super) delete_message: bool,
+
     // number of concurrent tasks spawned for receiving/processing SQS messages
     #[serde(default = "default_client_concurrency")]
     #[derivative(Default(value = "default_client_concurrency()"))]
@@ -59,6 +68,8 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
+                visibility_timeout_secs: self.visibility_timeout_secs,
+                delete_message: self.delete_message,
                 acknowledgements,
             }
             .run(cx.out, cx.shutdown),
@@ -97,6 +108,14 @@ const fn default_poll_secs() -> u32 {
 
 fn default_client_concurrency() -> u32 {
     cmp::max(1, num_cpus::get() as u32)
+}
+
+const fn default_visibility_timeout_secs() -> u32 {
+    300
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl_generate_config_from_default!(AwsSqsConfig);
