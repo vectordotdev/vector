@@ -47,7 +47,8 @@ safety. In short, any arbitrary log data that gets sent to a Vector pipeline wil
 need to match a given schema. In this context, we define log schemas as the
 internal knowledge of data types — i.e. metadata — that informs features that
 require type information. This initial log schema support is limited to
-`datadog_agent` source and `datadog_logs` sink.
+`datadog_agent` source and `datadog_logs` sink, but will be expanded
+out to additional sources and sinks soon.
 
 This works by Vector implying a schema of some kind from the log source, then
 enforcing a schema based on the requirements of the sink. On the source side,
