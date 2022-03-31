@@ -240,7 +240,7 @@ fn main() {
                                 failed = true;
                             }
 
-                            println!("");
+                            println!();
                         }
 
                         if cmd.verbose {
@@ -363,11 +363,9 @@ fn run_vrl(
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-    state: vrl::state::ExternalEnv,
+    mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
-    let mut state = state.into();
-
     match vrl_runtime {
         VrlRuntime::Vm => {
             let vm = runtime.compile(functions, &program, &mut state).unwrap();
