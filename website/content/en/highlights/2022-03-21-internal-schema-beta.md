@@ -66,7 +66,7 @@ those reserved attributes live and ensure they are the expected data types.
 
 An added advantage to Vector's log schema support is that it is polymorphic,
 meaning that it is flexible to support a full spectrum of strictness and
-backward compatible. With this release, if your pipeline is using a source
+backwards compatibility
 in a way that does not describe a schema, Vector will now catch and surface
 mapping errors due to data type requirements.
 
