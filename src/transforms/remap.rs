@@ -247,13 +247,13 @@ impl VrlRunner for AstRunner {
 
 impl Remap<VmRunner> {
     pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, state) = config.compile_vrl_program(
+        let (program, functions, mut state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
         let runtime = Runtime::default();
-        let vm = runtime.compile(functions, &program, state)?;
+        let vm = runtime.compile(functions, &program, &mut state)?;
         let runner = VmRunner {
             runtime,
             vm: Arc::new(vm),

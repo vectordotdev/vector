@@ -63,7 +63,7 @@ impl ConditionConfig for VrlConfig {
 
         match self.runtime {
             VrlRuntime::Vm => {
-                let vm = Arc::new(Runtime::default().compile(functions, &program, state)?);
+                let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
                 Ok(Condition::VrlVm(VrlVm {
                     source: self.source.clone(),
                     vm,
