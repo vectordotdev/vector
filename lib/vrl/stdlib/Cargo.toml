@@ -63,6 +63,7 @@ default = [
     "contains",
     "decode_base64",
     "decode_percent",
+    "decrypt",
     "del",
     "downcase",
     "encode_base64",
@@ -70,6 +71,7 @@ default = [
     "encode_key_value",
     "encode_logfmt",
     "encode_percent",
+    "encrypt",
     "ends_with",
     "exists",
     "find",
@@ -188,6 +190,7 @@ compact = []
 contains = []
 decode_base64 = ["base64"]
 decode_percent = ["percent-encoding"]
+decrypt = []
 del = []
 downcase = []
 encode_base64 = ["base64"]
@@ -195,6 +198,7 @@ encode_json = ["serde_json", "value/json", "chrono", "regex"]
 encode_key_value = ["vector_common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
+encrypt = []
 ends_with = []
 exists = []
 find = ["regex"]

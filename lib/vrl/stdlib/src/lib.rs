@@ -27,6 +27,8 @@ mod contains;
 mod decode_base64;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
+#[cfg(feature = "decrypt")]
+mod decrypt;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -41,6 +43,8 @@ mod encode_key_value;
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
 mod encode_percent;
+#[cfg(feature = "encrypt")]
+mod encrypt;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -302,6 +306,8 @@ pub use encode_key_value::EncodeKeyValue;
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
 pub use encode_percent::EncodePercent;
+#[cfg(feature = "encrypt")]
+pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -535,6 +541,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        // #[cfg(feature = "decrypt")]
+        // Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -549,6 +557,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]
         Box::new(EncodePercent),
+        #[cfg(feature = "encrypt")]
+        Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
