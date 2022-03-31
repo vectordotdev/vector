@@ -20,6 +20,7 @@ enumflags2 = { version = "0.7.4", default-features = false }
 float_eq = { version = "0.7", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
+headers = { version = "0.3.7", default-features = false }
 http = { version = "0.2.6", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.0", default-features = false, features = ["serde"] }
@@ -50,6 +51,7 @@ tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.3.9", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
+url = { version = "2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
@@ -61,6 +63,7 @@ vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 prost-build = "0.9"
 
 [dev-dependencies]
+base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
