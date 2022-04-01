@@ -578,21 +578,19 @@ mod test {
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-        let query = HashMap::from([
-            ("key1".to_string(), vec!["val2".to_string()]),
-            (
-                "key2".to_string(),
-                vec!["val1".to_string(), "val2".to_string()],
-            ),
-        ]);
-
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
             scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: Some(query.clone()),
+            query: Some(HashMap::from([
+                ("key1".to_string(), vec!["val2".to_string()]),
+                (
+                    "key2".to_string(),
+                    vec!["val1".to_string(), "val2".to_string()],
+                ),
+            ])),
             auth: None,
             tls: None,
         };
@@ -626,34 +624,17 @@ mod test {
         ]);
 
         for metric in metrics {
-            // note: keys in HashMaps are in undefined order, therefore a
-            // pair of maps must be compared back and forth key-by-key
             if let Some(q) = metric.tag_value("query") {
-                // parse the received textual query into a new HashMap
                 let mut got: HashMap<String, Vec<String>> = HashMap::new();
                 for (k, v) in url::form_urlencoded::parse(q.as_bytes()) {
                     got.entry(k.to_string())
                         .or_insert_with(Vec::new)
                         .push(v.to_string());
                 }
-                // assert that all keys and values in 'expected' are in 'got'
-                for (k, l) in &expected {
-                    assert!(got.contains_key(k));
-                    let mut got_key_value = got[k].clone();
-                    got_key_value.sort();
-                    let mut expected_key_value = l.clone();
-                    expected_key_value.sort();
-                    assert_eq!(got_key_value, expected_key_value);
+                for v in got.values_mut() {
+                    v.sort();
                 }
-                // assert that all keys and values in 'got' are in 'expected'
-                for (k, l) in &got {
-                    assert!(expected.contains_key(k));
-                    let mut expected_key_value = expected[k].clone();
-                    expected_key_value.sort();
-                    let mut got_key_value = l.clone();
-                    got_key_value.sort();
-                    assert_eq!(expected_key_value, got_key_value);
-                }
+                assert_eq!(got, expected);
             }
         }
     }
