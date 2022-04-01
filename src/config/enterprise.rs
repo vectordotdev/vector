@@ -177,7 +177,7 @@ pub async fn try_attach(
     config_paths: &[ConfigPath],
     mut signal_rx: SignalRx,
 ) -> Result<(), PipelinesError> {
-    // Only valid if a [datadog] section is present in config.
+    // Only valid if a [enterprise] section is present in config.
     let datadog = match config.enterprise.as_ref() {
         Some(datadog) => datadog,
         _ => return Err(PipelinesError::Disabled),
