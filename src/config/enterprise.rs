@@ -29,7 +29,7 @@ static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
-const DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
+static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
