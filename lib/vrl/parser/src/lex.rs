@@ -261,6 +261,7 @@ pub enum Token<S> {
     Equals,
     MergeEquals,
     Bang,
+    Question,
 
     /// The {L,R}Query token is an "instruction" token. It does not represent
     /// any character in the source, instead it represents the start or end of a
@@ -343,6 +344,7 @@ impl<S> Token<S> {
             Equals => Equals,
             MergeEquals => MergeEquals,
             Bang => Bang,
+            Question => Question,
 
             LQuery => LQuery,
             RQuery => RQuery,
@@ -395,6 +397,7 @@ where
             Equals => "Equals",
             MergeEquals => "MergeEquals",
             Bang => "Bang",
+            Question => "Question",
 
             LQuery => "LQuery",
             RQuery => "RQuery",
@@ -505,6 +508,10 @@ impl<'input> Iterator for Lexer<'input> {
 
                     '_' if !self.test_peek(is_ident_continue) => {
                         Some(Ok(self.token(start, Underscore)))
+                    }
+
+                    '?' if self.test_peek(char::is_alphabetic) => {
+                        Some(Ok(self.internal_test(start)))
                     }
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
@@ -990,6 +997,7 @@ impl<'input> Lexer<'input> {
         let token = match op {
             "=" => Token::Equals,
             "|=" => Token::MergeEquals,
+            "?" => Token::Question,
             op => Token::Operator(op),
         };
 
@@ -1136,7 +1144,7 @@ fn is_digit(ch: char) -> bool {
 pub fn is_operator(ch: char) -> bool {
     matches!(
         ch,
-        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '|'
+        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
     )
 }
 
