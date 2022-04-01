@@ -10,11 +10,11 @@ use crate::{
     },
     event::{Event, Value},
     schema,
+    serde::OneOrMany,
     topology::{
         self,
         builder::{self, Pieces},
     },
-    serde::OneOrMany,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
