@@ -261,9 +261,7 @@ jobs:
       - run: |
           $Env:Path
           perl -v
-          Get-ChildItem -Path C:\Strawberry\c\bin
           Get-ChildItem -Path C:\Strawberry\perl\bin
-          Get-ChildItem -Path C:\Strawberry\perl\site\bin
       - run: make test
 
   test-vrl:

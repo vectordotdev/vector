@@ -16,7 +16,4 @@ choco install make
 # Update our path so that Strawberry Perl gets used for the build. This is annoying because it's
 # already in the path thanks to the Github Actions image for Windows 2022, but it's after Git which
 # supplies its own version of Perl on Windows, so we have to be super explicit here.
-echo "C:\Strawberry\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-echo "C:\Strawberry\c\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-echo "C:\Strawberry\perl\site\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 echo "C:\Strawberry\perl\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
