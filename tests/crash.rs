@@ -62,6 +62,7 @@ impl Sink<Event> for PanicSink {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_sink_panic() {
     let num_lines: usize = 10;
 
