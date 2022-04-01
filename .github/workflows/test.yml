@@ -322,6 +322,16 @@ jobs:
       - name: check features
         run: make check-features PACKAGE=${{ matrix.package }}
 
+  check-features-check:
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    runs-on: ubuntu-latest
+    name: Check Features
+    needs: check-features
+    steps:
+      - name: Check check features status
+        if: ${{ needs.check-features.result != 'success' }}
+        run: exit 1
+
   check-msrv:
     name: Check minimum supported Rust version
     runs-on: [linux, test-runner]
