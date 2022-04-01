@@ -190,7 +190,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.36", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.37", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.36", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -246,7 +246,7 @@ infer = { version = "0.7.0", default-features = false, optional = true}
 indoc = { version = "1.0.4", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
-kube = { version = "0.69.1", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
+kube = { version = "0.70.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "0.5.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.3", default-features = false, optional = true }

@@ -207,7 +207,7 @@ impl InternalEvent for PrometheusServerRequestComplete {
         if self.status_code.is_success() {
             debug!(message, status_code = %self.status_code);
         } else {
-            error!(message, status_code = %self.status_code);
+            warn!(message, status_code = %self.status_code);
         }
         counter!("requests_received_total", 1);
     }
