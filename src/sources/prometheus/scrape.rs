@@ -624,18 +624,17 @@ mod test {
         ]);
 
         for metric in metrics {
-            if let Some(q) = metric.tag_value("query") {
-                let mut got: HashMap<String, Vec<String>> = HashMap::new();
-                for (k, v) in url::form_urlencoded::parse(q.as_bytes()) {
-                    got.entry(k.to_string())
-                        .or_insert_with(Vec::new)
-                        .push(v.to_string());
-                }
-                for v in got.values_mut() {
-                    v.sort();
-                }
-                assert_eq!(got, expected);
+            let query = metric.tag_value("query").expect("query must be tagged");
+            let mut got: HashMap<String, Vec<String>> = HashMap::new();
+            for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
+                got.entry(k.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(v.to_string());
             }
+            for v in got.values_mut() {
+                v.sort();
+            }
+            assert_eq!(got, expected);
         }
     }
 
