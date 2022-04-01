@@ -199,6 +199,7 @@ jobs:
     runs-on: [windows, release-builder]
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
+      RELEASE_BUILDER: "true"
     steps:
       - uses: actions/checkout@v3
       - name: "Add Vector version"
