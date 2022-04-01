@@ -17,7 +17,7 @@ use crate::{
     test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
 };
 
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;

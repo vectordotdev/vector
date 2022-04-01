@@ -13,8 +13,8 @@ use snafu::Snafu;
 use tokio_util::io::StreamReader;
 
 use super::util::MultilineConfig;
-use crate::aws::aws_sdk::{create_client, ClientBuilder};
 use crate::aws::RegionOrEndpoint;
+use crate::aws::{create_client, ClientBuilder};
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
@@ -372,7 +372,7 @@ mod integration_tests {
     use pretty_assertions::assert_eq;
 
     use super::{sqs, AwsS3Config, Compression, Strategy};
-    use crate::aws::aws_sdk::create_client;
+    use crate::aws::create_client;
     use crate::aws::{AwsAuthentication, RegionOrEndpoint};
     use crate::common::sqs::SqsClientBuilder;
     use crate::config::ProxyConfig;
