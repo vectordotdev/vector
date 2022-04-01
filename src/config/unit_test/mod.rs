@@ -6,7 +6,7 @@ use crate::{
     conditions::Condition,
     config::{
         self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
-        OneOrMany, SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
+        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
     schema,
@@ -14,6 +14,7 @@ use crate::{
         self,
         builder::{self, Pieces},
     },
+    serde::OneOrMany,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;

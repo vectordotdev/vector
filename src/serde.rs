@@ -98,3 +98,46 @@ impl<V: 'static> Fields<V> {
             })
     }
 }
+
+/// Structure to handle when a configuration field can be a value
+/// or a list of values.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T: ToString> OneOrMany<T> {
+    pub fn stringify(&self) -> OneOrMany<String> {
+        match self {
+            Self::One(value) => value.to_string().into(),
+            Self::Many(values) => values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
+}
+
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(list) => list,
+        }
+    }
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        Self::One(value)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Many(value)
+    }
+}

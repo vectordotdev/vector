@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
 
-use crate::{conditions, event::Metric};
+use crate::{conditions, event::Metric, serde::OneOrMany};
 
 pub mod api;
 mod builder;
@@ -495,47 +495,6 @@ pub struct TestInput {
     pub value: Option<String>,
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
     pub metric: Option<Metric>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-#[serde(untagged)]
-pub enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
-}
-
-impl<T: ToString> OneOrMany<T> {
-    pub fn stringify(&self) -> OneOrMany<String> {
-        match self {
-            Self::One(value) => value.to_string().into(),
-            Self::Many(values) => values
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .into(),
-        }
-    }
-}
-
-impl<T> OneOrMany<T> {
-    pub fn into_vec(self) -> Vec<T> {
-        match self {
-            Self::One(value) => vec![value],
-            Self::Many(list) => list,
-        }
-    }
-}
-
-impl<T> From<T> for OneOrMany<T> {
-    fn from(value: T) -> Self {
-        Self::One(value)
-    }
-}
-
-impl<T> From<Vec<T>> for OneOrMany<T> {
-    fn from(value: Vec<T>) -> Self {
-        Self::Many(value)
-    }
 }
 
 fn default_test_input_type() -> String {
