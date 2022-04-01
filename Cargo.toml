@@ -379,6 +379,8 @@ api = [
   "async-graphql",
   "async-graphql-warp",
   "base64",
+  "itertools",
+  "vector_core/api",
 ]
 
 # API client
