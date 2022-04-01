@@ -15,7 +15,6 @@ impl InternalEvent for RedisEventsSent {
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
         // deprecated
         counter!("processed_events_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

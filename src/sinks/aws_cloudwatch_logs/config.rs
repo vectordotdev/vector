@@ -6,7 +6,7 @@ use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
-use crate::aws::aws_sdk::{create_client, ClientBuilder};
+use crate::aws::{create_client, ClientBuilder};
 use crate::sinks::util::ServiceBuilderExt;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},

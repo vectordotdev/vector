@@ -24,7 +24,7 @@ mod integration_tests {
         event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
     };
 
-    use crate::aws::aws_sdk::create_client;
+    use crate::aws::create_client;
     use crate::aws::{AwsAuthentication, RegionOrEndpoint};
     use crate::common::s3::S3ClientBuilder;
     use crate::{

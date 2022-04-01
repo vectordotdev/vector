@@ -34,13 +34,7 @@ components: sinks: redis: {
 				concurrency: 1
 				headers:     false
 			}
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled: false
 			to: {
 				service: services.redis
 				interface: {

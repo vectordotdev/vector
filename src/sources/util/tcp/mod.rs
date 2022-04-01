@@ -12,6 +12,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 
+use codecs::StreamDecodingError;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -20,7 +21,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
-use super::{AfterReadExt as _, StreamDecodingError};
+use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,

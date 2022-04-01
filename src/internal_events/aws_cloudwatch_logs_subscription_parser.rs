@@ -38,7 +38,9 @@ pub struct AwsCloudwatchLogsMessageSizeError {
 impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
     fn emit(self) {
         error!(
-            message = %format!("Encoded event is too long: {} > {}", self.size, self.max_size),
+            message = "Encoded event is too long.",
+            size = self.size as u64,
+            max_size = self.max_size as u64,
             error_code = "message_too_long",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,

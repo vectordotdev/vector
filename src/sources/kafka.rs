@@ -6,6 +6,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{FutureExt, Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
@@ -19,10 +23,7 @@ use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
@@ -35,7 +36,6 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 use async_stream::stream;
@@ -176,7 +176,7 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
@@ -267,7 +267,7 @@ async fn kafka_source(
                                 }
                             },
                             Err(error) => {
-                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                                // Error is logged by `codecs::Decoder`, no further handling
                                 // is needed here.
                                 if !error.can_continue() {
                                     break;
@@ -526,7 +526,7 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
-            codecs::Decoder::default(),
+            crate::codecs::Decoder::default(),
             shutdown,
             tx,
             acknowledgements,

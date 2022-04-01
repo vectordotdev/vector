@@ -21,16 +21,14 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::task::AtomicWaker;
 use leveldb::{
     batch::{Batch, Writebatch},
     database::Database,
     iterator::Iterable,
     options::{Options, ReadOptions, WriteOptions},
 };
-use parking_lot::Mutex;
 use snafu::{ResultExt, Snafu};
-use tokio::time::Instant;
+use tokio::{sync::Notify, time::Instant};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -101,11 +99,7 @@ where
         // Create the actual buffer subcomponents.
         let (writer, reader, acker) = open(&self.data_dir, &self.id, self.max_size, usage_handle)?;
 
-        Ok((
-            SenderAdapter::opaque(writer),
-            ReceiverAdapter::opaque(reader),
-            Some(acker),
-        ))
+        Ok((writer.into(), reader.into(), Some(acker)))
     }
 }
 
@@ -368,15 +362,15 @@ pub fn build<T: Bufferable>(
     let write_offset = initial_state.write_offset();
 
     let current_size = Arc::new(AtomicU64::new(initial_state.total_bytes));
-    let write_notifier = Arc::new(AtomicWaker::new());
-    let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
+    let read_waker = Arc::new(Notify::new());
+    let write_waker = Arc::new(Notify::new());
     let ack_counter = Arc::new(AtomicUsize::new(0));
-    let acker = create_disk_v1_acker(&ack_counter, &write_notifier);
+    let acker = create_disk_v1_acker(&ack_counter, &read_waker);
 
     let writer = Writer {
         db: Some(Arc::clone(&db)),
-        write_notifier: Arc::clone(&write_notifier),
-        blocked_write_tasks: Arc::clone(&blocked_write_tasks),
+        read_waker: Arc::clone(&read_waker),
+        write_waker: Arc::clone(&write_waker),
         offset: Arc::new(AtomicUsize::new(write_offset)),
         writebatch: Writebatch::new(),
         batch_size: 0,
@@ -388,8 +382,8 @@ pub fn build<T: Bufferable>(
 
     let reader = Reader {
         db,
-        write_notifier,
-        blocked_write_tasks,
+        read_waker,
+        write_waker,
         read_offset,
         compacted_offset: 0,
         delete_offset,

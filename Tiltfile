@@ -7,7 +7,7 @@ load('ext://helm_resource', 'helm_resource', 'helm_repo')
 docker_build(
     ref='timberio/vector',
     context='.',
-    build_args={'RUST_VERSION': '1.59'},
+    build_args={'RUST_VERSION': '1.58'},
     dockerfile='tilt/Dockerfile'
     )
 
@@ -25,4 +25,4 @@ helm_resource(
         ]
     )
 
-k8s_resource(workload='vector', port_forwards=8686)
+k8s_resource(workload='vector', port_forwards=9090)

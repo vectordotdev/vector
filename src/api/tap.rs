@@ -1,10 +1,9 @@
 use std::{
     collections::{HashMap, HashSet},
-    pin::Pin,
-    task::{Context, Poll},
+    num::NonZeroUsize,
 };
 
-use futures::{future::try_join_all, FutureExt, Sink};
+use futures::{future::try_join_all, FutureExt};
 use itertools::Itertools;
 use tokio::sync::{
     mpsc as tokio_mpsc,
@@ -12,10 +11,7 @@ use tokio::sync::{
     oneshot,
 };
 use uuid::Uuid;
-use vector_buffers::{
-    topology::channel::{BufferSender, SenderAdapter},
-    WhenFull,
-};
+use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
 
 use super::{
     schema::events::{
@@ -32,6 +28,8 @@ use crate::{
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
+
+const TAP_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 /// Clients can supply glob patterns to find matched topology components.
 trait GlobMatcher<T> {
@@ -128,31 +126,19 @@ impl TapPayload {
     }
 }
 
-/// A `TapSink` is used as an output channel for a topology component, and receives
-/// `Event`s.
+/// A `TapTransformer` transforms raw events and ships them to the global tap receiver.
 #[derive(Clone)]
-pub struct TapSink {
+pub struct TapTransformer {
     tap_tx: TapSender,
     output: TapOutput,
 }
 
-impl TapSink {
+impl TapTransformer {
     pub const fn new(tap_tx: TapSender, output: TapOutput) -> Self {
         Self { tap_tx, output }
     }
-}
 
-impl Sink<EventArray> for TapSink {
-    type Error = ();
-
-    /// This sink is always ready to accept, because TapSink should never cause back-pressure.
-    /// Events will be dropped instead of propagating back-pressure
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    /// Immediately send the event to the tap_tx, only if it has room. Otherwise just drop it
-    fn start_send(self: Pin<&mut Self>, events: EventArray) -> Result<(), Self::Error> {
+    pub fn try_send(&mut self, events: EventArray) {
         let payload = match events {
             EventArray::Logs(logs) => TapPayload::Log(self.output.clone(), logs),
             EventArray::Metrics(metrics) => TapPayload::Metric(self.output.clone(), metrics),
@@ -166,17 +152,6 @@ impl Sink<EventArray> for TapSink {
                 component_id = ?self.output.output_id,
             );
         }
-
-        Ok(())
-    }
-
-    /// Events are immediately flushed, so this doesn't do anything
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
     }
 }
 
@@ -337,18 +312,27 @@ async fn tap_handler(
                                 ?output.output_id, ?component_id_patterns, matched = ?found
                             );
 
-                            // (Re)connect the sink. This is necessary because a sink may be
-                            // reconfigured with the same id as a previous, and we are not
-                            // getting involved in config diffing at this point.
-                            let sink_id = Uuid::new_v4().to_string();
-                            let sink = TapSink::new(tx.clone(), output.clone());
-                            // TODO: don't want to emit event with DropNewest
-                            let sink = SenderAdapter::opaque(sink);
-                            let sink = BufferSender::new(sink, WhenFull::DropNewest);
+                            // Build a new intermediate buffer pair that we can insert as a sink
+                            // target for the component, and spawn our transformer task which will
+                            // wrap each event payload with the necessary metadata before forwarding
+                            // it to our global tap receiver.
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest).await;
+                            let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
+
+                            tokio::spawn(async move {
+                                while let Some(events) = tap_buffer_rx.next().await {
+                                    tap_transformer.try_send(events);
+                                }
+                            });
 
                             // Attempt to connect the sink.
+                            //
+                            // This is necessary because a sink may be reconfigured with the same id
+                            // as a previous, and we are not getting involved in config diffing at
+                            // this point.
+                            let sink_id = Uuid::new_v4().to_string();
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), sink))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), tap_buffer_tx))
                             {
                                 Ok(_) => {
                                     debug!(
