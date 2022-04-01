@@ -251,7 +251,7 @@ nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
-openssl = { version = "0.10.38", default-features = false }
+openssl = { version = "0.10.38", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -337,15 +337,15 @@ chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-defa
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "transforms", "openssl/vendored", "vrl-cli", "enterprise"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
-default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "enterprise"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "transforms", "vrl-cli", "enterprise"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
+default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "enterprise"]
 tokio-console = ["console-subscriber", "tokio/tracing"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
@@ -354,16 +354,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterp
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "openssl/vendored", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vrl-cli", "enterprise"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka/gssapi-vendored", "vrl-cli", "enterprise"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 # currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "openssl/vendored", "vrl-cli", "enterprise"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator"]

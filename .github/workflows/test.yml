@@ -252,29 +252,13 @@ jobs:
 
   test-windows:
     name: Unit - Windows
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
-    runs-on: [self-hosted, windows, x64, general]
+    runs-on: [windows, test-runner]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
-      # We always make sure to stop any previous sccache process before starting it fresh, that
-      # way we can be sure we're using the right credentials for storage, etc.
-      - name: Start sccache
-        env:
-          SCCACHE_REDIS: ${{ secrets.SCCACHE_REDIS }}
-          SCCACHE_IDLE_TIMEOUT: 0
-        run: |
-          sccache --stop-server
-          sccache --start-server
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
       - run: make test
-      - name: Stop sccache
-        run: sccache --stop-server
 
   test-vrl:
     name: VRL - Linux
