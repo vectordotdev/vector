@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 use super::service::{S3Response, S3Service};
-use crate::aws::aws_sdk::{create_client, is_retriable_error};
+use crate::aws::{create_client, is_retriable_error};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::s3::S3ClientBuilder;
 use crate::tls::TlsOptions;

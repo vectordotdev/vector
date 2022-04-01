@@ -62,37 +62,14 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
-#[cfg(feature = "rusoto")]
-pub struct AwsBytesSent {
-    pub byte_size: usize,
-    pub region: rusoto_core::Region,
-}
-
-#[cfg(feature = "rusoto")]
-impl InternalEvent for AwsBytesSent {
-    fn emit(self) {
-        trace!(
-            message = "Bytes sent.",
-            protocol = "https",
-            byte_size = %self.byte_size,
-            region = ?self.region,
-        );
-        counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
-            "protocol" => "https",
-            "region" => self.region.name().to_owned(),
-        );
-    }
-}
-
 #[cfg(feature = "aws-core")]
-pub struct AwsSdkBytesSent {
+pub struct AwsBytesSent {
     pub byte_size: usize,
     pub region: Option<aws_types::region::Region>,
 }
 
 #[cfg(feature = "aws-core")]
-impl InternalEvent for AwsSdkBytesSent {
+impl InternalEvent for AwsBytesSent {
     fn emit(self) {
         trace!(
             message = "Bytes sent.",

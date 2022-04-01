@@ -1,13 +1,13 @@
 use bytes::BytesMut;
+use codecs::{
+    self, decoding::Deserializer, decoding::Framer, BytesDeserializer, NewlineDelimitedDecoder,
+};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
 use std::{fmt, time::Duration};
 use tokio_util::codec::Decoder;
-use vector::codecs::{
-    self, decoding::Deserializer, decoding::Framer, BytesDeserializer, NewlineDelimitedDecoder,
-};
 
 #[derive(Debug)]
 struct Param {
@@ -53,7 +53,7 @@ fn decoding(c: &mut Criterion) {
                                 .unwrap_or(NewlineDelimitedDecoder::new()),
                         );
                         let deserializer = Deserializer::Bytes(BytesDeserializer::new());
-                        let decoder = codecs::Decoder::new(framer, deserializer);
+                        let decoder = vector::codecs::Decoder::new(framer, deserializer);
 
                         (Box::new(decoder), param.input.clone())
                     },

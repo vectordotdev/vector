@@ -1,6 +1,7 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{FutureExt, StreamExt};
 use tokio::{
     io::AsyncWriteExt,
@@ -16,14 +17,14 @@ use vector_core::ByteSizeOf;
 use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs,
+    codecs::Decoder,
     event::Event,
     internal_events::{
         BytesReceived, ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode,
         StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
+    sources::Source,
     SourceSender,
 };
 
@@ -33,7 +34,7 @@ use crate::{
 /// syslog source).
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,

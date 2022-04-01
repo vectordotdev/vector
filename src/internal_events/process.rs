@@ -1,3 +1,4 @@
+use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -63,40 +64,67 @@ impl InternalEvent for VectorQuit {
 }
 
 #[derive(Debug)]
-pub struct VectorReloadFailed;
+pub struct VectorReloadError;
 
-impl InternalEvent for VectorReloadFailed {
+impl InternalEvent for VectorReloadError {
     fn emit(self) {
         error!(
-            target: "vector",
-            message = "Reload was not successful."
+            message = "Reload was not successful.",
+            error_code = "reload",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
         );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "reload",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("reload_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct VectorConfigLoadFailed;
+pub struct VectorConfigLoadError;
 
-impl InternalEvent for VectorConfigLoadFailed {
+impl InternalEvent for VectorConfigLoadError {
     fn emit(self) {
         error!(
-            target: "vector",
-            message = "Failed to load config files, reload aborted."
+            message = "Failed to load config files, reload aborted.",
+            error_code = "config_load",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
         );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "config_load",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("config_load_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct VectorRecoveryFailed;
+pub struct VectorRecoveryError;
 
-impl InternalEvent for VectorRecoveryFailed {
+impl InternalEvent for VectorRecoveryError {
     fn emit(self) {
         error!(
-            target: "vector",
-            message = "Vector has failed to recover from a failed reload."
+            message = "Vector has failed to recover from a failed reload.",
+            error_code = "recovery",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::PROCESSING,
         );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "recovery",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("recover_errors_total", 1);
     }
 }

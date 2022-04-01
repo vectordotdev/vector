@@ -64,7 +64,7 @@ pub(crate) async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode
     loop {
         tokio::select! {
             biased;
-            Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
+            Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             status = run(url.clone(), opts, outputs_patterns.clone(), formatter.clone()) => {
                 if status == exitcode::UNAVAILABLE || status == exitcode::TEMPFAIL && !opts.no_reconnect {
                     eprintln!("[tap] Connection failed. Reconnecting in {:?} seconds.", RECONNECT_DELAY / 1000);

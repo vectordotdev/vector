@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
