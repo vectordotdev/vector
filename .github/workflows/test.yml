@@ -258,7 +258,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
-      - run: make test
+      - run: |
+          $Env:Path
+          make test
 
   test-vrl:
     name: VRL - Linux
