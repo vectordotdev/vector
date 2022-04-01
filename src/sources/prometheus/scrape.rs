@@ -94,7 +94,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .iter()
             .map(|s| s.parse::<http::Uri>().context(sources::UriParseSnafu))
             .map(|r| {
-                if let Ok(uri) = r {
+                r.map(|uri| {
                     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
                     if let Some(query) = uri.query() {
                         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
@@ -117,10 +117,8 @@ impl SourceConfig for PrometheusScrapeConfig {
                         query if !query.is_empty() => format!("{}?{}", uri.path(), query),
                         _ => uri.path().to_string(),
                     });
-                    Ok(builder.build().expect("error building URI"))
-                } else {
-                    r
-                }
+                    builder.build().expect("error building URI")
+                })
             })
             .collect::<Result<Vec<http::Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
