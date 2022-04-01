@@ -64,7 +64,3 @@ pub fn parse_literal(input: impl AsRef<str>) -> Result<Literal, Error> {
             dropped_tokens: vec![],
         })
 }
-
-pub mod test {
-    pub use super::parser::TestParser as Parser;
-}

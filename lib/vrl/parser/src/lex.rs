@@ -233,9 +233,6 @@ pub enum Token<S> {
     // Reserved for future use.
     ReservedIdentifier(S),
 
-    // A token used by the internal parser unit tests.
-    InternalTest(S),
-
     InvalidToken(char),
 
     // keywords
@@ -259,12 +256,10 @@ pub enum Token<S> {
     RParen,
     SemiColon,
     Underscore,
-    Escape,
 
     Equals,
     MergeEquals,
     Bang,
-    Question,
 
     /// The {L,R}Query token is an "instruction" token. It does not represent
     /// any character in the source, instead it represents the start or end of a
@@ -320,8 +315,6 @@ impl<S> Token<S> {
 
             ReservedIdentifier(s) => ReservedIdentifier(f(s)),
 
-            InternalTest(s) => InternalTest(f(s)),
-
             InvalidToken(s) => InvalidToken(s),
 
             Else => Else,
@@ -344,12 +337,10 @@ impl<S> Token<S> {
             RParen => RParen,
             SemiColon => SemiColon,
             Underscore => Underscore,
-            Escape => Escape,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
             Bang => Bang,
-            Question => Question,
 
             LQuery => LQuery,
             RQuery => RQuery,
@@ -375,7 +366,6 @@ where
             RegexLiteral(_) => "RegexLiteral",
             TimestampLiteral(_) => "TimestampLiteral",
             ReservedIdentifier(_) => "ReservedIdentifier",
-            InternalTest(_) => "InternalTest",
             InvalidToken(_) => "InvalidToken",
 
             Else => "Else",
@@ -398,12 +388,10 @@ where
             RParen => "RParen",
             SemiColon => "SemiColon",
             Underscore => "Underscore",
-            Escape => "Escape",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
             Bang => "Bang",
-            Question => "Question",
 
             LQuery => "LQuery",
             RQuery => "RQuery",
@@ -499,7 +487,6 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ';' => Some(Ok(self.token(start, SemiColon))),
                     '\n' => Some(Ok(self.token(start, Newline))),
-                    '\\' => Some(Ok(self.token(start, Escape))),
 
                     '(' => Some(Ok(self.open(start, LParen))),
                     '[' => Some(Ok(self.open(start, LBracket))),
@@ -514,10 +501,6 @@ impl<'input> Iterator for Lexer<'input> {
 
                     '_' if !self.test_peek(is_ident_continue) => {
                         Some(Ok(self.token(start, Underscore)))
-                    }
-
-                    '?' if self.test_peek(char::is_alphabetic) => {
-                        Some(Ok(self.internal_test(start)))
                     }
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
@@ -1003,18 +986,10 @@ impl<'input> Lexer<'input> {
         let token = match op {
             "=" => Token::Equals,
             "|=" => Token::MergeEquals,
-            "?" => Token::Question,
             op => Token::Operator(op),
         };
 
         (start, token, end)
-    }
-
-    fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
-        self.bump();
-        let (end, test) = self.take_while(start, char::is_alphabetic);
-
-        (start, Token::InternalTest(test), end)
     }
 
     fn quoted_literal(
@@ -1157,7 +1132,7 @@ fn is_digit(ch: char) -> bool {
 pub fn is_operator(ch: char) -> bool {
     matches!(
         ch,
-        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
+        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '|'
     )
 }
 
