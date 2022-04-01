@@ -1,5 +1,5 @@
-use std::{collections::HashMap, num::NonZeroUsize};
 use once_cell::sync::Lazy;
+use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
@@ -164,15 +164,14 @@ impl EventEncoder {
                 key_template.render_string(event),
                 value_template.render_string(event),
             ) {
-                if key.ends_with("_*") {
-                    let pkey = key.trim_end_matches('*');
+                if let Some(opening_prefix) = key.strip_suffix('*') {
                     let output: serde_json::map::Map<String, serde_json::Value> =
-                        serde_json::from_str(value.as_str()).unwrap();
+                        serde_json::from_str(value.as_str()).unwrap_or_default();
 
                     // key_* -> key_one, key_two, key_three
                     for (k, v) in output {
                         vec.push((
-                            slugify_text(format!("{}{}", pkey, k)),
+                            slugify_text(format!("{}{}", opening_prefix, k)),
                             Value::from(v).to_string_lossy(),
                         ))
                     }
@@ -476,6 +475,10 @@ mod tests {
         labels.insert(
             Template::try_from("test_key_*").unwrap(),
             Template::try_from("{{ dict }}").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("going_to_fail_*").unwrap(),
+            Template::try_from("{{ value }}").unwrap(),
         );
         let encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),

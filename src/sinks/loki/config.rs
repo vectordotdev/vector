@@ -152,10 +152,10 @@ pub fn valid_label_name(label: &Template) -> bool {
         //
         // [a-zA-Z_][a-zA-Z0-9_]*
         //
-        // '_*' symbol at the end of the label name will be treated as a prefix for
+        // '*' symbol at the end of the label name will be treated as a prefix for
         // underlying object keys.
         let mut label_trim = label.get_ref().trim();
-        if let Some(without_opening_end) = label_trim.strip_suffix("_*") {
+        if let Some(without_opening_end) = label_trim.strip_suffix('*') {
             label_trim = without_opening_end
         }
 
@@ -182,12 +182,12 @@ mod tests {
         assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
         assert!(valid_label_name(&"abc_*".try_into().unwrap()));
+        assert!(valid_label_name(&"_*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
         assert!(!valid_label_name(&"*".try_into().unwrap()));
         assert!(!valid_label_name(&"".try_into().unwrap()));
         assert!(!valid_label_name(&" ".try_into().unwrap()));
-        assert!(!valid_label_name(&"_*".try_into().unwrap()));
 
         assert!(valid_label_name(&"{{field}}".try_into().unwrap()));
     }
