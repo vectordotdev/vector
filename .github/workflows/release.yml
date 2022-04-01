@@ -202,7 +202,6 @@ jobs:
       - name: "Build archive"
         shell: bash
         run: |
-          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
