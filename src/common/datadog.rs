@@ -1,6 +1,7 @@
 // Allow unused imports here, since use of these functions will differ depending on the
 // Datadog component type, whether it's used in integration tests, etc.
 #![allow(dead_code)]
+#![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -31,7 +32,7 @@ pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Region {
+pub enum Region {
     Us,
     Eu,
 }
