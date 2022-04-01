@@ -260,7 +260,12 @@ jobs:
       - run: .\scripts\environment\bootstrap-windows-2022.ps1
       - run: |
           $Env:Path
-          make test
+          perl -v
+          Get-ChildItem -Path C:\Strawberry\bin
+          Get-ChildItem -Path C:\Strawberry\c\bin
+          Get-ChildItem -Path C:\Strawberry\perl\bin
+          Get-ChildItem -Path C:\Strawberry\perl\site\bin
+      - run: make test
 
   test-vrl:
     name: VRL - Linux
