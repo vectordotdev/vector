@@ -510,10 +510,6 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Ok(self.token(start, Underscore)))
                     }
 
-                    '?' if self.test_peek(char::is_alphabetic) => {
-                        Some(Ok(self.internal_test(start)))
-                    }
-
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
                         Some(Ok(self.token(start, Bang)))
                     }
