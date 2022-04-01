@@ -38,10 +38,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(output_errors);
     }
 
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     let version = Some(builder.sha256_hash());
 
-    #[cfg(not(feature = "datadog-pipelines"))]
+    #[cfg(not(feature = "enterprise"))]
     let version = None;
 
     let ConfigBuilder {
@@ -49,8 +49,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         #[cfg(feature = "api")]
         api,
         schema,
-        #[cfg(feature = "datadog-pipelines")]
-        datadog,
+        #[cfg(feature = "enterprise")]
+        enterprise,
         healthchecks,
         enrichment_tables,
         sources,
@@ -103,8 +103,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             version,
             healthchecks,
             enrichment_tables,

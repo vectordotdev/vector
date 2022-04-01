@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-#[cfg(unix)]
 use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;

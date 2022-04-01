@@ -1,12 +1,17 @@
 package metadata
 
-components: sources: aws_sqs: components._aws_new_sdk & {
+components: sources: aws_sqs: components._aws & {
 	title: "AWS SQS"
 
 	features: {
 		acknowledgements: true
 		collect: {
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_sqs
