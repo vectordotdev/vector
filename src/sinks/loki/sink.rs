@@ -1,4 +1,5 @@
 use std::{collections::HashMap, num::NonZeroUsize};
+use once_cell::sync::Lazy;
 
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
@@ -164,7 +165,7 @@ impl EventEncoder {
                 value_template.render_string(event),
             ) {
                 if key.ends_with("_*") {
-                    let pkey = key.trim_end_matches("*");
+                    let pkey = key.trim_end_matches('*');
                     let output: serde_json::map::Map<String, serde_json::Value> =
                         serde_json::from_str(value.as_str()).unwrap();
 
@@ -180,7 +181,7 @@ impl EventEncoder {
                 }
             }
         }
-        return vec;
+        vec
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -412,10 +413,11 @@ impl StreamSink<Event> for LokiSink {
     }
 }
 
-fn slugify_text(s: String) -> String {
-    let re = Regex::new(r"[^0-9A-Za-z_]").unwrap();
-    let result = re.replace_all(&s, "_");
-    return result.to_lowercase();
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+
+fn slugify_text(input: String) -> String {
+    let result = RE.replace_all(&input, "_");
+    result.to_lowercase()
 }
 
 #[cfg(test)]
