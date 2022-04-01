@@ -26,9 +26,14 @@ pub(crate) enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
+#[cfg(any(
+    feature = "sinks-datadog_logs",
+    feature = "sinks-datadog_events",
+    feature = "enterprise"
+))]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Region {
+pub enum Region {
     Us,
     Eu,
 }
