@@ -130,7 +130,6 @@ pub fn udp(
                         let last = Pin::new(&mut stream).peek().await.is_none();
                         match result {
                             Ok((mut events, _byte_size)) => {
-
                                 if last && truncated {
                                     // The last event in this payload was truncated, so we want to drop it.
                                     let _ = events.pop();
@@ -155,7 +154,7 @@ pub fn udp(
                                         if let Event::Log(ref mut log) = event {
                                             log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
                                             log.try_insert(log_schema().timestamp_key(), now);
-                                            log.try_insert(host_key.as_str(), address.to_string());
+                                            log.try_insert(host_key.as_str(), address.ip().to_string());
                                         }
                                     }
 

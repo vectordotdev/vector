@@ -33,7 +33,6 @@ components: sinks: datadog_logs: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
