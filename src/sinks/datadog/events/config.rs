@@ -18,7 +18,7 @@ use crate::{
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::TlsConfig,
+    tls::{MaybeTlsSettings, TlsConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -30,7 +30,6 @@ pub struct DatadogEventsConfig {
     pub site: Option<String>,
     pub default_api_key: String,
 
-    // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
     pub(super) tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -61,7 +60,8 @@ impl DatadogEventsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
 

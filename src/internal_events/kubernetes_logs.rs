@@ -110,7 +110,7 @@ pub struct KubernetesLogsDockerFormatParseError<'a> {
 
 impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Failed to parse log line in docker format.",
             error = %self.error,
             error_type = error_type::PARSER_FAILED,

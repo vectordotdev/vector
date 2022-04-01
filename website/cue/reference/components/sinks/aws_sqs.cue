@@ -36,10 +36,9 @@ components: sinks: aws_sqs: components._aws_new_sdk & {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.aws_sqs

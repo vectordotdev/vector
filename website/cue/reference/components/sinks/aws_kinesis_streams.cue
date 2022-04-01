@@ -43,10 +43,9 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.aws_kinesis_data_streams

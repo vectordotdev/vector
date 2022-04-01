@@ -229,9 +229,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.36"
+version = "3.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78e5de7666eb4c3e18e362890a2c1e06ba6e2fa53426574e252b5d52ee7f954a"
+checksum = "1fff26a58e85256388bc67a2c6373d9876978f11d912051e8a2b1caf6bb46ff6"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -260,9 +260,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "3.0.36"
+version = "3.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa710ce371f4f3f301d60e5bcd7cec3f06c8ec8b3ef8ba55e986518a97254ce"
+checksum = "447958447d3ed56f4f01618b240cae4d47f04bffd81b576bf3942a06e573f017"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -276,9 +276,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "3.0.36"
+version = "3.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac5aa058dbe2ed53700360fc77f112ed12a22ec3247fbdaee0e6b2afc3e8ba38"
+checksum = "9b6852c0e92b7fad08753d5fb23e6528db21c088d4423f85669c8ced7c5ec6e1"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -289,9 +289,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "3.0.36"
+version = "3.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6fa83548a7b9fe164ad5a7526dc68c1a7bc2a4fdaf6eab1bc77d7701635df8e"
+checksum = "e094427865a6fe74867767a9d48423ee079bd660cb3013031ff74f815dc97690"
 dependencies = [
  "bytes 1.1.0",
  "indexmap",
@@ -3831,9 +3831,9 @@ dependencies = [
 
 [[package]]
 name = "kube"
-version = "0.69.1"
+version = "0.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86835e9147615457c1edc2b11c723acd1d21372e9cefa80a9d2742f6d69042d0"
+checksum = "4dcc72fdf0c491160a34d4a1bfb03f96da8a5054288d61c816d514b5c2fa49ea"
 dependencies = [
  "k8s-openapi",
  "kube-client",
@@ -3843,9 +3843,9 @@ dependencies = [
 
 [[package]]
 name = "kube-client"
-version = "0.69.1"
+version = "0.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71f8aa916ee8290fbd0af76b3a28093a8786fccb6286902095a5243484447971"
+checksum = "94b01c722d55ffedec74cbc259b4508d8a59bf19540006ec87618f76ab156579"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -3871,7 +3871,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-native-tls",
- "tokio-util 0.6.8",
+ "tokio-util 0.7.0",
  "tower",
  "tower-http",
  "tracing 0.1.32",
@@ -3879,9 +3879,9 @@ dependencies = [
 
 [[package]]
 name = "kube-core"
-version = "0.69.1"
+version = "0.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da41f98f213796a68fcd4510c88b5fd36de131c1ea30d152474c3f2e1bef1a72"
+checksum = "7dd9e3535777edd122cc26fe3fe6357066b33eff63d8b919862edbe7a956a679"
 dependencies = [
  "chrono",
  "form_urlencoded",
@@ -3896,9 +3896,9 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.69.1"
+version = "0.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e8bf2258850dbc0a062b561656a1d7020fa8040d552e149f0a0361f0d6794e"
+checksum = "816c8c086f8bbcf9a4db0b7a68db90b784ef6292a57de35c64cccb90d5edfbe5"
 dependencies = [
  "ahash",
  "backoff",
@@ -3907,14 +3907,14 @@ dependencies = [
  "json-patch",
  "k8s-openapi",
  "kube-client",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "pin-project 1.0.10",
  "serde",
  "serde_json",
  "smallvec",
  "thiserror",
  "tokio",
- "tokio-util 0.6.8",
+ "tokio-util 0.7.0",
  "tracing 0.1.32",
 ]
 
@@ -6358,9 +6358,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.36"
+version = "0.7.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5230ae2981a885590b0dc84e0b24c0ed23ad24f7adc0eb824b26cafa961f7c36"
+checksum = "1f08c8062c1fe1253064043b8fc07bfea1b9702b71b4a86c11ea3588183b12e1"
 dependencies = [
  "bytecheck",
  "hashbrown 0.12.0",
@@ -6372,9 +6372,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.36"
+version = "0.7.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fc752d5925dbcb324522f3a4c93193d17f107b2e11810913aa3ad352fa01480"
+checksum = "e289706df51226e84814bf6ba1a9e1013112ae29bc7a9878f73fce360520c403"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -8996,6 +8996,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "atomig",
+ "base64 0.13.0",
  "bitmask-enum",
  "bytes 1.1.0",
  "chrono",
@@ -9009,6 +9010,7 @@ dependencies = [
  "float_eq",
  "futures 0.3.21",
  "futures-util",
+ "headers",
  "http",
  "hyper-proxy",
  "indexmap",
@@ -9049,6 +9051,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "url",
  "value",
  "vector_buffers",
  "vector_common",
