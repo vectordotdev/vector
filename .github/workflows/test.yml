@@ -258,10 +258,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2022.ps1
-      - run: |
-          $Env:Path
-          perl -v
-          Get-ChildItem -Path C:\Strawberry\perl\bin
       - run: make test
 
   test-vrl:
