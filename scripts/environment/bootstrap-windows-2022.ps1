@@ -13,7 +13,6 @@ rustup run stable cargo install cargo-nextest --version 0.9.8
 # Install some required dependencies / tools.
 choco install make
 
-# Update our path so that Strawberry Perl gets used for the build. This is annoying because it's
-# already in the path thanks to the Github Actions image for Windows 2022, but it's after Git which
-# supplies its own version of Perl on Windows, so we have to be super explicit here.
-echo "C:\Strawberry\perl\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+# Explicitly instruct the `openssl` crate to use Strawberry Perl instead of the Perl bundled with
+# git-bash, since the GHA Windows 2022 image has a poorly arranged PATH.
+echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
