@@ -140,33 +140,35 @@ pub fn udp(
                                     );
                                 }
 
-                                if !events.is_empty() {
-                                    let count = events.len();
-                                    emit!(SocketEventsReceived {
-                                        mode: SocketMode::Udp,
-                                        byte_size: events.size_of(),
-                                        count,
-                                    });
+                                if events.is_empty() {
+                                    continue;
+                                }
 
-                                    let now = Utc::now();
+                                let count = events.len();
+                                emit!(SocketEventsReceived {
+                                    mode: SocketMode::Udp,
+                                    byte_size: events.size_of(),
+                                    count,
+                                });
 
-                                    for event in &mut events {
-                                        if let Event::Log(ref mut log) = event {
-                                            log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
-                                            log.try_insert(log_schema().timestamp_key(), now);
-                                            log.try_insert(host_key.as_str(), address.ip().to_string());
+                                let now = Utc::now();
+
+                                for event in &mut events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                        log.try_insert(log_schema().timestamp_key(), now);
+                                        log.try_insert(host_key.as_str(), address.ip().to_string());
+                                    }
+                                }
+
+                                tokio::select!{
+                                    result = out.send_batch(events) => {
+                                        if let Err(error) = result {
+                                            emit!(StreamClosedError { error, count });
+                                            return Ok(())
                                         }
                                     }
-
-                                    tokio::select!{
-                                        result = out.send_batch(events) => {
-                                            if let Err(error) = result {
-                                                emit!(StreamClosedError { error, count });
-                                                return Ok(())
-                                            }
-                                        }
-                                        _ = &mut shutdown => return Ok(()),
-                                    }
+                                    _ = &mut shutdown => return Ok(()),
                                 }
                             }
                             Err(error) => {
