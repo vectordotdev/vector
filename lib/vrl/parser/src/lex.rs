@@ -256,6 +256,7 @@ pub enum Token<S> {
     RParen,
     SemiColon,
     Underscore,
+    Escape,
 
     Equals,
     MergeEquals,
@@ -337,6 +338,7 @@ impl<S> Token<S> {
             RParen => RParen,
             SemiColon => SemiColon,
             Underscore => Underscore,
+            Escape => Escape,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -388,6 +390,7 @@ where
             RParen => "RParen",
             SemiColon => "SemiColon",
             Underscore => "Underscore",
+            Escape => "Escape",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
@@ -487,6 +490,7 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ';' => Some(Ok(self.token(start, SemiColon))),
                     '\n' => Some(Ok(self.token(start, Newline))),
+                    '\\' => Some(Ok(self.token(start, Escape))),
 
                     '(' => Some(Ok(self.open(start, LParen))),
                     '[' => Some(Ok(self.open(start, LBracket))),
