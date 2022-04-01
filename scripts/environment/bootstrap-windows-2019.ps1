@@ -15,6 +15,9 @@ if ($env:RELEASE_BUILDER -ne "true") {
 # Install some required dependencies / tools.
 choco install make
 
+# Set a specific override path for libclang.
+echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
 # Explicitly instruct the `openssl` crate to use Strawberry Perl instead of the Perl bundled with
 # git-bash, since the GHA Windows 2022 image has a poorly arranged PATH.
 echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
