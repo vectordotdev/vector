@@ -20,9 +20,9 @@ mod builder;
 mod cmd;
 mod compiler;
 pub mod component;
-#[cfg(feature = "datadog-pipelines")]
-pub mod datadog;
 mod diff;
+#[cfg(feature = "enterprise")]
+pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
@@ -97,8 +97,8 @@ pub struct Config {
     pub api: api::Options,
     pub schema: schema::Options,
     pub version: Option<String>,
-    #[cfg(feature = "datadog-pipelines")]
-    pub datadog: Option<datadog::Options>,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentKey, SourceOuter>,
@@ -733,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     fn order_independent_sha256_hashes() {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"
