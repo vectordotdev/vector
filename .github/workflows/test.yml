@@ -257,7 +257,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v3
-      - run: .\scripts\environment\bootstrap-windows-2019.ps1
+      - run: .\scripts\environment\bootstrap-windows-2022.ps1
       - run: |
           $Env:Path
           make test
