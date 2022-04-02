@@ -135,7 +135,13 @@
 //! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
 
-use std::{error::Error, marker::PhantomData, num::NonZeroU64, path::PathBuf, sync::Arc};
+use std::{
+    error::Error,
+    marker::PhantomData,
+    num::NonZeroU64,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
@@ -290,7 +296,7 @@ where
         usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
-        let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
+        let buffer_path = get_disk_v2_data_dir_path(&self.data_dir, self.id.as_str());
         let config = DiskBufferConfigBuilder::from_path(buffer_path)
             .max_buffer_size(self.max_size.get())
             .build()?;
@@ -298,4 +304,8 @@ where
 
         Ok((writer.into(), reader.into(), Some(acker)))
     }
+}
+
+pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
+    base_dir.join("buffer").join("v2").join(buffer_id)
 }

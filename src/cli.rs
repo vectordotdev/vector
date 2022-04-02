@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::{AppSettings, FromArgMatches, IntoApp, Parser};
 
+use crate::migrations;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api-client")]
@@ -208,7 +209,8 @@ pub enum SubCommand {
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
 
-    Migrate(migrate::Opts),
+    /// Manual migration workflows.
+    Migrate(migrations::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

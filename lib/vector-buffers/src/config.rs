@@ -293,6 +293,11 @@ impl BufferType {
 /// component, where you could only choose which buffer type to use.  As we expand buffer
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
+///
+/// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
+/// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
+/// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
+/// would go horribly wrong.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
     pub stages: Vec<BufferType>,
