@@ -5905,38 +5905,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pulsar"
-version = "4.1.1"
-dependencies = [
- "async-trait",
- "bit-vec 0.6.3",
- "bytes 1.1.0",
- "chrono",
- "crc",
- "data-url",
- "futures 0.3.21",
- "futures-io",
- "futures-timer",
- "log",
- "native-tls",
- "nom 7.1.1",
- "oauth2",
- "openidconnect",
- "pem 0.8.3",
- "prost",
- "prost-build",
- "prost-derive",
- "rand 0.8.5",
- "regex",
- "serde",
- "serde_json",
- "tokio",
- "tokio-native-tls",
- "tokio-util 0.6.8",
- "url",
-]
-
-[[package]]
 name = "quanta"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7194,6 +7162,40 @@ dependencies = [
  "serde_json",
  "simpl",
  "time 0.2.27",
+]
+
+[[package]]
+name = "sn-pulsar"
+version = "4.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16abefe4b60579dadd9542d1ce3691bfff7cfb54057c355a1f2d009341cc0b3"
+dependencies = [
+ "async-trait",
+ "bit-vec 0.6.3",
+ "bytes 1.1.0",
+ "chrono",
+ "crc",
+ "data-url",
+ "futures 0.3.21",
+ "futures-io",
+ "futures-timer",
+ "log",
+ "native-tls",
+ "nom 7.1.1",
+ "oauth2",
+ "openidconnect",
+ "pem 0.8.3",
+ "prost",
+ "prost-build",
+ "prost-derive",
+ "rand 0.8.5",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-native-tls",
+ "tokio-util 0.6.8",
+ "url",
 ]
 
 [[package]]
@@ -8770,7 +8772,6 @@ dependencies = [
  "proptest",
  "prost",
  "prost-build",
- "pulsar",
  "quickcheck",
  "rand 0.8.5",
  "rand_distr",
@@ -8794,6 +8795,7 @@ dependencies = [
  "sha2 0.10.2",
  "smallvec",
  "smpl_jwt",
+ "sn-pulsar",
  "snafu",
  "snap",
  "socket2 0.4.4",
