@@ -130,7 +130,11 @@ impl Expression for Query {
         }
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         // Write the target depending on what target we are trying to retrieve.
         let variable = match &self.target {
             Target::External => {
@@ -143,7 +147,7 @@ impl Expression for Query {
             }
             Target::FunctionCall(call) => {
                 // Write the code to call the function.
-                call.compile_to_vm(vm)?;
+                call.compile_to_vm(vm, state)?;
 
                 // Then retrieve the given path from the returned value that has been pushed on the stack
                 vm.write_opcode(OpCode::GetPath);
@@ -151,7 +155,7 @@ impl Expression for Query {
             }
             Target::Container(container) => {
                 // Write the code to create the container onto the stack.
-                container.compile_to_vm(vm)?;
+                container.compile_to_vm(vm, state)?;
 
                 // Then retrieve the given path from the returned value that has been pushed on the stack
                 vm.write_opcode(OpCode::GetPath);

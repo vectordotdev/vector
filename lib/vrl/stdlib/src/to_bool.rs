@@ -1,7 +1,7 @@
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_bool(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_bool(value: Value) -> Resolved {
     use Value::*;
 
     match value {
@@ -150,7 +150,7 @@ impl Function for ToBool {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");

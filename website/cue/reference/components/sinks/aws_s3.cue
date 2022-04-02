@@ -13,6 +13,7 @@ components: sinks: aws_s3: components._aws & {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -42,10 +43,9 @@ components: sinks: aws_s3: components._aws & {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.aws_s3

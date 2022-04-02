@@ -157,7 +157,7 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(&SocketEventsReceived {
+                emit!(SocketEventsReceived {
                     mode: SocketMode::Unix,
                     byte_size: frame.len(),
                     count: 1
@@ -486,7 +486,7 @@ pub fn build_framestream_unix_source(
             let frames = sock_stream
                 .take_until(shutdown.clone())
                 .map_err(move |error| {
-                    emit!(&UnixSocketError {
+                    emit!(UnixSocketError {
                         error: &error,
                         path: &listen_path,
                     });
@@ -503,13 +503,13 @@ pub fn build_framestream_unix_source(
                 });
 
                 let handler = async move {
-                    if let Err(e) = event_sink.send_stream(&mut events).await {
+                    if let Err(e) = event_sink.send_event_stream(&mut events).await {
                         error!("Error sending event: {:?}.", e);
                     }
 
                     info!("Finished sending.");
                 };
-                tokio::spawn(handler.instrument(span));
+                tokio::spawn(handler.instrument(span.or_current()));
             } else {
                 let handler = async move {
                     frames
@@ -535,7 +535,7 @@ pub fn build_framestream_unix_source(
                         .await;
                     info!("Finished sending.");
                 };
-                tokio::spawn(handler.instrument(span));
+                tokio::spawn(handler.instrument(span.or_current()));
             }
         }
 
@@ -544,7 +544,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(&UnixSocketFileDeleteError { path: &path, error });
+            emit!(UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())
@@ -566,7 +566,7 @@ fn spawn_event_handling_tasks(
     tokio::spawn(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data) {
-                if event_sink.send(evt).await.is_err() {
+                if event_sink.send_event(evt).await.is_err() {
                     error!("Encountered error while sending event.");
                 }
             }
@@ -668,7 +668,7 @@ mod test {
                 .as_mut_log()
                 .insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.as_mut_log().insert(self.host_key(), host);
+                event.as_mut_log().insert(self.host_key().as_str(), host);
             }
 
             (self.extra_task_handling_routine.clone())();

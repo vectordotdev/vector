@@ -288,13 +288,13 @@ where
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
                                         if response.event_status() == EventStatus::Delivered {
-                                            emit(&response.events_sent());
+                                            emit(response.events_sent());
                                         }
                                     }
                                 };
                                 (seq_num, ack_size)
                             })
-                            .instrument(info_span!("request", request_id));
+                            .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
                     }
@@ -436,7 +436,7 @@ mod tests {
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             assert!(
-                !self.permit.is_some(),
+                self.permit.is_none(),
                 "should not call poll_ready again after a successful call"
             );
 

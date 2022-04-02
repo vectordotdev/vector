@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     internal_events::TemplateRenderingError,
     sinks::util::{
@@ -82,8 +85,8 @@ impl SinkConfig for PapertrailConfig {
         "papertrail"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -103,7 +106,7 @@ fn encode_event(
         .and_then(|t| {
             t.render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("process"),
                         drop_event: false,

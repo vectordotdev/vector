@@ -12,11 +12,13 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
+use crate::tls::{MaybeTlsSettings, TlsConfig};
 use crate::{
-    config::{Input, SinkConfig, SinkContext},
+    common::datadog::get_base_domain,
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
+        datadog::{get_api_validate_endpoint, healthcheck, Region},
         util::{
             batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
@@ -111,6 +113,13 @@ pub struct DatadogMetricsConfig {
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+    tls: Option<TlsConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -134,8 +143,8 @@ impl SinkConfig for DatadogMetricsConfig {
         "datadog_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -182,7 +191,11 @@ impl DatadogMetricsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
+        let client = HttpClient::new(tls_settings, proxy)?;
         Ok(client)
     }
 

@@ -47,7 +47,7 @@ impl Function for MatchDatadogQuery {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -74,7 +74,7 @@ impl Function for MatchDatadogQuery {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -410,7 +410,7 @@ impl Filter<Value> for VrlFilter {
             Field::Tag(_) => resolve_value(
                 buf,
                 Run::boxed(move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(':') {
                         Some((_, lhs)) => {
                             let lhs = Cow::from(lhs);
 

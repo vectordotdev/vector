@@ -2,7 +2,7 @@ use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
 use crate::{
-    config::{DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
         encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
@@ -75,6 +75,12 @@ pub struct NewRelicConfig {
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -135,8 +141,8 @@ impl SinkConfig for NewRelicConfig {
         "new_relic"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

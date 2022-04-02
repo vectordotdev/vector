@@ -4,9 +4,15 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: true
 		collect: {
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_s3

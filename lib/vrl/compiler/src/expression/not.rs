@@ -54,8 +54,12 @@ impl Expression for Not {
         TypeDef::boolean().with_fallibility(fallible)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
-        self.inner.compile_to_vm(vm)?;
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> std::result::Result<(), String> {
+        self.inner.compile_to_vm(vm, state)?;
         vm.write_opcode(OpCode::Not);
 
         Ok(())

@@ -1,5 +1,11 @@
 use vrl::prelude::*;
 
+fn includes(list: Value, item: Value) -> Resolved {
+    let list = list.try_array()?;
+    let included = list.iter().any(|i| i == &item);
+    Ok(included.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Includes;
 
@@ -41,13 +47,20 @@ impl Function for Includes {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
         Ok(Box::new(IncludesFn { value, item }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let item = args.required("item");
+
+        includes(value, item)
     }
 }
 
@@ -59,12 +72,10 @@ struct IncludesFn {
 
 impl Expression for IncludesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
 
-        let included = list.iter().any(|i| i == &item);
-
-        Ok(included.into())
+        includes(list, item)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

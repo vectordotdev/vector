@@ -1,6 +1,11 @@
 use md5::Digest;
 use vrl::prelude::*;
 
+fn md5(value: Value) -> Resolved {
+    let value = value.try_bytes()?;
+    Ok(hex::encode(md5::Md5::digest(&value)).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Md5;
 
@@ -28,12 +33,17 @@ impl Function for Md5 {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(Md5Fn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        md5(value)
     }
 }
 
@@ -44,9 +54,8 @@ struct Md5Fn {
 
 impl Expression for Md5Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-
-        Ok(hex::encode(md5::Md5::digest(&value)).into())
+        let value = self.value.resolve(ctx)?;
+        md5(value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

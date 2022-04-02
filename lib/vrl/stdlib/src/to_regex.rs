@@ -1,7 +1,7 @@
 use tracing::warn;
 use vrl::prelude::*;
 
-fn to_regex(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_regex(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let regex = regex::Regex::new(string.as_ref())
         .map_err(|err| format!("could not create regex: {}", err))
@@ -36,7 +36,7 @@ impl Function for ToRegex {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");

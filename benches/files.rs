@@ -56,6 +56,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
                         compression: sinks::file::Compression::None,
+                        acknowledgements: Default::default(),
                     },
                 );
 

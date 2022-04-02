@@ -8,21 +8,19 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use derivative::Derivative;
+use lookup::lookup_v2::Path;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Value,
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Derivative, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize)]
 pub struct LogEvent {
-    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
     fields: Arc<Value>,
 
@@ -43,6 +41,7 @@ impl LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
+            // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Arc::new(Value::Object(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }
@@ -95,11 +94,13 @@ impl LogEvent {
         )
     }
 
+    #[must_use]
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
@@ -109,49 +110,41 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.as_map(), key.as_ref())
+    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
+        self.fields.get_by_path_v2(key)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.fields.get_by_path(path))
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.as_map_mut(), key.as_ref())
+    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(path)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.as_map(), key.as_ref())
+    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+        util::log::contains(self.as_map(), path)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), path, value.into())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+        if !self.contains(path.clone()) {
+            self.insert(path, value);
         }
-    }
-
-    #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value> + Debug,
-    {
-        util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
     /// Rename a key in place without reference to pathing
@@ -163,8 +156,8 @@ impl LogEvent {
     /// This function is a no-op if `from_key` and `to_key` are identical. If
     /// `to_key` already exists in the structure its value will be overwritten
     /// silently.
-    #[instrument(level = "trace", skip(self, from_key, to_key), fields(key = %from_key))]
     #[inline]
+    #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
     pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
     where
         K: AsRef<str> + Into<String> + PartialEq + Display,
@@ -184,7 +177,6 @@ impl LogEvent {
     /// This function will insert a key in place without reference to any
     /// pathing information in the key. It will insert over the top of any value
     /// that exists in the map already.
-    #[instrument(level = "trace", skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: Into<String> + Display,
@@ -193,7 +185,6 @@ impl LogEvent {
         self.as_map_mut().insert(key.into(), value.into())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
         if !self.as_map().contains_key(key) {
@@ -201,35 +192,29 @@ impl LogEvent {
         }
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), false)
+    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+        self.remove_prune(path, false)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
+    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+        util::log::remove(Arc::make_mut(&mut self.fields), path, prune)
     }
 
-    #[instrument(level = "trace", skip(self))]
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
+    pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
         match self.fields.as_ref() {
             Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(self.as_map())
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.as_map().is_empty()
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         match self.fields.as_ref() {
             Value::Object(map) => map,
@@ -237,7 +222,6 @@ impl LogEvent {
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
         match Arc::make_mut(&mut self.fields) {
             Value::Object(ref mut map) => map,
@@ -248,13 +232,13 @@ impl LogEvent {
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field) {
+            let incoming_val = match incoming.remove(field.as_ref()) {
                 None => continue,
                 Some(val) => val,
             };
-            match self.get_mut(&field) {
+            match self.get_mut(field.as_ref()) {
                 None => {
-                    self.insert(field, incoming_val);
+                    self.insert(field.as_ref(), incoming_val);
                 }
                 Some(current_val) => current_val.merge(incoming_val),
             }

@@ -1,4 +1,4 @@
-use super::prelude::error_stage;
+use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -9,24 +9,23 @@ pub struct StatsdInvalidRecordError<'a> {
     pub bytes: Bytes,
 }
 
+const INVALID_PACKET: &str = "invalid_packet";
+
 impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Invalid packet from statsd, discarding.",
             error = %self.error,
-            error_code = "invalid_packet",
-            error_type = "parse_error",
+            error_code = INVALID_PACKET,
+            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => "invalid_packet",
-            "error_type" => "parse_error",
+            "error_code" => INVALID_PACKET,
+            "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
         // deprecated
@@ -70,29 +69,25 @@ impl<T> StatsdSocketError<T> {
 }
 
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError<T> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = match self.r#type {
             StatsdSocketErrorType::Bind => {
                 format!("Failed to bind to UDP listener socket: {:?}", self.error)
             }
             StatsdSocketErrorType::Read => format!("Failed to read UDP datagram: {:?}", self.error),
         };
-        let error = self.error_code();
+        let error_code = self.error_code();
         error!(
             message = %message,
-            error = %error,
-            error_code = %self.error_code(),
-            error_type = "connection_failed",
+            error_code = %error_code,
+            error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code(),
-            "error_type" => "connection_failed",
+            "error_code" => error_code,
+            "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         );
         // deprecated

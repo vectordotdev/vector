@@ -219,6 +219,12 @@ parent = "setup"
 weight = 4
 
 [[languages.en.menus.footer]]
+name = "Going to Prod"
+url = "/docs/setup/going-to-prod"
+parent = "setup"
+weight = 5
+
+[[languages.en.menus.footer]]
 name = "Community"
 url = "/community"
 identifier = "community"

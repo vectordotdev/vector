@@ -1,9 +1,6 @@
 use vrl::prelude::*;
 
-fn del(
-    query: &expression::Query,
-    ctx: &mut Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
     if query.is_external() {
         return Ok(ctx
@@ -83,7 +80,7 @@ impl Function for Del {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
@@ -94,7 +91,7 @@ impl Function for Del {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {

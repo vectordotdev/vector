@@ -141,7 +141,8 @@ impl ComponentTester {
     fn emitted_all_counters(&mut self, names: &[&str], tags: &[&str]) {
         let tag_suffix = (!tags.is_empty())
             .then(|| format!("{{{}}}", tags.join(",")))
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
+
         for name in names {
             if !self.metrics.iter().any(|m| {
                 matches!(m.value(), MetricValue::Counter { .. })

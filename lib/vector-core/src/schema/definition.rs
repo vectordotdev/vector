@@ -56,6 +56,7 @@ impl Definition {
     /// - Provided path is a root path (e.g. `.`).
     /// - Provided path points to a root-level array (e.g. `.[0]`).
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
+    #[must_use]
     pub fn required_field(
         mut self,
         path: impl Into<LookupBuf>,
@@ -102,6 +103,7 @@ impl Definition {
     /// # Panics
     ///
     /// See `Definition::require_field`.
+    #[must_use]
     pub fn optional_field(
         mut self,
         path: impl Into<LookupBuf>,
@@ -115,6 +117,7 @@ impl Definition {
     }
 
     /// Set the kind for all unknown fields.
+    #[must_use]
     pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
         self.collection.set_unknown(unknown);
         self
@@ -134,6 +137,7 @@ impl Definition {
     /// example, `.foo` might be set as optional, but `.foo.bar` as required. In this case, it
     /// means that the object at `.foo` is allowed to be missing, but if it's present, then it's
     /// required to have a `bar` field.
+    #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
         let mut optional = BTreeSet::default();
 
@@ -173,6 +177,13 @@ impl Definition {
         );
 
         self
+    }
+
+    /// Returns a `Lookup` into an event, based on the provided `meaning`, if the meaning exists.
+    ///
+    /// TODO(Jean): return `Lookup` here, but it requires some changes to `Value`s API first.
+    pub fn meaning_path(&self, meaning: &str) -> Option<&LookupBuf> {
+        self.meaning.get(meaning)
     }
 
     /// Returns `true` if the provided field is marked as optional.

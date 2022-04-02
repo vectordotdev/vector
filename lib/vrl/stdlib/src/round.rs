@@ -2,6 +2,23 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
+fn round(precision: Value, value: Value) -> Resolved {
+    let precision = precision.try_integer()?;
+    match value {
+        Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+            f.into_inner(),
+            precision,
+            f64::round,
+        ))),
+        value @ Value::Integer(_) => Ok(value),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float() | Kind::integer(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Round;
 
@@ -48,13 +65,20 @@ impl Function for Round {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision").unwrap_or(expr!(0));
 
         Ok(Box::new(RoundFn { value, precision }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let precision = args.optional("precision").unwrap_or_else(|| value!(0));
+
+        round(precision, value)
     }
 }
 
@@ -66,21 +90,10 @@ struct RoundFn {
 
 impl Expression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = self.precision.resolve(ctx)?.try_integer()?;
+        let precision = self.precision.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
-                f.into_inner(),
-                precision,
-                f64::round,
-            ))),
-            value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::float() | Kind::integer(),
-            }
-            .into()),
-        }
+        round(precision, value)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn float(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn float(value: Value) -> Resolved {
     match value {
         v @ Value::Float(_) => Ok(v),
         v => Err(format!("expected float, got {}", v.kind()).into()),
@@ -43,7 +43,7 @@ impl Function for Float {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -51,11 +51,7 @@ impl Function for Float {
         Ok(Box::new(FloatFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         float(value)
     }

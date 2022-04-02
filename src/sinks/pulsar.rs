@@ -11,17 +11,20 @@ use pulsar::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-
-use crate::{
-    config::{log_schema, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    internal_events::PulsarEncodeEventFailed,
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
-};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use vector_core::event::MaybeAsLogMut;
+
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
+    event::Event,
+    internal_events::PulsarEncodeEventError,
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -130,8 +133,8 @@ impl SinkConfig for PulsarSinkConfig {
         "pulsar"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -262,11 +265,8 @@ impl Sink<Event> for PulsarSink {
             None
         };
 
-        let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
-            emit!(&PulsarEncodeEventFailed {
-                error: &*e.to_string()
-            })
-        })?;
+        let message = encode_event(item, &self.encoding, &self.avro_schema)
+            .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,

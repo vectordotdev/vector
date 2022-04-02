@@ -516,6 +516,10 @@ _values: {
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
 	examples?: [float, ...float]
+
+	// `unit` clarifies the value's unit. While this should be included
+	// as the suffix in the name, this helps to explicitly clarify that.
+	unit: #Unit | *null
 }
 
 #TypeObject: {

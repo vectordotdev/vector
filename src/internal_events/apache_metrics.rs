@@ -14,11 +14,8 @@ pub struct ApacheMetricsEventsReceived<'a> {
 }
 
 impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_events_total", self.count as u64,
             "endpoint" => self.endpoint.to_owned(),
@@ -31,10 +28,6 @@ impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
             "events_in_total", self.count as u64,
             "uri" => self.endpoint.to_owned(),
         );
-        counter!(
-            "processed_bytes_total", self.byte_size as u64,
-            "uri" => self.endpoint.to_owned(),
-        );
     }
 }
 
@@ -45,11 +38,8 @@ pub struct ApacheMetricsRequestCompleted {
 }
 
 impl InternalEvent for ApacheMetricsRequestCompleted {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Request completed.");
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
         histogram!("request_duration_seconds", self.end - self.start);
     }
@@ -62,7 +52,7 @@ pub struct ApacheMetricsParseError<'a> {
 }
 
 impl InternalEvent for ApacheMetricsParseError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Parsing error.",
             endpoint = %self.endpoint,
@@ -75,9 +65,6 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
@@ -95,7 +82,7 @@ pub struct ApacheMetricsResponseError<'a> {
 }
 
 impl InternalEvent for ApacheMetricsResponseError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP error response.",
             endpoint = %self.endpoint,
@@ -105,9 +92,6 @@ impl InternalEvent for ApacheMetricsResponseError<'_> {
             endpoint = %self.endpoint,
             error = %self.code,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
@@ -126,7 +110,7 @@ pub struct ApacheMetricsHttpError<'a> {
 }
 
 impl InternalEvent for ApacheMetricsHttpError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "HTTP request processing error.",
             endpoint = %self.endpoint,
@@ -134,9 +118,6 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("http_request_errors_total", 1);
         counter!(
             "component_errors_total", 1,

@@ -1,3 +1,9 @@
+use aws_sdk_cloudwatchlogs::error::{
+    CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError,
+};
+use aws_sdk_cloudwatchlogs::model::InputLogEvent;
+use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use std::{
     collections::HashMap,
     fmt,
@@ -7,11 +13,6 @@ use std::{
 use chrono::Duration;
 use futures::{future::BoxFuture, ready, FutureExt};
 use futures_util::TryFutureExt;
-use rusoto_core::RusotoError;
-use rusoto_logs::{
-    CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError,
-    InputLogEvent, PutLogEventsError,
-};
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
@@ -50,10 +51,10 @@ type Svc = Buffer<
 
 #[derive(Debug)]
 pub enum CloudwatchError {
-    Put(RusotoError<PutLogEventsError>),
-    Describe(RusotoError<DescribeLogStreamsError>),
-    CreateStream(RusotoError<CreateLogStreamError>),
-    CreateGroup(RusotoError<CreateLogGroupError>),
+    Put(SdkError<PutLogEventsError>),
+    Describe(SdkError<DescribeLogStreamsError>),
+    CreateStream(SdkError<CreateLogStreamError>),
+    CreateGroup(SdkError<CreateLogGroupError>),
     NoStreamsFound,
 }
 
@@ -75,14 +76,14 @@ impl fmt::Display for CloudwatchError {
 
 impl std::error::Error for CloudwatchError {}
 
-impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
-    fn from(error: RusotoError<PutLogEventsError>) -> Self {
+impl From<SdkError<PutLogEventsError>> for CloudwatchError {
+    fn from(error: SdkError<PutLogEventsError>) -> Self {
         CloudwatchError::Put(error)
     }
 }
 
-impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
-    fn from(error: RusotoError<DescribeLogStreamsError>) -> Self {
+impl From<SdkError<DescribeLogStreamsError>> for CloudwatchError {
+    fn from(error: SdkError<DescribeLogStreamsError>) -> Self {
         CloudwatchError::Describe(error)
     }
 }
@@ -118,7 +119,7 @@ impl DriverResponse for CloudwatchResponse {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {
+    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudwatchLogsClient) -> Self {
         let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
 
         Self {
@@ -146,9 +147,11 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
         let events = req
             .events
             .into_iter()
-            .map(|req| InputLogEvent {
-                message: req.message,
-                timestamp: req.timestamp,
+            .map(|req| {
+                InputLogEvent::builder()
+                    .message(req.message)
+                    .timestamp(req.timestamp)
+                    .build()
             })
             .collect();
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
@@ -192,7 +195,7 @@ impl CloudwatchLogsSvc {
     pub fn new(
         config: &CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
-        client: CloudWatchLogsClient,
+        client: CloudwatchLogsClient,
     ) -> Self {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
@@ -222,9 +225,16 @@ impl CloudwatchLogsSvc {
         // We will split events into 24h batches.
         // Relies on log_events being sorted by timestamp in ascending order.
         while let Some(oldest) = events.first() {
-            let limit = oldest.timestamp + Duration::days(1).num_milliseconds();
+            let limit = oldest.timestamp.expect("timestamp must exist")
+                + Duration::days(1).num_milliseconds();
 
-            if events.last().expect("Events can't be empty").timestamp <= limit {
+            if events
+                .last()
+                .expect("Events can't be empty")
+                .timestamp
+                .expect("timestamp must exist")
+                <= limit
+            {
                 // Fast path.
                 // In most cases the difference between oldest and newest event
                 // is less than 24h.
@@ -239,7 +249,7 @@ impl CloudwatchLogsSvc {
             // at found event, and send those before at with this batch, and
             // those after at with the next batch.
             let at = events
-                .binary_search_by_key(&limit, |e| e.timestamp)
+                .binary_search_by_key(&limit, |e| e.timestamp.expect("timestamp must exist"))
                 .unwrap_or_else(|at| at);
 
             // Can't be empty
@@ -289,7 +299,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 }
 
 pub struct CloudwatchLogsSvc {
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -300,7 +310,7 @@ pub struct CloudwatchLogsSvc {
 
 impl EncodedLength for InputLogEvent {
     fn encoded_length(&self) -> usize {
-        self.message.len() + 26
+        self.message.as_ref().expect("message must exist").len() + 26
     }
 }
 
@@ -309,5 +319,5 @@ pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
 }

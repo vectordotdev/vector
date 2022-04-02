@@ -9,7 +9,6 @@
 pub(super) use vector_core::fanout;
 
 pub mod builder;
-pub(self) mod ready_events;
 mod running;
 mod schema;
 mod task;
@@ -18,7 +17,7 @@ mod task;
 mod test;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
@@ -27,7 +26,7 @@ use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
 use vector_buffers::{
-    topology::channel::{BufferReceiver, BufferSender},
+    topology::channel::{BufferReceiverStream, BufferSender},
     Acker,
 };
 
@@ -44,18 +43,32 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
     BufferSender<EventArray>,
-    Arc<Mutex<Option<BufferReceiver<EventArray>>>>,
+    Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>,
     Acker,
 );
+
+/// A tappable output consisting of an output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: &'static str,
+    pub component_type: String,
+}
 
 /// Resources used by the `tap` API to monitor component inputs and outputs,
 /// updated alongside the topology
 #[derive(Debug, Default, Clone)]
 pub struct TapResource {
     // Outputs and their corresponding Fanout control
-    pub outputs: HashMap<OutputId, fanout::ControlChannel>,
+    pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
     // Components (transforms, sinks) and their corresponding inputs
     pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Source component keys used to warn against invalid pattern matches
+    pub source_keys: Vec<String>,
+    // Sink component keys used to warn against invalid pattern amtches
+    pub sink_keys: Vec<String>,
+    // Components removed on a reload (used to drop TapSinks)
+    pub removals: HashSet<ComponentKey>,
 }
 
 // Watcher types for topology changes.
@@ -119,7 +132,7 @@ async fn handle_errors(
         .map_err(|_| ())
         .and_then(|res| res)
         .map_err(|_| {
-            error!("An error occurred that vector couldn't handle.");
+            error!("An error occurred that Vector couldn't handle.");
             let _ = abort_tx.send(());
         })
 }

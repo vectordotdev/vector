@@ -13,6 +13,7 @@ components: sinks: blackhole: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
@@ -31,7 +32,7 @@ components: sinks: blackhole: {
 	configuration: {
 		print_interval_secs: {
 			common:      false
-			description: "The number of seconds between reporting a summary of activity."
+			description: "The number of seconds between reporting a summary of activity. Set to `0` to disable reporting."
 			required:    false
 			type: uint: {
 				default: 1

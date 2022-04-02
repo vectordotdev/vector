@@ -48,7 +48,7 @@ impl Function for TagTypesExternally {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -62,6 +62,11 @@ impl Function for TagTypesExternally {
             kind: kind::ANY,
             required: true,
         }]
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        Ok(tag_type_externally(value))
     }
 }
 

@@ -47,15 +47,32 @@ impl Expression for Block {
         type_def.with_fallibility(fallible)
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: &mut crate::state::Compiler,
+    ) -> Result<(), String> {
         let mut jumps = Vec::new();
 
-        for expr in &self.inner {
-            // Write each of the inner expressions
-            expr.compile_to_vm(vm)?;
+        // An empty block should resolve to Null.
+        if self.inner.is_empty() {
+            let null = vm.add_constant(Value::Null);
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(null);
+        }
 
-            // If there is an error, we need to jump to the end of the block.
-            jumps.push(vm.emit_jump(OpCode::JumpIfErr));
+        let mut expressions = self.inner.iter().peekable();
+
+        while let Some(expr) = expressions.next() {
+            // Write each of the inner expressions
+            expr.compile_to_vm(vm, state)?;
+
+            if expressions.peek().is_some() {
+                // At the end of each statement (apart from the last one) we need to clean up
+                // This involves popping the value remaining on the stack, and jumping to the end
+                // of the block if we are in error.
+                jumps.push(vm.emit_jump(OpCode::EndStatement));
+            }
         }
 
         // Update all the jumps to jump to the end of the block.

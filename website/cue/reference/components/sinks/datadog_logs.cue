@@ -6,6 +6,7 @@ components: sinks: datadog_logs: {
 	classes: sinks._datadog.classes
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -32,7 +33,6 @@ components: sinks: datadog_logs: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true

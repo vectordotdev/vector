@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn string(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn string(value: Value) -> Resolved {
     match value {
         v @ Value::Bytes(_) => Ok(v),
         v => Err(format!("expected string, got {}", v.kind()).into()),
@@ -43,7 +43,7 @@ impl Function for String {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");

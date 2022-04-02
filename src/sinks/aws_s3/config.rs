@@ -1,14 +1,14 @@
 use std::convert::TryInto;
 
-use rusoto_s3::S3Client;
+use aws_sdk_s3::Client as S3Client;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
-    config::{GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -51,10 +51,14 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for S3SinkConfig {
@@ -72,8 +76,8 @@ impl GenerateConfig for S3SinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: Some(TlsOptions::default()),
-            assume_role: None,
             auth: AwsAuthentication::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -83,7 +87,7 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy)?;
+        let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
@@ -97,8 +101,8 @@ impl SinkConfig for S3SinkConfig {
         "aws_s3"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -156,8 +160,8 @@ impl S3SinkConfig {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
+    pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
     }
 }
 

@@ -7,14 +7,14 @@ use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
     http::HttpClient,
     sinks::{
         gcp,
         util::{
             buffer::metrics::MetricsBuffer,
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -44,6 +44,12 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -111,8 +117,8 @@ impl SinkConfig for StackdriverConfig {
         "gcp_stackdriver_metrics"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        true
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -122,12 +128,10 @@ struct HttpEventSink {
     token: gouth::Token,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpEventSink {
-    type Input = Metric;
-    type Output = Vec<Metric>;
+struct StackdriverMetricsEncoder;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Metric> for StackdriverMetricsEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<Metric> {
         let metric = event.into_metric();
 
         match metric.value() {
@@ -138,6 +142,17 @@ impl HttpSink for HttpEventSink {
                 None
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for HttpEventSink {
+    type Input = Metric;
+    type Output = Vec<Metric>;
+    type Encoder = StackdriverMetricsEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverMetricsEncoder
     }
 
     async fn build_request(

@@ -15,12 +15,14 @@ use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
     },
-    internal_events::StatsdInvalidMetricReceived,
+    internal_events::StatsdInvalidMetricError,
     sinks::util::{
         buffer::metrics::compress_distribution,
         encode_namespace,
@@ -149,8 +151,8 @@ impl SinkConfig for StatsdSinkConfig {
         "statsd"
     }
 
-    fn can_acknowledge(&self) -> bool {
-        false
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -227,7 +229,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMu
             }
         }
         _ => {
-            emit!(&StatsdInvalidMetricReceived {
+            emit!(StatsdInvalidMetricError {
                 value: metric.value(),
                 kind: &metric.kind(),
             });

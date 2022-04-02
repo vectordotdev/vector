@@ -3,9 +3,6 @@ package metadata
 components: sinks: _splunk_hec: {
 	configuration: {
 		acknowledgements: {
-			common:      false
-			description: "The configuration for Splunk HEC indexer acknowledgement client behavior."
-			required:    false
 			type: object: {
 				options: {
 					indexer_acknowledgements_enabled: {

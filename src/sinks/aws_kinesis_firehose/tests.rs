@@ -35,8 +35,8 @@ async fn check_batch_size() {
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();
@@ -63,8 +63,8 @@ async fn check_batch_events() {
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();

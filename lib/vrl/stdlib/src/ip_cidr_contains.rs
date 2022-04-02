@@ -1,6 +1,19 @@
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 
+fn ip_cidr_contains(value: Value, cidr: Value) -> Resolved {
+    let value = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+    let cidr = {
+        let cidr = cidr.try_bytes_utf8_lossy()?;
+
+        IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
+    };
+    Ok(cidr.contains(value).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct IpCidrContains;
 
@@ -56,13 +69,20 @@ impl Function for IpCidrContains {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let cidr = arguments.required("cidr");
         let value = arguments.required("value");
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let cidr = args.required("cidr");
+        let value = args.required("value");
+
+        ip_cidr_contains(value, cidr)
     }
 }
 
@@ -74,23 +94,10 @@ struct IpCidrContainsFn {
 
 impl Expression for IpCidrContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = {
-            let value = self.value.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
+        let cidr = self.cidr.resolve(ctx)?;
 
-            value
-                .try_bytes_utf8_lossy()?
-                .parse()
-                .map_err(|err| format!("unable to parse IP address: {}", err))?
-        };
-
-        let cidr = {
-            let value = self.cidr.resolve(ctx)?;
-            let cidr = value.try_bytes_utf8_lossy()?;
-
-            IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
-        };
-
-        Ok(cidr.contains(value).into())
+        ip_cidr_contains(value, cidr)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

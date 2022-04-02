@@ -77,17 +77,20 @@ impl ByteSizeOf for EventMetadata {
 
 impl EventMetadata {
     /// Replace the finalizers array with the given one.
+    #[must_use]
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
         self.finalizers = EventFinalizers::new(finalizer);
         self
     }
 
     /// Replace the finalizer with a new one created from the given batch notifier.
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
     }
 
     /// Replace the finalizer with a new one created from the given optional batch notifier.
+    #[must_use]
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         match batch {
             Some(batch) => self.with_finalizer(EventFinalizer::new(Arc::clone(batch))),
@@ -96,6 +99,7 @@ impl EventMetadata {
     }
 
     /// Replace the schema definition with the given one.
+    #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
         self.schema_definition = Arc::clone(schema_definition);
         self

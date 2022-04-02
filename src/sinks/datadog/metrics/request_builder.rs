@@ -34,18 +34,24 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     /// Converts this error into its constituent parts: the error reason, and how many events were
     /// dropped as a result.
-    pub const fn into_parts(self) -> (&'static str, u64) {
+    pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
         match self {
-            Self::FailedToBuild { error_type } => (error_type, 0),
+            Self::FailedToBuild { error_type } => {
+                ("Failed to build the request builder.", error_type, 0)
+            }
             Self::FailedToEncode {
                 reason,
                 dropped_events,
-            } => (reason, dropped_events),
-            Self::FailedToSplit { dropped_events } => ("split_failed", dropped_events),
+            } => ("Encoding of a metric failed.", reason, dropped_events),
+            Self::FailedToSplit { dropped_events } => (
+                "A split payload was still too big to encode/compress withing size limits.",
+                "split_failed",
+                dropped_events,
+            ),
             Self::Unexpected {
                 error_type,
                 dropped_events,
-            } => (error_type, dropped_events),
+            } => ("An unexpected error occurred.", error_type, dropped_events),
         }
     }
 }

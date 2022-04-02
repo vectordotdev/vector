@@ -165,12 +165,13 @@ components: {
 		let Args = _args
 
 		if Args.kind == "source" {
-			collect?:  #FeaturesCollect
-			generate?: #FeaturesGenerate
-			multiline: #FeaturesMultiline
-			codecs?:   #FeaturesCodecs
-			encoding?: #FeaturesEncoding
-			receive?:  #FeaturesReceive
+			acknowledgements: bool
+			collect?:         #FeaturesCollect
+			generate?:        #FeaturesGenerate
+			multiline:        #FeaturesMultiline
+			codecs?:          #FeaturesCodecs
+			encoding?:        #FeaturesEncoding
+			receive?:         #FeaturesReceive
 		}
 
 		if Args.kind == "transform" {
@@ -188,6 +189,8 @@ components: {
 		}
 
 		if Args.kind == "sink" {
+			acknowledgements: #FeaturesAcknowledgements
+
 			// `buffer` describes how the component buffers data.
 			buffer: {
 				enabled: true
@@ -204,6 +207,8 @@ components: {
 
 		descriptions: [Name=string]: string
 	}
+
+	#FeaturesAcknowledgements: bool
 
 	#FeaturesAggregate: {
 	}
@@ -405,7 +410,6 @@ components: {
 		enabled: bool
 
 		if enabled {
-			can_enable:             bool
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
@@ -564,7 +568,6 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					enabled_default:        bool
 				}
@@ -574,13 +577,11 @@ components: {
 				description: "Configures the TLS options for incoming connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      false
-							description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      false
+						description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
@@ -633,7 +634,6 @@ components: {
 
 			_tls_connect: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
@@ -644,13 +644,11 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      true
-							description: "Enable TLS during connections to the remote."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      true
+						description: "Enable TLS during connections to the remote."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {

@@ -159,7 +159,7 @@ impl Dedupe {
     fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(&DedupeEventDiscarded { event });
+            emit!(DedupeEventDiscarded { event });
             None
         } else {
             Some(event)
@@ -175,7 +175,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(&field_name) {
+                if let Some(value) = event.as_log().get(field_name.as_str()) {
                     entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {
                     entry.push(None);

@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn array(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn array(value: Value) -> Resolved {
     match value {
         v @ Value::Array(_) => Ok(v),
         v => Err(format!("expected array, got {}", v.kind()).into()),
@@ -43,7 +43,7 @@ impl Function for Array {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -51,11 +51,7 @@ impl Function for Array {
         Ok(Box::new(ArrayFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         array(value)
     }

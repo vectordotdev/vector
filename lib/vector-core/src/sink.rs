@@ -3,7 +3,7 @@ use std::{fmt, iter::IntoIterator, pin::Pin};
 use async_trait::async_trait;
 use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
 
-use crate::event::{Event, EventArray, EventContainer};
+use crate::event::{into_event_stream, Event, EventArray, EventContainer};
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),
@@ -170,7 +170,7 @@ struct EventStream<T> {
 #[async_trait]
 impl<T: StreamSink<Event> + Send> StreamSink<EventArray> for EventStream<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), ()> {
-        let input = Box::pin(input.flat_map(|events| stream::iter(events.into_events())));
+        let input = Box::pin(input.flat_map(into_event_stream));
         self.sink.run(input).await
     }
 }

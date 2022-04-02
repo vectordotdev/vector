@@ -10,50 +10,45 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use vector_buffers::{Acker, BufferConfig, BufferType};
-pub use vector_core::{
-    config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output},
-    transform::{ExpandType, TransformConfig, TransformContext},
-};
+pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
+pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
 
-use crate::{
-    conditions,
-    event::Metric,
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    sinks::{self, util::UriSerde},
-    sources,
-    transforms::noop::Noop,
-    SourceSender,
-};
+use crate::{conditions, event::Metric, serde::OneOrMany};
 
 pub mod api;
 mod builder;
+mod cmd;
 mod compiler;
 pub mod component;
-#[cfg(feature = "datadog-pipelines")]
-pub mod datadog;
 mod diff;
+#[cfg(feature = "enterprise")]
+pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
 mod loading;
 pub mod provider;
-mod recursive;
 mod schema;
+mod sink;
+mod source;
+mod transform;
 mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    merge_path_lists, process_paths, CONFIG_PATHS,
+    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
+pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
+pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
+pub use transform::{TransformDescription, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
@@ -102,8 +97,8 @@ pub struct Config {
     pub api: api::Options,
     pub schema: schema::Options,
     pub version: Option<String>,
-    #[cfg(feature = "datadog-pipelines")]
-    pub datadog: Option<datadog::Options>,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentKey, SourceOuter>,
@@ -130,27 +125,24 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        let errors: Vec<_> = self
-            .sinks
-            .iter()
-            .filter_map(|(name, sink)| {
-                (sink.acknowledgements.enabled() && !sink.inner.can_acknowledge()).then(|| {
-                    format!(
-                        "Sink `{}` has acknowledgements enabled but does not support them.",
-                        name,
-                    )
-                })
-            })
-            .collect();
-        if !errors.is_empty() {
-            return Err(errors);
+        if self.global.acknowledgements.enabled() {
+            for (name, sink) in &self.sinks {
+                if sink.inner.acknowledgements().is_none() {
+                    warn!(
+                        message = "Acknowledgements are globally enabled but sink does not support them.",
+                        sink = %name,
+                    );
+                }
+            }
         }
 
         let inputs: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
-                sink.acknowledgements
+                sink.inner
+                    .acknowledgements()
+                    .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
@@ -232,409 +224,6 @@ macro_rules! impl_generate_config_from_default {
         }
     };
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct SourceOuter {
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub proxy: ProxyConfig,
-    #[serde(flatten)]
-    pub(super) inner: Box<dyn SourceConfig>,
-    #[serde(default, skip)]
-    pub sink_acknowledgements: bool,
-}
-
-impl SourceOuter {
-    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
-        Self {
-            inner: Box::new(source),
-            proxy: Default::default(),
-            sink_acknowledgements: false,
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SourceConfig: core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
-
-    fn outputs(&self) -> Vec<Output>;
-
-    fn source_type(&self) -> &'static str;
-
-    /// Resources that the source is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-
-    fn can_acknowledge(&self) -> bool;
-}
-
-pub struct SourceContext {
-    pub key: ComponentKey,
-    pub globals: GlobalOptions,
-    pub shutdown: ShutdownSignal,
-    pub out: SourceSender,
-    pub proxy: ProxyConfig,
-    pub acknowledgements: bool,
-
-    /// Tracks the schema IDs assigned to schemas exposed by the source.
-    ///
-    /// Given a source can expose multiple [`Output`] channels, the ID is tied to the identifier of
-    /// that `Output`.
-    pub schema_definitions: HashMap<Option<String>, schema::Definition>,
-}
-
-impl SourceContext {
-    #[cfg(test)]
-    pub fn new_shutdown(
-        key: &ComponentKey,
-        out: SourceSender,
-    ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
-        let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(key);
-        (
-            Self {
-                key: key.clone(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out,
-                proxy: Default::default(),
-                acknowledgements: false,
-                schema_definitions: HashMap::default(),
-            },
-            shutdown,
-        )
-    }
-
-    #[cfg(test)]
-    pub fn new_test(
-        out: SourceSender,
-        schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
-    ) -> Self {
-        Self {
-            key: ComponentKey::from("default"),
-            globals: GlobalOptions::default(),
-            shutdown: ShutdownSignal::noop(),
-            out,
-            proxy: Default::default(),
-            acknowledgements: false,
-            schema_definitions: schema_definitions.unwrap_or_default(),
-        }
-    }
-
-    pub fn do_acknowledgements(&self, config: &AcknowledgementsConfig) -> bool {
-        if config.enabled() {
-            warn!(
-                message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
-                component_name = self.key.id(),
-            );
-        }
-
-        config
-            .merge_default(&self.globals.acknowledgements)
-            .merge_default(&self.acknowledgements.into())
-            .enabled()
-    }
-}
-
-pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
-
-inventory::collect!(SourceDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    // We are accepting this option for backward compatibility.
-    healthcheck_uri: Option<UriSerde>,
-
-    // We are accepting bool for backward compatibility.
-    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
-    #[serde(default)]
-    healthcheck: SinkHealthcheckOptions,
-
-    #[serde(default)]
-    pub buffer: BufferConfig,
-
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
-
-    #[serde(flatten)]
-    pub inner: Box<dyn SinkConfig>,
-
-    #[serde(
-        default,
-        deserialize_with = "bool_or_struct",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    pub acknowledgements: AcknowledgementsConfig,
-}
-
-impl<T> SinkOuter<T> {
-    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
-        SinkOuter {
-            inputs,
-            buffer: Default::default(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            healthcheck_uri: None,
-            inner,
-            proxy: Default::default(),
-            acknowledgements: Default::default(),
-        }
-    }
-
-    pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
-        let mut resources = self.inner.resources();
-        for stage in self.buffer.stages() {
-            match stage {
-                BufferType::Memory { .. } => {}
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
-                    resources.push(Resource::DiskBuffer(id.to_string()))
-                }
-            }
-        }
-        resources
-    }
-
-    pub fn healthcheck(&self) -> SinkHealthcheckOptions {
-        if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
-            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
-        } else if self.healthcheck_uri.is_some() {
-            warn!(
-                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
-            )
-        }
-        SinkHealthcheckOptions {
-            uri: self
-                .healthcheck
-                .uri
-                .clone()
-                .or_else(|| self.healthcheck_uri.clone()),
-            ..self.healthcheck.clone()
-        }
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
-        SinkOuter {
-            inputs,
-            inner: self.inner,
-            buffer: self.buffer,
-            healthcheck: self.healthcheck,
-            healthcheck_uri: self.healthcheck_uri,
-            proxy: self.proxy,
-            acknowledgements: self.acknowledgements,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(default)]
-pub struct SinkHealthcheckOptions {
-    pub enabled: bool,
-    pub uri: Option<UriSerde>,
-}
-
-impl Default for SinkHealthcheckOptions {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            uri: None,
-        }
-    }
-}
-
-impl From<bool> for SinkHealthcheckOptions {
-    fn from(enabled: bool) -> Self {
-        Self { enabled, uri: None }
-    }
-}
-
-impl From<UriSerde> for SinkHealthcheckOptions {
-    fn from(uri: UriSerde) -> Self {
-        Self {
-            enabled: true,
-            uri: Some(uri),
-        }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
-
-    fn input(&self) -> Input;
-
-    fn sink_type(&self) -> &'static str;
-
-    /// Resources that the sink is using.
-    fn resources(&self) -> Vec<Resource> {
-        Vec::new()
-    }
-
-    fn can_acknowledge(&self) -> bool;
-}
-
-#[derive(Debug, Clone)]
-pub struct SinkContext {
-    pub acker: Acker,
-    pub healthcheck: SinkHealthcheckOptions,
-    pub globals: GlobalOptions,
-    pub proxy: ProxyConfig,
-}
-
-impl SinkContext {
-    #[cfg(test)]
-    pub fn new_test() -> Self {
-        Self {
-            acker: Acker::passthrough(),
-            healthcheck: SinkHealthcheckOptions::default(),
-            globals: GlobalOptions::default(),
-            proxy: ProxyConfig::default(),
-        }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
-    }
-
-    pub const fn globals(&self) -> &GlobalOptions {
-        &self.globals
-    }
-
-    pub const fn proxy(&self) -> &ProxyConfig {
-        &self.proxy
-    }
-}
-
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
-
-inventory::collect!(SinkDescription);
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter<T> {
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
-    pub inputs: Vec<T>,
-    #[serde(flatten)]
-    pub inner: Box<dyn TransformConfig>,
-}
-
-impl<T> TransformOuter<T> {
-    #[cfg(test)]
-    pub(crate) fn new(transform: impl TransformConfig + 'static) -> Self {
-        Self {
-            inputs: vec![],
-            inner: Box::new(transform),
-        }
-    }
-
-    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
-        let inputs = self.inputs.iter().map(f).collect();
-        self.with_inputs(inputs)
-    }
-
-    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
-        TransformOuter {
-            inputs,
-            inner: self.inner,
-        }
-    }
-}
-
-impl TransformOuter<String> {
-    pub(crate) fn expand(
-        mut self,
-        key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
-        transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
-        expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
-    ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.transform_type(),
-                parent_types
-            ));
-        }
-
-        let expansion = self
-            .inner
-            .expand()
-            .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.transform_type());
-
-        if let Some((expanded, expand_type)) = expansion {
-            let mut children = Vec::new();
-            let mut inputs = self.inputs.clone();
-
-            for (name, content) in expanded {
-                let full_name = key.join(name);
-
-                let child = TransformOuter {
-                    inputs,
-                    inner: content,
-                };
-                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
-                children.push(full_name.clone());
-
-                inputs = match expand_type {
-                    ExpandType::Parallel { .. } => self.inputs.clone(),
-                    ExpandType::Serial { .. } => vec![full_name.to_string()],
-                }
-            }
-
-            if matches!(expand_type, ExpandType::Parallel { aggregates: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs: children.iter().map(ToString::to_string).collect(),
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            } else if matches!(expand_type, ExpandType::Serial { alias: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            }
-
-            expansions.insert(key.clone(), children);
-        } else {
-            transforms.insert(key, self);
-        }
-        Ok(())
-    }
-}
-
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
-
-inventory::collect!(TransformDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct EnrichmentTableOuter {
@@ -764,6 +353,7 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -778,18 +368,45 @@ impl TestDefinition<String> {
 
         let outputs = outputs
             .into_iter()
-            .filter_map(|old| {
-                if let Some(output_id) = output_map.get(&old.extract_from) {
-                    Some(TestOutput {
-                        extract_from: output_id.clone(),
-                        conditions: old.conditions,
+            .map(|old| {
+                let TestOutput {
+                    extract_from,
+                    conditions,
+                } = old;
+
+                let extract_from = extract_from
+                    .into_vec()
+                    .into_iter()
+                    .flat_map(|from| {
+                        if let Some(expanded) = expansions.get(&from) {
+                            expanded.to_vec()
+                        } else {
+                            vec![from]
+                        }
                     })
-                } else {
-                    errors.push(format!(
-                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                        name, old.extract_from
-                    ));
+                    .collect::<Vec<_>>();
+
+                (extract_from, conditions)
+            })
+            .filter_map(|(extract_from, conditions)| {
+                let mut outputs = Vec::new();
+                for from in extract_from {
+                    if let Some(output_id) = output_map.get(&from) {
+                        outputs.push(output_id.clone());
+                    } else {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                            name, from
+                        ));
+                    }
+                }
+                if outputs.is_empty() {
                     None
+                } else {
+                    Some(TestOutput {
+                        extract_from: outputs.into(),
+                        conditions,
+                    })
                 }
             })
             .collect();
@@ -836,7 +453,14 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: old.extract_from.to_string(),
+                extract_from: match old.extract_from {
+                    OneOrMany::One(value) => value.to_string().into(),
+                    OneOrMany::Many(values) => values
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                        .into(),
+                },
                 conditions: old.conditions,
             })
             .collect();
@@ -880,7 +504,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
-    pub extract_from: T,
+    pub extract_from: OneOrMany<T>,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -1144,7 +768,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     fn order_independent_sha256_hashes() {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"

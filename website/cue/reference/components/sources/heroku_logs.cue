@@ -21,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
@@ -44,7 +45,6 @@ components: sources: heroku_logs: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}

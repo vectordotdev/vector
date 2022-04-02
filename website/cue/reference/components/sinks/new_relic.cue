@@ -13,6 +13,7 @@ components: sinks: new_relic: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

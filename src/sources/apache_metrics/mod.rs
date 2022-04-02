@@ -180,14 +180,14 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(&ApacheMetricsRequestCompleted {
+                                emit!(ApacheMetricsRequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });
 
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(&HttpClientBytesReceived {
+                                emit!(HttpClientBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,
@@ -212,7 +212,7 @@ fn apache_metrics(
                                     .filter_map(|res| match res {
                                         Ok(metric) => Some(metric),
                                         Err(e) => {
-                                            emit!(&ApacheMetricsParseError {
+                                            emit!(ApacheMetricsParseError {
                                                 error: e,
                                                 endpoint: &sanitized_url,
                                             });
@@ -221,7 +221,7 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                emit!(&ApacheMetricsEventsReceived {
+                                emit!(ApacheMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
@@ -229,7 +229,7 @@ fn apache_metrics(
                                 Some(stream::iter(metrics))
                             }
                             Ok((header, _)) => {
-                                emit!(&ApacheMetricsResponseError {
+                                emit!(ApacheMetricsResponseError {
                                     code: header.status,
                                     endpoint: &sanitized_url,
                                 });
@@ -243,7 +243,7 @@ fn apache_metrics(
                                 .with_timestamp(Some(Utc::now()))]))
                             }
                             Err(error) => {
-                                emit!(&ApacheMetricsHttpError {
+                                emit!(ApacheMetricsHttpError {
                                     error,
                                     endpoint: &sanitized_url
                                 });
@@ -263,7 +263,7 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
@@ -391,7 +391,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                             tags.get("endpoint"),
                             Some(&format!("http://{}/metrics", in_addr))
                         );
-                        assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

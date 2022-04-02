@@ -8,11 +8,8 @@ pub struct DnstapEventsReceived {
 }
 
 impl InternalEvent for DnstapEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Events received.", count = 1, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", 1);
         counter!(
             "component_received_event_bytes_total",
@@ -21,7 +18,6 @@ impl InternalEvent for DnstapEventsReceived {
         // deprecated
         counter!("processed_events_total", 1);
         counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -31,7 +27,7 @@ pub(crate) struct DnstapParseError<'a> {
 }
 
 impl<'a> InternalEvent for DnstapParseError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error occurred while parsing dnstap data.",
             error = ?self.error,
@@ -39,9 +35,6 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,

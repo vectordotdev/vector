@@ -13,6 +13,7 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
 			batch: {
@@ -34,10 +35,9 @@ components: sinks: gcp_stackdriver_metrics: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.gcp_cloud_monitoring

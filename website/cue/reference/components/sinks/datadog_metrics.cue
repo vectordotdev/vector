@@ -6,6 +6,7 @@ components: sinks: datadog_metrics: {
 	classes: sinks._datadog.classes
 
 	features: {
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -26,7 +27,12 @@ components: sinks: datadog_metrics: {
 				timeout_secs:               60
 				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 			to: {
 				service: services.datadog_metrics
 

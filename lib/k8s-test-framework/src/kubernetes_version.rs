@@ -23,14 +23,14 @@ pub async fn get(kubectl_command: &str) -> Result<K8sVersion> {
     let json: serde_json::Value = serde_json::from_slice(&reader.stdout)?;
 
     Ok(K8sVersion {
-        major: json["serverVersion"]["major"].to_string().replace("\"", ""),
-        minor: json["serverVersion"]["minor"].to_string().replace("\"", ""),
+        major: json["serverVersion"]["major"].to_string().replace('\"', ""),
+        minor: json["serverVersion"]["minor"].to_string().replace('\"', ""),
         platform: json["serverVersion"]["platform"]
             .to_string()
-            .replace("\"", ""),
+            .replace('\"', ""),
         git_version: json["serverVersion"]["gitVersion"]
             .to_string()
-            .replace("\"", ""),
+            .replace('\"', ""),
     })
 }
 

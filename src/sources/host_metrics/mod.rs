@@ -65,7 +65,7 @@ impl Default for Namespace {
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
-    scrape_interval_secs: u64,
+    scrape_interval_secs: f64,
 
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
@@ -86,8 +86,8 @@ pub struct HostMetricsConfig {
     network: network::NetworkConfig,
 }
 
-const fn default_scrape_interval() -> u64 {
-    15
+const fn default_scrape_interval() -> f64 {
+    15.0
 }
 
 inventory::submit! {
@@ -133,25 +133,25 @@ impl HostMetricsConfig {
     }
 
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 
     async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: 0,
                 protocol: "none"
             });
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(&StreamClosedError {
+                emit!(StreamClosedError {
                     count,
                     error: error.clone()
                 });
@@ -239,7 +239,7 @@ impl HostMetrics {
                 metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: metrics.len(),
             byte_size: metrics.size_of(),
         });

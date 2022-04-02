@@ -15,6 +15,7 @@ components: sources: file: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {

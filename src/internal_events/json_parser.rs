@@ -12,7 +12,7 @@ pub struct JsonParserError<'a> {
 }
 
 impl<'a> InternalEvent for JsonParserError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = %format!("Event failed to parse as JSON: {:?}", self.error),
             field = %self.field,
@@ -23,9 +23,6 @@ impl<'a> InternalEvent for JsonParserError<'a> {
             drop_invalid = self.drop_invalid,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error" => "invalid_json",

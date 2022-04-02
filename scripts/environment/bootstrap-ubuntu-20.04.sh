@@ -23,6 +23,7 @@ apt install --yes \
     cmake \
     cmark-gfm \
     curl \
+    docker-compose \
     gawk \
     gnupg2 \
     gnupg-agent \

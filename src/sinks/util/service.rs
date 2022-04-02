@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tower::{
@@ -6,7 +6,6 @@ use tower::{
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
-    util::BoxService,
     Service, ServiceBuilder,
 };
 use vector_buffers::Acker;
@@ -220,12 +219,10 @@ impl TowerRequestSettings {
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
     {
-        PartitionBatchSink::new(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-        )
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        PartitionBatchSink::new(service, batch, batch_timeout, acker)
     }
 
     pub fn batch_sink<B, RL, S>(
@@ -245,34 +242,10 @@ impl TowerRequestSettings {
         B: Batch,
         B::Output: Send + Clone + 'static,
     {
-        BatchSink::new(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-        )
-    }
-
-    pub fn service<RL, S, Request>(&self, retry_logic: RL, service: S) -> Svc<S, RL>
-    where
-        RL: RetryLogic<Response = S::Response>,
-        S: Service<Request> + Clone + Send + 'static,
-        S::Error: Into<crate::Error> + Send + Sync + 'static,
-        S::Response: Send + Response,
-        S::Future: Send + 'static,
-        Request: Send + Clone + 'static,
-    {
-        let policy = self.retry_policy(retry_logic.clone());
-        ServiceBuilder::new()
-            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .layer(AdaptiveConcurrencyLimitLayer::new(
-                self.concurrency,
-                self.adaptive_concurrency,
-                retry_logic,
-            ))
-            .retry(policy)
-            .timeout(self.timeout)
-            .service(service)
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
 
@@ -280,34 +253,35 @@ impl TowerRequestSettings {
 pub struct TowerRequestLayer<L, Request> {
     settings: TowerRequestSettings,
     retry_logic: L,
-    _pd: std::marker::PhantomData<Request>,
+    _pd: PhantomData<Request>,
 }
 
 impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
-    S: Service<Request> + Send + Clone + 'static,
+    S: Service<Request> + Send + 'static,
     S::Response: Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
-    type Service = BoxService<Request, S::Response, crate::Error>;
+    type Service = Svc<S, RL>;
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
-
-        let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.concurrency.unwrap_or(5))
+        ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .layer(AdaptiveConcurrencyLimitLayer::new(
+                self.settings.concurrency,
+                self.settings.adaptive_concurrency,
+                self.retry_logic.clone(),
+            ))
             .retry(policy)
             .timeout(self.settings.timeout)
-            .service(inner);
-
-        BoxService::new(l)
+            .service(inner)
     }
 }
 

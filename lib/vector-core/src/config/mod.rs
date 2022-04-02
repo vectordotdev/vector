@@ -1,6 +1,6 @@
 use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, num::NonZeroUsize};
 
 mod global_options;
 mod id;
@@ -13,7 +13,7 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 
 use crate::schema;
 
-pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
+pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
 
 // This enum should be kept alphabetically sorted as the bitmask value is used when
@@ -53,35 +53,35 @@ impl Input {
     pub fn new(ty: DataType) -> Self {
         Self {
             ty,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn trace() -> Self {
         Self {
             ty: DataType::Trace,
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn all() -> Self {
         Self {
             ty: DataType::all(),
-            log_schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 }
@@ -119,6 +119,7 @@ impl Output {
     }
 
     /// Set the schema definition for this output.
+    #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
         self.log_schema_definition = Some(schema_definition);
         self
@@ -141,6 +142,7 @@ pub struct AcknowledgementsConfig {
 }
 
 impl AcknowledgementsConfig {
+    #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);
         Self { enabled }

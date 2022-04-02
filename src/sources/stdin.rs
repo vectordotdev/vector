@@ -3,20 +3,23 @@ use std::{io, thread};
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    codecs::DecodingConfig,
     config::{
         log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -113,7 +116,7 @@ where
 
             stdin.consume(len);
 
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: len,
                 protocol: "none"
             });
@@ -131,7 +134,7 @@ where
             while let Some(result) = stream.next().await {
                 match result {
                     Ok((events, _byte_size)) => {
-                        emit!(&StdinEventsReceived {
+                        emit!(StdinEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
                         });
@@ -145,7 +148,7 @@ where
                             log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.try_insert(&host_key, hostname.clone());
+                                log.try_insert(host_key.as_str(), hostname.clone());
                             }
 
                             yield event;
@@ -163,14 +166,14 @@ where
         }
         .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
