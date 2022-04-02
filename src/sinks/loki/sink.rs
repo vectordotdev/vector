@@ -165,15 +165,17 @@ impl EventEncoder {
                 value_template.render_string(event),
             ) {
                 if let Some(opening_prefix) = key.strip_suffix('*') {
-                    let output: serde_json::map::Map<String, serde_json::Value> =
-                        serde_json::from_str(value.as_str()).unwrap_or_default();
+                    let output: Result<serde_json::map::Map<String, serde_json::Value>, _> =
+                        serde_json::from_str(value.as_str());
 
-                    // key_* -> key_one, key_two, key_three
-                    for (k, v) in output {
-                        vec.push((
-                            slugify_text(format!("{}{}", opening_prefix, k)),
-                            Value::from(v).to_string_lossy(),
-                        ))
+                    if let Ok(output) = output {
+                        // key_* -> key_one, key_two, key_three
+                        for (k, v) in output {
+                            vec.push((
+                                slugify_text(format!("{}{}", opening_prefix, k)),
+                                Value::from(v).to_string_lossy(),
+                            ))
+                        }
                     }
                 } else {
                     vec.push((key, value));
