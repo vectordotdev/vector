@@ -36,7 +36,7 @@ components: transforms: geoip: {
 			description: """
 				Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
 				database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
-				databases, such as the the country database, are not supported.
+				databases, such as the country database, are not supported.
 				"""
 			required:    true
 			type: string: {
