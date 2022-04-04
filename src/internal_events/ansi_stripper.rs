@@ -11,7 +11,7 @@ pub struct AnsiStripperFieldMissingError<'a> {
 
 impl InternalEvent for AnsiStripperFieldMissingError<'_> {
     fn emit(self) {
-        debug!(
+        error!(
             message = "Field does not exist.",
             field = %self.field,
             error_code = FIELD_MISSING,

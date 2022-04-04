@@ -33,7 +33,6 @@ components: sources: prometheus_scrape: {
 			proxy: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false

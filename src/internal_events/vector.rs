@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use prost::DecodeError;
@@ -24,7 +22,6 @@ impl InternalEvent for VectorEventReceived {
         );
         // deprecated
         counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

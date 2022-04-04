@@ -5,7 +5,7 @@ use crate::{config::component::ComponentDescription, event::Event};
 mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
-pub(self) mod is_metric;
+pub(crate) mod is_metric;
 pub mod not;
 mod vrl;
 
@@ -24,6 +24,16 @@ pub enum Condition {
     // used for benchmarks
     AlwaysPass,
     AlwaysFail,
+}
+
+impl Condition {
+    pub(crate) const fn is_log() -> Self {
+        Self::IsLog(is_log::IsLog {})
+    }
+
+    pub(crate) const fn is_metric() -> Self {
+        Self::IsMetric(is_metric::IsMetric {})
+    }
 }
 
 impl Condition {

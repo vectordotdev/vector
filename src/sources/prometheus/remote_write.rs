@@ -249,7 +249,9 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use futures_util::StreamExt;
     use tokio::time::Duration;
+    use vector_core::event::into_event_stream;
 
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
@@ -283,6 +285,8 @@ mod integration_tests {
         tokio::spawn(source);
 
         tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let rx = rx.into_stream().flat_map(into_event_stream);
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 

@@ -8,7 +8,7 @@ use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
-    event::EventStatus, internal_events::AwsSdkBytesSent,
+    event::EventStatus, internal_events::AwsBytesSent,
     sinks::aws_kinesis_firehose::request_builder::KinesisRequest,
 };
 use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
@@ -82,7 +82,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .instrument(info_span!("request").or_current())
                 .await?;
 
-            emit!(AwsSdkBytesSent {
+            emit!(AwsBytesSent {
                 byte_size: processed_bytes_total,
                 region
             });

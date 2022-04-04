@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
 use super::*;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::config::ProxyConfig;
 use crate::sinks::aws_kinesis_firehose::config::KinesisFirehoseClientBuilder;
 use crate::sinks::elasticsearch::BulkConfig;
@@ -84,7 +84,9 @@ async fn firehose_put_records() {
         }),
         ..Default::default()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
 
     let client = reqwest::Client::builder()
         .build()

@@ -40,7 +40,6 @@ impl InternalEvent for SocketEventsReceived {
         counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
         // deprecated
         counter!("events_in_total", self.count as u64, "mode" => self.mode.as_str());
-        counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
@@ -56,8 +55,6 @@ impl InternalEvent for SocketEventsSent {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
         counter!("component_sent_events_total", self.count as u64, "mode" => self.mode.as_str());
         counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
-        // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
@@ -65,7 +62,7 @@ impl InternalEvent for SocketEventsSent {
 #[derive(Debug)]
 pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
-    pub error: &'a crate::codecs::decoding::Error,
+    pub error: &'a codecs::decoding::Error,
 }
 
 #[cfg(feature = "codecs")]

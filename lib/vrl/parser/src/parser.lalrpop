@@ -40,7 +40,6 @@ extern {
 
         ";" => Token::SemiColon,
         "\n" => Token::Newline,
-        "?" => Token::Question,
         "|" => Token::Pipe,
         "=" => Token::Equals,
         "|=" => Token::MergeEquals,
@@ -49,7 +48,6 @@ extern {
         ":" => Token::Colon,
         "." => Token::Dot,
         "!" => Token::Bang,
-        "escape" => Token::Escape,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
@@ -75,15 +73,6 @@ extern {
         "]" => Token::RBracket,
         "}" => Token::RBrace,
         ")" => Token::RParen,
-
-        "?r" => Token::InternalTest("?r"),
-        "?e" => Token::InternalTest("?e"),
-        "?m" => Token::InternalTest("?m"),
-        "?a" => Token::InternalTest("?a"),
-        "?q" => Token::InternalTest("?q"),
-        "?c" => Token::InternalTest("?c"),
-        "?as" => Token::InternalTest("?as"),
-        "?fn" => Token::InternalTest("?fn"),
     }
 }
 
@@ -96,44 +85,11 @@ extern {
 // A program consists of one or more expressions.
 pub Program: Program = NonterminalNewline* <RootExprs> => Program(<>);
 
-// This nonterminal exists to aid in unit-testing. It exposes individual rules
-// through the "t ..." declaration, to allow testing individual rules without
-// having to generate parser functions for each rule, which kills build-times
-// and exposes entries into the parser that we don't want or need.
-pub Test: Test = {
-    // root
-    "?r" <Expr> => Test::Expr(<>),
-
-    // expressions
-    "?e" <Literal> => Test::Literal(<>),
-    "?e" <Container> => Test::Container(<>),
-
-    // arithmetic (math)
-    "?m" <ArithmeticExpr> => Test::Arithmetic(<>),
-
-    // atoms
-    "?a" <String> => Test::String(<>),
-    "?a" <Integer> => Test::Integer(<>),
-    "?a" <Float> => Test::Float(<>),
-    "?a" <Boolean> => Test::Boolean(<>),
-    "?a" <Null> => Test::Null(()),
-    "?a" <Regex> => Test::Regex(<>),
-
-    // collections
-    "?c" <Block> => Test::Block(<>),
-    "?c" <Array> => Test::Array(<>),
-    "?c" <Object> => Test::Object(<>),
-
-    // other
-    "?as" <Assignment> => Test::Assignment(<>),
-    "?fn" <FunctionCall> => Test::FunctionCall(<>),
-    "?q" <Query> => Test::Query(<>),
-};
-
 // -----------------------------------------------------------------------------
 // root expressions
 // -----------------------------------------------------------------------------
 
+#[inline]
 RootExprs: Vec<Node<RootExpr>> = {
     RootExpr => vec![<>],
     (<RootExpr> EndOfExpression)*,
@@ -195,6 +151,7 @@ RootExpr: Node<RootExpr> = {
 // expressions
 // -----------------------------------------------------------------------------
 
+#[inline]
 Exprs: Vec<Node<Expr>> = {
     Expr => vec![<>],
     <v:(<Expr> EndOfExpression)+> <e:(<Expr>)?> => match e {
@@ -223,14 +180,13 @@ NonterminalNewline: () = "\n";
 
 Ident: Ident = "identifier" => Ident(<>.to_owned());
 
-PathField: Ident = "path field" => Ident(<>.to_owned());
-
 AbortExpr: Expr = {
     Sp<"abort"> => Expr::Abort(<>.map(|_| Abort { message: None })),
     <n: Sp<"abort">> <message: Expr> => Expr::Abort(n.map(|_| Abort { message: Some(Box::new(message.clone())) })),
 }
 
 // An identifier that is allowed to include reserved keywords.
+#[inline]
 AnyIdent: Ident = {
     "identifier" => Ident(<>.to_owned()),
     "reserved identifier" => Ident(<>.to_owned()),
@@ -251,6 +207,7 @@ AssignmentExpr: Node<Expr> = {
     ArithmeticExpr,
 };
 
+#[inline]
 Assignment: Node<Assignment> = {
     Sp<AssignmentSingle>,
     Sp<AssignmentInfallible>,
@@ -261,6 +218,7 @@ AssignmentOp: AssignmentOp = {
     "|=" => AssignmentOp::Merge,
 }
 
+#[inline]
 AssignmentSingle: Assignment = {
     <target: Sp<AssignmentTarget>>
         <op: AssignmentOp>
@@ -268,6 +226,7 @@ AssignmentSingle: Assignment = {
         <expr: Box<Expr>> => Assignment::Single { target, op, expr },
 }
 
+#[inline]
 AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
         <err: Sp<AssignmentTarget>>
@@ -343,6 +302,7 @@ Not: Expr = {
     Term,
 };
 
+#[inline]
 Term: Expr = {
     Sp<Literal> => Expr::Literal(<>),
     Sp<Container> => Expr::Container(<>),
@@ -366,6 +326,7 @@ pub Query: Query = {
     LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path },
 };
 
+#[inline]
 QueryTarget: QueryTarget = {
     Ident => QueryTarget::Internal(<>),
     "." => QueryTarget::External,
@@ -377,8 +338,16 @@ QueryTarget: QueryTarget = {
 // path
 // -----------------------------------------------------------------------------
 
+pub Field: FieldBuf = {
+    AnyIdent => FieldBuf::from(<>.to_string()),
+    PathField => FieldBuf::from(<>.to_string()),
+    String => FieldBuf::from(<>.to_string()),
+}
+
+#[inline]
 Path: LookupBuf = PathSegment+ => LookupBuf::from_segments(<>);
 
+#[inline]
 PathSegment: SegmentBuf = {
     "."? <Field> => SegmentBuf::field(<>),
     "[" <Integer> "]" => SegmentBuf::index(<> as isize),
@@ -389,11 +358,8 @@ PathSegment: SegmentBuf = {
         },
 };
 
-pub Field: FieldBuf = {
-    AnyIdent => FieldBuf::from(<>.to_string()),
-    PathField => FieldBuf::from(<>.to_string()),
-    String => FieldBuf::from(<>.to_string()),
-}
+#[inline]
+PathField: Ident = "path field" => Ident(<>.to_owned());
 
 // -----------------------------------------------------------------------------
 // function call
@@ -440,6 +406,7 @@ IfStatement: IfStatement =
         IfStatement { predicate, consequent, alternative }
 };
 
+#[inline]
 ElseIf: IfStatement =
     "else" NonterminalNewline* "if"
     <predicate: Sp<Predicate>>
@@ -448,6 +415,7 @@ ElseIf: IfStatement =
     IfStatement { predicate, consequent, alternative: None }
 };
 
+#[inline]
 StatementSeparator: () = {
     NonterminalNewline, ";"
 };
@@ -479,15 +447,18 @@ Container: Container = {
     Sp<Object> => Container::Object(<>),
 };
 
+#[inline]
 Group: Group = "(" <AssignmentExpr> ")" => Group(<>);
 
 Block: Block = "{" NonterminalNewline* <Exprs>  "}" => Block(<>);
 
+#[inline]
 Array: Array = {
     "[" NonterminalNewline* "]" => Array(vec![]),
     "[" NonterminalNewline* <CommaMultiline<ArithmeticExpr>> "]" => Array(<>),
 };
 
+#[inline]
 Object: Object = {
     "{" NonterminalNewline* "}" => Object(BTreeMap::default()),
     "{" NonterminalNewline* <CommaMultiline<(<Sp<String>> ":" <ArithmeticExpr>)>> "}" => {
@@ -522,13 +493,10 @@ Timestamp: String = "timestamp literal" => <>.replace("\\'", "'");
 // macros
 // -----------------------------------------------------------------------------
 
-#[inline]
 Box<T>: Box<T> = T => Box::new(<>);
 
-#[inline]
 Sp<T>: Node<T> = <l: @L> <rule: T> <r: @R> => Node::new(span(l, r), rule);
 
-#[inline]
 Op<L, Code, R>: Expr = Sp<(<Sp<L>> <Sp<Code>> NonterminalNewline* <Sp<R>>)> => {
     let op = <>.map(|(lhs, code, rhs)| {
         let (span, code) = code.take();
@@ -543,7 +511,6 @@ Op<L, Code, R>: Expr = Sp<(<Sp<L>> <Sp<Code>> NonterminalNewline* <Sp<R>>)> => {
     Expr::Op(op)
 };
 
-#[inline]
 CommaMultiline<T>: Vec<T> = {
     <T> NonterminalNewline* => vec![<>],
     <v:(<T> "," NonterminalNewline*)+> <e:(<T> NonterminalNewline*)?> => match e {

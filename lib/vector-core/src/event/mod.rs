@@ -6,6 +6,7 @@ use std::{
 };
 
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
@@ -46,7 +47,8 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, PartialOrd, Debug, Clone)]
+#[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),

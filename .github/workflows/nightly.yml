@@ -196,9 +196,10 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
 
   build-x86_64-pc-windows-msvc-packages:
-    runs-on: [self-hosted, windows, x64, general]
+    runs-on: [windows, release-builder]
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
+      RELEASE_BUILDER: "true"
     steps:
       - uses: actions/checkout@v3
       - name: "Add Vector version"
@@ -210,28 +211,8 @@ jobs:
       - name: "Set release flags"
         run: ./scripts/environment/release-flags.sh
         shell: bash
-      - name: "Download Perl"
-        shell: bash
-        env:
-          VERSION: "5.32.0.1"
-        run: |
-          curl -sSfL https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-      - name: "Install Perl"
-        shell: cmd # msiexec fails when called from bash
-        run: |
-          msiexec /quiet /i perl-installer.msi
-          del perl-installer.msi
-      - name: "Download CMake"
-        shell: bash
-        env:
-          VERSION: "3.15.5"
-        run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
-      - name: "Install CMake"
-        shell: cmd # msiexec fails when called from bash
-        run: |
-          msiexec /quiet /i cmake-installer.msi
-          del cmake-installer.msi
+      - name: "Configure environment"
+        run: .\scripts\environment\bootstrap-windows-2019.ps1
       - name: "Install Wix"
         shell: bash
         run: |
@@ -240,11 +221,9 @@ jobs:
           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
           unzip -o wix-binaries.zip
           rm wix-binaries.zip
-      - run: choco install llvm
       - name: "Build archive"
         shell: bash
         run: |
-          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"

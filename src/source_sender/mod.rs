@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
@@ -89,7 +89,7 @@ impl SourceSender {
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_with_buffer(100);
-        let recv = recv.flat_map(into_event_stream);
+        let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
@@ -99,7 +99,7 @@ impl SourceSender {
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
-        let recv = recv.flat_map(move |mut events| {
+        let recv = recv.into_stream().flat_map(move |mut events| {
             events.for_each_event(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
@@ -117,7 +117,7 @@ impl SourceSender {
         name: String,
     ) -> impl Stream<Item = EventArray> + Unpin {
         let (inner, recv) = Inner::new_with_buffer(100, name.clone());
-        let recv = recv.map(move |mut events| {
+        let recv = recv.into_stream().map(move |mut events| {
             events.for_each_event(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
@@ -189,7 +189,7 @@ impl Inner {
     async fn send(&mut self, events: EventArray) -> Result<(), ClosedError> {
         let byte_size = events.size_of();
         let count = events.len();
-        self.inner.send(events).await?;
+        self.inner.send(events).await.map_err(|_| ClosedError)?;
         emit!(EventsSent {
             count,
             byte_size,
