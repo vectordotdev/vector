@@ -20,71 +20,42 @@ result in bugs.
 
 ## User Experience
 
-We will be loosely basing our format strings on Pythons [f-strings](https://peps.python.org/pep-0498/).
+The initial version of string interpolation will be the simplest possible, allowing
+for further expansion in the future should it be deemed useful.
 
-`f-strings` allow for a combination of embedded expressions and include the ability
-to specify formatting options for the outputs. Plus, their use in a widespread language
-should mean a lot of users will already be familiar with the functionality.
+We will allow interpolating only string variables in strings delimited by `f'...'`.
 
-To format a string there will be a string type denoted with the prefix `f'`.
-
-Within that string, it is possible to embed VRL expressions by surrounding them
-with `{..}`. VRL will evaluate the expressions and will call `as_string` on
-that expression to return the text representation.
+Syntax would be as follows:
 
 ```coffee
-f'The message is { .message } created at { .timestamp }'
+f'foo {bar}'
 ```
 
-If you wish to actually insert a `{` into a string, a double '{{' will be needed.
+You can "escape" `{` and `}` to avoid interpolation:
 
 ```coffee
-f'Here is a curly brace -> {{'
+f'foo {{bar}}'
 ```
 
-Since this is a new string type there are no backward compatibility issues.
-
-### Format strings
-
-The format can be specified by adding format strings after a `:` in the string.
-
-For example to format date the following would be valid:
+As mentioned, only variables are supported, any other expression evaluation has
+to be done before interpolating:
 
 ```coffee
-ts = t'2020-10-21T16:00:00Z'
-f'The time is {ts : %v %R}'
+foobar = upcase("foo bar")
+f'{foobar} BAZ'
+Also, the variable has to resolve to an exact string type, and nothing else:
 ```
 
-### Errors
-
-We do not want an f string to be fallible as this would cumbersome to the experience of using VRL.
-
-Each template segment must be infallible in order for the string to compile. Errors must be
-handled to provide alternative text if needed:
-
+# not allowed
 ```coffee
-f'This is some json { parse_json(.thing) ?? "oops" }'
-# This is some json oops
+number = 1
+f'{number}'
 ```
 
-Another source of error would be if the format string is specified for a different
-type - for example using date format strings when the type is an integer.
-
-If format strings are provided, we need to lean on VRLs type system to ensure that the format
-strings are valid for the given type. The user must ensure the types are coerced if
-necessary.
-
-For example this will not compile:
-
+# allowed
 ```coffee
-thing = 2
-f'The date is {thing: %v %R}.'
-```
-
-If needed the user will be expected to coerce the type:
-
-```coffee
-f'The date is {timestamp!(thing): %v %R}.'
+number = to_string(1)
+f'{number}'
 ```
 
 ## Implementation
@@ -94,21 +65,19 @@ concatenation.
 
 The VRL parser will take a template literal string such as:
 
-```
-f'The message is { .message } created at { .timestamp: %v %R }'
+```coffee
+f'The message is { message } and we { feeling } it'
 ```
 
 and create an AST identical to the AST for the following expression:
 
-```
+```coffee
 s'The message is ' +
-as_string(.message) +
-s' created at ' +
-as_string(.timestamp, format: "%v %R")
+message +
+s' and we ' +
+feeling +
+s' it'
 ```
-
-`as_string` is a new function that will convert any type to a string and potentially
-apply format strings. Objects will be json encoded.
 
 ## Rationale
 
@@ -146,13 +115,13 @@ position.
 
 For example:
 
-```
+```coffee
 sprintf("The message is %s created at %t", .message, .timestamp)
 ```
 
 will return
 
-```
+```coffee
 The message is the message created at Tue, 27 Jul 2021 10:10:01 +0000
 ```
 
@@ -174,24 +143,128 @@ f'The date is { .date: %v %R }' ?? "invalid date"
 
 ### Output error text
 
-Rather than forcing the user to handle errors, if an error occurs the error text is output. For example:
+Rather than forcing the user to handle errors, if an error occurs the error text is output.
+For example:
 
 ```coffee
 f'This is some json { parse_json(.thing) }'
 # This is some json function call error for "parse_json" at (0:18): unable to parse json: expected ident at line 1 column 2
 ```
 
+### Use comprehensive f-strings
+
+
+We will be loosely basing our format strings on Pythons [f-strings](https://peps.python.org/pep-0498/).
+
+`f-strings` allow for a combination of embedded expressions and include the ability
+to specify formatting options for the outputs. Plus, their use in a widespread language
+should mean a lot of users will already be familiar with the functionality.
+
+To format a string there will be a string type denoted with the prefix `f'`.
+
+Within that string, it is possible to embed VRL expressions by surrounding them
+with `{..}`. VRL will evaluate the expressions and will call `as_string` on
+that expression to return the text representation.
+
+```coffee
+f'The message is { .message } created at { .timestamp }'
+```
+
+If you wish to actually insert a `{` into a string, a double '{{' will be needed.
+
+```coffee
+f'Here is a curly brace -> {{'
+```
+
+Since this is a new string type there are no backward compatibility issues.
+
+#### Format strings
+
+The format can be specified by adding format strings after a `:` in the string.
+
+For example to format date the following would be valid:
+
+```coffee
+ts = t'2020-10-21T16:00:00Z'
+f'The time is {ts : %v %R}'
+```
+
+#### Errors
+
+We do not want an f string to be fallible as this would cumbersome to the experience of using VRL.
+
+Each template segment must be infallible in order for the string to compile. Errors must be
+handled to provide alternative text if needed:
+
+```coffee
+f'This is some json { parse_json(.thing) ?? "oops" }'
+# This is some json oops
+```
+
+Another source of error would be if the format string is specified for a different
+type - for example using date format strings when the type is an integer.
+
+If format strings are provided, we need to lean on VRLs type system to ensure that the format
+strings are valid for the given type. The user must ensure the types are coerced if
+necessary.
+
+For example this will not compile:
+
+```coffee
+thing = 2
+f'The date is {thing: %v %R}.'
+```
+
+If needed the user will be expected to coerce the type:
+
+```coffee
+f'The date is {timestamp!(thing): %v %R}.'
+```
+
+This is a comprehensive solution, and would allow overly complex strings such as:
+
+```coffee
+f'This could { if contains(.thing, "zonk") ?? contains(.thunk, "zork") ?? false {
+  foreach(.zeek) -> {
+    f'My god what { object!(parse_json!(.zork)).zoog } is going on'
+  }
+  else {
+...
+} be a bit complex'
+```
+
+This is not in the spirit of VRL as it would lead to complex unmaintainable VRL code.
 
 ## Outstanding Questions
 
+
+## Future work
+
+### Expand to enable format strings
+
+The current proposal only works with string variables. Future work can allow other types to be used
+together with format strings
+
+```coffee
+f'The message is message { number: %d } created at { timestamp: %v %R }'
+```
+
+### Allow templates in dynamic paths
+
+Namely, we can allow the following dynamic path operations:
+
+```coffee
+.foo.f'{bar}'[index]
+```
+
+Where bar has to resolve to a string, and index has to resolve to an integer. Both variables are known
+to exist and be of the correct type, so we can keep path access infallible this way, and since we
+already support the ."foo bar" syntax for path segments with special characters, there also won't
+be a breaking syntax change, or any additional syntax that needs to be added to support this.
 
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
+- [ ] Submit a PR that updates the lexer, parser and rewrites the AST for template strings to perform
+      string concatenation instead.
