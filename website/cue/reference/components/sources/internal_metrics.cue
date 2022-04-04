@@ -613,6 +613,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		datadog_trace_payloads_too_big: {
+			description:       "Number of Datadog trace payloads that exceeded the maximum size to be sent."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
 			type:              "gauge"

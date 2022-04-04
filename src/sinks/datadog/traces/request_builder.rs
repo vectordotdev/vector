@@ -11,6 +11,7 @@ use super::{
 };
 use crate::{
     event::{Event, TraceEvent, Value},
+    internal_events::DatadogTracesPayloadTooBig,
     sinks::{
         datadog::traces::sink::PartitionKey,
         util::{Compression, Compressor, IncrementalRequestBuilder},
@@ -196,7 +197,7 @@ impl DatadogTracesEncoder {
         let encoded_payload = payload.encode_to_vec();
         // This may happen exceptionally
         if encoded_payload.len() > self.max_size {
-            warn!("Maximum payload size exceeded.");
+            emit!(DatadogTracesPayloadTooBig {});
             let n_chunks: usize = (encoded_payload.len() / self.max_size) + 1;
             let chunk_size = (events.len() / n_chunks) + 1;
             events.chunks(chunk_size).for_each(|events| {

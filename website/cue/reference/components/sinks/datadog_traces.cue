@@ -18,7 +18,7 @@ components: sinks: datadog_traces: {
 			}
 			compression: {
 				enabled: true
-				default: "gzip"
+				default: "none"
 				algorithms: ["none", "gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
