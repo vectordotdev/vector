@@ -1,6 +1,6 @@
 # Target Specification
 
-This document specifies requirements for deployment targets for the
+This document specifies requirements for installation targets for the
 integration of Vector.
 
 The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
@@ -11,11 +11,12 @@ Other words, such as "agent", "aggregator", "node", and "service" are to be
 interpreted as described in the [terminology document][terminology_document].
 
 - [1. Introduction](#1-introduction)
-- [2. Deployment Architectures](#2-deployment-architectures)
-  - [3. Agent Architecture](#3-agent-architecture)
-  - [4. Aggregator Architecture](#4-aggregator-architecture)
-  - [5. Unified Architecture](#5-unified-architecture)
-- [6. Hardening](#6-hardening)
+- [2. Installation Targets](#2-installation-targets)
+- [3. Deployment Architectures](#3-deployment-architectures)
+  - [4. Agent Architecture](#4-agent-architecture)
+  - [5. Aggregator Architecture](#5-aggregator-architecture)
+  - [6. Unified Architecture](#6-unified-architecture)
+- [7. Hardening](#7-hardening)
 
 ## 1. Introduction
 
@@ -28,25 +29,49 @@ it's deployed, providing easy facilities for adopting Vector's
 [achieving high availability][high_availability], and [hardening][hardening]
 Vector.
 
-## 2. Deployment Architectures
+## 2. Installation Targets
+
+Vector supports a number of installation targets that can be categorized into:
+
+- Virtual/Physical Machine
+- Orchestration Platform
+
+The primary differentiator between the two being that Virtual/Physical Machines
+provide a single node as the deployment target, whereas Orchestration Platforms
+allow for a scheduler to deploy Vector across a number nodes. These categories
+have their own requirements for each
+[Deployment Architecture](#3-deployment-architectures).
+
+Examples of Virtual/Physical Machine targets include, but are not limited to:
+
+- Debian
+- Docker
+- RHEL
+- Windows
+
+Examples of Orchestration Platform targets include, but are not limited to:
+
+- Kubernetes
+
+## 3. Deployment Architectures
 
 When supporting a target, Vector must support them through the the paradigm of
 architectures:
 
-- Targets SHOULD support the [agent architecture][agent_architecture] by
+- Targets MUST support the [agent architecture][agent_architecture] by
   providing a single command that deploys Vector and achieves the
   [agent architecture requirements](#agent-architecture).
 - Targets SHOULD support the [aggregator architecture][aggregator_architecture] by
   providing a single command that deploys Vector and achieves the
   [aggregator architecture requirements](#aggregator-architecture).
-- Targets SHOULD support the [unified architecture][unified_architecture] by
+- Targets MAY support the [unified architecture][unified_architecture] by
   providing a single command that deploys Vector and achieves the
   [unified architecture requirements](#unified-architecture).
 
-### 3. Agent Architecture
+### 4. Agent Architecture
 
 The [agent architecture][agent_architecture] deploys Vector on each individual
-node for local data collection. Along with general [hardening](#6-hardening)
+node for local data collection. Along with general [hardening](#7-hardening)
 requirements, the following requirements define support for this architecture:
 
 - Architecture
@@ -62,10 +87,10 @@ requirements, the following requirements define support for this architecture:
     overridable by the user.
   - SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
 
-### 4. Aggregator Architecture
+### 5. Aggregator Architecture
 
 The [aggregator architecture][aggregator_architecture] deploys Vector onto
-dedicated nodes for data aggregation. Along with general [hardening](#6-hardening)
+dedicated nodes for data aggregation. Along with general [hardening](#7-hardening)
 requirements, the following requirements define support for this architecture:
 
 - Architecture
@@ -82,12 +107,9 @@ requirements, the following requirements define support for this architecture:
   - Configured Vector sources, including non-default user configured sources,
     SHOULD be automatically discoverable via target service discovery
     mechanisms.
-- High Availability
-  - SHOULD deploy across 2 nodes, MUST be overridable by the user.
-  - SHOULD deploy across 2 availability zones, MUST be overridable by the user.
 - Sizing
   - MUST deploy in a way that takes full advantage of all system resources.
-    The Vector service should not be artificially limited with resource
+  - The Vector service SHOULD NOT be artificially limited with resource
     limiters such as cgroups.
   - SHOULD request 8 vCPUs, MUST be overridable by the user.
   - SHOULD request 2 GiB of memory per vCPU (16 GiB in this case), MUST be
@@ -101,20 +123,29 @@ requirements, the following requirements define support for this architecture:
       space.
     - GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
       48 GiB of SSD persisted disk space.
+
+The following are additional requirements for Orchestration Platform installation
+targets:
+
+- High Availability
+  - SHOULD deploy across multiple nodes, MUST be overridable by the user.
+  - SHOULD deploy across multiple availability zones, MUST be overridable by the user.
 - Scaling
   - MUST deploy along with a load balancer to enable horizontal autoscaling.
-  - Autoscaling SHOULD be enabled by default driven by an 85% CPU utilization
-    target over a rolling 5 minute window.
+  - Autoscaling SHOULD be enabled by default, driven by an average of 85%
+    CPU utilization.
   - Autoscaling SHOULD have a stabilization period of 5 minutes.
 
-### 5. Unified Architecture
+### 6. Unified Architecture
 
 The [unified architecture][unified_architecture] deploys Vector on each
 individual node for local data collection, as well as onto dedicated nodes for
-data aggregation. The requirements for both the [agent](#3-agent-architecture)
-and the [aggregator](#4-aggregator-architecture) apply to this architecture.
+data aggregation. The requirements for both the [agent](#4-agent-architecture)
+and the [aggregator](#5-aggregator-architecture) apply to this architecture.
+This architecture SHOULD NOT be installed on Virtual/Physical Machine targets
+as there is little added benefit.
 
-## 6. Hardening
+## 7. Hardening
 
 - Setup
   - An unprivileged Vector service account SHOULD be created upon installation
