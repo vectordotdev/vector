@@ -19,7 +19,7 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
-pub(crate) const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
+pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
