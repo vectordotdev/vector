@@ -32,6 +32,7 @@ use super::util::{
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -41,7 +42,6 @@ use crate::{
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
-        gcp::{GcpAuthConfig, GcpCredentials},
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
