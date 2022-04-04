@@ -1558,9 +1558,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.7"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c67e7973e74896f4bba06ca2dcfd28d54f9cb8c035e940a32b88ed48f5f5ecf2"
+checksum = "71c47df61d9e16dc010b55dba1952a57d8c215dbb533fd13cdd13369aac73b1c"
 dependencies = [
  "atty",
  "bitflags",
@@ -1698,7 +1698,7 @@ dependencies = [
  "prost-types 0.9.0",
  "tonic 0.6.2",
  "tonic-build 0.6.2",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -1721,7 +1721,7 @@ dependencies = [
  "tokio-stream",
  "tonic 0.6.2",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -4156,9 +4156,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcb87f3080f6d1d69e8c564c0fcfde1d7aa8cc451ce40cae89479111f03bc0eb"
+checksum = "22e8810f0ab5b02d4fc737c818258c8560a3216b7ebd5fd756cb437e23157fc6"
 
 [[package]]
 name = "lru-cache"
@@ -4381,7 +4381,7 @@ dependencies = [
  "metrics-util 0.10.2",
  "once_cell",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -5676,9 +5676,9 @@ dependencies = [
 
 [[package]]
 name = "pretty_assertions"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c038cb5319b9c704bf9c227c261d275bfec0ad438118a2787ce47944fb228b"
+checksum = "c89f989ac94207d048d92db058e4f6ec7342b0971fc58d1271ca148b799b3563"
 dependencies = [
  "ansi_term",
  "ctor",
@@ -8246,7 +8246,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.20",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8280,9 +8280,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa31669fa42c09c34d94d8165dd2012e8ff3c66aca50f3bb226b68f216f2706c"
+checksum = "90442985ee2f57c9e1b548ee72ae842f4a9a20e3f417cc38dbc5dc684d9bb4ee"
 dependencies = [
  "lazy_static",
  "valuable",
@@ -8295,7 +8295,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -8329,7 +8329,7 @@ dependencies = [
  "dashmap 5.2.0",
  "mock_instant",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -8341,7 +8341,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8351,7 +8351,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6b213177105856957181934e4920de57730fc69bf42c37ee5bb664d406d9e1"
 dependencies = [
  "serde",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8369,7 +8369,7 @@ dependencies = [
  "sharded-slab",
  "thread_local",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8830,7 +8830,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.1.7",
+ "clap 3.1.8",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8950,7 +8950,7 @@ dependencies = [
  "tower",
  "tower-test",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-subscriber",
@@ -9014,7 +9014,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.1.7",
+ "clap 3.1.8",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9131,7 +9131,7 @@ dependencies = [
  "toml",
  "tower",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
@@ -9178,7 +9178,7 @@ name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
- "clap 3.1.7",
+ "clap 3.1.8",
  "exitcode",
  "indoc",
  "once_cell",
@@ -9304,7 +9304,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.1.7",
+ "clap 3.1.8",
  "enrichment",
  "glob",
  "prettydiff",

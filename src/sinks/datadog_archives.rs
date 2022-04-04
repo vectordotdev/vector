@@ -242,7 +242,7 @@ impl DatadogArchivesSinkConfig {
         cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
-        // thus no need in the the higher number of outcoming requests
+        // thus no need of the higher number of outcoming requests
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
@@ -923,7 +923,7 @@ mod tests {
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
-        // check the the second batch has a different UUID
+        // check that the second batch has a different UUID
         let log2 = Event::new_empty_log();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
