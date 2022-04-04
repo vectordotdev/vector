@@ -346,10 +346,11 @@ mod integration_tests {
     });
     static PROJECT_URI: Lazy<String> =
         Lazy::new(|| format!("{}/v1/projects/{}", *ADDRESS, PROJECT));
+    const ACK_DEADLINE: u64 = 1;
 
     #[tokio::test]
     async fn oneshot() {
-        let (client, topic, mut rx) = setup().await;
+        let (client, topic, _, mut rx) = setup().await;
         let start = now_trunc();
         let test_data = send_test_events(25..50, &client, &topic, btreemap![]).await;
         receive_events(&mut rx, start, test_data, btreemap![]).await;
@@ -357,7 +358,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        let (client, topic, mut rx) = setup().await;
+        let (client, topic, _, mut rx) = setup().await;
         for _ in 0..10 {
             let start = now_trunc();
             let test_data = send_test_events(100..128, &client, &topic, btreemap![]).await;
@@ -367,7 +368,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        let (client, topic, mut rx) = setup().await;
+        let (client, topic, _, mut rx) = setup().await;
         let start = now_trunc();
         let attributes = btreemap![
             random_string(8) => random_string(88),
@@ -378,7 +379,30 @@ mod integration_tests {
         receive_events(&mut rx, start, test_data, attributes).await;
     }
 
-    async fn setup() -> (HttpClient, String, impl Stream<Item = Event> + Unpin) {
+    #[tokio::test]
+    async fn acks_received() {
+        let (client, topic, subscription, mut rx) = setup().await;
+        let start = now_trunc();
+
+        let test_data = send_test_events(1..10, &client, &topic, btreemap![]).await;
+        receive_events(&mut rx, start, test_data, btreemap![]).await;
+
+        // Make sure there are no messages left in the queue
+        assert_eq!(pull_count(&client, &subscription, 10).await, 0);
+
+        // Wait for the acknowledgement deadline to expire
+        tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+
+        // All messages are still acknowledged
+        assert_eq!(pull_count(&client, &subscription, 10).await, 0);
+    }
+
+    async fn setup() -> (
+        HttpClient,
+        String,
+        String,
+        impl Stream<Item = Event> + Unpin,
+    ) {
         components::init_test();
 
         let tls_settings = TlsSettings::from_options(&None).unwrap();
@@ -386,9 +410,9 @@ mod integration_tests {
         let topic = make_topic(&client).await;
         let subscription = make_subscription(&client, &topic).await;
 
-        let rx = make_source(subscription).await;
+        let rx = make_source(subscription.clone()).await;
 
-        (client, topic, rx)
+        (client, topic, subscription, rx)
     }
 
     fn now_trunc() -> DateTime<Utc> {
@@ -407,7 +431,10 @@ mod integration_tests {
     async fn make_subscription(client: &HttpClient, topic: &str) -> String {
         let subscription = format!("sub-{}", random_string(10).to_lowercase());
         let uri = format!("{}/subscriptions/{}", *PROJECT_URI, subscription);
-        let body = json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) });
+        let body = json!({
+            "topic": format!("projects/{}/topics/{}", PROJECT, topic),
+            "ackDeadlineSeconds": ACK_DEADLINE,
+        });
         request(client, Method::PUT, uri, body).await;
         subscription
     }
@@ -491,7 +518,21 @@ mod integration_tests {
         components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
     }
 
-    async fn request(client: &HttpClient, method: Method, uri: String, body: Value) {
+    async fn pull_count(client: &HttpClient, subscription: &str, count: usize) -> usize {
+        let response = request(
+            &client,
+            Method::POST,
+            format!("{}/subscriptions/{}:pull", *PROJECT_URI, subscription),
+            json!({ "maxMessages": count, "returnImmediately": true }),
+        )
+        .await;
+        response
+            .get("receivedMessages")
+            .map(|rm| rm.as_array().unwrap().len())
+            .unwrap_or(0)
+    }
+
+    async fn request(client: &HttpClient, method: Method, uri: String, body: Value) -> Value {
         let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
         let request = Request::builder()
             .method(method)
@@ -500,5 +541,7 @@ mod integration_tests {
             .unwrap();
         let response = client.send(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
     }
 }
