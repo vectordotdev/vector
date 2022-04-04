@@ -1,6 +1,6 @@
 # Target Specification
 
-This document specifies requirements for platforms ("targets") for the
+This document specifies requirements for deployment targets for the
 integration of Vector.
 
 The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”,
