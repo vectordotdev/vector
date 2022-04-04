@@ -157,7 +157,7 @@ where
 {
     /// `K` - file name, or other line source,
     /// `Bytes` - the line data,
-    /// `C` - the context related the the line data.
+    /// `C` - the context related to the line data.
     type Item = (K, Bytes, C);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
