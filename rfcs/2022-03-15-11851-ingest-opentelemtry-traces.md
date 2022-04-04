@@ -57,7 +57,7 @@ action like the `filter` transform to discard traces base on certain metadata ca
 this also involve evaluating a VRL condition on traces. The key problem here is to exposes traces and spans field in a
 way that the user can still manipulate those easily.
 
-This however raises the case of the granularity of a single event ; for instance multiple traces can bundles into a
+This however raises the case of the granularity of a single event ; for instance multiple traces can bundle into a
 single payload in both OpenTelemetry and Datadog wire format. Enabling clear processing without ambiguity advocate for a
 clear constraint that should be enforced by all future traces sources : **a single Vector event shall not hold data
 relative to more that one trace**.
@@ -133,14 +133,14 @@ top-level requirements:
   for each indivual trace ID and its associated spans and metadata.
 - Use the Opentelemetry trace format as the common denominator and base the Vector internal representation to ensure :
   - A clear reference point for conversion between trace formats
-  - Avoid destructive manipulation by transforms and keep traces object fully functionnal even after heavy modifications
-    while flowing throw the topology
+  - Avoid destructive manipulation by transforms and keep traces object fully functional even after heavy modifications
+    while flowing through the topology
 
 #### Source structure
 
-A new `opentelemetry` source sources with a named ouptut `traces` (future extension would cover `metrics` then `logs`):
+A new `opentelemetry` source with a named output `traces` (future extension would cover `metrics` then `logs`):
 - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
-  use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accept, this should be
+  use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
   relatively easy to extend it to support metrics and logs gRPC services.
 - HTTP variant would use a Warp server and attempt to decode protobuf payloads, as per the [specification][otlp-http],
   payloads are encoded using protobuf either in binary format or in JSON format ([Protobuf schemas][otlp-proto-def]).
@@ -314,12 +314,12 @@ The APM stats computation can be seen as a generic way to compute some statistic
 way forward is suggested:
 
 - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
-  Datadog product with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
+  Datadog products with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
   computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on the
   [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
 - Following the named outputs logic, an `apm_stats` output could be envisionned, this would make the APM stats flow
   explicit and allow another metrics sinks to just tap APM stats as APM stats would be plain Vector metrics.
-- The previous point also implies that the APM stats computation would happend in the source, the code should be fairly
+- The previous point also implies that the APM stats computation would happen in the source, the code should be fairly
   generic as APM stats computation would logically takes the normalised traces as input.
 - The computation will be optional with a relevant configuration flag.
 
