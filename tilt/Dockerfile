@@ -27,7 +27,6 @@ RUN --mount=type=cache,target=/vector/target \
 FROM debian:${DEBIAN_RELEASE}-slim
 RUN apt-get update && apt-get -y install zlib1g
 COPY --from=builder /vector/vector /usr/bin/vector
-VOLUME /var/lib/vector/
 
 # Smoke test
 RUN ["vector", "--version"]

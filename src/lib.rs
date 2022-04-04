@@ -46,7 +46,7 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+#[cfg(feature = "aws-config")]
 pub mod aws;
 #[cfg(feature = "codecs")]
 #[allow(unreachable_pub)]
