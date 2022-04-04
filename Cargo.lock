@@ -1655,7 +1655,7 @@ dependencies = [
  "prost-types 0.9.0",
  "tonic",
  "tonic-build",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -1678,7 +1678,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -4332,7 +4332,7 @@ dependencies = [
  "metrics-util 0.10.2",
  "once_cell",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -8037,7 +8037,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.20",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8071,9 +8071,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa31669fa42c09c34d94d8165dd2012e8ff3c66aca50f3bb226b68f216f2706c"
+checksum = "90442985ee2f57c9e1b548ee72ae842f4a9a20e3f417cc38dbc5dc684d9bb4ee"
 dependencies = [
  "lazy_static",
  "valuable",
@@ -8086,7 +8086,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -8120,7 +8120,7 @@ dependencies = [
  "dashmap 5.2.0",
  "mock_instant",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-subscriber",
 ]
 
@@ -8132,7 +8132,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8142,7 +8142,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6b213177105856957181934e4920de57730fc69bf42c37ee5bb664d406d9e1"
 dependencies = [
  "serde",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
 ]
 
 [[package]]
@@ -8160,7 +8160,7 @@ dependencies = [
  "sharded-slab",
  "thread_local",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-log",
  "tracing-serde",
 ]
@@ -8741,7 +8741,7 @@ dependencies = [
  "tower",
  "tower-test",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-subscriber",
@@ -8922,7 +8922,7 @@ dependencies = [
  "toml",
  "tower",
  "tracing 0.1.32",
- "tracing-core 0.1.23",
+ "tracing-core 0.1.24",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
