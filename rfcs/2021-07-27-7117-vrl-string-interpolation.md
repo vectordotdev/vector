@@ -23,18 +23,24 @@ result in bugs.
 The initial version of string interpolation will be the simplest possible, allowing
 for further expansion in the future should it be deemed useful.
 
-We will allow interpolating only string variables in strings delimited by `f'...'`.
+We will allow interpolating only string variables in strings delimited by `"..."`.
 
 Syntax would be as follows:
 
 ```coffee
-f'foo {bar}'
+"foo {bar}"
 ```
 
 You can "escape" `{` and `}` to avoid interpolation:
 
 ```coffee
-f'foo {{bar}}'
+"foo {{bar}}"
+```
+
+Alternatively raw strings can be used:
+
+```coffee
+s'foo {bar}'
 ```
 
 As mentioned, only variables are supported, any other expression evaluation has
@@ -42,20 +48,20 @@ to be done before interpolating:
 
 ```coffee
 foobar = upcase("foo bar")
-f'{foobar} BAZ'
+"{foobar} BAZ"
 Also, the variable has to resolve to an exact string type, and nothing else:
 ```
 
 # not allowed
 ```coffee
 number = 1
-f'{number}'
+"{number}"
 ```
 
 # allowed
 ```coffee
 number = to_string(1)
-f'{number}'
+"{number}"
 ```
 
 ## Implementation
@@ -66,17 +72,17 @@ concatenation.
 The VRL parser will take a template literal string such as:
 
 ```coffee
-f'The message is { message } and we { feeling } it'
+"The message is { message } and we { feeling } it"
 ```
 
 and create an AST identical to the AST for the following expression:
 
 ```coffee
-s'The message is ' +
+"The message is " +
 message +
-s' and we ' +
+" and we " +
 feeling +
-s' it'
+" it"
 ```
 
 ## Rationale
