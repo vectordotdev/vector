@@ -48,7 +48,7 @@ tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.32", default-features = false }
 tracing-core = { version = "0.1.24", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.3.9", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.10", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
 url = { version = "2", default-features = false }
@@ -75,7 +75,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-tracing-subscriber = { version = "0.3.9", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { version = "0.3.10", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
 
