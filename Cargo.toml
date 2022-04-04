@@ -187,7 +187,7 @@ async-graphql-warp = { version = "3.0.37", default-features = false, optional = 
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.23.1", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.23.2", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.17.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -213,7 +213,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
-clap = { version = "3.1.7", features = ["derive", "env"] }
+clap = { version = "3.1.8", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
