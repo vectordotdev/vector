@@ -33,13 +33,13 @@ Vector.
 When supporting a target, Vector must support them through the the paradigm of
 architectures:
 
-* Targets SHOULD support the [agent architecture][agent_architecture] by
+- Targets SHOULD support the [agent architecture][agent_architecture] by
   providing a single command that deploys Vector and achieves the
   [agent architecture requirements](#agent-architecture).
-* Targets SHOULD support the [aggregator architecture][aggregator_architecture] by
+- Targets SHOULD support the [aggregator architecture][aggregator_architecture] by
   providing a single command that deploys Vector and achieves the
   [aggregator architecture requirements](#aggregator-architecture).
-* Targets SHOULD support the [unified architecture][unified_architecture] by
+- Targets SHOULD support the [unified architecture][unified_architecture] by
   providing a single command that deploys Vector and achieves the
   [unified architecture requirements](#unified-architecture).
 
@@ -49,18 +49,18 @@ The [agent architecture][agent_architecture] deploys Vector on each individual
 node for local data collection. Along with general [hardening](#6-hardening)
 requirements, the following requirements define support for this architecture:
 
-* Architecture
-  * MUST deploy as a daemon on existing nodes, one Vector process per node.
-  * MUST deploy with Vector's [default agent configuration][default_agent_configuration]
+- Architecture
+  - MUST deploy as a daemon on existing nodes, one Vector process per node.
+  - MUST deploy with Vector's [default agent configuration][default_agent_configuration]
     which largely covers the agent architecture
     [design recommendations][agent_architecture].
-* Sizing
-  * MUST deploy as a good infrastructure citizen, giving resource priority to
+- Sizing
+  - MUST deploy as a good infrastructure citizen, giving resource priority to
     other services on the same node.
-  * SHOULD be limited to 2 vCPUs, MUST be overridable by the user.
-  * SHOULD be limited to 2 GiB of memory per vCPU (4 GiB in this case), MUST be
+  - SHOULD be limited to 2 vCPUs, MUST be overridable by the user.
+  - SHOULD be limited to 2 GiB of memory per vCPU (4 GiB in this case), MUST be
     overridable by the user.
-  * SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
+  - SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
 
 ### 4. Aggregator Architecture
 
@@ -68,44 +68,44 @@ The [aggregator architecture][aggregator_architecture] deploys Vector onto
 dedicated nodes for data aggregation. Along with general [hardening](#6-hardening)
 requirements, the following requirements define support for this architecture:
 
-* Architecture
-  * SHOULD deploy as a service on dedicated nodes, Vector is the only service
+- Architecture
+  - SHOULD deploy as a service on dedicated nodes, Vector is the only service
     on the node.
-  * MUST deploy with a persistent disk that is available between deployments.
-  * MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
+  - MUST deploy with a persistent disk that is available between deployments.
+  - MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
     which largely covers the aggregator architecture
     [design recommendations][aggregator_architecture].
     in order to achieve durability with disk buffers and source checkpoints.
-  * SHOULD deploy within one Cluster or VPC at a time.
-  * Configured Vector ports, including non-default user configured ports,
+  - SHOULD deploy within one Cluster or VPC at a time.
+  - Configured Vector ports, including non-default user configured ports,
     SHOULD be automatically accessible within the Cluster or VPC.
-  * Configured Vector sources, including non-default user configured sources,
+  - Configured Vector sources, including non-default user configured sources,
     SHOULD be automatically discoverable via target service discovery
     mechanisms.
-* High Availability
-  * SHOULD deploy across 2 nodes, MUST be overridable by the user.
-  * SHOULD deploy across 2 availability zones, MUST be overridable by the user.
-* Sizing
-  * MUST deploy in a way that takes full advantage of all system resources.
+- High Availability
+  - SHOULD deploy across 2 nodes, MUST be overridable by the user.
+  - SHOULD deploy across 2 availability zones, MUST be overridable by the user.
+- Sizing
+  - MUST deploy in a way that takes full advantage of all system resources.
     The Vector service should not be artificially limited with resource
     limiters such as cgroups.
-  * SHOULD request 8 vCPUs, MUST be overridable by the user.
-  * SHOULD request 2 GiB of memory per vCPU (16 GiB in this case), MUST be
+  - SHOULD request 8 vCPUs, MUST be overridable by the user.
+  - SHOULD request 2 GiB of memory per vCPU (16 GiB in this case), MUST be
     overridable by the user.
-  * SHOULD request 6 GiB of disk space per vCPU (48 GiB in this case), MUST be
+  - SHOULD request 6 GiB of disk space per vCPU (48 GiB in this case), MUST be
     overridable by the user.
-  * SHOULD use the following instances if deployed in a listed cloud.
-    * AWS SHOULD default to `c6g.2xlarge` instances with 48 GiB of EBS `io2`
+  - SHOULD use the following instances if deployed in a listed cloud.
+    - AWS SHOULD default to `c6g.2xlarge` instances with 48 GiB of EBS `io2`
       disk space.
-    * Azure SHOULD default to `f8` instances with 48 GiB of standard SSD disk
+    - Azure SHOULD default to `f8` instances with 48 GiB of standard SSD disk
       space.
-    * GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
+    - GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
       48 GiB of SSD persisted disk space.
-* Scaling
-  * MUST deploy along with a load balancer to enable horizontal autoscaling.
-  * Autoscaling SHOULD be enabled by default driven by an 85% CPU utilization
+- Scaling
+  - MUST deploy along with a load balancer to enable horizontal autoscaling.
+  - Autoscaling SHOULD be enabled by default driven by an 85% CPU utilization
     target over a rolling 5 minute window.
-  * Autoscaling SHOULD have a stabilization period of 5 minutes.
+  - Autoscaling SHOULD have a stabilization period of 5 minutes.
 
 ### 5. Unified Architecture
 
@@ -116,34 +116,34 @@ and the [aggregator](#4-aggregator-architecture) apply to this architecture.
 
 ## 6. Hardening
 
-* Setup
-  * An unprivileged Vector service account SHOULD be created upon installation
+- Setup
+  - An unprivileged Vector service account SHOULD be created upon installation
     for running the Vector process.
-* Data hardening
-  * Swap SHOULD be disabled to prevent in-flight data from leaking to disk.
+- Data hardening
+  - Swap SHOULD be disabled to prevent in-flight data from leaking to disk.
     Swap would also make Vector prohibitively slow.
-  * Vector's data directory SHOULD be read and write restricted to Vector's
+  - Vector's data directory SHOULD be read and write restricted to Vector's
     dedicated service account.
-  * Core dumps SHOULD be prevented for the Vector process to prevent in flight
+  - Core dumps SHOULD be prevented for the Vector process to prevent in flight
     data from leaking to disk.
-* Process hardening
-  * Vector's artifacts
-    * All communication during the setup process, such as downloading Vector
+- Process hardening
+  - Vector's artifacts
+    - All communication during the setup process, such as downloading Vector
       artifacts, MUST use encrypted channels.
-    * Downloaded Vector artifacts MUST be verified against the provided
+    - Downloaded Vector artifacts MUST be verified against the provided
       checksum.
-    * The latest Vector version SHOULD be downloaded unless otherwise specified
+    - The latest Vector version SHOULD be downloaded unless otherwise specified
       by the user.
-  * Vector's configuration
-    * Vector's configuration directory SHOULD be read restricted to Vector's
+  - Vector's configuration
+    - Vector's configuration directory SHOULD be read restricted to Vector's
       service account.
-  * Vector's runtime
-    * Vector SHOULD be run under an unprivileged, dedicated service account.
-    * Vector's service account SHOULD NOT have the ability to overwrite Vector's
+  - Vector's runtime
+    - Vector SHOULD be run under an unprivileged, dedicated service account.
+    - Vector's service account SHOULD NOT have the ability to overwrite Vector's
       binary or configuration files. The only directory the Vector service
       account should write to is Vector’s data directory.
-* Network hardening
-  * Configured sources and sinks SHOULD use encrypted channels by default.
+- Network hardening
+  - Configured sources and sinks SHOULD use encrypted channels by default.
 
 [agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
 [aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
