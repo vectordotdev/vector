@@ -326,7 +326,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.11"
+wiremock = "0.5.12"
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
