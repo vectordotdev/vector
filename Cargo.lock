@@ -3542,9 +3542,9 @@ checksum = "20b2b533137b9cad970793453d4f921c2e91312a6d88b1085c07bc15fc51bb3b"
 
 [[package]]
 name = "inherent"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c05a410d53e44fc943a35a32ca27e32af2ea004d5107ccef685d022fc2b9fb"
+checksum = "daa5135cb6aa90ee17b4f0a0fb2908059b0830f90fda333f12816f275b21820c"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -9540,9 +9540,9 @@ dependencies = [
 
 [[package]]
 name = "wiremock"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "359a3231e905044f3993eb5f85dbc99f8b88e078c376f0f2c7bd2d7d729301da"
+checksum = "08965ad3b91480b5bebbd4a7987eb8607ed8ad5afad9b39c70a9f931b8b19250"
 dependencies = [
  "assert-json-diff",
  "async-trait",
