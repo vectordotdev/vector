@@ -84,7 +84,7 @@ components: sinks: vector: {
 			}
 		}
 		compression: {
-			description: "Enable gRPC compression"
+			description: "Enable gRPC compression with gzip."
 			common:      true
 			required:    false
 			type: bool: default: false
