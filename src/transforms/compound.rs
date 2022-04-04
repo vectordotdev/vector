@@ -1,9 +1,9 @@
-use indexmap::IndexMap;
 use serde::{self, Deserialize, Serialize};
+use vector_core::transform::{InnerTopology, InnerTopologyTransform};
 
 use crate::{
     config::{
-        DataType, ExpandType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        ComponentKey, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     schema,
@@ -21,6 +21,15 @@ pub struct TransformStep {
 
     #[serde(flatten)]
     transform: Box<dyn TransformConfig>,
+}
+
+impl TransformStep {
+    pub fn id(&self, index: usize) -> String {
+        self.id
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| index.to_string())
+    }
 }
 
 inventory::submit! {
@@ -42,22 +51,57 @@ impl TransformConfig for CompoundConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        name: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
+        let definition = schema::Definition::empty();
+
+        let last_step = self
+            .steps
+            .last()
+            .ok_or("must specify at least one transform")?;
+        let mut result = InnerTopology {
+            inner: Default::default(),
+            outputs: vec![(
+                name.join(last_step.id(self.steps.len() - 1)),
+                last_step.transform.outputs(&definition),
+            )],
+        };
+
+        let mut last_inputs = inputs.to_vec();
         for (i, step) in self.steps.iter().enumerate() {
-            if map
-                .insert(
-                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
-                    step.transform.to_owned(),
-                )
+            let step_name = name.join(step.id(i));
+
+            let step_outputs = step
+                .transform
+                .outputs(&definition)
+                .into_iter()
+                .map(|output| {
+                    output
+                        .port
+                        .map(|p| step_name.port(p))
+                        .unwrap_or_else(|| step_name.id().to_string())
+                })
+                .collect::<Vec<String>>();
+
+            let inner_transform = InnerTopologyTransform {
+                inputs: last_inputs,
+                inner: step.transform.to_owned(),
+            };
+
+            if result
+                .inner
+                .insert(step_name.clone(), inner_transform)
                 .is_some()
             {
                 return Err("conflicting id found while expanding transform".into());
             }
+
+            last_inputs = step_outputs;
         }
 
-        if !map.is_empty() {
-            Ok(Some((map, ExpandType::Serial { alias: false })))
+        if !result.inner.is_empty() {
+            Ok(Some(result))
         } else {
             Err("must specify at least one transform".into())
         }
@@ -87,6 +131,8 @@ mod test {
 
     #[test]
     fn can_serialize_nested_transforms() {
+        let name = ComponentKey::from("main");
+        let inputs = vec!["bar".to_owned(), "baz".to_owned()];
         // We need to serialize the config to check if a config has
         // changed when reloading.
         let config = toml::from_str::<CompoundConfig>(
@@ -102,13 +148,20 @@ mod test {
         "#,
         )
         .unwrap()
-        .expand()
+        .expand(&name, &inputs)
         .unwrap()
         .unwrap();
 
         assert_eq!(
-            serde_json::to_string(&config).unwrap(),
-            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},{"Serial":{"alias":false}}]"#
+            serde_json::to_string(&config.inner).unwrap(),
+            r#"{"main.0":{"inputs":["bar","baz"],"inner":{"type":"mock"}},"main.foo":{"inputs":["main.0"],"inner":{"type":"mock"}}}"#,
+        );
+        assert_eq!(
+            config.outputs,
+            vec![(
+                ComponentKey::from("main.foo"),
+                vec![Output::default(DataType::all())]
+            )]
         );
     }
 }

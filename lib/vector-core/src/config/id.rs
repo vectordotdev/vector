@@ -21,8 +21,17 @@ impl ComponentKey {
     #[must_use]
     pub fn join<D: fmt::Display>(&self, name: D) -> Self {
         Self {
-            id: format!("{}.{}", self.id, name),
+            // ports and inner component use the same naming convention
+            id: self.port(name),
         }
+    }
+
+    pub fn port<D: fmt::Display>(&self, name: D) -> String {
+        format!("{}.{}", self.id, name)
+    }
+
+    pub fn into_id(self) -> String {
+        self.id
     }
 }
 

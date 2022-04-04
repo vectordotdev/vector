@@ -1,4 +1,4 @@
-use crate::aws::aws_sdk::ClientBuilder;
+use crate::aws::ClientBuilder;
 use aws_sdk_s3::{Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;

@@ -5,12 +5,13 @@ mod unix;
 
 use std::net::SocketAddr;
 
+use codecs::NewlineDelimitedDecoderConfig;
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
-    codecs::{decoding::DecodingConfig, NewlineDelimitedDecoderConfig},
+    codecs::DecodingConfig,
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -226,6 +227,7 @@ mod test {
         time::{timeout, Duration, Instant},
     };
 
+    use codecs::NewlineDelimitedDecoderConfig;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -242,7 +244,6 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        codecs::NewlineDelimitedDecoderConfig,
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -701,7 +702,7 @@ mod test {
 
         assert_eq!(
             events[0].as_log()[log_schema().host_key()],
-            from.to_string().into()
+            from.ip().to_string().into()
         );
     }
 

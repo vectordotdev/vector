@@ -208,8 +208,7 @@ components: sources: [Name=string]: {
 			if features.collect.tls != _|_ {
 				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
-						can_enable:             features.collect.tls.can_enable
-						can_verify_certificate: features.collect.tls.can_enable
+						can_verify_certificate: features.collect.tls.can_verify_certificate
 						can_verify_hostname:    features.collect.tls.can_verify_hostname
 						enabled_default:        features.collect.tls.enabled_default
 					}}
@@ -258,8 +257,7 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_enable:             features.receive.tls.can_enable
-					can_verify_certificate: features.receive.tls.can_enable
+					can_verify_certificate: features.receive.tls.can_verify_certificate
 					enabled_default:        features.receive.tls.enabled_default
 				}}
 			}

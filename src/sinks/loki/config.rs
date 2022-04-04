@@ -151,7 +151,14 @@ pub fn valid_label_name(label: &Template) -> bool {
         // The closest mention is in section about Parser Expression https://grafana.com/docs/loki/latest/logql/
         //
         // [a-zA-Z_][a-zA-Z0-9_]*
-        let label_trim = label.get_ref().trim();
+        //
+        // '*' symbol at the end of the label name will be treated as a prefix for
+        // underlying object keys.
+        let mut label_trim = label.get_ref().trim();
+        if let Some(without_opening_end) = label_trim.strip_suffix('*') {
+            label_trim = without_opening_end
+        }
+
         let mut label_chars = label_trim.chars();
         if let Some(ch) = label_chars.next() {
             (ch.is_ascii_alphabetic() || ch == '_')
@@ -174,6 +181,8 @@ mod tests {
         assert!(valid_label_name(&" name ".try_into().unwrap()));
         assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
+        assert!(valid_label_name(&"abc_*".try_into().unwrap()));
+        assert!(valid_label_name(&"_*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
         assert!(!valid_label_name(&"*".try_into().unwrap()));

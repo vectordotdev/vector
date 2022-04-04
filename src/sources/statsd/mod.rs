@@ -11,11 +11,7 @@ use vector_core::ByteSizeOf;
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{
-        self,
-        decoding::{self, Deserializer, Framer},
-        NewlineDelimitedDecoder,
-    },
+    codecs::Decoder,
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
@@ -28,6 +24,10 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     udp, SourceSender,
+};
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
 };
 
 pub mod parser;
@@ -207,7 +207,7 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = codecs::Decoder::new(
+    let codec = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
         Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
@@ -235,11 +235,11 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )

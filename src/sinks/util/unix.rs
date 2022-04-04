@@ -12,8 +12,8 @@ use crate::{
     config::SinkContext,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
-        UnixSocketConnectionFailed, UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
+        UnixSocketConnectionEstablished, UnixSocketError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -87,7 +87,7 @@ impl UnixConnector {
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionFailed {
+                    emit!(UnixSocketConnectionError {
                         error,
                         path: &self.path
                     });

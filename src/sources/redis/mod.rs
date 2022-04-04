@@ -1,8 +1,5 @@
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
         SourceDescription,
@@ -11,11 +8,14 @@ use crate::{
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::StreamExt;
 use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
@@ -115,7 +115,7 @@ impl SourceConfig for RedisSourceConfig {
 
 async fn redis_source(
     config: &RedisSourceConfig,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<super::Source> {
@@ -164,7 +164,7 @@ async fn handle_line(
     line: String,
     key: &str,
     redis_key: Option<&str>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     out: &mut SourceSender,
 ) -> Result<(), ()> {
     let now = Utc::now();
@@ -263,7 +263,7 @@ mod integration_test {
         tokio::spawn(
             redis_source(
                 &config,
-                codecs::Decoder::default(),
+                crate::codecs::Decoder::default(),
                 ShutdownSignal::noop(),
                 tx,
             )
@@ -305,7 +305,7 @@ mod integration_test {
         tokio::spawn(
             redis_source(
                 &config,
-                codecs::Decoder::default(),
+                crate::codecs::Decoder::default(),
                 ShutdownSignal::noop(),
                 tx,
             )
@@ -341,7 +341,7 @@ mod integration_test {
         tokio::spawn(
             redis_source(
                 &config,
-                codecs::Decoder::default(),
+                crate::codecs::Decoder::default(),
                 ShutdownSignal::noop(),
                 tx,
             )
