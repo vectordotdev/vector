@@ -27,6 +27,10 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 
+// prost emits some generated code that includes clones on `Arc`
+// objects, which causes a clippy ding on this block. We don't
+// directly control the generated code, so allow this lint here.
+#[allow(clippy::clone_on_ref_ptr)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
@@ -219,7 +223,7 @@ impl PubsubSource {
                 let mut ack_ids = ack_ids.lock().await;
                 proto::StreamingPullRequest {
                     subscription,
-                    ack_ids: std::mem::replace(ack_ids.as_mut(), Vec::new()),
+                    ack_ids: std::mem::take(ack_ids.as_mut()),
                     stream_ack_deadline_seconds: 600,
                     client_id: CLIENT_ID.clone(),
                     max_outstanding_messages: 1024,
@@ -435,7 +439,7 @@ mod integration_tests {
         let test_data: Vec<_> = range.into_iter().map(random_string).collect();
         let messages: Vec<_> = test_data
             .iter()
-            .map(|message| base64::encode(&message).to_string())
+            .map(|message| base64::encode(&message))
             .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
             .collect();
         let uri = format!("{}/topics/{}:publish", *PROJECT_URI, topic);
@@ -468,7 +472,7 @@ mod integration_tests {
             assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() >= &start);
             assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() <= &end);
             assert!(
-                message_ids.insert(log.get("message_id").unwrap().clone()),
+                message_ids.insert(log.get("message_id").unwrap().clone().to_string()),
                 "Message contained duplicate message_id"
             );
             let logattr = log
