@@ -8,3 +8,4 @@ transforms:
       - source.*
     source: |-
       .new_field = "new value"
+
