@@ -85,7 +85,7 @@ fn simple_span() -> BTreeMap<String, Value> {
     ])
 }
 
-fn simple_trace_event() -> TraceEvent {
+pub fn simple_trace_event() -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert("language", "a_language");
     t.insert("host", "a_host");

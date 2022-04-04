@@ -324,7 +324,7 @@ test-integration: test-integration-eventstoredb_metrics test-integration-fluent 
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
-test-integration: test-integration-shutdown
+test-integration: test-integration-datadog-traces test-integration-shutdown
 
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
