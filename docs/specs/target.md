@@ -153,11 +153,11 @@ and the [aggregator](#4-aggregator-architecture) apply to this architecture.
 
 [agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
 [aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
-[default_agent_configuration]: TODO...
-[default_aggregator_configuration]: TODO...
+[default_agent_configuration]: https://github.com/vectordotdev/vector/blob/target-specification/config/agent/vector.yaml
+[default_aggregator_configuration]: https://vector.dev/docs/reference/configuration/default/aggregator.yaml
 [hardening]: https://vector.dev/docs/setup/going-to-prod/hardening/
 [high_availability]: https://vector.dev/docs/setup/going-to-prod/high-availability/
 [reference_architectures]: https://vector.dev/docs/setup/going-to-prod/arch/
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
-[terminology_document]: TODO...
+[terminology_document]: https://vector.dev/docs/reference/glossary/
 [unified_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/unified/
