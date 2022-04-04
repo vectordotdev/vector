@@ -120,7 +120,27 @@ components: sources: prometheus_scrape: {
 			required: false
 			type: object: {
 				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
-				options: {}
+				options: {
+					"*": {
+						common:      false
+						description: "Any query key"
+						required:    false
+						type: array: {
+							default: null
+							examples: [[
+								#"{job="somejob"}"#,
+								#"{__name__=~"job:.*"}"#,
+							]]
+							items: type: string: {
+								examples: [
+									#"{job="somejob"}"#,
+									#"{__name__=~"job:.*"}"#,
+								]
+								syntax: "literal"
+							}
+						}
+					}
+				}
 			}
 		}
 		auth: configuration._http_auth & {_args: {
