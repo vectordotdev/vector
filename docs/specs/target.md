@@ -56,7 +56,7 @@ this architecture:
     configured to assume agent responsibilities.
   * MUST deploy with Vector's [default agent configuration][default_agent_configuration]
     which largely covers the agent architecture
-    [design recommendations][agent_architecture_design].
+    [design recommendations][agent_architecture].
 * Sizing
   * MUST deploy as a good infrastructure citizen, giving resource priority to
     other services on the same node.
@@ -77,7 +77,7 @@ for this architecture:
   * MUST deploy with a persistent disk that is available between deployments.
   * MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
     which largely covers the aggregator architecture
-    [design recommendations][aggregator_architecture_design].
+    [design recommendations][aggregator_architecture].
     in order to achieve durability with disk buffers and source checkpoints.
   * SHOULD deploy within one Cluster or VPC at a time.
   * Configured Vector ports, including non-default user configured ports,
@@ -152,7 +152,6 @@ and the [aggregator](#4-aggregator-architecture) apply to this architecture.
 ## 7. Sizing & Scaling
 
 [agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
-[agent_architecture_design]: TODO...
 [aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
 [default_agent_configuration]: TODO...
 [default_aggregator_configuration]: TODO...
