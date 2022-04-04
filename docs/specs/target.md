@@ -14,6 +14,7 @@ interpreted as described in the [terminology document][terminology_document].
 - [2. Deployment Architectures](#2-deployment-architectures)
   - [3. Agent Architecture](#3-agent-architecture)
   - [4. Aggregator Architecture](#4-aggregator-architecture)
+  - [5. Unified Architecture](#5-unified-architecture)
 - [6. Hardening](#6-hardening)
 - [7. Sizing & Scaling](#7-sizing--scaling)
 
@@ -39,6 +40,9 @@ architectures:
 * Targets MUST support the [aggregator architecture][aggregator_architecture] by
   providing a single command that deploys Vector and achieves the
   [aggregator architecture requirements](#aggregator-architecture).
+* Targets MAY support the [unified architecture][unified_architecture] by
+  providing a single command that deploys Vector and achieves the
+  [unified architecture requirements](#unified-architecture).
 
 ### 3. Agent Architecture
 
@@ -106,6 +110,13 @@ for this architecture:
     target over a rolling 5 minute window.
   * Autoscaling SHOULD have a stabilization period of 5 minutes.
 
+### 5. Unified Architecture
+
+The [unified architecture][unified_architecture] deploys Vector on each
+individual node for local data collection, as well as onto dedicated nodes for
+data aggregation. The requirements for both the [agent](#3-agent-architecture)
+and the [aggregator](#4-aggregator-architecture) apply to this architecture.
+
 ## 6. Hardening
 
 * Setup
@@ -150,3 +161,4 @@ for this architecture:
 [reference_architectures]: https://vector.dev/docs/setup/going-to-prod/arch/
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
 [terminology_document]: TODO...
+[unified_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/unified/
