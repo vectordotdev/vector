@@ -14,10 +14,11 @@ use super::{
 };
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 use crate::{
+    common::datadog::get_base_domain,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
+        datadog::{get_api_validate_endpoint, healthcheck, Region},
         util::{
             batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,

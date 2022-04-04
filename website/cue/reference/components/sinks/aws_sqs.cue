@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_sqs: components._aws_new_sdk & {
+components: sinks: aws_sqs: components._aws & {
 	title: "Amazon Simple Queue Service (SQS)"
 
 	classes: {

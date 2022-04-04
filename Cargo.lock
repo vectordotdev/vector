@@ -301,9 +301,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "3.0.36"
+version = "3.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d2cb9bc3dd9d3f8e34893c959c71c03428939f7d4772fb5442a692371672b90"
+checksum = "08fb8219423b2eafaaa350409c4d77c1cb7ea00283c9f5b8b294a53d48c8efd9"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -1105,7 +1105,7 @@ dependencies = [
  "quote 1.0.10",
  "regex",
  "rustc-hash",
- "shlex 0.1.1",
+ "shlex",
  "which 3.1.1",
 ]
 
@@ -1406,9 +1406,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.72"
+version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22a9137b95ea06864e018375b72adfb7db6e6f68cfc8df5a04d00288050485ee"
+checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
 dependencies = [
  "jobserver",
 ]
@@ -1515,9 +1515,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.6"
+version = "3.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8c93436c21e4698bacadf42917db28b23017027a4deccb35dbe47a7e7840123"
+checksum = "c67e7973e74896f4bba06ca2dcfd28d54f9cb8c035e940a32b88ed48f5f5ecf2"
 dependencies = [
  "atty",
  "bitflags",
@@ -1532,9 +1532,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.1.4"
+version = "3.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da95d038ede1a964ce99f49cbe27a7fb538d1da595e4b4f70b8c8f338d17bf16"
+checksum = "a3aab4734e083b809aaf5794e14e756d1c798d2c69c7f7de7a09a2f5214993c1"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -1556,9 +1556,9 @@ dependencies = [
 
 [[package]]
 name = "cmake"
-version = "0.1.46"
+version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7b858541263efe664aead4a5209a4ae5c5d2811167d4ed4ee0944503f8d2089"
+checksum = "e8ad8cef104ac57b68b89df3208164d228503abbdce70f6880ffa3d970e7443a"
 dependencies = [
  "cc",
 ]
@@ -2251,7 +2251,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "thiserror",
- "trust-dns-proto 0.21.1",
+ "trust-dns-proto 0.21.2",
 ]
 
 [[package]]
@@ -6441,118 +6441,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rusoto_core"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b4f000e8934c1b4f70adde180056812e7ea6b1a247952db8ee98c94cd3116cc"
-dependencies = [
- "async-trait",
- "base64 0.13.0",
- "bytes 1.1.0",
- "crc32fast",
- "flate2",
- "futures 0.3.21",
- "http",
- "hyper",
- "hyper-tls",
- "lazy_static",
- "log",
- "rusoto_credential",
- "rusoto_signature",
- "rustc_version 0.4.0",
- "serde",
- "serde_json",
- "tokio",
- "xml-rs",
-]
-
-[[package]]
-name = "rusoto_credential"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a46b67db7bb66f5541e44db22b0a02fed59c9603e146db3a9e633272d3bac2f"
-dependencies = [
- "async-trait",
- "chrono",
- "dirs-next",
- "futures 0.3.21",
- "hyper",
- "serde",
- "serde_json",
- "shlex 1.1.0",
- "tokio",
- "zeroize",
-]
-
-[[package]]
-name = "rusoto_s3"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "048c2fe811a823ad5a9acc976e8bf4f1d910df719dcf44b15c3e96c5b7a51027"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "xml-rs",
-]
-
-[[package]]
-name = "rusoto_signature"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6264e93384b90a747758bcc82079711eacf2e755c3a8b5091687b5349d870bcc"
-dependencies = [
- "base64 0.13.0",
- "bytes 1.1.0",
- "chrono",
- "digest 0.9.0",
- "futures 0.3.21",
- "hex",
- "hmac",
- "http",
- "hyper",
- "log",
- "md-5 0.9.1",
- "percent-encoding",
- "pin-project-lite",
- "rusoto_credential",
- "rustc_version 0.4.0",
- "serde",
- "sha2 0.9.8",
- "tokio",
-]
-
-[[package]]
-name = "rusoto_sqs"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ae091bb560b2aa3b6ec2ab8224516b63f6b6f7c495ae4e41f0566089b156e5f"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures 0.3.21",
- "rusoto_core",
- "serde_urlencoded 0.7.1",
- "xml-rs",
-]
-
-[[package]]
-name = "rusoto_sts"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e7edd42473ac006fd54105f619e480b0a94136e7f53cf3fb73541363678fd92"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "chrono",
- "futures 0.3.21",
- "rusoto_core",
- "serde_urlencoded 0.7.1",
- "xml-rs",
-]
-
-[[package]]
 name = "rust-argon2"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7108,12 +6996,6 @@ name = "shlex"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
-
-[[package]]
-name = "shlex"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
 name = "signal-hook"
@@ -8330,9 +8212,9 @@ dependencies = [
 
 [[package]]
 name = "trust-dns-proto"
-version = "0.21.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2861b3ed517888174d13909e675c4e94b3291867512068be59d76533e4d1270c"
+checksum = "9c31f240f59877c3d4bb3b3ea0ec5a6a0cff07323580ff8c7a605cd7d08b255d"
 dependencies = [
  "async-trait",
  "cfg-if 1.0.0",
@@ -8739,7 +8621,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.1.6",
+ "clap 3.1.7",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8824,12 +8706,6 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "roaring",
- "rusoto_core",
- "rusoto_credential",
- "rusoto_s3",
- "rusoto_signature",
- "rusoto_sqs",
- "rusoto_sts",
  "schannel",
  "seahash",
  "security-framework",
@@ -8870,7 +8746,7 @@ dependencies = [
  "tracing-limit",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns-proto 0.21.1",
+ "trust-dns-proto 0.21.2",
  "tui",
  "typetag",
  "url",
@@ -8929,7 +8805,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.1.6",
+ "clap 3.1.7",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9093,7 +8969,7 @@ name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
- "clap 3.1.6",
+ "clap 3.1.7",
  "exitcode",
  "indoc",
  "once_cell",
@@ -9219,7 +9095,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.1.6",
+ "clap 3.1.7",
  "enrichment",
  "glob",
  "prettydiff",
