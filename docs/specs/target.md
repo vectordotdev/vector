@@ -16,7 +16,6 @@ interpreted as described in the [terminology document][terminology_document].
   - [4. Aggregator Architecture](#4-aggregator-architecture)
   - [5. Unified Architecture](#5-unified-architecture)
 - [6. Hardening](#6-hardening)
-- [7. Sizing & Scaling](#7-sizing--scaling)
 
 ## 1. Introduction
 
@@ -34,26 +33,24 @@ Vector.
 When supporting a target, Vector must support them through the the paradigm of
 architectures:
 
-* Targets MUST support the [agent architecture][agent_architecture] by
+* Targets SHOULD support the [agent architecture][agent_architecture] by
   providing a single command that deploys Vector and achieves the
   [agent architecture requirements](#agent-architecture).
-* Targets MUST support the [aggregator architecture][aggregator_architecture] by
+* Targets SHOULD support the [aggregator architecture][aggregator_architecture] by
   providing a single command that deploys Vector and achieves the
   [aggregator architecture requirements](#aggregator-architecture).
-* Targets MAY support the [unified architecture][unified_architecture] by
+* Targets SHOULD support the [unified architecture][unified_architecture] by
   providing a single command that deploys Vector and achieves the
   [unified architecture requirements](#unified-architecture).
 
 ### 3. Agent Architecture
 
 The [agent architecture][agent_architecture] deploys Vector on each individual
-node for local data collection. The following requirements define support for
-this architecture:
+node for local data collection. Along with general [hardening](#6-hardening)
+requirements, the following requirements define support for this architecture:
 
 * Architecture
   * MUST deploy as a daemon on existing nodes, one Vector process per node.
-  * MUST NOT deploy Vector aggregator nodes, since the Vector aggregator can be
-    configured to assume agent responsibilities.
   * MUST deploy with Vector's [default agent configuration][default_agent_configuration]
     which largely covers the agent architecture
     [design recommendations][agent_architecture].
@@ -68,12 +65,12 @@ this architecture:
 ### 4. Aggregator Architecture
 
 The [aggregator architecture][aggregator_architecture] deploys Vector onto
-dedicated nodes for data aggregation. The following requirements define support
-for this architecture:
+dedicated nodes for data aggregation. Along with general [hardening](#6-hardening)
+requirements, the following requirements define support for this architecture:
 
 * Architecture
-  * MUST deploy as a stateful service on dedicated nodes, Vector is the only
-    service on the node.
+  * SHOULD deploy as a service on dedicated nodes, Vector is the only service
+    on the node.
   * MUST deploy with a persistent disk that is available between deployments.
   * MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
     which largely covers the aggregator architecture
@@ -105,7 +102,7 @@ for this architecture:
     * GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
       48 GiB of SSD persisted disk space.
 * Scaling
-  * Load-balancing?...
+  * MUST deploy along with a load balancer to enable horizontal autoscaling.
   * Autoscaling SHOULD be enabled by default driven by an 85% CPU utilization
     target over a rolling 5 minute window.
   * Autoscaling SHOULD have a stabilization period of 5 minutes.
@@ -141,15 +138,12 @@ and the [aggregator](#4-aggregator-architecture) apply to this architecture.
     * Vector's configuration directory SHOULD be read restricted to Vector's
       service account.
   * Vector's runtime
-    * Vector SHOULD be run under an unprivileged, deciated service account by
-      default.
+    * Vector SHOULD be run under an unprivileged, dedicated service account.
     * Vector's service account SHOULD NOT have the ability to overwrite Vector's
       binary or configuration files. The only directory the Vector service
       account should write to is Vector’s data directory.
 * Network hardening
   * Configured sources and sinks SHOULD use encrypted channels by default.
-
-## 7. Sizing & Scaling
 
 [agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
 [aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
