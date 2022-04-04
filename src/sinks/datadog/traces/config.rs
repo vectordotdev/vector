@@ -10,11 +10,12 @@ use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
 use super::service::TraceApiRetry;
 use crate::{
+    common::datadog::get_base_domain,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{
-            get_api_validate_endpoint, get_base_domain, healthcheck,
+            get_api_validate_endpoint, healthcheck,
             traces::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
