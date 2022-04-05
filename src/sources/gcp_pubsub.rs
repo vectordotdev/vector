@@ -114,7 +114,7 @@ pub struct PubsubConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_ack_deadline() -> i32 {
+const fn default_ack_deadline() -> i32 {
     600
 }
 
@@ -548,7 +548,7 @@ mod integration_tests {
 
     async fn pull_count(client: &HttpClient, subscription: &str, count: usize) -> usize {
         let response = request(
-            &client,
+            client,
             Method::POST,
             format!("{}/subscriptions/{}:pull", *PROJECT_URI, subscription),
             json!({ "maxMessages": count, "returnImmediately": true }),
