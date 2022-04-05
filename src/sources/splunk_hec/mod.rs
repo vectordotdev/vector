@@ -1472,6 +1472,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn health() {
+        let (_source, address) = source(None).await;
+
+        let res = reqwest::Client::new()
+            .get(&format!("http://{}/services/collector/health", address))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+    }
+
+    #[tokio::test]
     async fn secondary_token() {
         let message = r#"{"event":"first", "color": "blue"}"#;
         let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
