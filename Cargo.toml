@@ -242,7 +242,7 @@ kube = { version = "0.70.0", default-features = false, features = ["client", "na
 listenfd = { version = "0.5.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.5", default-features = false, optional = true }
-maxminddb = { version = "0.22.0", default-features = false, optional = true }
+maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
 mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.18.1", default-features = false, optional = true }
