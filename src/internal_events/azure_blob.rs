@@ -69,7 +69,5 @@ impl InternalEvent for AzureBlobEventsSent {
         trace!(message = "Events sent.", request_id = %self.request_id, count = 1, byte_size = %self.byte_size);
         counter!("component_sent_events_total", 1);
         counter!("component_sent_event_bytes_total", self.byte_size as u64);
-        // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

@@ -79,7 +79,7 @@ pub struct UnitTestSinkConfig {
     // Name of the test this sink is part of
     pub test_name: String,
     // Name of the transform/branch associated with this sink
-    pub transform_id: String,
+    pub transform_ids: Vec<String>,
     #[serde(skip)]
     // Sender used to transmit the test result
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
@@ -96,7 +96,7 @@ impl SinkConfig for UnitTestSinkConfig {
         let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
             test_name: self.test_name.clone(),
-            transform_id: self.transform_id.clone(),
+            transform_ids: self.transform_ids.clone(),
             result_tx: tx,
             check: self.check.clone(),
         };
@@ -120,7 +120,7 @@ impl SinkConfig for UnitTestSinkConfig {
 
 pub struct UnitTestSink {
     pub test_name: String,
-    pub transform_id: String,
+    pub transform_ids: Vec<String>,
     // None for NoOp test sinks
     pub result_tx: Option<oneshot::Sender<UnitTestSinkResult>>,
     pub check: UnitTestSinkCheck,
@@ -144,7 +144,7 @@ impl StreamSink<Event> for UnitTestSink {
                 if output_events.is_empty() {
                     result
                         .test_errors
-                        .push(format!("checks for transform {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_id));
+                        .push(format!("checks for transforms {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_ids));
                 } else {
                     for (i, check) in checks.iter().enumerate() {
                         let mut check_errors = Vec::new();
@@ -169,8 +169,8 @@ impl StreamSink<Event> for UnitTestSink {
                             check_errors.insert(
                                 0,
                                 format!(
-                                    "check[{}] for transform {:?} failed conditions:",
-                                    i, self.transform_id
+                                    "check[{}] for transforms {:?} failed conditions:",
+                                    i, self.transform_ids
                                 ),
                             );
                         }
@@ -182,7 +182,7 @@ impl StreamSink<Event> for UnitTestSink {
                     if !result.test_errors.is_empty() {
                         result.test_errors.push(format!(
                             "output payloads from {:?} (events encoded as JSON):\n  {}",
-                            self.transform_id,
+                            self.transform_ids,
                             events_to_string(&output_events)
                         ));
                     }
@@ -191,8 +191,8 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOutputs => {
                 if !output_events.is_empty() {
                     result.test_errors.push(format!(
-                        "check for transform {:?} failed: expected no outputs",
-                        self.transform_id
+                        "check for transforms {:?} failed: expected no outputs",
+                        self.transform_ids
                     ));
                 }
             }

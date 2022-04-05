@@ -70,7 +70,7 @@ pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
 impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
     fn emit(self) {
         error!(
-            message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
+            message = "Detected record failed to decode so passing along data as-is.",
             error = ?self.error,
             error_code = "automatic_record_decode",
             error_type = error_type::PARSER_FAILED,

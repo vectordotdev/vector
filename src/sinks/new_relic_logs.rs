@@ -182,13 +182,13 @@ mod tests {
     use std::io::BufRead;
 
     use bytes::Buf;
+    use codecs::encoding::Serializer;
     use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;
 
     use super::*;
     use crate::{
-        codecs::encoding::Serializer,
         config::SinkConfig,
         event::Event,
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},

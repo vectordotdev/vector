@@ -7,7 +7,7 @@ use aws_sdk_kinesis::types::DateTime;
 use tokio::time::{sleep, Duration};
 
 use super::*;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::ProxyConfig;
 use crate::sinks::aws_kinesis_streams::config::KinesisClientBuilder;

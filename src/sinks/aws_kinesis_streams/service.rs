@@ -6,8 +6,7 @@ use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
-    event::EventStatus,
-    internal_events::{AwsKinesisStreamsEventSent, AwsSdkBytesSent},
+    event::EventStatus, internal_events::AwsBytesSent,
     sinks::aws_kinesis_streams::request_builder::KinesisRequest,
 };
 use aws_sdk_kinesis::error::PutRecordsError;
@@ -86,14 +85,9 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .stream_name(stream_name)
                 .send()
                 .inspect_ok(|_| {
-                    emit!(AwsSdkBytesSent {
+                    emit!(AwsBytesSent {
                         byte_size: processed_bytes_total,
                         region,
-                    });
-
-                    // Deprecated
-                    emit!(AwsKinesisStreamsEventSent {
-                        byte_size: processed_bytes_total
                     });
                 })
                 .instrument(info_span!("request").or_current())

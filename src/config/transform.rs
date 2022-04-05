@@ -3,10 +3,9 @@ use std::collections::HashSet;
 use component::ComponentDescription;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use vector_core::transform::{ExpandType, TransformConfig};
+use vector_core::transform::TransformConfig;
 
 use super::{component, ComponentKey};
-use crate::transforms::noop::Noop;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter<T> {
@@ -56,53 +55,32 @@ impl TransformOuter<String> {
 
         let expansion = self
             .inner
-            .expand()
+            .expand(&key, &self.inputs)
             .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
 
         let mut ptypes = parent_types.clone();
         ptypes.insert(self.inner.transform_type());
 
-        if let Some((expanded, expand_type)) = expansion {
+        if let Some(inner_topology) = expansion {
             let mut children = Vec::new();
-            let mut inputs = self.inputs.clone();
 
-            for (name, content) in expanded {
-                let full_name = key.join(name);
+            expansions.insert(
+                key.clone(),
+                inner_topology
+                    .outputs()
+                    .into_iter()
+                    .map(ComponentKey::from)
+                    .collect(),
+            );
 
+            for (inner_name, inner_transform) in inner_topology.inner {
                 let child = TransformOuter {
-                    inputs,
-                    inner: content,
+                    inputs: inner_transform.inputs,
+                    inner: inner_transform.inner,
                 };
-                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
-                children.push(full_name.clone());
-
-                inputs = match expand_type {
-                    ExpandType::Parallel { .. } => self.inputs.clone(),
-                    ExpandType::Serial { .. } => vec![full_name.to_string()],
-                }
+                children.push(inner_name.clone());
+                transforms.insert(inner_name, child);
             }
-
-            if matches!(expand_type, ExpandType::Parallel { aggregates: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs: children.iter().map(ToString::to_string).collect(),
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            } else if matches!(expand_type, ExpandType::Serial { alias: true }) {
-                transforms.insert(
-                    key.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: Box::new(Noop),
-                    },
-                );
-                children.push(key.clone());
-            }
-
-            expansions.insert(key.clone(), children);
         } else {
             transforms.insert(key, self);
         }

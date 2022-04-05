@@ -350,7 +350,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 
         NodeType::Element => {
             match (config.always_use_text_key, node.attributes().is_empty()) {
-                // If the the node has attributes, *always* recurse to expand default keys.
+                // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),

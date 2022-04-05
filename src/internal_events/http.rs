@@ -56,7 +56,6 @@ impl InternalEvent for HttpEventsReceived<'_> {
             "protocol" => self.protocol,
         );
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -97,18 +96,6 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         );
         // deprecated
         counter!("http_bad_requests_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct HttpEventEncoded {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for HttpEventEncoded {
-    fn emit(self) {
-        trace!(message = "Encode event.");
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

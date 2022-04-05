@@ -2,6 +2,10 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
@@ -12,15 +16,11 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -137,7 +137,7 @@ async fn demo_logs_source(
     interval: f64,
     count: usize,
     format: OutputFormat,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {

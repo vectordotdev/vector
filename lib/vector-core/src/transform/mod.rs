@@ -13,7 +13,9 @@ use crate::{
 
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
-pub use config::{ExpandType, TransformConfig, TransformContext};
+pub use config::{
+    ExpandType, InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext,
+};
 
 mod config;
 

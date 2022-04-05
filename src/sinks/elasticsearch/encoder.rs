@@ -4,7 +4,6 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     event::{EventFinalizers, Finalizable, LogEvent},
-    internal_events::ElasticsearchEventEncoded,
     sinks::{
         elasticsearch::BulkAction,
         util::encoding::{as_tracked_write, Encoder, VisitLogMut},
@@ -59,11 +58,6 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                     writer.write_all(&[b'\n'])?;
                     Ok(())
                 })?;
-
-            emit!(ElasticsearchEventEncoded {
-                byte_size: written_bytes,
-                index: event.index,
-            });
         }
         Ok(written_bytes)
     }
