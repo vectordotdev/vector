@@ -1,6 +1,6 @@
 use std::{borrow::Cow, time::Instant};
 
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, http_error_code, hyper_error_code};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -72,7 +72,6 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
-            "error" => self.error.to_string(),
             "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
@@ -89,16 +88,16 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
     fn emit(self) {
         error!(
             message = "HTTP error response.",
-            endpoint = %self.endpoint,
             stage = error_stage::RECEIVING,
-            error = %self.code,
+            error_code = %http_error_code(self.code.as_u16()),
             error_type = "http_error",
+            endpoint = %self.endpoint,
         );
         counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error" => self.code.to_string(),
+            "error_code" => http_error_code(self.code.as_u16()),
             "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
@@ -115,10 +114,11 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
     fn emit(self) {
         error!(
             message = "HTTP request processing error.",
-            endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
+            error_code = %hyper_error_code(&self.error),
+            endpoint = %self.endpoint,
         );
         counter!("http_request_errors_total", 1);
         counter!(
@@ -126,6 +126,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "stage" => error_stage::RECEIVING,
             "error" => self.error.to_string(),
             "error_type" => error_type::REQUEST_FAILED,
+            "error_code" => hyper_error_code(&self.error),
             "endpoint" => self.endpoint.to_owned(),
         );
     }
