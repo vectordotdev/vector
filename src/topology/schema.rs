@@ -46,7 +46,7 @@ pub(super) fn merged_definition(
         // "empty" schema.
         //
         // We merge this schema into the top-level schema.
-        if let Some(source) = config.sources.get(key) {
+        if let Some(source) = config.source(key) {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
@@ -77,7 +77,7 @@ pub(super) fn merged_definition(
         // If the input is a transform, it _might_ define its own output schema, or it might not
         // change anything in the schema from its inputs, in which case we need to recursively get
         // the schemas of the transform inputs.
-        } else if let Some(transform) = config.transforms.get(key) {
+        } else if let Some(transform) = config.transform(key) {
             let merged_definition = merged_definition(&transform.inputs, config, cache);
 
             // After getting the transform matching to the given input, we need to further narrow
@@ -126,7 +126,7 @@ mod tests {
         transform::{Transform, TransformConfig, TransformContext},
     };
 
-    use crate::config::{SourceConfig, SourceContext, SourceOuter, TransformOuter};
+    use crate::config::{SourceConfig, SourceContext};
 
     use super::*;
 
@@ -267,15 +267,15 @@ mod tests {
                 },
             ),
         ]) {
-            let mut config = topology::Config::default();
-            config.sources = sources
-                .into_iter()
-                .map(|(key, outputs)| (key.into(), SourceOuter::new(MockComponent { outputs })))
-                .collect::<IndexMap<_, _>>();
-            config.transforms = transforms
-                .into_iter()
-                .map(|(key, outputs)| (key.into(), TransformOuter::new(MockComponent { outputs })))
-                .collect::<IndexMap<_, _>>();
+            let mut config = topology::Config::builder();
+
+            for (key, outputs) in sources {
+                config.add_source(key, MockComponent { outputs });
+            }
+
+            for (key, outputs) in transforms {
+                config.add_transform(key, &[], MockComponent { outputs });
+            }
 
             let inputs = inputs
                 .into_iter()
@@ -284,6 +284,8 @@ mod tests {
                     port,
                 })
                 .collect::<Vec<_>>();
+
+            let config = config.build().unwrap();
 
             let got = merged_definition(&inputs, &config, &mut HashMap::default());
             assert_eq!(got, want, "{}", title);

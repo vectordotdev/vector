@@ -222,8 +222,7 @@ async fn validate_healthchecks(
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
-                    .sinks
-                    .get(&id)
+                    .sink(&id)
                     .expect("Sink not present")
                     .healthcheck()
                     .enabled
