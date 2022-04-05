@@ -154,7 +154,8 @@ async fn run(
     let service = proto::Server::new(Service {
         pipeline: cx.out,
         acknowledgements,
-    }).accept_gzip();
+    })
+    .accept_gzip();
 
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
@@ -251,7 +252,7 @@ mod tests {
         let output = test_util::collect_ready(rx).await;
         assert_event_data_eq!(events, output);
     }
-    
+
     #[tokio::test]
     async fn receive_compressed_message() {
         let addr = test_util::next_addr();
@@ -270,8 +271,11 @@ mod tests {
         // Ideally, this would be a fully custom agent to send the data,
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
-        let config = format!(r#"address = "{}"
-        compression=true"#, addr);
+        let config = format!(
+            r#"address = "{}"
+        compression=true"#,
+            addr
+        );
         let sink: SinkConfig = toml::from_str(&config).unwrap();
         let cx = SinkContext::new_test();
         let (sink, _) = sink.build(cx).await.unwrap();
