@@ -103,6 +103,15 @@ names. That process works as follows:
 4. The upload assembled to the final object with the
    `CompleteMultipartUpload` action as above.
 
+In the case of multiple Vector instances writing into the same bucket
+with the same `key_prefix` where one restarts, the above process could
+trigger the reassembly of a multipart upload that is still being
+written to by another instance. When the other instance(s) try to
+upload a subsequent part, S3 will report that the multipart upload can
+no longer be found. When encountering this error, the writing instance
+will discard its previous multipart data and retry after creating a
+new upload.
+
 ### User Experience
 
 From a user point of view, there is no visible change in the behavior
