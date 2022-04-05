@@ -276,6 +276,57 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
     }
 }
 
+impl std::fmt::Display for Collection<Field> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("object");
+        }
+
+        f.write_str("{ ")?;
+
+        let mut known = self.known.iter().peekable();
+        while let Some((key, kind)) = known.next() {
+            write!(f, "\"{key}\": {kind}")?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str(" }")?;
+
+        return Ok(());
+    }
+}
+
+impl std::fmt::Display for Collection<Index> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("array");
+        }
+
+        f.write_str("[")?;
+
+        let mut known = self.known.iter().peekable();
+
+        // This expects the invariant to hold that an array without "unknown"
+        // fields cannot have known fields with non-incremental indices. That
+        // is, an array of 5 elements has to define index 0 to 4, otherwise
+        // "unknown" has to be defined.
+        while let Some((_, kind)) = known.next() {
+            kind.fmt(f)?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("]")?;
+
+        return Ok(());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

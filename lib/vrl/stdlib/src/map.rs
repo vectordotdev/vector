@@ -156,35 +156,13 @@ impl Function for Map {
                 }
              "#),
             },
-            Example {
-                title: "non array return value for object iteration does not compile",
-                source: r#"map({"b": 2}) -> |index, value| { { "a": 1} }"#,
-
-                result: Err(
-                    r#"function call error for "map" at (0:45): object iteration requires returning a key/value array return value"#,
-                ),
-            },
-            Example {
-                title: "single value return array does not compile",
-                source: r#"map({ "a": 1}) -> |key, value| { [key]  }"#,
-                result: Err(
-                    r#"function call error for "map" at (0:41): object iteration requires a two-element array return value"#,
-                ),
-            },
-            Example {
-                title: "non-byte key type does not compile",
-                source: r#"map({ "a": 1}) -> |key, value| { [value, key]  }"#,
-                result: Err(
-                    r#"function call error for "map" at (0:48): object iteration requires the first element to be a string type"#,
-                ),
-            },
         ]
     }
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &vrl::prelude::FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -211,6 +189,11 @@ impl Function for Map {
             output: closure::Output::Array {
                 elements: vec![Kind::bytes(), Kind::any()],
             },
+            example: Example {
+                title: "mapping object keys and values",
+                source: r#"map({ "one" : 1, "two": 2 }) -> |key, value| { [key + "*2", value * 2] }"#,
+                result: Ok(r#"{ "one*2": 2, "two*2": 4 }"#),
+            },
         };
 
         let array = closure::Input {
@@ -223,11 +206,20 @@ impl Function for Map {
                 closure::Variable { kind: Kind::any() },
             ],
             output: closure::Output::Any,
+            example: Example {
+                title: "adding numbers in array",
+                source: r#"map([1,2,3]) -> |index, value| {  index + value }"#,
+                result: Ok("[1,3,5]"),
+            },
         };
 
         Some(closure::Definition {
             inputs: vec![object, array],
         })
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
+        todo!()
     }
 }
 
@@ -327,7 +319,7 @@ impl Expression for MapFn {
         // };
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)
             .fallible_unless(Kind::object(Collection::any()) | Kind::array(Collection::any()))
@@ -336,7 +328,7 @@ impl Expression for MapFn {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+enum Error {
     #[error("object iteration requires a two-element array return value")]
     ObjectArrayRequired,
 

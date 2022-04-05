@@ -57,7 +57,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     fn compile(
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
-        info: &mut FunctionCompileContext,
+        ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -451,7 +451,7 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
 
 impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
     fn from(args: ArgumentList) -> Self {
-        args.0
+        args.arguments
             .iter()
             .map(|(key, expr)| {
                 (

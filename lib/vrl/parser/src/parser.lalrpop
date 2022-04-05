@@ -48,7 +48,6 @@ extern {
         ":" => Token::Colon,
         "." => Token::Dot,
         "!" => Token::Bang,
-        "escape" => Token::Escape,
         "->" => Token::Arrow,
 
         "+" => Token::Operator("+"),

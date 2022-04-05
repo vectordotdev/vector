@@ -176,7 +176,7 @@ impl Expression for Query {
 
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}", self.target, self.path)
+        write!(f, "{}{}", self.target, self.path)
     }
 }
 

@@ -47,6 +47,15 @@ impl std::fmt::Display for Kind {
             return f.write_str("any");
         }
 
+        // exact representation
+        if self.is_exact() {
+            if let Some(object) = &self.object {
+                return object.fmt(f);
+            } else if let Some(array) = &self.array {
+                return array.fmt(f);
+            }
+        }
+
         let mut kinds = vec![];
 
         if self.contains_bytes() {

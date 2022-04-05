@@ -1,0 +1,15 @@
+# result:
+#
+# error[E109]: unexpected closure
+#   ┌─ :2:15
+#   │
+# 2 │ upcase("foo") -> |k, v| { [upcase(k) + "_" + k, upcase(v)] }
+#   │ --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   │ │             │
+#   │ │             unexpected closure
+#   │ this function does not accept a closure
+#   │
+#   = learn more about error code 109 at https://errors.vrl.dev/109
+#   = see language documentation at https://vrl.dev
+
+upcase("foo") -> |k, v| { [upcase(k) + "_" + k, upcase(v)] }

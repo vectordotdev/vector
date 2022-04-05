@@ -1,0 +1,13 @@
+# result:
+#
+# error[E120]: invalid closure arity
+#   ┌─ :2:1
+#   │
+# 2 │ map({}) -> |k, v, oops| { [k, v] }
+#   │ ^^^         ---------- but 3 argument(s) are supplied
+#   │ │
+#   │ this function requires a closure with 2 argument(s)
+#   │
+#   = see language documentation at https://vrl.dev
+
+map({}) -> |k, v, oops| { [k, v] }

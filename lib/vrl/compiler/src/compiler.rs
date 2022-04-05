@@ -14,7 +14,7 @@ use crate::{
 pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
 
 pub(crate) struct Compiler<'a> {
-    pub(crate) fns: &'a [Box<dyn Function>],
+    fns: &'a [Box<dyn Function>],
     errors: Errors,
     fallible: bool,
     abortable: bool,
@@ -153,12 +153,7 @@ impl<'a> Compiler<'a> {
         Group::new(expr)
     }
 
-    // FIXME: remove pub(crate)
-    pub(crate) fn compile_block(
-        &mut self,
-        node: Node<ast::Block>,
-        external: &mut ExternalEnv,
-    ) -> Block {
+    fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
         // We track the original local state, as any mutations within the block
         // are removed after the block returns.
         let local = self.local.clone();
@@ -377,6 +372,8 @@ impl<'a> Compiler<'a> {
         node: Node<ast::FunctionCall>,
         external: &mut ExternalEnv,
     ) -> FunctionCall {
+        use function_call::Builder;
+
         let call_span = node.span();
         let ast::FunctionCall {
             ident,
@@ -394,15 +391,37 @@ impl<'a> Compiler<'a> {
             self.fallible = true;
         }
 
-        FunctionCall::new(
+        // expand function closure, but don't expand the block yet.
+        let (closure_span, closure_variables, closure_block) = match closure {
+            Some(closure) => {
+                let span = closure.span();
+                let ast::FunctionClosure { variables, block } = closure.into_inner();
+                (Some(span), Some(variables), Some(block))
+            }
+            None => (None, None, None),
+        };
+
+        Builder::new(
             call_span,
             ident,
             abort_on_error,
             arguments,
+            self.fns,
+            &mut self.local,
             external,
-            closure,
-            self,
+            closure_span,
+            closure_variables,
         )
+        .and_then(|mut builder| {
+            let block = closure_block.map(|block| {
+                let span = block.span();
+                let block = self.compile_block(block, external);
+
+                Node::new(span, block)
+            });
+
+            builder.compile(&mut self.local, external, block)
+        })
         .unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             FunctionCall::noop()

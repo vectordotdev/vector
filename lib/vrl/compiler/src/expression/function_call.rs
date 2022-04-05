@@ -1,7 +1,7 @@
-use crate::compiler::Compiler;
 use crate::expression::assignment::Details;
+use crate::function::closure;
+use crate::function::Example;
 
-use parser::ast;
 use std::{fmt, sync::Arc};
 
 use anymap::AnyMap;
@@ -18,58 +18,44 @@ use crate::{
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
-#[derive(Clone)]
-pub struct FunctionCall {
+use super::Block;
+
+pub(crate) struct Builder<'a> {
     abort_on_error: bool,
-    expr: Box<dyn Expression>,
     maybe_fallible_arguments: bool,
-
-    // used for enhancing runtime error messages (using abort-instruction).
-    //
-    // TODO: have span store line/col details to further improve this.
-    span: Span,
-
-    // used for equality check
-    ident: &'static str,
-
-    // The index of the function in the list of stdlib functions.
-    // Used by the VM to identify this function when called.
+    call_span: Span,
+    ident_span: Span,
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
+    closure: Option<(Vec<Node<Ident>>, closure::Input)>,
+    list: ArgumentList,
+    function: &'a Box<dyn Function>,
 }
 
-impl FunctionCall {
+impl<'a> Builder<'a> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new<'a>(
+    pub(crate) fn new(
         call_span: Span,
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-<<<<<<< HEAD
-        funcs: &[Box<dyn Function>],
+        fns: &'a [Box<dyn Function>],
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-=======
-        closure: Option<Node<ast::FunctionClosure>>,
-        compiler: &'a mut Compiler,
->>>>>>> c6f603a5a (feat: initial iteration support spike)
+        closure_span: Option<Span>,
+        closure_variables: Option<Vec<Node<Ident>>>,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = match compiler
-            .fns
+        let (function_id, function) = match fns
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
         {
             Some(function) => function,
             None => {
-                let idents = compiler
-                    .fns
-                    .iter()
-                    .map(|func| func.identifier())
-                    .collect::<Vec<_>>();
+                let idents = fns.iter().map(|func| func.identifier()).collect::<Vec<_>>();
 
                 return Err(Error::Undefined {
                     ident_span,
@@ -134,11 +120,7 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
-<<<<<<< HEAD
             let argument_type_def = argument.type_def((local, external));
-=======
-            let argument_type_def = argument.type_def(compiler.state);
->>>>>>> c6f603a5a (feat: initial iteration support spike)
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -184,32 +166,26 @@ impl FunctionCall {
                 })
             })?;
 
-<<<<<<< HEAD
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
-
-        let mut compile_ctx =
-            FunctionCompileContext::new(call_span).with_external_context(external_context);
-
-        let mut expr = function
-            .compile((local, external), &mut compile_ctx, list)
-=======
         // Check function closure validity.
-        match (function.closure(), closure) {
+        let closure = match (function.closure(), closure_variables, closure_span) {
             // Ensure function accepts closure.
-            (None, Some(_)) => return Err(Error::UnexpectedClosure { call_span }),
+            (None, _, Some(closure_span)) => {
+                return Err(Error::UnexpectedClosure {
+                    call_span,
+                    closure_span,
+                })
+            }
 
             // Ensure required closure is present.
-            (Some(_), None) => return Err(Error::MissingClosure { call_span }),
+            (Some(definition), None, _) => {
+                let example = definition.inputs.get(0).map(|input| input.example);
+
+                return Err(Error::MissingClosure { call_span, example });
+            }
 
             // Check for invalid closure signature.
-            (Some(definition), Some(closure)) => {
-                // expand function closure, but don't expand the block yet.
-                let ast::FunctionClosure { variables, block } = closure.into_inner();
-
-                let mut matched = false;
+            (Some(definition), Some(variables), _) => {
+                let mut matched = None;
                 let mut found_type_def = None;
                 let mut input_expression = None;
                 for input in definition.inputs {
@@ -222,17 +198,17 @@ impl FunctionCall {
                         // invalid.
                         None => continue,
                         Some(expr) => {
-                            let type_def = expr.type_def(compiler.state);
+                            let type_def = expr.type_def((local, external));
                             // The type definition of the value does not match the expected closure
                             // type, continue to check if the closure eventually accepts this
                             // definition.
-                            if !input.kind.is_superset(&type_def.kind()) {
+                            if !input.kind.is_superset(type_def.kind()) {
                                 found_type_def = Some(type_def.kind().clone());
                                 input_expression = Some(expr);
                                 continue;
                             }
 
-                            matched = true;
+                            matched = Some(input.clone());
                         }
                     };
 
@@ -245,8 +221,13 @@ impl FunctionCall {
                     // - set the expected type definition of each argument
 
                     if input.variables.len() != variables.len() {
+                        let closure_arguments_span = variables.first().map_or(call_span, |node| {
+                            (node.span().start(), variables.last().unwrap().span().end()).into()
+                        });
+
                         return Err(Error::ClosureArityMismatch {
-                            call_span,
+                            ident_span,
+                            closure_arguments_span,
                             expected: input.variables.len(),
                             supplied: variables.len(),
                         });
@@ -284,36 +265,82 @@ impl FunctionCall {
                             value: None,
                         };
 
-                        compiler
-                            .state
-                            .insert_variable(call_ident.to_owned().into_inner(), details);
+                        local.insert_variable(call_ident.to_owned().into_inner(), details);
                     }
                 }
 
                 // None of the inputs matched the value type, this is a user error.
-                if !matched {
-                    return Err(Error::EnumerationTypeMismatch {
-                        call_span,
-                        found_kind: found_type_def.unwrap_or(Kind::any()),
-                        input_expression: input_expression
-                            .unwrap_or(&expression::Expr::Noop(Noop {}))
-                            .clone(),
-                    });
-                }
+                match matched {
+                    None => {
+                        return Err(Error::EnumerationTypeMismatch {
+                            call_span,
+                            found_kind: found_type_def.unwrap_or_else(Kind::any),
+                            input_expression: input_expression
+                                .unwrap_or(&expression::Expr::Noop(Noop {}))
+                                .clone(),
+                        })
+                    }
 
-                let block = compiler.compile_block(block);
-                let closure = FunctionClosure::new(variables, block);
-                list.set_closure(closure);
+                    Some(input) => Some((variables, input)),
+                }
             }
 
-            (None, None) => {}
-        }
+            _ => None,
+        };
 
-        let compile_ctx = FunctionCompileContext { span: call_span };
+        Ok(Self {
+            abort_on_error,
+            maybe_fallible_arguments,
+            call_span,
+            ident_span,
+            function_id,
+            arguments: Arc::new(arguments),
+            closure,
+            list,
+            function,
+        })
+    }
 
-        let mut expr = function
-            .compile(compiler.state, &compile_ctx, list)
->>>>>>> c6f603a5a (feat: initial iteration support spike)
+    pub(crate) fn compile(
+        &mut self,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+        closure_block: Option<Node<Block>>,
+    ) -> Result<FunctionCall, Error> {
+        if let Some((variables, input)) = self.closure.clone() {
+            let block = closure_block.unwrap();
+            let (block_span, block) = block.take();
+
+            // Check the type definition of the resulting block.This needs to match
+            // whatever is configured by the closure input type.
+            let found_kind = block.type_def((local, external)).into();
+            let expected_kind = input.output.into_kind();
+            if !expected_kind.is_superset(&found_kind) {
+                return Err(Error::ReturnTypeMismatch {
+                    block_span,
+                    found_kind,
+                    expected_kind,
+                });
+            }
+
+            let closure = FunctionClosure::new(variables, block);
+            self.list.set_closure(closure);
+        };
+
+        let call_span = self.call_span;
+        let ident_span = self.ident_span;
+
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = external.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(self.call_span).with_external_context(external_context);
+
+        let mut expr = self
+            .function
+            .compile((local, external), &mut compile_ctx, self.list.clone())
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
@@ -322,13 +349,9 @@ impl FunctionCall {
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error
-            && !maybe_fallible_arguments
-<<<<<<< HEAD
+        if self.abort_on_error
+            && !self.maybe_fallible_arguments
             && !expr.type_def((local, external)).is_fallible()
-=======
-            && !expr.type_def(compiler.state).is_fallible()
->>>>>>> c6f603a5a (feat: initial iteration support spike)
         {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -337,27 +360,45 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
-<<<<<<< HEAD
         expr.update_state(local, external)
-=======
-        expr.update_state(compiler.state)
->>>>>>> c6f603a5a (feat: initial iteration support spike)
             .map_err(|err| Error::UpdateState {
                 call_span,
                 error: err.to_string(),
             })?;
 
-        Ok(Self {
-            abort_on_error,
+        Ok(FunctionCall {
+            abort_on_error: self.abort_on_error,
             expr,
-            maybe_fallible_arguments,
+            maybe_fallible_arguments: self.maybe_fallible_arguments,
             span: call_span,
-            ident: function.identifier(),
-            function_id,
-            arguments: Arc::new(arguments),
+            ident: self.function.identifier(),
+            function_id: self.function_id,
+            arguments: self.arguments.clone(),
         })
     }
+}
 
+#[derive(Clone)]
+pub struct FunctionCall {
+    abort_on_error: bool,
+    expr: Box<dyn Expression>,
+    maybe_fallible_arguments: bool,
+
+    // used for enhancing runtime error messages (using abort-instruction).
+    //
+    // TODO: have span store line/col details to further improve this.
+    span: Span,
+
+    // used for equality check
+    ident: &'static str,
+
+    // The index of the function in the list of stdlib functions.
+    // Used by the VM to identify this function when called.
+    function_id: usize,
+    arguments: Arc<Vec<Node<FunctionArgument>>>,
+}
+
+impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
     /// The error path in this function should never really be hit as the compiler should
@@ -652,7 +693,7 @@ impl PartialEq for FunctionCall {
 
 #[derive(thiserror::Error, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum Error {
+pub(crate) enum Error {
     #[error("call to undefined function")]
     Undefined {
         ident_span: Span,
@@ -704,14 +745,18 @@ pub enum Error {
     UpdateState { call_span: Span, error: String },
 
     #[error("unexpected closure")]
-    UnexpectedClosure { call_span: Span },
+    UnexpectedClosure { call_span: Span, closure_span: Span },
 
     #[error("missing closure")]
-    MissingClosure { call_span: Span },
+    MissingClosure {
+        call_span: Span,
+        example: Option<Example>,
+    },
 
     #[error("invalid closure arity")]
     ClosureArityMismatch {
-        call_span: Span,
+        ident_span: Span,
+        closure_arguments_span: Span,
         expected: usize,
         supplied: usize,
     },
@@ -720,6 +765,12 @@ pub enum Error {
         call_span: Span,
         found_kind: Kind,
         input_expression: expression::Expr,
+    },
+    #[error("type mismatch in enumeration return type")]
+    ReturnTypeMismatch {
+        block_span: Span,
+        found_kind: Kind,
+        expected_kind: Kind,
     },
 }
 
@@ -741,6 +792,7 @@ impl DiagnosticError for Error {
             MissingClosure { .. } => 111,
             ClosureArityMismatch { .. } => 120,
             EnumerationTypeMismatch { .. } => 121,
+            ReturnTypeMismatch { .. } => 122,
         }
     }
 
@@ -894,21 +946,30 @@ impl DiagnosticError for Error {
                 format!("an error occurred updating the compiler state: {}", error),
                 call_span,
             )],
-            UnexpectedClosure { call_span } => {
-                vec![Label::primary("Unexpected Closure", call_span), Label::context("This function does not accept a closure.", call_span)]
-            }
-            MissingClosure { call_span } => vec![Label::primary("This function expects a closure and one was not provided.", call_span)], 
-            ClosureArityMismatch { call_span, expected, supplied } => vec![Label::primary("This closure does not accept the required number of arguments.",call_span), Label::context(format!("{supplied} arguments were supplied, {expected} were expected."), call_span)],
+            UnexpectedClosure { call_span, closure_span } => vec![
+                Label::primary("unexpected closure", closure_span),
+                Label::context("this function does not accept a closure", call_span)
+            ],
+            MissingClosure { call_span, .. } => vec![Label::primary("this function expects a closure", call_span)],
+            ClosureArityMismatch { ident_span, closure_arguments_span, expected, supplied } => vec![
+                Label::primary(format!("this function requires a closure with {expected} argument(s)"), ident_span),
+                Label::context(format!("but {supplied} argument(s) are supplied"), closure_arguments_span)
+            ],
             EnumerationTypeMismatch {
                 call_span,
                 found_kind,
                 input_expression
-            } => vec![Label::primary(
-                format!(
-                    "This input value does not have a known enumerable type."
-                ),
-                call_span,
-            ), Label::context(format!("The expression {input_expression} has an inferred type of {found_kind} where an array or object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
+            } => vec![
+                Label::primary("This input value does not have a known enumerable type.", call_span),
+                Label::context(format!("The expression {input_expression} has an inferred type of {found_kind} where an array or object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
+            ReturnTypeMismatch {
+                block_span,
+                found_kind,
+                expected_kind,
+            } => vec![
+                Label::primary("block returns invalid value type", block_span),
+                Label::context(format!("expected: {expected_kind}"), block_span),
+                Label::context(format!("received: {found_kind}"), block_span)],
         }
     }
 
@@ -1000,6 +1061,11 @@ impl DiagnosticError for Error {
             }
 
             Compilation { error, .. } => error.notes(),
+
+            MissingClosure { example, .. } if example.is_some() => {
+                let code = example.unwrap().source.to_owned();
+                vec![Note::Example(code)]
+            }
 
             _ => vec![],
         }
@@ -1094,7 +1160,7 @@ mod tests {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
 
-        FunctionCall::new(
+        Builder::new(
             Span::new(0, 0),
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
@@ -1102,7 +1168,11 @@ mod tests {
             &[Box::new(TestFn) as _],
             &mut local,
             &mut external,
+            None,
+            None,
         )
+        .unwrap()
+        .compile(&mut local, &mut external, None)
         .unwrap()
     }
 

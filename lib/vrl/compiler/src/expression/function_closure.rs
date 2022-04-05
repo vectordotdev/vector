@@ -16,9 +16,9 @@ impl FunctionClosure {
         Self { variables, block }
     }
 
-    pub(crate) fn variables(&self) -> &[Node<Ident>] {
-        &self.variables
-    }
+    // pub(crate) fn variables(&self) -> &[Node<Ident>] {
+    //     &self.variables
+    // }
 
     pub fn resolve(
         &self,
