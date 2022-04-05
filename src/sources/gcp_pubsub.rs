@@ -364,14 +364,11 @@ mod integration_tests {
 
     use super::*;
     use crate::test_util::{self, components, random_string};
-    use crate::{config::ProxyConfig, http::HttpClient, SourceSender};
+    use crate::{config::ProxyConfig, gcp, http::HttpClient, SourceSender};
 
     const PROJECT: &str = "sourceproject";
-    static ADDRESS: Lazy<String> = Lazy::new(|| {
-        std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://127.0.0.1:8681".into())
-    });
     static PROJECT_URI: Lazy<String> =
-        Lazy::new(|| format!("{}/v1/projects/{}", *ADDRESS, PROJECT));
+        Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
     const ACK_DEADLINE: u64 = 10; // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
@@ -442,7 +439,7 @@ mod integration_tests {
         let config = PubsubConfig {
             project: PROJECT.into(),
             subscription,
-            endpoint: Some(ADDRESS.clone()),
+            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
             skip_authentication: true,
             ack_deadline_seconds: ACK_DEADLINE as i32,
             ..Default::default()

@@ -9,6 +9,7 @@ use goauth::{
     GoErr,
 };
 use hyper::header::AUTHORIZATION;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -20,6 +21,10 @@ const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
+
+pub static PUBSUB_ADDRESS: Lazy<String> = Lazy::new(|| {
+    std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
+});
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
