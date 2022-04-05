@@ -3585,9 +3585,9 @@ checksum = "20b2b533137b9cad970793453d4f921c2e91312a6d88b1085c07bc15fc51bb3b"
 
 [[package]]
 name = "inherent"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c05a410d53e44fc943a35a32ca27e32af2ea004d5107ccef685d022fc2b9fb"
+checksum = "daa5135cb6aa90ee17b4f0a0fb2908059b0830f90fda333f12816f275b21820c"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -4156,9 +4156,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e8810f0ab5b02d4fc737c818258c8560a3216b7ebd5fd756cb437e23157fc6"
+checksum = "32613e41de4c47ab04970c348ca7ae7382cf116625755af070b008a15516a889"
 
 [[package]]
 name = "lru-cache"
@@ -4246,9 +4246,9 @@ dependencies = [
 
 [[package]]
 name = "maxminddb"
-version = "0.22.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d04a4887cd66b92e72593360cab9de5916059b7383776a9c7b9e906008f2827b"
+checksum = "fe2ba61113f9f7a9f0e87c519682d39c43a6f3f79c2cc42c3ba3dda83b1fa334"
 dependencies = [
  "ipnetwork",
  "log",

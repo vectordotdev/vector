@@ -283,7 +283,18 @@ components: sinks: elasticsearch: {
 			required:    false
 			type: object: {
 				examples: [{"X-Powered-By": "Vector"}]
-				options: {}
+				options: {
+					"*": {
+						common:      false
+						description: "Any query key"
+						required:    false
+						type: string: {
+							default: null
+							examples: ["Vector"]
+							syntax: "literal"
+						}
+					}
+				}
 			}
 		}
 		suppress_type_name: {
