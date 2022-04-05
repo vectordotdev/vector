@@ -62,7 +62,7 @@ components: sources: gcp_pubsub: {
 			common:      false
 			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted."
 			required:    false
-			type: integer: {
+			type: uint: {
 				default: 600
 				examples: [10, 600]
 				unit: "seconds"
