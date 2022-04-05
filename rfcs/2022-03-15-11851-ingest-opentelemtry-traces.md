@@ -39,7 +39,7 @@ transforms:
           return
         }
         key = get_enrichment_table_record!("api_keys", { "user": .tags.user_id })
-        set_dd_api_key(key) # this does not exists yet
+        set_metadata_field("datadog_api_key", key)
       inputs:
        - otlp.traces # Would exclusively emit traces
        - otlp.traces_stats # Would exclusively emit metrics
@@ -291,10 +291,14 @@ Anyway the OpenTelemtry to Datadog traces conversion is dictacted by existing im
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
 consideration applies for APM stats computation, as [official implementations][apm-stats-computation] already provides a
 reference that define what should be done to get the same result with Vector in the loop. The other way, from Datadog to
-OpenTelemetry is less common as of today but while implementing conversions we should ensure that the following path is
-at best idempotent but at least fully functional:
+OpenTelemetry is less common as of today but while implementing conversions we shall ensure that the following path is
+idempotent:
 
 `(Datadog Trace) -> (Vector internal format - based on Opentelemetry) -> (Datadog Trace)`
+
+There is no particular field or subset of metadata that would prevent idempotency in that case. This remains a strong
+requirement and shall be applicable to all third party trace format that will be converted to/from the upcoming Vector
+internal representation for similare scenarios.
 
 **Note**: The [Rust OpenTelemetry implementation][otlp-rust] implement a conversion from OpenTelemetry traces to the
 Datadog `trace-agent` format. This is not the purpose of this RFC, and with the OpenTelemetry traces format being
@@ -348,7 +352,7 @@ N/A
 
 ## Outstanding Questions
 
-- The extend of transforms support and VRL (at least condition evaluation)
+N/A
 
 ## Plan Of Attack
 
