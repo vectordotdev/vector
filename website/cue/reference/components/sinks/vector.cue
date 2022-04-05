@@ -83,6 +83,12 @@ components: sinks: vector: {
 				examples: ["92.12.333.224:\(_port)"]
 			}
 		}
+		compression: {
+			description: "Enable gRPC compression with gzip."
+			common:      true
+			required:    false
+			type: bool: default: false
+		}
 		version: {
 			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."
 			common:      true
