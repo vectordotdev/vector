@@ -5,6 +5,8 @@ use std::{
 };
 
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
+use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
     Error as PulsarError, Producer, Pulsar, TokioExecutor,
@@ -12,8 +14,6 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
-use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
-use pulsar::error::AuthenticationError;
 
 use crate::{
     config::{
@@ -147,14 +147,18 @@ impl PulsarSinkConfig {
                     data: auth.token.as_ref().unwrap().as_bytes().to_vec(),
                 });
             } else if let Some(oauth2) = &auth.oauth2 {
-                builder = builder.with_auth_provider(OAuth2Authentication::client_credentials(OAuth2Params {
-                    issuer_url: oauth2.issuer_url.clone(),
-                    credentials_url: oauth2.credentials_url.clone(),
-                    audience: oauth2.audience.clone(),
-                    scope: oauth2.scope.clone(),
-                }));
+                builder = builder.with_auth_provider(OAuth2Authentication::client_credentials(
+                    OAuth2Params {
+                        issuer_url: oauth2.issuer_url.clone(),
+                        credentials_url: oauth2.credentials_url.clone(),
+                        audience: oauth2.audience.clone(),
+                        scope: oauth2.scope.clone(),
+                    },
+                ));
             } else {
-                return Err(PulsarError::Authentication(AuthenticationError::Custom("Invalid auth config".to_string())));
+                return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                    "Invalid auth config".to_string(),
+                )));
             }
         }
 
@@ -252,16 +256,10 @@ impl Sink<Event> for PulsarSink {
         );
 
         let event_time = match &item {
-            Event::Log(log) => {
-                log.get(log_schema().timestamp_key())
-                    .map(|v| {
-                        v.as_timestamp()
-                            .map(|dt| {
-                                dt.timestamp_millis()
-                            })
-                    })
-                    .unwrap_or(None)
-            },
+            Event::Log(log) => log
+                .get(log_schema().timestamp_key())
+                .map(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
+                .unwrap_or(None),
             _ => None,
         };
 
@@ -276,8 +274,7 @@ impl Sink<Event> for PulsarSink {
         let _ = std::mem::replace(
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
-                let mut builder = producer.create_message()
-                    .with_content(message);
+                let mut builder = producer.create_message().with_content(message);
                 if let Some(et) = event_time {
                     builder = builder.event_time(et as u64);
                 }
