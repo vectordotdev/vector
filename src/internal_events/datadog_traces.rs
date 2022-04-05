@@ -32,13 +32,3 @@ impl InternalEvent for DatadogTracesEncodingError {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct DatadogTracesPayloadTooBig;
-
-impl InternalEvent for DatadogTracesPayloadTooBig {
-    fn emit(self) {
-        warn!(message = "Datadog trace payload maximum size exceeded.",);
-        counter!("datadog_trace_payloads_too_big", 1);
-    }
-}
