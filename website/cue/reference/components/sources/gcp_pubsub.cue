@@ -58,6 +58,16 @@ components: sources: gcp_pubsub: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
+		ack_deadline_seconds: {
+			common:      false
+			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted."
+			required:    false
+			type: integer: {
+				default: 600
+				examples: [10, 600]
+				unit: "seconds"
+			}
+		}
 		api_key:          configuration._gcp_api_key
 		credentials_path: configuration._gcp_credentials_path
 		endpoint: {

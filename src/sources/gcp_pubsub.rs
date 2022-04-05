@@ -27,6 +27,9 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 
+const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
+const MAX_ACK_DEADLINE_SECONDS: i32 = 600;
+
 // prost emits some generated code that includes clones on `Arc`
 // objects, which causes a clippy ding on this block. We don't
 // directly control the generated code, so allow this lint here.
@@ -72,6 +75,12 @@ enum PubsubError {
     Connect { source: tonic::transport::Error },
     #[snafu(display("Could not pull data from remote: {}", source))]
     Pull { source: tonic::Status },
+    #[snafu(display(
+        "`ack_deadline_seconds` is outside the valid range of {} to {}",
+        MIN_ACK_DEADLINE_SECONDS,
+        MAX_ACK_DEADLINE_SECONDS
+    ))]
+    InvalidAckDeadline,
 }
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
@@ -91,6 +100,9 @@ pub struct PubsubConfig {
 
     pub tls: Option<TlsOptions>,
 
+    #[serde(default = "default_ack_deadline")]
+    pub ack_deadline_seconds: i32,
+
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
@@ -102,10 +114,20 @@ pub struct PubsubConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+fn default_ack_deadline() -> i32 {
+    600
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
+        if self.ack_deadline_seconds < MIN_ACK_DEADLINE_SECONDS
+            || self.ack_deadline_seconds > MAX_ACK_DEADLINE_SECONDS
+        {
+            return Err(PubsubError::InvalidAckDeadline.into());
+        }
+
         let authorization = if self.skip_authentication {
             None
         } else {
@@ -129,6 +151,7 @@ impl SourceConfig for PubsubConfig {
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
             tls: TlsSettings::from_options(&self.tls)?,
             cx,
+            ack_deadline_seconds: self.ack_deadline_seconds,
             ack_ids: Default::default(),
         }
         .run()
@@ -159,6 +182,7 @@ struct PubsubSource {
     decoder: Decoder,
     acknowledgements: bool,
     tls: TlsSettings,
+    ack_deadline_seconds: i32,
     cx: SourceContext,
     // The acknowledgement IDs are pulled out of the response message
     // and then inserted into the request. However, the request is
@@ -214,20 +238,23 @@ impl PubsubSource {
     }
 
     fn request_stream(&self) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
+        // This data is only allowed in the first request
         let mut subscription = Some(self.subscription.clone());
+        let mut client_id = Some(CLIENT_ID.clone());
+
         let ack_ids = Arc::clone(&self.ack_ids);
+        let stream_ack_deadline_seconds = self.ack_deadline_seconds;
         stream::repeat(()).then(move |()| {
             let ack_ids = Arc::clone(&ack_ids);
-            let subscription = subscription.take().unwrap_or_else(String::new);
+            let subscription = subscription.take().unwrap_or_default();
+            let client_id = client_id.take().unwrap_or_default();
             async move {
                 let mut ack_ids = ack_ids.lock().await;
                 proto::StreamingPullRequest {
                     subscription,
+                    client_id,
                     ack_ids: std::mem::take(ack_ids.as_mut()),
-                    stream_ack_deadline_seconds: 600,
-                    client_id: CLIENT_ID.clone(),
-                    max_outstanding_messages: 1024,
-                    max_outstanding_bytes: 1024 * 1024,
+                    stream_ack_deadline_seconds,
                     ..Default::default()
                 }
             }
@@ -346,7 +373,7 @@ mod integration_tests {
     });
     static PROJECT_URI: Lazy<String> =
         Lazy::new(|| format!("{}/v1/projects/{}", *ADDRESS, PROJECT));
-    const ACK_DEADLINE: u64 = 1;
+    const ACK_DEADLINE: u64 = 10; // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
@@ -446,6 +473,7 @@ mod integration_tests {
             subscription,
             endpoint: Some(ADDRESS.clone()),
             skip_authentication: true,
+            ack_deadline_seconds: ACK_DEADLINE as i32,
             ..Default::default()
         };
         let source = config
