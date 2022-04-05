@@ -28,6 +28,7 @@ md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
 once_cell = { version = "1.10", optional = true }
+rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -44,6 +45,16 @@ woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
 utf8-width = { version = "0.1.6", optional = true }
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
+
+# Cryptography
+aes = { version = "0.8.1", optional = true }
+
+# Cryptography - Block Modes
+ctr = { version = "0.9.1", optional = true }
+cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
+cfb-mode = { version = "0.8.1", optional = true }
+ofb = { version = "0.6.1", optional = true }
+
 
 [dev-dependencies]
 anyhow = "1"
@@ -144,6 +155,7 @@ default = [
     "parse_user_agent",
     "parse_xml",
     "push",
+    "random_bytes",
     "redact",
     "remove",
     "replace",
@@ -188,9 +200,10 @@ boolean = []
 ceil = []
 compact = []
 contains = []
+cryptography = ["aes", "ctr", "cbc", "cfb-mode", "ofb"]
 decode_base64 = ["base64"]
 decode_percent = ["percent-encoding"]
-decrypt = []
+decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
 encode_base64 = ["base64"]
@@ -198,7 +211,7 @@ encode_json = ["serde_json", "value/json", "chrono", "regex"]
 encode_key_value = ["vector_common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
-encrypt = []
+encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []
 find = ["regex"]
@@ -272,6 +285,7 @@ parse_url = ["url"]
 parse_user_agent = ["woothee","uaparser","once_cell"]
 parse_xml = ["roxmltree", "once_cell", "regex"]
 push = []
+random_bytes = ["rand"]
 redact = ["once_cell", "regex"]
 remove = ["vector_common/btreemap"]
 replace = ["regex"]

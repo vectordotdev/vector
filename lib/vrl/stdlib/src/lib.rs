@@ -197,6 +197,8 @@ mod parse_user_agent;
 mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
+#[cfg(feature = "random_bytes")]
+mod random_bytes;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "remove")]
@@ -292,6 +294,8 @@ pub use contains::Contains;
 pub use decode_base64::DecodeBase64;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
+#[cfg(feature = "decrypt")]
+pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -452,6 +456,8 @@ pub use parse_xml::ParseXml;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
+#[cfg(feature = "random_bytes")]
+pub use random_bytes::RandomBytes;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
 #[cfg(feature = "remove")]
@@ -541,8 +547,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
-        // #[cfg(feature = "decrypt")]
-        // Box::new(Decrypt),
+        #[cfg(feature = "decrypt")]
+        Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -707,6 +713,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
+        #[cfg(feature = "random_bytes")]
+        Box::new(RandomBytes),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "remove")]
