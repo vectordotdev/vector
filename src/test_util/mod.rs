@@ -285,7 +285,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    std::iter::repeat(()).map(move |_| random_string(len))
+    iter::repeat_with(move || random_string(len))
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
@@ -300,7 +300,7 @@ pub fn random_maps(
     max_size: usize,
     field_len: usize,
 ) -> impl Iterator<Item = HashMap<String, String>> {
-    iter::repeat(()).map(move |_| random_map(max_size, field_len))
+    iter::repeat_with(move || random_map(max_size, field_len))
 }
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>

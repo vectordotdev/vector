@@ -353,7 +353,6 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
-    use core::ops::Range;
     use std::collections::{BTreeMap, HashSet};
 
     use futures::Stream;
@@ -364,7 +363,7 @@ mod integration_tests {
     use vector_common::btreemap;
 
     use super::*;
-    use crate::test_util::{collect_n_stream, components, random_string};
+    use crate::test_util::{self, components, random_string};
     use crate::{config::ProxyConfig, http::HttpClient, SourceSender};
 
     const PROJECT: &str = "sourceproject";
@@ -377,93 +376,65 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        let (client, topic, _, mut rx) = setup().await;
-        let start = now_trunc();
-        let test_data = send_test_events(25..50, &client, &topic, btreemap![]).await;
-        receive_events(&mut rx, start, test_data, btreemap![]).await;
+        let (tester, mut rx) = setup().await;
+        let test_data = tester.send_test_events(99, btreemap![]).await;
+        receive_events(&mut rx, test_data).await;
     }
 
     #[tokio::test]
     async fn streams_data() {
-        let (client, topic, _, mut rx) = setup().await;
+        let (tester, mut rx) = setup().await;
         for _ in 0..10 {
-            let start = now_trunc();
-            let test_data = send_test_events(100..128, &client, &topic, btreemap![]).await;
-            receive_events(&mut rx, start, test_data, btreemap![]).await;
+            let test_data = tester.send_test_events(9, btreemap![]).await;
+            receive_events(&mut rx, test_data).await;
         }
     }
 
     #[tokio::test]
     async fn sends_attributes() {
-        let (client, topic, _, mut rx) = setup().await;
-        let start = now_trunc();
+        let (tester, mut rx) = setup().await;
         let attributes = btreemap![
             random_string(8) => random_string(88),
             random_string(8) => random_string(88),
             random_string(8) => random_string(88),
         ];
-        let test_data = send_test_events(100..101, &client, &topic, attributes.clone()).await;
-        receive_events(&mut rx, start, test_data, attributes).await;
+        let test_data = tester.send_test_events(1, attributes).await;
+        receive_events(&mut rx, test_data).await;
     }
 
     #[tokio::test]
     async fn acks_received() {
-        let (client, topic, subscription, mut rx) = setup().await;
-        let start = now_trunc();
+        let (tester, mut rx) = setup().await;
 
-        let test_data = send_test_events(1..10, &client, &topic, btreemap![]).await;
-        receive_events(&mut rx, start, test_data, btreemap![]).await;
+        let test_data = tester.send_test_events(10, btreemap![]).await;
+        receive_events(&mut rx, test_data).await;
 
         // Make sure there are no messages left in the queue
-        assert_eq!(pull_count(&client, &subscription, 10).await, 0);
+        assert_eq!(tester.pull_count(10).await, 0);
 
         // Wait for the acknowledgement deadline to expire
         tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
 
         // All messages are still acknowledged
-        assert_eq!(pull_count(&client, &subscription, 10).await, 0);
+        assert_eq!(tester.pull_count(10).await, 0);
     }
 
-    async fn setup() -> (
-        HttpClient,
-        String,
-        String,
-        impl Stream<Item = Event> + Unpin,
-    ) {
+    async fn setup() -> (Tester, impl Stream<Item = Event> + Unpin) {
         components::init_test();
 
         let tls_settings = TlsSettings::from_options(&None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
-        let topic = make_topic(&client).await;
-        let subscription = make_subscription(&client, &topic).await;
+        let tester = Tester::new(client).await;
 
-        let rx = make_source(subscription.clone()).await;
+        let rx = make_source(tester.subscription.clone()).await;
 
-        (client, topic, subscription, rx)
+        (tester, rx)
     }
 
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
         DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(start, 0), Utc)
-    }
-
-    async fn make_topic(client: &HttpClient) -> String {
-        let topic = format!("topic-{}", random_string(10).to_lowercase());
-        let uri = format!("{}/topics/{}", *PROJECT_URI, topic);
-        request(client, Method::PUT, uri, json!({})).await;
-        topic
-    }
-
-    async fn make_subscription(client: &HttpClient, topic: &str) -> String {
-        let subscription = format!("sub-{}", random_string(10).to_lowercase());
-        let uri = format!("{}/subscriptions/{}", *PROJECT_URI, subscription);
-        let body = json!({
-            "topic": format!("projects/{}/topics/{}", PROJECT, topic),
-            "ackDeadlineSeconds": ACK_DEADLINE,
-        });
-        request(client, Method::PUT, uri, body).await;
-        subscription
     }
 
     async fn make_source(subscription: String) -> impl Stream<Item = Event> + Unpin {
@@ -485,33 +456,102 @@ mod integration_tests {
         rx
     }
 
-    async fn send_test_events(
-        range: Range<usize>,
-        client: &HttpClient,
-        topic: &str,
-        attributes: BTreeMap<String, String>,
-    ) -> Vec<String> {
-        let test_data: Vec<_> = range.into_iter().map(random_string).collect();
-        let messages: Vec<_> = test_data
-            .iter()
-            .map(|message| base64::encode(&message))
-            .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
-            .collect();
-        let uri = format!("{}/topics/{}:publish", *PROJECT_URI, topic);
-        let body = json!({ "messages": messages });
-        request(client, Method::POST, uri, body).await;
-        test_data
+    struct Tester {
+        client: HttpClient,
+        topic: String,
+        subscription: String,
     }
 
-    async fn receive_events(
-        rx: &mut (impl Stream<Item = Event> + Unpin),
+    struct TestData {
+        lines: Vec<String>,
         start: DateTime<Utc>,
-        test_data: Vec<String>,
         attributes: BTreeMap<String, String>,
-    ) {
+    }
+
+    impl Tester {
+        async fn new(client: HttpClient) -> Self {
+            let this = Self {
+                client,
+                topic: format!("topic-{}", random_string(10).to_lowercase()),
+                subscription: format!("sub-{}", random_string(10).to_lowercase()),
+            };
+
+            this.request(Method::PUT, "topics/{topic}", json!({})).await;
+
+            let body = json!({
+                "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
+                "ackDeadlineSeconds": ACK_DEADLINE,
+            });
+            this.request(Method::PUT, "subscriptions/{sub}", body).await;
+
+            this
+        }
+
+        async fn send_test_events(
+            &self,
+            count: usize,
+            attributes: BTreeMap<String, String>,
+        ) -> TestData {
+            let start = now_trunc();
+            let lines: Vec<_> = test_util::random_lines(44).take(count).collect();
+            let messages: Vec<_> = lines
+                .iter()
+                .map(|message| base64::encode(&message))
+                .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
+                .collect();
+            let body = json!({ "messages": messages });
+            self.request(Method::POST, "topics/{topic}:publish", body)
+                .await;
+
+            TestData {
+                lines,
+                start,
+                attributes,
+            }
+        }
+
+        async fn pull_count(&self, count: usize) -> usize {
+            let response = self
+                .request(
+                    Method::POST,
+                    "subscriptions/{sub}:pull",
+                    json!({ "maxMessages": count, "returnImmediately": true }),
+                )
+                .await;
+            response
+                .get("receivedMessages")
+                .map(|rm| rm.as_array().unwrap().len())
+                .unwrap_or(0)
+        }
+
+        async fn request(&self, method: Method, base: &str, body: Value) -> Value {
+            let path = base
+                .replace("{topic}", &self.topic)
+                .replace("{sub}", &self.subscription);
+            let uri = [PROJECT_URI.as_str(), &path].join("/");
+            let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
+            let request = Request::builder()
+                .method(method)
+                .uri(uri)
+                .body(body.into())
+                .unwrap();
+            let response = self.client.send(request).await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
+        }
+    }
+
+    async fn receive_events(rx: &mut (impl Stream<Item = Event> + Unpin), test_data: TestData) {
+        let TestData {
+            start,
+            lines,
+            attributes,
+        } = test_data;
+
         let events: Vec<Event> = tokio::time::timeout(
             std::time::Duration::from_secs(1),
-            collect_n_stream(rx, test_data.len()),
+            test_util::collect_n_stream(rx, lines.len()),
         )
         .await
         .unwrap();
@@ -519,8 +559,8 @@ mod integration_tests {
         let end = Utc::now();
         let mut message_ids = HashSet::new();
 
-        assert_eq!(events.len(), test_data.len());
-        for (message, event) in test_data.into_iter().zip(events) {
+        assert_eq!(events.len(), lines.len());
+        for (message, event) in lines.into_iter().zip(events) {
             let log = event.into_log();
             assert_eq!(log.get("message"), Some(&message.into()));
             assert_eq!(log.get("source_type"), Some(&"gcp_pubsub".into()));
@@ -544,32 +584,5 @@ mod integration_tests {
         }
 
         components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
-    }
-
-    async fn pull_count(client: &HttpClient, subscription: &str, count: usize) -> usize {
-        let response = request(
-            client,
-            Method::POST,
-            format!("{}/subscriptions/{}:pull", *PROJECT_URI, subscription),
-            json!({ "maxMessages": count, "returnImmediately": true }),
-        )
-        .await;
-        response
-            .get("receivedMessages")
-            .map(|rm| rm.as_array().unwrap().len())
-            .unwrap_or(0)
-    }
-
-    async fn request(client: &HttpClient, method: Method, uri: String, body: Value) -> Value {
-        let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
-        let request = Request::builder()
-            .method(method)
-            .uri(uri)
-            .body(body.into())
-            .unwrap();
-        let response = client.send(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
     }
 }
