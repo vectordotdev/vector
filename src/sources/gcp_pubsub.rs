@@ -216,10 +216,14 @@ impl PubsubSource {
         .context(PullSnafu)?
         .into_inner();
 
-        while let Some(response) = stream.next().await {
-            match response {
-                Ok(response) => self.handle_response(response).await,
-                Err(error) => emit!(GcpPubsubReceiveError { error }),
+        loop {
+            tokio::select! {
+                _ = &mut self.cx.shutdown => break,
+                response = stream.next() => match response {
+                    Some(Ok(response)) => self.handle_response(response).await,
+                    Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
+                    None => break,
+                },
             }
         }
 
@@ -355,16 +359,18 @@ mod tests {
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
-    use futures::Stream;
+    use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
+    use tokio::time::{Duration, Instant};
     use vector_common::btreemap;
 
     use super::*;
+    use crate::config::{ComponentKey, ProxyConfig};
     use crate::test_util::{self, components, random_string};
-    use crate::{config::ProxyConfig, gcp, http::HttpClient, SourceSender};
+    use crate::{gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =
@@ -373,23 +379,52 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        let (tester, mut rx) = setup().await;
+        let (tester, mut rx, shutdown) = setup().await;
         let test_data = tester.send_test_events(99, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
+        tester.shutdown(shutdown).await;
+    }
+
+    #[tokio::test]
+    async fn shuts_down0() {
+        let (tester, mut rx, shutdown) = setup().await;
+
+        tester.shutdown(shutdown).await;
+
+        assert!(rx.next().await.is_none());
+        tester.send_test_events(1, btreemap![]).await;
+        assert!(rx.next().await.is_none());
+        tester.pull_count(1).await;
+    }
+
+    #[tokio::test]
+    async fn shuts_down1() {
+        let (tester, mut rx, shutdown) = setup().await;
+
+        let test_data = tester.send_test_events(1, btreemap![]).await;
+        receive_events(&mut rx, test_data).await;
+
+        tester.shutdown(shutdown).await;
+
+        assert!(rx.next().await.is_none());
+        tester.send_test_events(1, btreemap![]).await;
+        assert!(rx.next().await.is_none());
+        tester.pull_count(1).await;
     }
 
     #[tokio::test]
     async fn streams_data() {
-        let (tester, mut rx) = setup().await;
+        let (tester, mut rx, shutdown) = setup().await;
         for _ in 0..10 {
             let test_data = tester.send_test_events(9, btreemap![]).await;
             receive_events(&mut rx, test_data).await;
         }
+        tester.shutdown(shutdown).await;
     }
 
     #[tokio::test]
     async fn sends_attributes() {
-        let (tester, mut rx) = setup().await;
+        let (tester, mut rx, shutdown) = setup().await;
         let attributes = btreemap![
             random_string(8) => random_string(88),
             random_string(8) => random_string(88),
@@ -397,35 +432,42 @@ mod integration_tests {
         ];
         let test_data = tester.send_test_events(1, attributes).await;
         receive_events(&mut rx, test_data).await;
+        tester.shutdown(shutdown).await;
     }
 
     #[tokio::test]
     async fn acks_received() {
-        let (tester, mut rx) = setup().await;
+        let (tester, mut rx, shutdown) = setup().await;
 
         let test_data = tester.send_test_events(10, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
+
+        tester.shutdown(shutdown).await;
 
         // Make sure there are no messages left in the queue
         assert_eq!(tester.pull_count(10).await, 0);
 
         // Wait for the acknowledgement deadline to expire
-        tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+        tokio::time::sleep(Duration::from_secs(ACK_DEADLINE + 1)).await;
 
         // All messages are still acknowledged
         assert_eq!(tester.pull_count(10).await, 0);
     }
 
-    async fn setup() -> (Tester, impl Stream<Item = Event> + Unpin) {
+    async fn setup() -> (
+        Tester,
+        impl Stream<Item = Event> + Unpin,
+        shutdown::SourceShutdownCoordinator,
+    ) {
         components::init_test();
 
         let tls_settings = TlsSettings::from_options(&None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
-        let rx = make_source(tester.subscription.clone()).await;
+        let (rx, shutdown) = tester.spawn_source().await;
 
-        (tester, rx)
+        (tester, rx, shutdown)
     }
 
     fn now_trunc() -> DateTime<Utc> {
@@ -434,29 +476,11 @@ mod integration_tests {
         DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(start, 0), Utc)
     }
 
-    async fn make_source(subscription: String) -> impl Stream<Item = Event> + Unpin {
-        let (tx, rx) = SourceSender::new_test();
-        let config = PubsubConfig {
-            project: PROJECT.into(),
-            subscription,
-            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
-            skip_authentication: true,
-            ack_deadline_seconds: ACK_DEADLINE as i32,
-            ..Default::default()
-        };
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .expect("Failed to build source");
-        tokio::spawn(async move { source.await.expect("Failed to run source") });
-
-        rx
-    }
-
     struct Tester {
         client: HttpClient,
         topic: String,
         subscription: String,
+        component: ComponentKey,
     }
 
     struct TestData {
@@ -471,6 +495,7 @@ mod integration_tests {
                 client,
                 topic: format!("topic-{}", random_string(10).to_lowercase()),
                 subscription: format!("sub-{}", random_string(10).to_lowercase()),
+                component: ComponentKey::from("gcp_pubsub"),
             };
 
             this.request(Method::PUT, "topics/{topic}", json!({})).await;
@@ -482,6 +507,28 @@ mod integration_tests {
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
             this
+        }
+
+        async fn spawn_source(
+            &self,
+        ) -> (
+            impl Stream<Item = Event> + Unpin,
+            shutdown::SourceShutdownCoordinator,
+        ) {
+            let (tx, rx) = SourceSender::new_test();
+            let config = PubsubConfig {
+                project: PROJECT.into(),
+                subscription: self.subscription.clone(),
+                endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+                skip_authentication: true,
+                ack_deadline_seconds: ACK_DEADLINE as i32,
+                ..Default::default()
+            };
+            let (ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
+            let source = config.build(ctx).await.expect("Failed to build source");
+            tokio::spawn(async move { source.await.expect("Failed to run source") });
+
+            (rx, shutdown)
         }
 
         async fn send_test_events(
@@ -537,6 +584,13 @@ mod integration_tests {
             let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
             serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
         }
+
+        async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
+            let deadline = Instant::now() + Duration::from_secs(1);
+            let shutdown = shutdown.shutdown_source(&self.component, deadline);
+            assert!(shutdown.await);
+            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
+        }
     }
 
     async fn receive_events(rx: &mut (impl Stream<Item = Event> + Unpin), test_data: TestData) {
@@ -547,7 +601,7 @@ mod integration_tests {
         } = test_data;
 
         let events: Vec<Event> = tokio::time::timeout(
-            std::time::Duration::from_secs(1),
+            Duration::from_secs(1),
             test_util::collect_n_stream(rx, lines.len()),
         )
         .await
@@ -579,7 +633,5 @@ mod integration_tests {
                 assert_eq!(a.1, b.1.clone().into());
             }
         }
-
-        components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
     }
 }
