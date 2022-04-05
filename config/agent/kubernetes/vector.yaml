@@ -1,19 +1,12 @@
 ---
-# data_dir: /vector-data-dir
-data_dir: /tmp/vector
+data_dir: /vector-data-dir
 api:
   enabled: true
   address: "[::]:8686"
   playground: false
 sources:
-  datadog_agent:
-    address: "[::1]:8282"
-    type: datadog_agent
-  file:
-    include:
-      - "/var/log/**/*.log"
-    type: file
-    ignore_checkpoints: true
+  kubernetes_logs:
+    type: kubernetes_logs
   host_metrics:
     filesystem:
       devices:
@@ -25,9 +18,6 @@ sources:
     type: host_metrics
   internal_metrics:
     type: internal_metrics
-  logstash:
-    address: "[::1]:5044"
-    type: logstash
 sinks:
   prom_exporter:
     type: prometheus_exporter
@@ -38,9 +28,7 @@ sinks:
   blackhole:
     type: blackhole
     inputs:
-      - datadog_agent
-      - file
-      - logstash
+      - kubernetes_logs
     print_interval_secs: 10
     acknowledgements:
       enabled: true
