@@ -124,7 +124,6 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error" => self.error.to_string(),
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => hyper_error_code(&self.error),
             "endpoint" => self.endpoint.to_owned(),
