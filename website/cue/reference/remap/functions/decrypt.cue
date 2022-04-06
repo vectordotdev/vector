@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: encrypt: {
+remap: functions: decrypt: {
 	category: "Cryptography"
 	description: """
 		Decryptes a string with a symmetric encryption algorithm.
