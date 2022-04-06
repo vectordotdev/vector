@@ -13,7 +13,7 @@ pub struct LogToMetricFieldNullError<'a> {
 impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
     fn emit(self) {
         error!(
-            message = "Unable to convert null field",
+            message = "Unable to convert null field.",
             error_code = "field_null",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
@@ -43,7 +43,7 @@ pub struct LogToMetricParseFloatError<'a> {
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     fn emit(self) {
         error!(
-            message = "Failed to parse field as float",
+            message = "Failed to parse field as float.",
             error = ?self.error,
             field = %self.field,
             error_code = "failed_parsing_float",
@@ -73,7 +73,7 @@ pub struct LogToMetricTemplateParseError {
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit(self) {
         error!(
-            message = "Failed to parse template",
+            message = "Failed to parse template.",
             error = ?self.error,
             error_code = "failed_parsing_template",
             error_type = error_type::TEMPLATE_FAILED,
