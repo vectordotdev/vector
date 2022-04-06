@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, sync::Arc};
+use std::sync::Arc;
 
 use futures::FutureExt;
 use http::Uri;
@@ -35,7 +35,7 @@ use crate::{
 // limit as a safety margin.
 pub const BATCH_GOAL_BYTES: usize = 3_000_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 10;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 10.0;
 
 pub const PAYLOAD_LIMIT: usize = 3_200_000;
 
@@ -49,8 +49,7 @@ pub struct DatadogTracesDefaultBatchSettings;
 impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
-    const TIMEOUT_SECS: NonZeroU64 =
-        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+    const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
