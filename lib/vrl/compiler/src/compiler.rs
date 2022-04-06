@@ -88,7 +88,7 @@ impl<'a> Compiler<'a> {
         use ast::Expr::*;
 
         match node.into_inner() {
-            Literal(node) => self.compile_literal(node).into(),
+            Literal(node) => self.compile_literal(node),
             Container(node) => self.compile_container(node).into(),
             IfStatement(node) => self.compile_if_statement(node).into(),
             Op(node) => self.compile_op(node).into(),
@@ -101,20 +101,26 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn compile_literal(&mut self, node: Node<ast::Literal>) -> Literal {
+    fn compile_literal(&mut self, node: Node<ast::Literal>) -> Expr {
         use literal::ErrorVariant::*;
 
-        Literal::try_from(node).unwrap_or_else(|err| {
-            let value = match &err.variant {
-                #[allow(clippy::trivial_regex)]
-                InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
-                InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
-                NanFloat => NotNan::new(0.0).unwrap().into(),
-            };
+        if let ast::Literal::String(template) = node.inner() {
+            self.compile_expr(Node::new(node.span(), template.rewrite(node.span())))
+        } else {
+            let literal = Literal::try_from(node).unwrap_or_else(|err| {
+                let value = match &err.variant {
+                    #[allow(clippy::trivial_regex)]
+                    InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
+                    InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
+                    NanFloat => NotNan::new(0.0).unwrap().into(),
+                };
 
-            self.errors.push(Box::new(err));
-            value
-        })
+                self.errors.push(Box::new(err));
+                value
+            });
+
+            literal.into()
+        }
     }
 
     fn compile_container(&mut self, node: Node<ast::Container>) -> Container {
@@ -149,6 +155,8 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
+        todo!()
+        /*
         use std::collections::BTreeMap;
 
         let exprs = node
@@ -158,6 +166,7 @@ impl<'a> Compiler<'a> {
             .collect::<BTreeMap<_, _>>();
 
         Object::new(exprs)
+        */
     }
 
     fn compile_if_statement(&mut self, node: Node<ast::IfStatement>) -> IfStatement {

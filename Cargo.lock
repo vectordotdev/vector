@@ -9038,6 +9038,7 @@ dependencies = [
  "lookup",
  "ordered-float",
  "paste",
+ "regex",
  "test-case",
  "thiserror",
  "vrl-diagnostic",

@@ -2,6 +2,7 @@ use std::{fmt, iter::Peekable, str::CharIndices};
 
 use diagnostic::{DiagnosticError, Label, Span};
 use ordered_float::NotNan;
+use regex::Regex;
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
@@ -225,6 +226,7 @@ pub enum Token<S> {
 
     // literals
     StringLiteral(StringLiteral<S>),
+    RawStringLiteral(RawStringLiteral<S>),
     IntegerLiteral(i64),
     FloatLiteral(NotNan<f64>),
     RegexLiteral(S),
@@ -299,55 +301,55 @@ pub enum Token<S> {
 
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
-        use self::Token::*;
         match self {
-            Identifier(s) => Identifier(f(s)),
-            PathField(s) => PathField(f(s)),
-            FunctionCall(s) => FunctionCall(f(s)),
-            Operator(s) => Operator(f(s)),
+            Token::Identifier(s) => Token::Identifier(f(s)),
+            Token::PathField(s) => Token::PathField(f(s)),
+            Token::FunctionCall(s) => Token::FunctionCall(f(s)),
+            Token::Operator(s) => Token::Operator(f(s)),
 
-            StringLiteral(s) => StringLiteral(match s {
-                self::StringLiteral::Escaped(s) => self::StringLiteral::Escaped(f(s)),
-                self::StringLiteral::Raw(s) => self::StringLiteral::Raw(f(s)),
-            }),
-            IntegerLiteral(s) => IntegerLiteral(s),
-            FloatLiteral(s) => FloatLiteral(s),
-            RegexLiteral(s) => RegexLiteral(f(s)),
-            TimestampLiteral(s) => TimestampLiteral(f(s)),
+            Token::StringLiteral(StringLiteral(s)) => Token::StringLiteral(StringLiteral(f(s))),
+            Token::RawStringLiteral(RawStringLiteral(s)) => {
+                Token::RawStringLiteral(RawStringLiteral(f(s)))
+            }
 
-            ReservedIdentifier(s) => ReservedIdentifier(f(s)),
+            Token::IntegerLiteral(s) => Token::IntegerLiteral(s),
+            Token::FloatLiteral(s) => Token::FloatLiteral(s),
+            Token::RegexLiteral(s) => Token::RegexLiteral(f(s)),
+            Token::TimestampLiteral(s) => Token::TimestampLiteral(f(s)),
 
-            InvalidToken(s) => InvalidToken(s),
+            Token::ReservedIdentifier(s) => Token::ReservedIdentifier(f(s)),
 
-            Else => Else,
-            False => False,
-            If => If,
-            Null => Null,
-            True => True,
-            Abort => Abort,
+            Token::InvalidToken(s) => Token::InvalidToken(s),
+
+            Token::Else => Token::Else,
+            Token::False => Token::False,
+            Token::If => Token::If,
+            Token::Null => Token::Null,
+            Token::True => Token::True,
+            Token::Abort => Token::Abort,
 
             // tokens
-            Colon => Colon,
-            Comma => Comma,
-            Dot => Dot,
-            LBrace => LBrace,
-            LBracket => LBracket,
-            LParen => LParen,
-            Newline => Newline,
-            RBrace => RBrace,
-            RBracket => RBracket,
-            RParen => RParen,
-            SemiColon => SemiColon,
-            Underscore => Underscore,
-            Escape => Escape,
+            Token::Colon => Token::Colon,
+            Token::Comma => Token::Comma,
+            Token::Dot => Token::Dot,
+            Token::LBrace => Token::LBrace,
+            Token::LBracket => Token::LBracket,
+            Token::LParen => Token::LParen,
+            Token::Newline => Token::Newline,
+            Token::RBrace => Token::RBrace,
+            Token::RBracket => Token::RBracket,
+            Token::RParen => Token::RParen,
+            Token::SemiColon => Token::SemiColon,
+            Token::Underscore => Token::Underscore,
+            Token::Escape => Token::Escape,
 
-            Equals => Equals,
-            MergeEquals => MergeEquals,
-            Bang => Bang,
-            Question => Question,
+            Token::Equals => Token::Equals,
+            Token::MergeEquals => Token::MergeEquals,
+            Token::Bang => Token::Bang,
+            Token::Question => Token::Question,
 
-            LQuery => LQuery,
-            RQuery => RQuery,
+            Token::LQuery => Token::LQuery,
+            Token::RQuery => Token::RQuery,
         }
     }
 }
@@ -365,6 +367,7 @@ where
             FunctionCall(_) => "FunctionCall",
             Operator(_) => "Operator",
             StringLiteral(_) => "StringLiteral",
+            RawStringLiteral(_) => "RawStringLiteral",
             IntegerLiteral(_) => "IntegerLiteral",
             FloatLiteral(_) => "FloatLiteral",
             RegexLiteral(_) => "RegexLiteral",
@@ -436,17 +439,106 @@ impl<'input> Token<&'input str> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum StringLiteral<S> {
-    Escaped(S),
-    Raw(S),
+pub struct StringLiteral<S>(pub S);
+
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub struct RawStringLiteral<S>(pub S);
+
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Hash)]
+pub struct TemplateString(pub Vec<StringSegment>);
+
+impl TemplateString {
+    /// Rewrites the ast for the template string to be a series of string concatenations
+    pub fn rewrite(&self, span: Span) -> crate::ast::Expr {
+        self.0
+            .iter()
+            .map(|node| -> crate::ast::Expr {
+                match node {
+                    StringSegment::Literal(s) => crate::ast::Expr::Literal(crate::ast::Node::new(
+                        diagnostic::Span::default(),
+                        crate::ast::Literal::RawString(s.clone()),
+                    )),
+                    StringSegment::Template(s, span) => crate::ast::Expr::Variable(
+                        crate::ast::Node::new(*span, crate::ast::Ident::new(s)),
+                    ),
+                }
+            })
+            .reduce(|accum, item| {
+                crate::ast::Expr::Op(crate::ast::Node::new(
+                    diagnostic::Span::default(),
+                    crate::ast::Op(
+                        Box::new(crate::ast::Node::new(diagnostic::Span::default(), accum)),
+                        crate::ast::Node::new(diagnostic::Span::default(), crate::ast::Opcode::Add),
+                        Box::new(crate::ast::Node::new(diagnostic::Span::default(), item)),
+                    ),
+                ))
+            })
+            .unwrap()
+    }
+}
+
+impl fmt::Display for TemplateString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for segment in &self.0 {
+            segment.fmt(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Hash)]
+pub enum StringSegment {
+    Literal(String),
+    Template(String, Span),
+}
+
+impl fmt::Display for StringSegment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StringSegment::Literal(s) => write!(f, "{}", s),
+            StringSegment::Template(s, _) => write!(f, "{}", s),
+        }
+    }
 }
 
 impl StringLiteral<&str> {
-    pub fn unescape(&self) -> String {
-        match self {
-            StringLiteral::Escaped(s) => unescape_string_literal(s),
-            StringLiteral::Raw(s) => s.to_string(),
+    pub fn unescape(&self, span: Span) -> TemplateString {
+        let text = unescape_string_literal(self.0);
+
+        let mut result = Vec::new();
+        let regex = Regex::new(r"\{.*?\}").unwrap();
+        let mut pos = 0;
+        for segment in regex.find_iter(&text) {
+            if segment.start() > pos {
+                let text = &text[pos..segment.start()];
+                result.push(StringSegment::Literal(text.to_string()));
+            }
+
+            let template = &text[segment.start() + 1..segment.end() - 1].trim();
+            result.push(StringSegment::Template(
+                template.to_string(),
+                Span::new(
+                    span.start() + segment.start() + 1,
+                    span.start() + segment.end() + 1,
+                ),
+            ));
+            pos = segment.end();
         }
+
+        if pos < text.len() {
+            // Push the remaining literal text.
+            let literal = &text[pos..text.len()];
+            result.push(StringSegment::Literal(literal.to_string()));
+        }
+
+        TemplateString(result)
+    }
+}
+
+impl RawStringLiteral<&str> {
+    pub fn unescape(&self) -> String {
+        self.0.to_string()
     }
 }
 
@@ -916,7 +1008,7 @@ impl<'input> Lexer<'input> {
                 Some((content_end, '"')) => {
                     let end = self.next_index();
                     let slice = self.slice(content_start, content_end);
-                    let token = Token::StringLiteral(StringLiteral::Escaped(slice));
+                    let token = Token::StringLiteral(StringLiteral(slice));
                     return Ok((start, token, end));
                 }
                 _ => break,
@@ -931,7 +1023,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn raw_string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
-        self.quoted_literal(start, |c| Token::StringLiteral(StringLiteral::Raw(c)))
+        self.quoted_literal(start, |c| Token::RawStringLiteral(RawStringLiteral(c)))
     }
 
     fn timestamp_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
@@ -1184,7 +1276,7 @@ mod test {
     #![allow(clippy::print_stdout)] // tests
 
     use super::{StringLiteral, *};
-    use crate::lex::Token::*;
+    use crate::lex::Token;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
@@ -1245,15 +1337,15 @@ mod test {
         test(
             data(r#"foo "bar\"\n" baz "" "\t" "\"\"""#),
             vec![
-                (r#"~~~                             "#, Identifier("foo")),
-                (r#"    ~~~~~~~~~                   "#, L(S::Escaped("bar\\\"\\n"))),
-                (r#"              ~~~               "#, Identifier("baz")),
-                (r#"                  ~~            "#, L(S::Escaped(""))),
-                (r#"                     ~~~~       "#, L(S::Escaped("\\t"))),
-                (r#"                          ~~~~~~"#, L(S::Escaped(r#"\"\""#))),
+                (r#"~~~                             "#, Token::Identifier("foo")),
+                (r#"    ~~~~~~~~~                   "#, L(S("bar\\\"\\n"))),
+                (r#"              ~~~               "#, Token::Identifier("baz")),
+                (r#"                  ~~            "#, L(S(""))),
+                (r#"                     ~~~~       "#, L(S("\\t"))),
+                (r#"                          ~~~~~~"#, L(S(r#"\"\""#))),
             ],
         );
-        assert_eq!(StringLiteral::Escaped(r#"\"\""#).unescape(), r#""""#);
+        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string())]), StringLiteral(r#"\"\""#).unescape(Span::default()));
     }
 
     #[test]
@@ -1263,7 +1355,7 @@ mod test {
                                   bar""#);
 
         match lexer.next() {
-            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!("foo bar", s.unescape()),
+            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string())]), s.unescape(Span::default())),
             _ => panic!("Not a string literal"),
         }
     }
@@ -1290,9 +1382,9 @@ mod test {
         test(
             data(r#"r'[fb]oo+' r'a/b\[rz\]' r''"#),
             vec![
-                (r#"~~~~~~~~~~                 "#, RegexLiteral("[fb]oo+")),
-                (r#"           ~~~~~~~~~~~~    "#, RegexLiteral("a/b\\[rz\\]")),
-                (r#"                        ~~~"#, RegexLiteral("")),
+                (r#"~~~~~~~~~~                 "#, Token::RegexLiteral("[fb]oo+")),
+                (r#"           ~~~~~~~~~~~~    "#, Token::RegexLiteral("a/b\\[rz\\]")),
+                (r#"                        ~~~"#, Token::RegexLiteral("")),
             ],
         );
     }
@@ -1311,7 +1403,7 @@ mod test {
         test(
             data(r#"t'foo \' bar'"#),
             vec![
-                (r#"~~~~~~~~~~~~~"#, TimestampLiteral("foo \\' bar")),
+                (r#"~~~~~~~~~~~~~"#, Token::TimestampLiteral("foo \\' bar")),
             ],
         );
     }
@@ -1327,13 +1419,13 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn raw_string_literals() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteral as S;
+        use Token::RawStringLiteral as R;
 
         test(
             data(r#"s'a "bc" \n \'d'"#),
             vec![
-                (r#"~~~~~~~~~~~~~~~~"#, L(S::Raw(r#"a "bc" \n \'d"#))),
+                (r#"~~~~~~~~~~~~~~~~"#, R(S(r#"a "bc" \n \'d"#))),
             ],
         );
     }
@@ -1352,12 +1444,12 @@ mod test {
         test(
             data(r#"12 012 12.43 12. 0 902.0001"#),
             vec![
-                (r#"~~                         "#, IntegerLiteral(12)),
-                (r#"   ~~~                     "#, IntegerLiteral(12)),
-                (r#"       ~~~~~               "#, FloatLiteral(NotNan::new(12.43).unwrap())),
-                (r#"             ~~~           "#, FloatLiteral(NotNan::new(12.0).unwrap())),
-                (r#"                 ~         "#, IntegerLiteral(0)),
-                (r#"                   ~~~~~~~~"#, FloatLiteral(NotNan::new(902.0001).unwrap())),
+                (r#"~~                         "#, Token::IntegerLiteral(12)),
+                (r#"   ~~~                     "#, Token::IntegerLiteral(12)),
+                (r#"       ~~~~~               "#, Token::FloatLiteral(NotNan::new(12.43).unwrap())),
+                (r#"             ~~~           "#, Token::FloatLiteral(NotNan::new(12.0).unwrap())),
+                (r#"                 ~         "#, Token::IntegerLiteral(0)),
+                (r#"                   ~~~~~~~~"#, Token::FloatLiteral(NotNan::new(902.0001).unwrap())),
             ],
         );
     }
@@ -1368,8 +1460,8 @@ mod test {
         test(
             data(r#"1_000 1_2_3._4_0_"#),
             vec![
-                (r#"~~~~~            "#, IntegerLiteral(1000)),
-                (r#"      ~~~~~~~~~~~"#, FloatLiteral(NotNan::new(123.40).unwrap())),
+                (r#"~~~~~            "#, Token::IntegerLiteral(1000)),
+                (r#"      ~~~~~~~~~~~"#, Token::FloatLiteral(NotNan::new(123.40).unwrap())),
             ],
         );
     }
@@ -1379,11 +1471,14 @@ mod test {
         test(
             data(r#"foo bar1 if baz_12_qux else "#),
             vec![
-                (r#"~~~                         "#, Identifier("foo")),
-                (r#"    ~~~~                    "#, Identifier("bar1")),
-                (r#"         ~~                 "#, If),
-                (r#"            ~~~~~~~~~~      "#, Identifier("baz_12_qux")),
-                (r#"                       ~~~~ "#, Else),
+                (r#"~~~                         "#, Token::Identifier("foo")),
+                (r#"    ~~~~                    "#, Token::Identifier("bar1")),
+                (r#"         ~~                 "#, Token::If),
+                (
+                    r#"            ~~~~~~~~~~      "#,
+                    Token::Identifier("baz_12_qux"),
+                ),
+                (r#"                       ~~~~ "#, Token::Else),
             ],
         );
     }
@@ -1393,15 +1488,15 @@ mod test {
         test(
             data(r#"foo() bar_1() if() "#),
             vec![
-                (r#"~~~                "#, FunctionCall("foo")),
-                (r#"   ~               "#, LParen),
-                (r#"    ~              "#, RParen),
-                (r#"      ~~~~~        "#, FunctionCall("bar_1")),
-                (r#"           ~       "#, LParen),
-                (r#"            ~      "#, RParen),
-                (r#"              ~~   "#, FunctionCall("if")),
-                (r#"                ~  "#, LParen),
-                (r#"                 ~ "#, RParen),
+                (r#"~~~                "#, Token::FunctionCall("foo")),
+                (r#"   ~               "#, Token::LParen),
+                (r#"    ~              "#, Token::RParen),
+                (r#"      ~~~~~        "#, Token::FunctionCall("bar_1")),
+                (r#"           ~       "#, Token::LParen),
+                (r#"            ~      "#, Token::RParen),
+                (r#"              ~~   "#, Token::FunctionCall("if")),
+                (r#"                ~  "#, Token::LParen),
+                (r#"                 ~ "#, Token::RParen),
             ],
         );
     }
@@ -1412,9 +1507,9 @@ mod test {
             data(r#"."#),
             vec![
                 //
-                (r#"~"#, LQuery),
-                (r#"~"#, Dot),
-                (r#"~"#, RQuery),
+                (r#"~"#, Token::LQuery),
+                (r#"~"#, Token::Dot),
+                (r#"~"#, Token::RQuery),
             ],
         );
     }
@@ -1424,23 +1519,23 @@ mod test {
         test(
             data(r#". .foo . .bar ."#),
             vec![
-                (r#"~              "#, LQuery),
-                (r#"~              "#, Dot),
-                (r#"~              "#, RQuery),
-                (r#"  ~            "#, LQuery),
-                (r#"  ~            "#, Dot),
-                (r#"   ~~~         "#, Identifier("foo")),
-                (r#"     ~         "#, RQuery),
-                (r#"       ~       "#, LQuery),
-                (r#"       ~       "#, Dot),
-                (r#"       ~       "#, RQuery),
-                (r#"         ~     "#, LQuery),
-                (r#"         ~     "#, Dot),
-                (r#"          ~~~  "#, Identifier("bar")),
-                (r#"            ~  "#, RQuery),
-                (r#"              ~"#, LQuery),
-                (r#"              ~"#, Dot),
-                (r#"              ~"#, RQuery),
+                (r#"~              "#, Token::LQuery),
+                (r#"~              "#, Token::Dot),
+                (r#"~              "#, Token::RQuery),
+                (r#"  ~            "#, Token::LQuery),
+                (r#"  ~            "#, Token::Dot),
+                (r#"   ~~~         "#, Token::Identifier("foo")),
+                (r#"     ~         "#, Token::RQuery),
+                (r#"       ~       "#, Token::LQuery),
+                (r#"       ~       "#, Token::Dot),
+                (r#"       ~       "#, Token::RQuery),
+                (r#"         ~     "#, Token::LQuery),
+                (r#"         ~     "#, Token::Dot),
+                (r#"          ~~~  "#, Token::Identifier("bar")),
+                (r#"            ~  "#, Token::RQuery),
+                (r#"              ~"#, Token::LQuery),
+                (r#"              ~"#, Token::Dot),
+                (r#"              ~"#, Token::RQuery),
             ],
         );
     }
@@ -1450,16 +1545,16 @@ mod test {
         test(
             data(r#".@foo .bar.@ook"#),
             vec![
-                (r#"~              "#, LQuery),
-                (r#"~              "#, Dot),
-                (r#" ~~~~          "#, PathField("@foo")),
-                (r#"    ~          "#, RQuery),
-                (r#"      ~        "#, LQuery),
-                (r#"      ~        "#, Dot),
-                (r#"       ~~~     "#, Identifier("bar")),
-                (r#"          ~    "#, Dot),
-                (r#"           ~~~~"#, PathField("@ook")),
-                (r#"              ~"#, RQuery),
+                (r#"~              "#, Token::LQuery),
+                (r#"~              "#, Token::Dot),
+                (r#" ~~~~          "#, Token::PathField("@foo")),
+                (r#"    ~          "#, Token::RQuery),
+                (r#"      ~        "#, Token::LQuery),
+                (r#"      ~        "#, Token::Dot),
+                (r#"       ~~~     "#, Token::Identifier("bar")),
+                (r#"          ~    "#, Token::Dot),
+                (r#"           ~~~~"#, Token::PathField("@ook")),
+                (r#"              ~"#, Token::RQuery),
             ],
         );
     }
@@ -1469,21 +1564,21 @@ mod test {
         test(
             data(r#".foo bar.baz .baz.qux"#),
             vec![
-                (r#"~                    "#, LQuery),
-                (r#"~                    "#, Dot),
-                (r#" ~~~                 "#, Identifier("foo")),
-                (r#"   ~                 "#, RQuery),
-                (r#"     ~               "#, LQuery),
-                (r#"     ~~~             "#, Identifier("bar")),
-                (r#"        ~            "#, Dot),
-                (r#"         ~~~         "#, Identifier("baz")),
-                (r#"           ~         "#, RQuery),
-                (r#"             ~       "#, LQuery),
-                (r#"             ~       "#, Dot),
-                (r#"              ~~~    "#, Identifier("baz")),
-                (r#"                 ~   "#, Dot),
-                (r#"                  ~~~"#, Identifier("qux")),
-                (r#"                    ~"#, RQuery),
+                (r#"~                    "#, Token::LQuery),
+                (r#"~                    "#, Token::Dot),
+                (r#" ~~~                 "#, Token::Identifier("foo")),
+                (r#"   ~                 "#, Token::RQuery),
+                (r#"     ~               "#, Token::LQuery),
+                (r#"     ~~~             "#, Token::Identifier("bar")),
+                (r#"        ~            "#, Token::Dot),
+                (r#"         ~~~         "#, Token::Identifier("baz")),
+                (r#"           ~         "#, Token::RQuery),
+                (r#"             ~       "#, Token::LQuery),
+                (r#"             ~       "#, Token::Dot),
+                (r#"              ~~~    "#, Token::Identifier("baz")),
+                (r#"                 ~   "#, Token::Dot),
+                (r#"                  ~~~"#, Token::Identifier("qux")),
+                (r#"                    ~"#, Token::RQuery),
             ],
         );
     }
@@ -1497,28 +1592,28 @@ mod test {
         test(
             data(r#"[.foo].bar { "foo": [2][0] }"#),
             vec![
-                (r#"~                           "#, LQuery),
-                (r#"~                           "#, LBracket),
-                (r#" ~                          "#, LQuery),
-                (r#" ~                          "#, Dot),
-                (r#"  ~~~                       "#, Identifier("foo")),
-                (r#"    ~                       "#, RQuery),
-                (r#"     ~                      "#, RBracket),
-                (r#"      ~                     "#, Dot),
-                (r#"       ~~~                  "#, Identifier("bar")),
-                (r#"         ~                  "#, RQuery),
-                (r#"           ~                "#, LBrace),
-                (r#"             ~~~~~          "#, L(S::Escaped("foo"))),
-                (r#"                  ~         "#, Colon),
-                (r#"                    ~       "#, LQuery),
-                (r#"                    ~       "#, LBracket),
-                (r#"                     ~      "#, IntegerLiteral(2)),
-                (r#"                      ~     "#, RBracket),
-                (r#"                       ~    "#, LBracket),
-                (r#"                        ~   "#, IntegerLiteral(0)),
-                (r#"                         ~  "#, RBracket),
-                (r#"                         ~  "#, RQuery),
-                (r#"                           ~"#, RBrace),
+                (r#"~                           "#, Token::LQuery),
+                (r#"~                           "#, Token::LBracket),
+                (r#" ~                          "#, Token::LQuery),
+                (r#" ~                          "#, Token::Dot),
+                (r#"  ~~~                       "#, Token::Identifier("foo")),
+                (r#"    ~                       "#, Token::RQuery),
+                (r#"     ~                      "#, Token::RBracket),
+                (r#"      ~                     "#, Token::Dot),
+                (r#"       ~~~                  "#, Token::Identifier("bar")),
+                (r#"         ~                  "#, Token::RQuery),
+                (r#"           ~                "#, Token::LBrace),
+                (r#"             ~~~~~          "#, L(S("foo"))),
+                (r#"                  ~         "#, Token::Colon),
+                (r#"                    ~       "#, Token::LQuery),
+                (r#"                    ~       "#, Token::LBracket),
+                (r#"                     ~      "#, Token::IntegerLiteral(2)),
+                (r#"                      ~     "#, Token::RBracket),
+                (r#"                       ~    "#, Token::LBracket),
+                (r#"                        ~   "#, Token::IntegerLiteral(0)),
+                (r#"                         ~  "#, Token::RBracket),
+                (r#"                         ~  "#, Token::RQuery),
+                (r#"                           ~"#, Token::RBrace),
             ],
         );
     }
@@ -1528,16 +1623,16 @@ mod test {
         test(
             data(r#".foo.(bar | baz)"#),
             vec![
-                (r#"~               "#, LQuery),
-                (r#"~               "#, Dot),
-                (r#" ~~~            "#, Identifier("foo")),
-                (r#"    ~           "#, Dot),
-                (r#"     ~          "#, LParen),
-                (r#"      ~~~       "#, Identifier("bar")),
-                (r#"          ~     "#, Operator("|")),
-                (r#"            ~~~ "#, Identifier("baz")),
-                (r#"               ~"#, RParen),
-                (r#"               ~"#, RQuery),
+                (r#"~               "#, Token::LQuery),
+                (r#"~               "#, Token::Dot),
+                (r#" ~~~            "#, Token::Identifier("foo")),
+                (r#"    ~           "#, Token::Dot),
+                (r#"     ~          "#, Token::LParen),
+                (r#"      ~~~       "#, Token::Identifier("bar")),
+                (r#"          ~     "#, Token::Operator("|")),
+                (r#"            ~~~ "#, Token::Identifier("baz")),
+                (r#"               ~"#, Token::RParen),
+                (r#"               ~"#, Token::RQuery),
             ],
         );
     }
@@ -1550,23 +1645,23 @@ mod test {
         test(
             data(r#".a.(b | c  )."d\"e"[2 ][ 1]"#),
             vec![
-                (r#"~                          "#, LQuery),
-                (r#"~                          "#, Dot),
-                (r#" ~                         "#, Identifier("a")),
-                (r#"  ~                        "#, Dot),
-                (r#"   ~                       "#, LParen),
-                (r#"    ~                      "#, Identifier("b")),
-                (r#"      ~                    "#, Operator("|")),
-                (r#"        ~                  "#, Identifier("c")),
-                (r#"           ~               "#, RParen),
-                (r#"            ~              "#, Dot),
-                (r#"             ~~~~~~        "#, L(S::Escaped("d\\\"e"))),
-                (r#"                   ~       "#, LBracket),
-                (r#"                    ~      "#, IntegerLiteral(2)),
-                (r#"                      ~    "#, RBracket),
-                (r#"                       ~   "#, LBracket),
-                (r#"                         ~ "#, IntegerLiteral(1)),
-                (r#"                          ~"#, RBracket),
+                (r#"~                          "#, Token::LQuery),
+                (r#"~                          "#, Token::Dot),
+                (r#" ~                         "#, Token::Identifier("a")),
+                (r#"  ~                        "#, Token::Dot),
+                (r#"   ~                       "#, Token::LParen),
+                (r#"    ~                      "#, Token::Identifier("b")),
+                (r#"      ~                    "#, Token::Operator("|")),
+                (r#"        ~                  "#, Token::Identifier("c")),
+                (r#"           ~               "#, Token::RParen),
+                (r#"            ~              "#, Token::Dot),
+                (r#"             ~~~~~~        "#, L(S("d\\\"e"))),
+                (r#"                   ~       "#, Token::LBracket),
+                (r#"                    ~      "#, Token::IntegerLiteral(2)),
+                (r#"                      ~    "#, Token::RBracket),
+                (r#"                       ~   "#, Token::LBracket),
+                (r#"                         ~ "#, Token::IntegerLiteral(1)),
+                (r#"                          ~"#, Token::RBracket),
             ],
         );
     }
@@ -1580,19 +1675,19 @@ mod test {
         test(
             data(r#"{ "a": parse_json!("{ \"b\": 0 }").c }"#),
             vec![
-                (r#"~                                     "#, LBrace),
-                (r#"  ~~~                                 "#, L(S::Escaped("a"))),
-                (r#"     ~                                "#, Colon),
-                (r#"       ~                              "#, LQuery),
-                (r#"       ~~~~~~~~~~                     "#, FunctionCall("parse_json")),
-                (r#"                 ~                    "#, Bang),
-                (r#"                  ~                   "#, LParen),
-                (r#"                   ~~~~~~~~~~~~~~     "#, L(S::Escaped("{ \\\"b\\\": 0 }"))),
-                (r#"                                 ~    "#, RParen),
-                (r#"                                  ~   "#, Dot),
-                (r#"                                   ~  "#, Identifier("c")),
-                (r#"                                   ~  "#, RQuery),
-                (r#"                                     ~"#, RBrace),
+                (r#"~                                     "#, Token::LBrace),
+                (r#"  ~~~                                 "#, L(S("a"))),
+                (r#"     ~                                "#, Token::Colon),
+                (r#"       ~                              "#, Token::LQuery),
+                (r#"       ~~~~~~~~~~                     "#, Token::FunctionCall("parse_json")),
+                (r#"                 ~                    "#, Token::Bang),
+                (r#"                  ~                   "#, Token::LParen),
+                (r#"                   ~~~~~~~~~~~~~~     "#, L(S("{ \\\"b\\\": 0 }"))),
+                (r#"                                 ~    "#, Token::RParen),
+                (r#"                                  ~   "#, Token::Dot),
+                (r#"                                   ~  "#, Token::Identifier("c")),
+                (r#"                                   ~  "#, Token::RQuery),
+                (r#"                                     ~"#, Token::RBrace),
             ],
         );
     }
@@ -1601,28 +1696,30 @@ mod test {
     #[rustfmt::skip]
     fn query_with_literals() {
         use StringLiteral as S;
+        use RawStringLiteral as RS;
         use Token::StringLiteral as L;
+        use Token::RawStringLiteral as R;
 
         test(
             data(r#"{ "a": r'b?c', "d": s'"e"\'f', "g": t'1.0T0' }.h"#),
             vec![
-                (r#"~                                               "#, LQuery),
-                (r#"~                                               "#, LBrace),
-                (r#"  ~~~                                           "#, L(S::Escaped("a"))),
-                (r#"     ~                                          "#, Colon),
-                (r#"       ~~~~~~                                   "#, RegexLiteral("b?c")),
-                (r#"             ~                                  "#, Comma),
-                (r#"               ~~~                              "#, L(S::Escaped("d"))),
-                (r#"                  ~                             "#, Colon),
-                (r#"                    ~~~~~~~~~                   "#, L(S::Raw("\"e\"\\\'f"))),
-                (r#"                             ~                  "#, Comma),
-                (r#"                               ~~~              "#, L(S::Escaped("g"))),
-                (r#"                                  ~             "#, Colon),
-                (r#"                                    ~~~~~~~~    "#, TimestampLiteral("1.0T0")),
-                (r#"                                             ~  "#, RBrace),
-                (r#"                                              ~ "#, Dot),
-                (r#"                                               ~"#, Identifier("h")),
-                (r#"                                               ~"#, RQuery),
+                (r#"~                                               "#, Token::LQuery),
+                (r#"~                                               "#, Token::LBrace),
+                (r#"  ~~~                                           "#, L(S("a"))),
+                (r#"     ~                                          "#, Token::Colon),
+                (r#"       ~~~~~~                                   "#, Token::RegexLiteral("b?c")),
+                (r#"             ~                                  "#, Token::Comma),
+                (r#"               ~~~                              "#, L(S("d"))),
+                (r#"                  ~                             "#, Token::Colon),
+                (r#"                    ~~~~~~~~~                   "#, R(RS("\"e\"\\\'f"))),
+                (r#"                             ~                  "#, Token::Comma),
+                (r#"                               ~~~              "#, L(S("g"))),
+                (r#"                                  ~             "#, Token::Colon),
+                (r#"                                    ~~~~~~~~    "#, Token::TimestampLiteral("1.0T0")),
+                (r#"                                             ~  "#, Token::RBrace),
+                (r#"                                              ~ "#, Token::Dot),
+                (r#"                                               ~"#, Token::Identifier("h")),
+                (r#"                                               ~"#, Token::RQuery),
             ],
         );
     }
@@ -1632,17 +1729,17 @@ mod test {
         test(
             data(r#"foo.bar foo[2]"#),
             vec![
-                (r#"~             "#, LQuery),
-                (r#"~~~           "#, Identifier("foo")),
-                (r#"   ~          "#, Dot),
-                (r#"    ~~~       "#, Identifier("bar")),
-                (r#"      ~       "#, RQuery),
-                (r#"        ~     "#, LQuery),
-                (r#"        ~~~   "#, Identifier("foo")),
-                (r#"           ~  "#, LBracket),
-                (r#"            ~ "#, IntegerLiteral(2)),
-                (r#"             ~"#, RBracket),
-                (r#"             ~"#, RQuery),
+                (r#"~             "#, Token::LQuery),
+                (r#"~~~           "#, Token::Identifier("foo")),
+                (r#"   ~          "#, Token::Dot),
+                (r#"    ~~~       "#, Token::Identifier("bar")),
+                (r#"      ~       "#, Token::RQuery),
+                (r#"        ~     "#, Token::LQuery),
+                (r#"        ~~~   "#, Token::Identifier("foo")),
+                (r#"           ~  "#, Token::LBracket),
+                (r#"            ~ "#, Token::IntegerLiteral(2)),
+                (r#"             ~"#, Token::RBracket),
+                (r#"             ~"#, Token::RQuery),
             ],
         );
     }
@@ -1655,15 +1752,15 @@ mod test {
         test(
             data(r#"{ "foo": "bar" }.foo"#),
             vec![
-                (r#"~                   "#, LQuery),
-                (r#"~                   "#, LBrace),
-                (r#"  ~~~~~             "#, L(S::Escaped("foo"))),
-                (r#"       ~            "#, Colon),
-                (r#"         ~~~~~      "#, L(S::Escaped("bar"))),
-                (r#"               ~    "#, RBrace),
-                (r#"                ~   "#, Dot),
-                (r#"                 ~~~"#, Identifier("foo")),
-                (r#"                   ~"#, RQuery),
+                (r#"~                   "#, Token::LQuery),
+                (r#"~                   "#, Token::LBrace),
+                (r#"  ~~~~~             "#, L(S("foo"))),
+                (r#"       ~            "#, Token::Colon),
+                (r#"         ~~~~~      "#, L(S("bar"))),
+                (r#"               ~    "#, Token::RBrace),
+                (r#"                ~   "#, Token::Dot),
+                (r#"                 ~~~"#, Token::Identifier("foo")),
+                (r#"                   ~"#, Token::RQuery),
             ],
         );
     }
@@ -1673,17 +1770,17 @@ mod test {
         test(
             data(r#"[ 1, 2 , 3].foo"#),
             vec![
-                (r#"~              "#, LQuery),
-                (r#"~              "#, LBracket),
-                (r#"  ~            "#, IntegerLiteral(1)),
-                (r#"   ~           "#, Comma),
-                (r#"     ~         "#, IntegerLiteral(2)),
-                (r#"       ~       "#, Comma),
-                (r#"         ~     "#, IntegerLiteral(3)),
-                (r#"          ~    "#, RBracket),
-                (r#"           ~   "#, Dot),
-                (r#"            ~~~"#, Identifier("foo")),
-                (r#"              ~"#, RQuery),
+                (r#"~              "#, Token::LQuery),
+                (r#"~              "#, Token::LBracket),
+                (r#"  ~            "#, Token::IntegerLiteral(1)),
+                (r#"   ~           "#, Token::Comma),
+                (r#"     ~         "#, Token::IntegerLiteral(2)),
+                (r#"       ~       "#, Token::Comma),
+                (r#"         ~     "#, Token::IntegerLiteral(3)),
+                (r#"          ~    "#, Token::RBracket),
+                (r#"           ~   "#, Token::Dot),
+                (r#"            ~~~"#, Token::Identifier("foo")),
+                (r#"              ~"#, Token::RQuery),
             ],
         );
     }
@@ -1696,19 +1793,19 @@ mod test {
         test(
             data(r#"foo(ab: "c")[2].d"#),
             vec![
-                (r#"~                "#, LQuery),
-                (r#"~~~              "#, FunctionCall("foo")),
-                (r#"   ~             "#, LParen),
-                (r#"    ~~           "#, Identifier("ab")),
-                (r#"      ~          "#, Colon),
-                (r#"        ~~~      "#, L(S::Escaped("c"))),
-                (r#"           ~     "#, RParen),
-                (r#"            ~    "#, LBracket),
-                (r#"             ~   "#, IntegerLiteral(2)),
-                (r#"              ~  "#, RBracket),
-                (r#"               ~ "#, Dot),
-                (r#"                ~"#, Identifier("d")),
-                (r#"                ~"#, RQuery),
+                (r#"~                "#, Token::LQuery),
+                (r#"~~~              "#, Token::FunctionCall("foo")),
+                (r#"   ~             "#, Token::LParen),
+                (r#"    ~~           "#, Token::Identifier("ab")),
+                (r#"      ~          "#, Token::Colon),
+                (r#"        ~~~      "#, L(S("c"))),
+                (r#"           ~     "#, Token::RParen),
+                (r#"            ~    "#, Token::LBracket),
+                (r#"             ~   "#, Token::IntegerLiteral(2)),
+                (r#"              ~  "#, Token::RBracket),
+                (r#"               ~ "#, Token::Dot),
+                (r#"                ~"#, Token::Identifier("d")),
+                (r#"                ~"#, Token::RQuery),
             ],
         );
     }
@@ -1718,14 +1815,14 @@ mod test {
         test(
             data("[foo[0]]"),
             vec![
-                ("~       ", LBracket),
-                (" ~      ", LQuery),
-                (" ~~~    ", Identifier("foo")),
-                ("    ~   ", LBracket),
-                ("     ~  ", IntegerLiteral(0)),
-                ("      ~ ", RBracket),
-                ("      ~ ", RQuery),
-                ("       ~", RBracket),
+                ("~       ", Token::LBracket),
+                (" ~      ", Token::LQuery),
+                (" ~~~    ", Token::Identifier("foo")),
+                ("    ~   ", Token::LBracket),
+                ("     ~  ", Token::IntegerLiteral(0)),
+                ("      ~ ", Token::RBracket),
+                ("      ~ ", Token::RQuery),
+                ("       ~", Token::RBracket),
             ],
         );
     }
@@ -1735,18 +1832,18 @@ mod test {
         test(
             data(r#".a + 3 .b == true"#),
             vec![
-                (r#"~                "#, LQuery),
-                (r#"~                "#, Dot),
-                (r#" ~               "#, Identifier("a")),
-                (r#" ~               "#, RQuery),
-                (r#"   ~             "#, Operator("+")),
-                (r#"     ~           "#, IntegerLiteral(3)),
-                (r#"       ~         "#, LQuery),
-                (r#"       ~         "#, Dot),
-                (r#"        ~        "#, Identifier("b")),
-                (r#"        ~        "#, RQuery),
-                (r#"          ~~     "#, Operator("==")),
-                (r#"             ~~~~"#, True),
+                (r#"~                "#, Token::LQuery),
+                (r#"~                "#, Token::Dot),
+                (r#" ~               "#, Token::Identifier("a")),
+                (r#" ~               "#, Token::RQuery),
+                (r#"   ~             "#, Token::Operator("+")),
+                (r#"     ~           "#, Token::IntegerLiteral(3)),
+                (r#"       ~         "#, Token::LQuery),
+                (r#"       ~         "#, Token::Dot),
+                (r#"        ~        "#, Token::Identifier("b")),
+                (r#"        ~        "#, Token::RQuery),
+                (r#"          ~~     "#, Token::Operator("==")),
+                (r#"             ~~~~"#, Token::True),
             ],
         );
     }
@@ -1756,12 +1853,12 @@ mod test {
         test(
             data(".foo.\n"),
             vec![
-                ("~      ", LQuery),
-                ("~      ", Dot),
-                (" ~~~   ", Identifier("foo")),
-                ("    ~  ", Dot),
-                ("    ~  ", RQuery),
-                ("     ~ ", Newline),
+                ("~      ", Token::LQuery),
+                ("~      ", Token::Dot),
+                (" ~~~   ", Token::Identifier("foo")),
+                ("    ~  ", Token::Dot),
+                ("    ~  ", Token::RQuery),
+                ("     ~ ", Token::Newline),
             ],
         );
     }
@@ -1771,17 +1868,17 @@ mod test {
         test(
             data(".foo\n.bar = true"),
             vec![
-                ("~               ", LQuery),
-                ("~               ", Dot),
-                (" ~~~            ", Identifier("foo")),
-                ("   ~            ", RQuery),
-                ("    ~           ", Newline),
-                ("     ~          ", LQuery),
-                ("     ~          ", Dot),
-                ("      ~~~       ", Identifier("bar")),
-                ("        ~       ", RQuery),
-                ("          ~     ", Equals),
-                ("            ~~~~", True),
+                ("~               ", Token::LQuery),
+                ("~               ", Token::Dot),
+                (" ~~~            ", Token::Identifier("foo")),
+                ("   ~            ", Token::RQuery),
+                ("    ~           ", Token::Newline),
+                ("     ~          ", Token::LQuery),
+                ("     ~          ", Token::Dot),
+                ("      ~~~       ", Token::Identifier("bar")),
+                ("        ~       ", Token::RQuery),
+                ("          ~     ", Token::Equals),
+                ("            ~~~~", Token::True),
             ],
         );
     }
@@ -1795,12 +1892,12 @@ mod test {
         test(
             data(r#"."parent.key.with.special characters".child"#),
             vec![
-                (r#"~                                          "#, LQuery),
-                (r#"~                                          "#, Dot),
-                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S::Escaped("parent.key.with.special characters"))),
-                (r#"                                     ~     "#, Dot),
-                (r#"                                      ~~~~~"#, Identifier("child")),
-                (r#"                                          ~"#, RQuery),
+                (r#"~                                          "#, Token::LQuery),
+                (r#"~                                          "#, Token::Dot),
+                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S("parent.key.with.special characters"))),
+                (r#"                                     ~     "#, Token::Dot),
+                (r#"                                      ~~~~~"#, Token::Identifier("child")),
+                (r#"                                          ~"#, Token::RQuery),
             ],
         );
     }
@@ -1810,17 +1907,17 @@ mod test {
         test(
             data(r#".0foo foo.00_7bar.tar"#),
             vec![
-                (r#"~                    "#, LQuery),
-                (r#"~                    "#, Dot),
-                (r#" ~~~~                "#, Identifier("0foo")),
-                (r#"    ~                "#, RQuery),
-                (r#"      ~              "#, LQuery),
-                (r#"      ~~~            "#, Identifier("foo")),
-                (r#"         ~           "#, Dot),
-                (r#"          ~~~~~~~    "#, Identifier("00_7bar")),
-                (r#"                 ~   "#, Dot),
-                (r#"                  ~~~"#, Identifier("tar")),
-                (r#"                    ~"#, RQuery),
+                (r#"~                    "#, Token::LQuery),
+                (r#"~                    "#, Token::Dot),
+                (r#" ~~~~                "#, Token::Identifier("0foo")),
+                (r#"    ~                "#, Token::RQuery),
+                (r#"      ~              "#, Token::LQuery),
+                (r#"      ~~~            "#, Token::Identifier("foo")),
+                (r#"         ~           "#, Token::Dot),
+                (r#"          ~~~~~~~    "#, Token::Identifier("00_7bar")),
+                (r#"                 ~   "#, Token::Dot),
+                (r#"                  ~~~"#, Token::Identifier("tar")),
+                (r#"                    ~"#, Token::RQuery),
             ],
         );
     }
@@ -1833,20 +1930,20 @@ mod test {
         test(
             data(r#"{ "foo": [true] }.foo[0]"#),
             vec![
-                (r#"~                       "#, LQuery),
-                (r#"~                       "#, LBrace),
-                (r#"  ~~~~~                 "#, L(S::Escaped("foo"))),
-                (r#"       ~                "#, Colon),
-                (r#"         ~              "#, LBracket),
-                (r#"          ~~~~          "#, True),
-                (r#"              ~         "#, RBracket),
-                (r#"                ~       "#, RBrace),
-                (r#"                 ~      "#, Dot),
-                (r#"                  ~~~   "#, Identifier("foo")),
-                (r#"                     ~  "#, LBracket),
-                (r#"                      ~ "#, IntegerLiteral(0)),
-                (r#"                       ~"#, RBracket),
-                (r#"                       ~"#, RQuery),
+                (r#"~                       "#, Token::LQuery),
+                (r#"~                       "#, Token::LBrace),
+                (r#"  ~~~~~                 "#, L(S("foo"))),
+                (r#"       ~                "#, Token::Colon),
+                (r#"         ~              "#, Token::LBracket),
+                (r#"          ~~~~          "#, Token::True),
+                (r#"              ~         "#, Token::RBracket),
+                (r#"                ~       "#, Token::RBrace),
+                (r#"                 ~      "#, Token::Dot),
+                (r#"                  ~~~   "#, Token::Identifier("foo")),
+                (r#"                     ~  "#, Token::LBracket),
+                (r#"                      ~ "#, Token::IntegerLiteral(0)),
+                (r#"                       ~"#, Token::RBracket),
+                (r#"                       ~"#, Token::RQuery),
             ],
         );
     }
@@ -1856,48 +1953,48 @@ mod test {
         test(
             data("v[-1] = 2"),
             vec![
-                ("~        ", LQuery),
-                ("~        ", Identifier("v")),
-                (" ~       ", LBracket),
-                ("  ~~     ", IntegerLiteral(-1)),
-                ("    ~    ", RBracket),
-                ("    ~    ", RQuery),
-                ("      ~  ", Equals),
-                ("        ~", IntegerLiteral(2)),
+                ("~        ", Token::LQuery),
+                ("~        ", Token::Identifier("v")),
+                (" ~       ", Token::LBracket),
+                ("  ~~     ", Token::IntegerLiteral(-1)),
+                ("    ~    ", Token::RBracket),
+                ("    ~    ", Token::RQuery),
+                ("      ~  ", Token::Equals),
+                ("        ~", Token::IntegerLiteral(2)),
             ],
         );
     }
 
     #[test]
     fn multi_byte_character_1() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteral as RS;
+        use Token::RawStringLiteral as R;
 
         test(
             data("a * s'漢字' * a"),
             vec![
-                ("~                ", Identifier("a")),
-                ("  ~              ", Operator("*")),
-                ("    ~~~~~~~~~    ", L(S::Raw("漢字"))),
-                ("              ~  ", Operator("*")),
-                ("                ~", Identifier("a")),
+                ("~                ", Token::Identifier("a")),
+                ("  ~              ", Token::Operator("*")),
+                ("    ~~~~~~~~~    ", R(RS("漢字"))),
+                ("              ~  ", Token::Operator("*")),
+                ("                ~", Token::Identifier("a")),
             ],
         );
     }
 
     #[test]
     fn multi_byte_character_2() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteral as RS;
+        use Token::RawStringLiteral as R;
 
         test(
             data("a * s'¡' * a"),
             vec![
-                ("~            ", Identifier("a")),
-                ("  ~          ", Operator("*")),
-                ("    ~~~~~    ", L(S::Raw("¡"))),
-                ("          ~  ", Operator("*")),
-                ("            ~", Identifier("a")),
+                ("~            ", Token::Identifier("a")),
+                ("  ~          ", Token::Operator("*")),
+                ("    ~~~~~    ", R(RS("¡"))),
+                ("          ~  ", Token::Operator("*")),
+                ("            ~", Token::Identifier("a")),
             ],
         );
     }
@@ -1907,15 +2004,34 @@ mod test {
         test(
             data("if x {\n   # It's an apostrophe.\n   3\n}"),
             vec![
-                ("~~                                    ", If),
-                ("   ~                                  ", Identifier("x")),
-                ("     ~                                ", LBrace),
-                ("      ~                               ", Newline),
-                ("                               ~      ", Newline),
-                ("                                   ~  ", IntegerLiteral(3)),
-                ("                                    ~ ", Newline),
-                ("                                     ~", RBrace),
+                ("~~                                    ", Token::If),
+                (
+                    "   ~                                  ",
+                    Token::Identifier("x"),
+                ),
+                ("     ~                                ", Token::LBrace),
+                ("      ~                               ", Token::Newline),
+                ("                               ~      ", Token::Newline),
+                (
+                    "                                   ~  ",
+                    Token::IntegerLiteral(3),
+                ),
+                ("                                    ~ ", Token::Newline),
+                ("                                     ~", Token::RBrace),
             ],
+        );
+    }
+
+    #[test]
+    fn unescape_string_literal() {
+        let string = StringLiteral("zork { zonk } zoog");
+        assert_eq!(
+            TemplateString(vec![
+                StringSegment::Literal("zork ".to_string()),
+                StringSegment::Template("zonk".to_string(), Span::new(5, 13)),
+                StringSegment::Literal(" zoog".to_string()),
+            ]),
+            string.unescape(Span::new(0, 18))
         );
     }
 }

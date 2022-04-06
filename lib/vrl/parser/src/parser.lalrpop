@@ -17,6 +17,7 @@ extern {
         "identifier" => Token::Identifier(<&'input str>),
         "path field" => Token::PathField(<&'input str>),
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
+        "raw string literal" => Token::RawStringLiteral(<RawStringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
         "regex literal" => Token::RegexLiteral(<&'input str>),
@@ -473,6 +474,7 @@ Object: Object = {
 
 pub Literal: Literal = {
     String => Literal::String(<>),
+    RawString => Literal::RawString(<>),
     Integer => Literal::Integer(<>),
     Float => Literal::Float(<>),
     Boolean => Literal::Boolean(<>),
@@ -481,7 +483,12 @@ pub Literal: Literal = {
     Timestamp => Literal::Timestamp(<>),
 };
 
-String: String = "string literal" => <>.unescape();
+String: TemplateString = Sp<"string literal"> => {
+    let Node { span, node } = <>;
+    node.unescape(span)
+};
+
+RawString: String = "raw string literal" => <>.unescape();
 Integer: i64 = "integer literal";
 Float: NotNan<f64> = "float literal";
 Boolean: bool = { "true" => true, "false" => false };

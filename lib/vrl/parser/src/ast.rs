@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::Error;
+use crate::{lex::TemplateString, Error};
 
 // -----------------------------------------------------------------------------
 // node
@@ -308,7 +308,8 @@ impl fmt::Debug for Ident {
 
 #[derive(Clone, PartialEq)]
 pub enum Literal {
-    String(String),
+    String(TemplateString),
+    RawString(String),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -323,6 +324,7 @@ impl fmt::Display for Literal {
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
+            RawString(v) => write!(f, r#""{}""#, v),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
@@ -507,14 +509,14 @@ impl IntoIterator for Array {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
-pub struct Object(pub(crate) BTreeMap<Node<String>, Node<Expr>>);
+pub struct Object(pub(crate) BTreeMap<Node<TemplateString>, Node<Expr>>);
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let exprs = self
             .0
             .iter()
-            .map(|(k, v)| format!(r#""{}": {}"#, k, v))
+            .map(|(k, v)| format!(r#""{}": {}"#, k.to_string(), v))
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -536,8 +538,8 @@ impl fmt::Debug for Object {
 }
 
 impl IntoIterator for Object {
-    type Item = (Node<String>, Node<Expr>);
-    type IntoIter = std::collections::btree_map::IntoIter<Node<String>, Node<Expr>>;
+    type Item = (Node<TemplateString>, Node<Expr>);
+    type IntoIter = std::collections::btree_map::IntoIter<Node<TemplateString>, Node<Expr>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
