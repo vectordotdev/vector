@@ -1,15 +1,10 @@
 use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
 use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{AsyncStreamCipher, BlockEncrypt, BlockEncryptMut, KeyInit, KeySizeUser};
-use std::str::Split;
-use vrl::prelude::expression::Expr;
-use vrl::prelude::value::Error;
+use aes::cipher::{AsyncStreamCipher, BlockEncryptMut};
 use vrl::prelude::*;
 
 use aes::cipher::KeyIvInit;
 use aes::cipher::StreamCipher;
-use aes::Aes256;
-use bytes::BytesMut;
 
 type Aes128Cbc = cbc::Encryptor<aes::Aes128>;
 type Aes192Cbc = cbc::Encryptor<aes::Aes192>;
@@ -87,7 +82,7 @@ macro_rules! encrypt_keystream {
 }
 
 fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Option<Value>) -> Resolved {
-    let mut plaintext = plaintext.try_bytes()?;
+    let plaintext = plaintext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
         "AES-256-CFB" => encrypt!(cfb_mode::Encryptor::<aes::Aes256>, plaintext, key, iv),
@@ -160,7 +155,7 @@ impl Function for Encrypt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -208,7 +203,141 @@ impl Expression for EncryptFn {
         encrypt(plaintext, algorithm, key, iv)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    test_function![
+        encrypt => Encrypt;
+
+        aes_256_cfb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CFB", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xd13\x92\x81\x9a^\x0e=<\x88\xdc\xe7/:]\x90\x08S\x84q")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_cfb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CFB", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"U\xbd6\xdbZ\xbfa}&8\xebog\x19\x99xE\xffL\xf1")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_cfb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CFB", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfd\xf9\xef\x1f@e\xef\xd0Z\xc3\x0c'\xad]\x0e\xd2\x0bZK4")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+        aes_256_ofb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-OFB", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xd13\x92\x81\x9a^\x0e=<\x88\xdc\xe7/:]\x90\xfe(\x89k")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_ofb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-OFB", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"U\xbd6\xdbZ\xbfa}&8\xebog\x19\x99x\xe4\xf4J\x1f")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_ofb {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-OFB", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfd\xf9\xef\x1f@e\xef\xd0Z\xc3\x0c'\xad]\x0e\xd2Qi\xe9\xf4")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_256_ctr {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CTR", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xd13\x92\x81\x9a^\x0e=<\x88\xdc\xe7/:]\x90\x9a\x99\xa7\xb6")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_ctr {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CTR", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"U\xbd6\xdbZ\xbfa}&8\xebog\x19\x99x\x88\xb69n")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_ctr {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CTR", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfd\xf9\xef\x1f@e\xef\xd0Z\xc3\x0c'\xad]\x0e\xd2v\x04\x05\xee")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_256_cbc_pkcs7 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CBC-PKCS7", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x80-9O\x1c\xf1,R\x02\xa0\x0e\x17G\xd8B\xf4\xf9q\xf3\x0c\xcaK\x03h\xbc\xb2\xe8vU\x12\x10\xb3")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_cbc_pkcs7 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CBC-PKCS7", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfaG\x97OVj\xd4\xf5\x80\x1c\x9f}\xac,:t\xfb\xca\xe5\xf1\x8c\x08\xed\\\xf5\xff\xef\xf8\xe9\n\x9c*")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_cbc_pkcs7 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CBC-PKCS7", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x94R\xb5\xfeE\xd9)N1\xd3\xfe\xe66E\x05\x9ch\xae\xf6\x82\rD\xfdH\xd3T8n\xa7\xec\x98W")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_256_cbc_ansix923 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CBC-ANSIX923", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x80-9O\x1c\xf1,R\x02\xa0\x0e\x17G\xd8B\xf4\xd9vj\x15\n&\x92\xea\xee\x03 \xeb\x9e\x8f\x97\x90")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_cbc_ansix923 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CBC-ANSIX923", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfaG\x97OVj\xd4\xf5\x80\x1c\x9f}\xac,:t\xbc\xaf\xbd\xdf0\x10\xdc\xe7\x10Lk\xe4\x03;\xa2\xf5")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_cbc_ansix923 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CBC-ANSIX923", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x94R\xb5\xfeE\xd9)N1\xd3\xfe\xe66E\x05\x9cEnq\x0f9\x02\xfe/T\x0f\xc5\x18r\x95\"\xe3")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_256_cbc_iso7816 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CBC-ISO7816", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x80-9O\x1c\xf1,R\x02\xa0\x0e\x17G\xd8B\xf4\x84\x12\xeb\xe6i\xef\xbcN\xe85\\HnV\xb2\x92")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_cbc_iso7816 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CBC-ISO7816", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfaG\x97OVj\xd4\xf5\x80\x1c\x9f}\xac,:t%lnCr;N\xbcq\xfeE\xb4\x83a \x9b")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_cbc_iso7816 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CBC-ISO7816", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x94R\xb5\xfeE\xd9)N1\xd3\xfe\xe66E\x05\x9cWp\xcfu\xba\x86\x01Q\x9fw\x8f\xf2\x12\xba\x9b0")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_256_cbc_iso10126 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-256-CBC-ISO10126", key: "32_bytes_xxxxxxxxxxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x80-9O\x1c\xf1,R\x02\xa0\x0e\x17G\xd8B\xf4\xf9q\xf3\x0c\xcaK\x03h\xbc\xb2\xe8vU\x12\x10\xb3")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_192_cbc_iso10126 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-192-CBC-ISO10126", key: "24_bytes_xxxxxxxxxxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\xfaG\x97OVj\xd4\xf5\x80\x1c\x9f}\xac,:t\xfb\xca\xe5\xf1\x8c\x08\xed\\\xf5\xff\xef\xf8\xe9\n\x9c*")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+
+        aes_128_cbc_iso10126 {
+            args: func_args![plaintext: value!("morethan1blockofdata"), algorithm: "AES-128-CBC-ISO10126", key: "16_bytes_xxxxxxx", iv: "16_bytes_xxxxxxx"],
+            want: Ok(value!(b"\x94R\xb5\xfeE\xd9)N1\xd3\xfe\xe66E\x05\x9ch\xae\xf6\x82\rD\xfdH\xd3T8n\xa7\xec\x98W")),
+            tdef: TypeDef::bytes().fallible(),
+        }
+    ];
 }

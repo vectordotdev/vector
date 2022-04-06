@@ -1,8 +1,4 @@
-use bytes::BytesMut;
-use rand::{thread_rng, Rng, RngCore};
-use std::str::Split;
-use vrl::prelude::expression::Expr;
-use vrl::prelude::value::Error;
+use rand::{thread_rng, RngCore};
 use vrl::prelude::*;
 
 const MAX_LENGTH: i64 = 1024 * 64;
@@ -44,7 +40,7 @@ impl Function for RandomBytes {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -92,7 +88,7 @@ impl Expression for RandomBytesFn {
         random_bytes(length)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match self.length.as_value() {
             None => TypeDef::bytes().fallible(),
             Some(value) => {
