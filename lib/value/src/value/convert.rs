@@ -234,13 +234,13 @@ impl From<Bytes> for Value {
 
 impl<const N: usize> From<[u8; N]> for Value {
     fn from(data: [u8; N]) -> Self {
-        Value::from(Bytes::copy_from_slice(&data[..]))
+        Self::from(Bytes::copy_from_slice(&data[..]))
     }
 }
 
 impl<const N: usize> From<&[u8; N]> for Value {
     fn from(data: &[u8; N]) -> Self {
-        Value::from(Bytes::copy_from_slice(data))
+        Self::from(Bytes::copy_from_slice(data))
     }
 }
 

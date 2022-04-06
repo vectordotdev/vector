@@ -2,8 +2,8 @@ use rand::{thread_rng, RngCore};
 use vrl::prelude::*;
 
 const MAX_LENGTH: i64 = 1024 * 64;
-const LENGTH_TOO_LARGE_ERR: &'static str = "Length is too large. Maximum is 64k";
-const LENGTH_TOO_SMALL_ERR: &'static str = "Length cannot be negative";
+const LENGTH_TOO_LARGE_ERR: &str = "Length is too large. Maximum is 64k";
+const LENGTH_TOO_SMALL_ERR: &str = "Length cannot be negative";
 
 fn random_bytes(length: Value) -> Resolved {
     let mut output = vec![0_u8; get_length(length)?];

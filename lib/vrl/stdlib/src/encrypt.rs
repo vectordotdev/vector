@@ -28,7 +28,7 @@ pub(crate) fn get_key_bytes<const N: usize>(key: Value) -> Result<[u8; N]> {
 pub(crate) fn get_iv_bytes<const N: usize>(iv: Option<Value>) -> Result<[u8; N]> {
     let iv = match iv {
         Some(iv) => iv,
-        None => return Err(format!("iv parameter is required",).into()),
+        None => return Err("iv parameter is required".to_string().into()),
     };
 
     let bytes = iv.try_bytes()?;
