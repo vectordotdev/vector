@@ -212,7 +212,7 @@ mod source {
 
     impl<'a> InternalEvent for FileDeleteError<'a> {
         fn emit(self) {
-            warn!(
+            error!(
                 message = "Failed in deleting file.",
                 file = %self.file.display(),
                 error = %self.error,

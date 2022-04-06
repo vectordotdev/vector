@@ -70,7 +70,7 @@ impl Function for EncodeKeyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -186,7 +186,7 @@ impl Expression for EncodeKeyValueFn {
         )
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
 }

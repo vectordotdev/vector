@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use super::prelude::{error_stage, error_type};
 use bollard::errors::Error;
 use chrono::ParseError;
@@ -16,7 +14,7 @@ pub struct DockerLogsEventsReceived<'a> {
 impl<'a> InternalEvent for DockerLogsEventsReceived<'a> {
     fn emit(self) {
         trace!(
-            message = "Received events.",
+            message = "Events received.",
             count = 1,
             byte_size = %self.byte_size,
             container_id = %self.container_id
@@ -173,10 +171,7 @@ pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
 impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
     fn emit(self) {
         error!(
-            message = r#"
-                Docker engine is not using either the `jsonfile` or `journald`
-                logging driver. Please enable one of these logging drivers
-                to get logs from the Docker daemon."#,
+            message = "Docker engine is not using either the `jsonfile` or `journald` logging driver. Please enable one of these logging drivers to get logs from the Docker daemon.",
             error = ?self.error,
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,

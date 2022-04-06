@@ -11,7 +11,7 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 
 use super::service::KinesisResponse;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
+use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},

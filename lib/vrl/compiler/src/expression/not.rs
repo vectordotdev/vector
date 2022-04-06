@@ -6,9 +6,10 @@ use crate::value::VrlValueConvert;
 use crate::{
     expression::{Expr, Noop, Resolved},
     parser::Node,
+    state::{ExternalEnv, LocalEnv},
     value::Kind,
     vm::OpCode,
-    Context, Expression, Span, State, TypeDef,
+    Context, Expression, Span, TypeDef,
 };
 
 pub(crate) type Result = std::result::Result<Not, Error>;
@@ -19,7 +20,7 @@ pub struct Not {
 }
 
 impl Not {
-    pub fn new(node: Node<Expr>, not_span: Span, state: &State) -> Result {
+    pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result {
         let (expr_span, expr) = node.take();
         let type_def = expr.type_def(state);
 
@@ -48,7 +49,7 @@ impl Expression for Not {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let fallible = self.inner.type_def(state).is_fallible();
 
         TypeDef::boolean().with_fallibility(fallible)
@@ -57,7 +58,7 @@ impl Expression for Not {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> std::result::Result<(), String> {
         self.inner.compile_to_vm(vm, state)?;
         vm.write_opcode(OpCode::Not);

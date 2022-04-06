@@ -1,6 +1,8 @@
+use headers::Authorization;
 use http::uri::InvalidUri;
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
+use url::Url;
 
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
@@ -105,32 +107,36 @@ impl ProxyConfig {
         }
     }
 
-    fn http_intercept(&self) -> Intercept {
-        self.interceptor().intercept("http")
+    fn build_proxy(
+        &self,
+        proxy_scheme: &'static str,
+        proxy_url: &Option<String>,
+    ) -> Result<Option<Proxy>, InvalidUri> {
+        proxy_url
+            .as_ref()
+            .map(|url| {
+                url.parse().map(|parsed| {
+                    let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
+                    if let Ok(authority) = Url::parse(url) {
+                        if let Some(password) = authority.password() {
+                            proxy.set_authorization(Authorization::basic(
+                                authority.username(),
+                                password,
+                            ));
+                        }
+                    }
+                    proxy
+                })
+            })
+            .transpose()
     }
 
     fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.http
-            .as_ref()
-            .map(|url| {
-                url.parse()
-                    .map(|parsed| Proxy::new(self.http_intercept(), parsed))
-            })
-            .transpose()
-    }
-
-    fn https_intercept(&self) -> Intercept {
-        self.interceptor().intercept("https")
+        self.build_proxy("http", &self.http)
     }
 
     fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.https
-            .as_ref()
-            .map(|url| {
-                url.parse()
-                    .map(|parsed| Proxy::new(self.https_intercept(), parsed))
-            })
-            .transpose()
+        self.build_proxy("https", &self.https)
     }
 
     /// Install the [`ProxyConnector<C>`] for this `ProxyConfig`
@@ -153,7 +159,9 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
+    use base64::encode;
     use env_test_util::TempEnvVar;
+    use http::{HeaderValue, Uri};
 
     use super::*;
 
@@ -243,5 +251,69 @@ mod tests {
         assert!(!result.enabled);
         assert_eq!(result.http, Some("http://remote.proxy".into()));
         assert_eq!(result.https, Some("https://2.3.4.5:9876".into()));
+    }
+
+    #[test]
+    fn build_proxy() {
+        let config = ProxyConfig {
+            http: Some("http://1.2.3.4:5678".into()),
+            https: Some("https://2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let first = config
+            .http_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+        let second = config
+            .https_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+
+        assert_eq!(
+            Some(first.uri()),
+            Uri::try_from("http://1.2.3.4:5678").as_ref().ok()
+        );
+        assert_eq!(
+            Some(second.uri()),
+            Uri::try_from("https://2.3.4.5:9876").as_ref().ok()
+        );
+    }
+
+    #[test]
+    fn build_proxy_with_basic_authorization() {
+        let config = ProxyConfig {
+            http: Some("http://user:pass@1.2.3.4:5678".into()),
+            https: Some("https://user:pass@2.3.4.5:9876".into()),
+            ..Default::default()
+        };
+        let first = config
+            .http_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+        let second = config
+            .https_proxy()
+            .expect("should not be an error")
+            .expect("should not be None");
+        let encoded_header = format!("Basic {}", encode("user:pass"));
+        let expected_header_value = HeaderValue::from_str(encoded_header.as_str());
+
+        assert_eq!(
+            Some(first.uri()),
+            Uri::try_from("http://user:pass@1.2.3.4:5678").as_ref().ok()
+        );
+        assert_eq!(
+            first.headers().get("authorization"),
+            expected_header_value.as_ref().ok()
+        );
+        assert_eq!(
+            Some(second.uri()),
+            Uri::try_from("https://user:pass@2.3.4.5:9876")
+                .as_ref()
+                .ok()
+        );
+        assert_eq!(
+            second.headers().get("authorization"),
+            expected_header_value.as_ref().ok()
+        );
     }
 }

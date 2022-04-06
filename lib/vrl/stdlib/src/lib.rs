@@ -229,6 +229,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "strlen")]
+mod strlen;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
 #[cfg(feature = "tally")]
@@ -486,6 +488,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "strlen")]
+pub use strlen::Strlen;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "tally")]
@@ -745,6 +749,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "strlen")]
+        Box::new(Strlen),
         #[cfg(feature = "tally")]
         Box::new(Tally),
         #[cfg(feature = "tally_value")]

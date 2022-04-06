@@ -8,7 +8,7 @@ use crate::{
 //------------------------------------------------------------------------------
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
-struct IsMetricConfig {}
+pub(crate) struct IsMetricConfig {}
 
 inventory::submit! {
     ConditionDescription::new::<IsMetricConfig>("is_metric")
@@ -19,7 +19,7 @@ impl_generate_config_from_default!(IsMetricConfig);
 #[typetag::serde(name = "is_metric")]
 impl ConditionConfig for IsMetricConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
-        Ok(Condition::IsMetric(IsMetric {}))
+        Ok(Condition::is_metric())
     }
 }
 

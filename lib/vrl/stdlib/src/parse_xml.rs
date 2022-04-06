@@ -112,7 +112,7 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -279,7 +279,7 @@ impl Expression for ParseXmlFn {
         parse_xml(value, options)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
@@ -350,7 +350,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 
         NodeType::Element => {
             match (config.always_use_text_key, node.attributes().is_empty()) {
-                // If the the node has attributes, *always* recurse to expand default keys.
+                // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),
