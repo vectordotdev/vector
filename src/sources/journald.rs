@@ -35,7 +35,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -404,8 +404,10 @@ impl<'a> Batch<'a> {
                 match self.source.out.send_batch(self.events).await {
                     Ok(_) => {
                         if let Some(receiver) = self.receiver {
-                            // Ignore the received status, we can't do anything with failures here.
-                            receiver.await;
+                            if receiver.await != BatchStatus::Delivered {
+                                error!(message = "Batch failed to deliver, stopping journal.");
+                                self.exiting = Some(false);
+                            }
                         }
                     }
                     Err(error) => {
@@ -1018,6 +1020,20 @@ mod tests {
 
     #[tokio::test]
     async fn waits_for_acknowledgements() {
+        let (count, status) = ack_test(EventStatus::Delivered).await;
+        assert_eq!(count, 8);
+        assert_eq!(status, Poll::Pending);
+    }
+
+    #[tokio::test]
+    async fn aborts_on_negative_acknowledgements() {
+        let (count, status) = ack_test(EventStatus::Rejected).await;
+        assert!(count > 0);
+        // This indicates the source has exited
+        assert_eq!(status, Poll::Ready(false));
+    }
+
+    async fn ack_test(status: EventStatus) -> (usize, Poll<bool>) {
         let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
@@ -1043,15 +1059,17 @@ mod tests {
         // Drive the journal until it waits for the acknowledgement.
         assert_eq!(handle.poll(), Poll::Pending);
         assert!(!handle.is_woken());
-        // Acknowledge all the received events.
+        // Mark the status on all the received events.
         let mut count = 0;
         while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            event.metadata().update_status(EventStatus::Delivered);
+            event.metadata().update_status(status);
             count += 1;
         }
-        assert_eq!(count, 8);
+
         // Make sure it is woken up again after receiving the acknowledgement.
         assert!(handle.is_woken());
+
+        (count, handle.poll())
     }
 
     #[test]
