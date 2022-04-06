@@ -57,7 +57,11 @@ components: sinks: datadog_traces: {
 		}
 	}
 
-	support: sinks._datadog.support
+	support: {
+		requirements: []
+		warnings: ["APM stats are not yet supported, so they will dropped when using Vector to send traces received from the Datadog Trace agent to Datadog."]
+		notices: []
+	}
 
 	configuration: {
 		default_api_key: sinks._datadog.configuration.api_key
