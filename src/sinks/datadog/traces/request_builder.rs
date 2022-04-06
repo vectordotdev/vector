@@ -34,6 +34,7 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
             Self::FailedToEncode {
