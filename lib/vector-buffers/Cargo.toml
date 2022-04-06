@@ -52,7 +52,7 @@ temp-dir = "0.1.11"
 tempdir = "0.3"
 tokio-test = "0.4.2"
 tracing-fluent-assertions = { version = "0.3" }
-tracing-subscriber = { version = "0.3.9", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
+tracing-subscriber = { version = "0.3.10", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 
 [[bench]]
 name = "sized_records"
