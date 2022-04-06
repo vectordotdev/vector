@@ -6,17 +6,11 @@ use vrl::prelude::value::Error;
 use vrl::prelude::*;
 
 const MAX_LENGTH: i64 = 1024 * 64;
+const LENGTH_TOO_LARGE_ERR: &'static str = "Length is too large. Maximum is 64k";
+const LENGTH_TOO_SMALL_ERR: &'static str = "Length cannot be negative";
 
 fn random_bytes(length: Value) -> Resolved {
-    let length = length.try_integer()?;
-    if length < 0 {
-        return Err(format!("Length cannot be negative").into());
-    }
-    if length > MAX_LENGTH {
-        return Err(format!("Length is too large. Maximum is {}", MAX_LENGTH).into());
-    }
-
-    let mut output = vec![0_u8; length as usize];
+    let mut output = vec![0_u8; get_length(length)?];
 
     // ThreadRng is a cryptographically secure generator
     thread_rng().fill_bytes(&mut output);
@@ -56,6 +50,17 @@ impl Function for RandomBytes {
     ) -> Compiled {
         let length = arguments.required("length");
 
+        if let Some(literal) = length.as_value() {
+            // check if length is valid
+            let _ = get_length(literal.clone()).map_err(|err| {
+                vrl::function::Error::InvalidArgument {
+                    keyword: "length",
+                    value: literal,
+                    error: err,
+                }
+            })?;
+        }
+
         Ok(Box::new(RandomBytesFn { length }))
     }
 
@@ -63,6 +68,17 @@ impl Function for RandomBytes {
         let length = args.required("length");
         random_bytes(length)
     }
+}
+
+fn get_length(value: Value) -> std::result::Result<usize, &'static str> {
+    let length = value.try_integer().expect("length must be an integer");
+    if length < 0 {
+        return Err(LENGTH_TOO_SMALL_ERR);
+    }
+    if length > MAX_LENGTH {
+        return Err(LENGTH_TOO_LARGE_ERR);
+    }
+    Ok(length as usize)
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +93,15 @@ impl Expression for RandomBytesFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().fallible()
+        match self.length.as_value() {
+            None => TypeDef::bytes().fallible(),
+            Some(value) => {
+                if get_length(value).is_ok() {
+                    TypeDef::bytes()
+                } else {
+                    TypeDef::bytes().fallible()
+                }
+            }
+        }
     }
 }
