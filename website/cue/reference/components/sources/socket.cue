@@ -104,6 +104,22 @@ components: sources: socket: {
 				examples: ["/path/to/socket"]
 			}
 		}
+		socket_file_mode: {
+			common: false
+			description: """
+				Unix file mode bits to be applied to the unix socket file
+				as its designated file permissions.
+				Note that the file mode value can be specified in any numeric format
+				supported by your configuration language, but it is most intuitive to use an octal number.
+				"""
+			relevant_when: "mode = `unix_datagram` or `unix_stream`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    null
+				examples: [0o777, 0o600, 508]
+			}
+		}
 		shutdown_timeout_secs: {
 			common:        false
 			description:   "The timeout before a connection is forcefully closed during shutdown."

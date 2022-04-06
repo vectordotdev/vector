@@ -20,6 +20,8 @@ mod http;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
+#[cfg(all(unix, feature = "sources-socket", feature = "sources-utils-unix"))]
+mod unix;
 #[cfg(all(unix, feature = "sources-socket"))]
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
