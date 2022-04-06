@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, task};
+use std::task;
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -34,7 +34,7 @@ pub struct PrometheusRemoteWriteDefaultBatchSettings;
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Snafu)]

@@ -13,7 +13,7 @@ components: sinks: datadog_metrics: {
 				enabled:      true
 				common:       false
 				max_events:   100_000
-				timeout_secs: 2
+				timeout_secs: 2.0
 			}
 			compression: enabled: false
 			encoding: enabled:    false

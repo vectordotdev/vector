@@ -20,7 +20,7 @@ components: sinks: http: {
 				enabled:      true
 				common:       true
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true

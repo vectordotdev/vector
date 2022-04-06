@@ -20,7 +20,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 				enabled:      true
 				common:       false
 				max_events:   20
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
