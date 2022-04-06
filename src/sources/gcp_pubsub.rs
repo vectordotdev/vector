@@ -370,7 +370,7 @@ mod integration_tests {
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};
     use crate::test_util::{self, components, random_string};
-    use crate::{gcp, http::HttpClient, shutdown, SourceSender};
+    use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =
@@ -379,7 +379,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
         let test_data = tester.send_test_events(99, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
         tester.shutdown(shutdown).await;
@@ -387,7 +387,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down0() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
         tester.shutdown(shutdown).await;
 
@@ -399,7 +399,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down1() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
         let test_data = tester.send_test_events(1, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
@@ -414,7 +414,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
         for _ in 0..10 {
             let test_data = tester.send_test_events(9, btreemap![]).await;
             receive_events(&mut rx, test_data).await;
@@ -424,7 +424,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
         let attributes = btreemap![
             random_string(8) => random_string(88),
             random_string(8) => random_string(88),
@@ -437,9 +437,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn acks_received() {
-        let (tester, mut rx, shutdown) = setup().await;
+        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-        let test_data = tester.send_test_events(10, btreemap![]).await;
+        let test_data = tester.send_test_events(1, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
 
         tester.shutdown(shutdown).await;
@@ -454,7 +454,28 @@ mod integration_tests {
         assert_eq!(tester.pull_count(10).await, 0);
     }
 
-    async fn setup() -> (
+    #[tokio::test]
+    async fn does_not_ack_rejected() {
+        let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
+
+        let test_data = tester.send_test_events(1, btreemap![]).await;
+        receive_events(&mut rx, test_data).await;
+
+        tester.shutdown(shutdown).await;
+
+        // Make sure there are no messages left in the queue
+        assert_eq!(tester.pull_count(10).await, 0);
+
+        // Wait for the acknowledgement deadline to expire
+        tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+
+        // All messages are still in the queue
+        assert_eq!(tester.pull_count(10).await, 1);
+    }
+
+    async fn setup(
+        status: EventStatus,
+    ) -> (
         Tester,
         impl Stream<Item = Event> + Unpin,
         shutdown::SourceShutdownCoordinator,
@@ -465,7 +486,7 @@ mod integration_tests {
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
-        let (rx, shutdown) = tester.spawn_source().await;
+        let (rx, shutdown) = tester.spawn_source(status).await;
 
         (tester, rx, shutdown)
     }
@@ -511,11 +532,12 @@ mod integration_tests {
 
         async fn spawn_source(
             &self,
+            status: EventStatus,
         ) -> (
             impl Stream<Item = Event> + Unpin,
             shutdown::SourceShutdownCoordinator,
         ) {
-            let (tx, rx) = SourceSender::new_test();
+            let (tx, rx) = SourceSender::new_test_finalize(status);
             let config = PubsubConfig {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
@@ -524,7 +546,8 @@ mod integration_tests {
                 ack_deadline_seconds: ACK_DEADLINE as i32,
                 ..Default::default()
             };
-            let (ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
+            let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
+            ctx.acknowledgements = true;
             let source = config.build(ctx).await.expect("Failed to build source");
             tokio::spawn(async move { source.await.expect("Failed to run source") });
 
