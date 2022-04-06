@@ -40,7 +40,7 @@ remap: {
 		"Enumerate",
 		"Event",
 		"Path",
-		"Hash",
+		"Cryptography",
 		"IP",
 		"Number",
 		"Object",
