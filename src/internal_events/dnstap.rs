@@ -31,14 +31,13 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
         error!(
             message = "Error occurred while parsing dnstap data.",
             error = ?self.error,
-            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
             internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
-            "error" => self.error.to_string(),
             "error_type" => error_type::PARSER_FAILED,
         );
         // deprecated
