@@ -71,7 +71,7 @@ we've yet to add support for all sources and sinks that support acknowledgements
 at the protocol level so we'll be adding that overtime.
 
 Sources that don't support acknowledgements will output a
-warning message to let you know if you try to enable acknowledgements, while sinks
+warning message to let you know if you try to enable acknowledgements on a connected sink, while sinks
 that don't support acknowledgements will trigger a fatal error and prevent the
 configuration from loading. You can find which components support acknowledgements
 on each of their documentation pages by looking for the acknowledgments badge.
