@@ -101,18 +101,18 @@ where
 
     if std::fs::remove_dir_all(&src_buffer_dir).is_err() {
         error!(
-			"Failed to delete the old disk buffer data directory at '{}'.  You can safely delete it manually at this point.",
+            "Failed to delete the old disk buffer data directory at '{}'.  You can safely delete it manually at this point.",
             src_buffer_dir.to_string_lossy(),
         );
     }
 
     info!(
-		"Migrated {} records in disk buffer for `{}` sink. Old disk buffer at '{}' has been deleted, and the new disk buffer has been created at '{}'.",
-		migrated_records,
-		id,
-		src_buffer_dir.to_string_lossy(),
-		dst_buffer_dir.to_string_lossy(),
-	);
+        "Migrated {} records in disk buffer for `{}` sink. Old disk buffer at '{}' has been deleted, and the new disk buffer has been created at '{}'.",
+        migrated_records,
+        id,
+        src_buffer_dir.to_string_lossy(),
+        dst_buffer_dir.to_string_lossy(),
+    );
 
     Ok(())
 }
