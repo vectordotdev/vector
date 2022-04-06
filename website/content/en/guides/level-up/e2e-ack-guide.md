@@ -84,7 +84,7 @@ Similarly, the final edge case is if you are using any user-space transforms, su
 as Lua. Because user-space transforms can drop, combine, split, or create events
 that may have no relation to the source event, tracking whether an event has been
 successfully delivered gets extremely complex. As such, end-to-end acknowledgement
-is not supported.
+is not supported if the `lua` transform is used.
 
 ## Parting thoughts
 
