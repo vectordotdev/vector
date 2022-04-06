@@ -78,7 +78,7 @@ impl InternalEvent for LuaBuildError {
     }
 }
 
-fn mlua_error_code(err: &mlua::Error) -> &'static str {
+const fn mlua_error_code(err: &mlua::Error) -> &'static str {
     use mlua::Error::*;
 
     match err {
@@ -109,7 +109,7 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
     }
 }
 
-fn lua_build_error_code(err: &BuildError) -> &'static str {
+const fn lua_build_error_code(err: &BuildError) -> &'static str {
     use BuildError::*;
 
     match err {

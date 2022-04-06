@@ -83,6 +83,7 @@ pub(crate) fn io_error_code(error: &std::io::Error) -> &'static str {
     }
 }
 
+#[cfg(feature = "sources-aws_ecs_metrics")]
 pub(crate) fn hyper_error_code(error: &hyper::Error) -> &'static str {
     if error.is_body_write_aborted() {
         "body_write_aborted"
