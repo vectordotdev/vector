@@ -10,8 +10,9 @@ pub use format::{
     RawMessageSerializerConfig,
 };
 pub use framing::{
-    BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
+    CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder,
+    NewlineDelimitedEncoderConfig,
 };
 
 use bytes::BytesMut;
@@ -52,6 +53,8 @@ impl From<std::io::Error> for Error {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
+    /// Configures the `BytesEncoder`.
+    Bytes,
     /// Configures the `CharacterDelimitedEncoder`.
     CharacterDelimited {
         /// Options for the character delimited encoder.
@@ -79,6 +82,7 @@ impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub const fn build(self) -> Framer {
         match self {
+            FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
@@ -97,12 +101,20 @@ impl FramingConfig {
 /// Produce a byte stream from byte frames.
 #[derive(Debug, Clone)]
 pub enum Framer {
+    /// Uses a `BytesEncoder` for framing.
+    Bytes(BytesEncoder),
     /// Uses a `CharacterDelimitedEncoder` for framing.
     CharacterDelimited(CharacterDelimitedEncoder),
     /// Uses a `NewlineDelimitedEncoder` for framing.
     NewlineDelimited(NewlineDelimitedEncoder),
     /// Uses an opaque `Encoder` implementation for framing.
     Boxed(BoxedFramer),
+}
+
+impl From<BytesEncoder> for Framer {
+    fn from(encoder: BytesEncoder) -> Self {
+        Self::Bytes(encoder)
+    }
 }
 
 impl From<CharacterDelimitedEncoder> for Framer {
@@ -128,6 +140,7 @@ impl tokio_util::codec::Encoder<()> for Framer {
 
     fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
+            Framer::Bytes(framer) => framer.encode((), dst),
             Framer::CharacterDelimited(framer) => framer.encode((), dst),
             Framer::NewlineDelimited(framer) => framer.encode((), dst),
             Framer::Boxed(framer) => framer.encode((), dst),
@@ -183,9 +196,9 @@ impl SerializerConfig {
 /// Serialize structured events as bytes.
 #[derive(Debug, Clone)]
 pub enum Serializer {
-    /// Uses a `JsonSerializer` for deserialization.
+    /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
-    /// Uses a `RawMessageSerializer` for deserialization.
+    /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
 }
 

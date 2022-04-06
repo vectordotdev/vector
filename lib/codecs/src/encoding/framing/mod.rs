@@ -3,9 +3,11 @@
 
 #![deny(missing_docs)]
 
+mod bytes;
 mod character_delimited;
 mod newline_delimited;
 
+pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
 pub use character_delimited::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions,
 };
