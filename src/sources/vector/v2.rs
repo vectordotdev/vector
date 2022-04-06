@@ -154,7 +154,9 @@ async fn run(
     let service = proto::Server::new(Service {
         pipeline: cx.out,
         acknowledgements,
-    });
+    })
+    .accept_gzip();
+
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
     let listener = tls_settings.bind(&address).await?;
@@ -239,6 +241,41 @@ mod tests {
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
         let config = format!(r#"address = "{}""#, addr);
+        let sink: SinkConfig = toml::from_str(&config).unwrap();
+        let cx = SinkContext::new_test();
+        let (sink, _) = sink.build(cx).await.unwrap();
+
+        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+        sink.run(stream).await.unwrap();
+        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+
+        let output = test_util::collect_ready(rx).await;
+        assert_event_data_eq!(events, output);
+    }
+
+    #[tokio::test]
+    async fn receive_compressed_message() {
+        let addr = test_util::next_addr();
+        let config = format!(r#"address = "{}""#, addr);
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        components::init_test();
+        let (tx, rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Ideally, this would be a fully custom agent to send the data,
+        // but the sink side already does such a test and this is good
+        // to ensure interoperability.
+        let config = format!(
+            r#"address = "{}"
+        compression=true"#,
+            addr
+        );
         let sink: SinkConfig = toml::from_str(&config).unwrap();
         let cx = SinkContext::new_test();
         let (sink, _) = sink.build(cx).await.unwrap();

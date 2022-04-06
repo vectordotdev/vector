@@ -1,5 +1,4 @@
 use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use std::num::NonZeroU64;
 use tower::ServiceBuilder;
 
 use futures::FutureExt;
@@ -176,7 +175,7 @@ pub struct CloudwatchLogsDefaultBatchSettings;
 impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(10_000);
     const MAX_BYTES: Option<usize> = Some(1_048_576);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[cfg(test)]

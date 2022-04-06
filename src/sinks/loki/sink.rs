@@ -1,7 +1,9 @@
+use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
+use regex::Regex;
 use snafu::Snafu;
 use vector_common::encode_logfmt;
 use vector_core::{
@@ -155,19 +157,32 @@ pub(super) struct EventEncoder {
 
 impl EventEncoder {
     fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
-        self.labels
-            .iter()
-            .filter_map(|(key_template, value_template)| {
-                if let (Ok(key), Ok(value)) = (
-                    key_template.render_string(event),
-                    value_template.render_string(event),
-                ) {
-                    Some((key, value))
+        let mut vec: Vec<(String, String)> = Vec::new();
+
+        for (key_template, value_template) in self.labels.iter() {
+            if let (Ok(key), Ok(value)) = (
+                key_template.render_string(event),
+                value_template.render_string(event),
+            ) {
+                if let Some(opening_prefix) = key.strip_suffix('*') {
+                    let output: Result<serde_json::map::Map<String, serde_json::Value>, _> =
+                        serde_json::from_str(value.as_str());
+
+                    if let Ok(output) = output {
+                        // key_* -> key_one, key_two, key_three
+                        for (k, v) in output {
+                            vec.push((
+                                slugify_text(format!("{}{}", opening_prefix, k)),
+                                Value::from(v).to_string_lossy(),
+                            ))
+                        }
+                    }
                 } else {
-                    None
+                    vec.push((key, value));
                 }
-            })
-            .collect()
+            }
+        }
+        vec
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -399,12 +414,22 @@ impl StreamSink<Event> for LokiSink {
     }
 }
 
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+
+fn slugify_text(input: String) -> String {
+    let result = RE.replace_all(&input, "_");
+    result.to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        convert::TryFrom,
+    };
 
     use futures::stream::StreamExt;
-    use vector_core::event::Event;
+    use vector_core::event::{Event, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -449,6 +474,14 @@ mod tests {
             Template::try_from("{{ name }}").unwrap(),
             Template::try_from("{{ value }}").unwrap(),
         );
+        labels.insert(
+            Template::try_from("test_key_*").unwrap(),
+            Template::try_from("{{ dict }}").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("going_to_fail_*").unwrap(),
+            Template::try_from("{{ value }}").unwrap(),
+        );
         let encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             encoding: EncodingConfig::from(Encoding::Json),
@@ -461,12 +494,21 @@ mod tests {
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");
         log.insert("value", "bar");
+
+        let mut test_dict = BTreeMap::default();
+        test_dict.insert("one".to_string(), Value::from("foo"));
+        test_dict.insert("two".to_string(), Value::from("baz"));
+        log.insert("dict", Value::from(test_dict));
+
         let record = encoder.encode_event(event);
         assert!(record.event.event.contains(log_schema().timestamp_key()));
-        assert_eq!(record.labels.len(), 2);
+        assert_eq!(record.labels.len(), 4);
+
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
         assert_eq!(labels["static"], "value".to_string());
         assert_eq!(labels["foo"], "bar".to_string());
+        assert_eq!(labels["test_key_one"], "foo".to_string());
+        assert_eq!(labels["test_key_two"], "baz".to_string());
     }
 
     #[test]

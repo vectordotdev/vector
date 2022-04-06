@@ -333,11 +333,11 @@ components: {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
-				enabled:      bool
-				common:       bool
-				max_bytes?:   uint | null
-				max_events?:  uint | null
-				timeout_secs: uint16 | null
+				enabled:       bool
+				common?:       bool
+				max_bytes?:    uint | null
+				max_events?:   uint | null
+				timeout_secs?: float | null
 			}
 		}
 

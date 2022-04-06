@@ -20,7 +20,7 @@ components: sinks: elasticsearch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -283,7 +283,18 @@ components: sinks: elasticsearch: {
 			required:    false
 			type: object: {
 				examples: [{"X-Powered-By": "Vector"}]
-				options: {}
+				options: {
+					"*": {
+						common:      false
+						description: "Any query key"
+						required:    false
+						type: string: {
+							default: null
+							examples: ["Vector"]
+							syntax: "literal"
+						}
+					}
+				}
 			}
 		}
 		suppress_type_name: {

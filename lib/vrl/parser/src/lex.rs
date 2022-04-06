@@ -233,9 +233,6 @@ pub enum Token<S> {
     // Reserved for future use.
     ReservedIdentifier(S),
 
-    // A token used by the internal parser unit tests.
-    InternalTest(S),
-
     InvalidToken(char),
 
     // keywords
@@ -320,8 +317,6 @@ impl<S> Token<S> {
 
             ReservedIdentifier(s) => ReservedIdentifier(f(s)),
 
-            InternalTest(s) => InternalTest(f(s)),
-
             InvalidToken(s) => InvalidToken(s),
 
             Else => Else,
@@ -375,7 +370,6 @@ where
             RegexLiteral(_) => "RegexLiteral",
             TimestampLiteral(_) => "TimestampLiteral",
             ReservedIdentifier(_) => "ReservedIdentifier",
-            InternalTest(_) => "InternalTest",
             InvalidToken(_) => "InvalidToken",
 
             Else => "Else",
@@ -514,10 +508,6 @@ impl<'input> Iterator for Lexer<'input> {
 
                     '_' if !self.test_peek(is_ident_continue) => {
                         Some(Ok(self.token(start, Underscore)))
-                    }
-
-                    '?' if self.test_peek(char::is_alphabetic) => {
-                        Some(Ok(self.internal_test(start)))
                     }
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
@@ -1008,13 +998,6 @@ impl<'input> Lexer<'input> {
         };
 
         (start, token, end)
-    }
-
-    fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
-        self.bump();
-        let (end, test) = self.take_while(start, char::is_alphabetic);
-
-        (start, Token::InternalTest(test), end)
     }
 
     fn quoted_literal(

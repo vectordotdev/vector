@@ -21,7 +21,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				common:       false
 				max_bytes:    1048576
 				max_events:   10000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true

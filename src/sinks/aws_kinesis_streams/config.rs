@@ -1,6 +1,5 @@
 use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
 use aws_sdk_kinesis::types::SdkError;
-use std::num::NonZeroU64;
 
 use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
@@ -82,7 +81,7 @@ pub struct KinesisDefaultBatchSettings;
 impl SinkBatchSettings for KinesisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(500);
     const MAX_BYTES: Option<usize> = Some(5_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

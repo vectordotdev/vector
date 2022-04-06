@@ -25,7 +25,7 @@ components: sinks: vector: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled:       false
 			encoding: enabled:          false
@@ -82,6 +82,12 @@ components: sinks: vector: {
 			type: string: {
 				examples: ["92.12.333.224:\(_port)"]
 			}
+		}
+		compression: {
+			description: "Enable gRPC compression with gzip."
+			common:      true
+			required:    false
+			type: bool: default: false
 		}
 		version: {
 			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."

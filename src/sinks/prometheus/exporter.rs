@@ -466,7 +466,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
-            // tracking and remove any which have exceeded the the flush interval in terms of not
+            // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
             //
             // TODO: Can we be smarter about this? As is, we might wait up to 2x the flush period to
