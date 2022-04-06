@@ -51,6 +51,8 @@ components: sinks: datadog_metrics: {
 		}
 	}
 
+	support: sinks._datadog.support
+
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
