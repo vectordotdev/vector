@@ -30,7 +30,8 @@ pub mod console;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
-    feature = "sinks-datadog_metrics"
+    feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces"
 ))]
 pub mod datadog;
 #[cfg(feature = "sinks-datadog_archives")]

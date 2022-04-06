@@ -594,6 +594,7 @@ sinks-logs = [
   "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
+  "sinks-datadog_traces",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -645,6 +646,7 @@ sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
+sinks-datadog_traces = ["protobuf-build"]
 sinks-elasticsearch = ["aws-core", "aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
 sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
@@ -689,6 +691,7 @@ all-integration-tests = [
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
+  "datadog-traces-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -740,6 +743,7 @@ clickhouse-integration-tests = ["sinks-clickhouse"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
+datadog-traces-integration-tests = ["sinks-datadog_traces"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
