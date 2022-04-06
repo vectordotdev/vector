@@ -102,10 +102,11 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (message, dropped_events) = e.into_parts();
+                        let (message, reason, dropped_events) = e.into_parts();
                         emit!(DatadogTracesEncodingError {
                             message,
                             dropped_events,
+                            reason,
                         });
                         None
                     }

@@ -22,30 +22,29 @@ mod dd_proto {
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
-    #[snafu(display("Encoding of a request payload failed ({})", reason))]
+    #[snafu(display("Encoding of a request payload failed ({}, {})", message, reason))]
     FailedToEncode {
-        reason: &'static str,
+        message: &'static str,
+        reason: String,
         dropped_events: u64,
     },
 
     #[snafu(display("Unsupported endpoint ({})", reason))]
-    UnsupportedEndpoint {
-        reason: &'static str,
-        dropped_events: u64,
-    },
+    UnsupportedEndpoint { reason: String, dropped_events: u64 },
 }
 
 impl RequestBuilderError {
-    pub const fn into_parts(self) -> (&'static str, u64) {
+    pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
             Self::FailedToEncode {
+                message,
                 reason,
                 dropped_events,
-            } => (reason, dropped_events),
+            } => (message, reason, dropped_events),
             Self::UnsupportedEndpoint {
                 reason,
                 dropped_events,
-            } => (reason, dropped_events),
+            } => ("unsupported endpoint", reason, dropped_events),
         }
     }
 }
@@ -97,7 +96,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         match key.endpoint {
             DatadogTracesEndpoint::APMStats => {
                 results.push(Err(RequestBuilderError::UnsupportedEndpoint {
-                    reason: "APM stats are not yet supported.",
+                    reason: "APM stats are not yet supported.".into(),
                     dropped_events: n as u64,
                 }))
             }
@@ -126,15 +125,17 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                                 Ok(()) => {
                                     results.push(Ok((metadata, compressor.into_inner().freeze())))
                                 }
-                                Err(_) => results.push(Err(RequestBuilderError::FailedToEncode {
-                                    reason: "Payload compression failed.",
+                                Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
+                                    message: "Payload compression failed.",
+                                    reason: e.to_string(),
                                     dropped_events: n as u64,
                                 })),
                             }
                         }
                         Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
-                            reason: err.parts().0,
-                            dropped_events: err.parts().1,
+                            message: err.parts().0,
+                            reason: err.parts().1.into(),
+                            dropped_events: err.parts().2,
                         })),
                     })
             }
@@ -175,13 +176,19 @@ pub struct DatadogTracesEncoder {
 #[derive(Debug, Snafu)]
 pub enum EncoderError {
     #[snafu(display("Unable to split payload into small enough chunks"))]
-    UnableToSplit { dropped_events: u64 },
+    UnableToSplit {
+        dropped_events: u64,
+        error_code: &'static str,
+    },
 }
 
 impl EncoderError {
-    pub const fn parts(&self) -> (&'static str, u64) {
+    pub const fn parts(&self) -> (&'static str, &'static str, u64) {
         match self {
-            Self::UnableToSplit { dropped_events: n } => ("unable to split into small chunks", *n),
+            Self::UnableToSplit {
+                dropped_events: n,
+                error_code,
+            } => ("unable to split into small chunks", error_code, *n),
         }
     }
 }
@@ -205,6 +212,7 @@ impl DatadogTracesEncoder {
                 if encoded_chunk.len() > self.max_size {
                     encoded_payloads.push(Err(EncoderError::UnableToSplit {
                         dropped_events: events.len() as u64,
+                        error_code: "message_too_big",
                     }));
                 } else {
                     encoded_payloads.push(Ok((encoded_chunk, events.to_vec())));
