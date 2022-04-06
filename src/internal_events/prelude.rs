@@ -47,6 +47,7 @@ pub mod error_type {
 #[cfg(any(
     feature = "sinks-azure_blob",
     feature = "sinks-elasticsearch",
+    feature = "sources-aws_ecs_metrics",
     feature = "sources-aws_kinesis_firehose",
     feature = "sources-utils-http",
 ))]
