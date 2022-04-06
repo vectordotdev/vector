@@ -30,7 +30,7 @@ where
         data_dir.as_ref(),
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
-        true,
+        false,
         usage_handle,
     )
     .expect("should not fail to create buffer")
@@ -48,7 +48,7 @@ where
         data_dir.as_ref(),
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
-        true,
+        false,
         usage_handle.clone(),
     )
     .expect("should not fail to create buffer");
@@ -71,7 +71,7 @@ where
         data_dir.as_ref(),
         "disk_buffer_v1",
         max_buffer_size,
-        true,
+        false,
         usage_handle,
     )
     .expect("should not fail to create buffer");

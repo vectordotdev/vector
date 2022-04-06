@@ -68,7 +68,7 @@ pub struct DiskV1Buffer {
     id: String,
     data_dir: PathBuf,
     max_size: NonZeroU64,
-    create_if_missing: bool,
+    is_migrating: bool,
 }
 
 impl DiskV1Buffer {
@@ -77,17 +77,21 @@ impl DiskV1Buffer {
             id,
             data_dir,
             max_size,
-            create_if_missing: true,
+            is_migrating: false,
         }
     }
 
-    /// When trying to create the buffer, do not create the database if it is missing.
-    pub fn no_create(&mut self) {
-        self.create_if_missing = false;
+    /// Configures this buffer to be used for migrations only.
+    ///
+    /// This configures certain behaviors:
+    /// - if the buffer doesn't exist, it won't automatically be created
+    /// - compaction is allowed to occur every 1 second, instead of the default of 60 seconds
+    pub fn set_migration_mode(&mut self) {
+        self.is_migrating = true;
     }
 
-    /// Gets the buffer path that this buffer will use.
-    pub fn get_buffer_path(&self) -> PathBuf {
+    /// Gets the path that this buffer will use for its data directory.
+    pub fn get_buffer_dir(&self) -> PathBuf {
         // NOTE: I'm not a fan of this code duplicating how `open` generates the directory to use,
         // but it's easily cross-checked and won't exist for much longer.
         get_new_style_buffer_dir_path(&self.data_dir, self.id.as_str())
@@ -115,7 +119,7 @@ where
             &self.data_dir,
             &self.id,
             self.max_size,
-            self.create_if_missing,
+            self.is_migrating,
             usage_handle,
         )?;
 
@@ -133,7 +137,7 @@ pub(self) fn open<T>(
     data_dir: &Path,
     name: &str,
     max_size: NonZeroU64,
-    create_if_missing: bool,
+    is_migrating: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError>
 where
@@ -226,7 +230,7 @@ where
         }
     }
 
-    build(&path, max_size, create_if_missing, usage_handle)
+    build(&path, max_size, is_migrating, usage_handle)
 }
 
 #[derive(Default)]
@@ -355,7 +359,7 @@ where
 fn build<T: Bufferable>(
     path: &Path,
     max_size: NonZeroU64,
-    create_if_missing: bool,
+    is_migrating: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
@@ -363,14 +367,14 @@ fn build<T: Bufferable>(
     let max_uncompacted_size = max_size.get() / MAX_UNCOMPACTED_DENOMINATOR;
     let max_size = max_size.get() - max_uncompacted_size;
 
-    let initial_state = db_initial_state::<T>(path, create_if_missing)?;
+    let initial_state = db_initial_state::<T>(path, !is_migrating)?;
     usage_handle.increment_received_event_count_and_byte_size(
         initial_state.total_events,
         initial_state.total_bytes,
     );
 
     let mut options = Options::new();
-    options.create_if_missing = create_if_missing;
+    options.create_if_missing = !is_migrating;
 
     let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
         data_dir: path.parent().expect("always a parent"),
@@ -413,6 +417,7 @@ fn build<T: Bufferable>(
         uncompacted_size: 0,
         record_acks: OrderedAcknowledgements::from_acked(read_offset),
         buffer: VecDeque::new(),
+        is_migrating,
         last_compaction: Instant::now(),
         last_flush: Instant::now(),
         pending_read: None,

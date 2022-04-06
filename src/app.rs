@@ -16,7 +16,7 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics, migrations,
+    config, generate, graph, heartbeat, list, metrics,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -135,7 +135,6 @@ impl Application {
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c, &config_paths),
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Migrate(m) => migrations::cmd(&m, color).await,
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),

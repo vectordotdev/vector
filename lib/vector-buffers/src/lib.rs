@@ -25,8 +25,6 @@ pub mod encoding;
 
 mod internal_events;
 
-pub mod migrations;
-
 #[cfg(test)]
 pub mod test;
 pub mod topology;

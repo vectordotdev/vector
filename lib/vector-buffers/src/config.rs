@@ -31,9 +31,9 @@ pub enum BufferBuildError {
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1,
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2,
 }
 
@@ -221,14 +221,14 @@ pub enum BufferType {
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1 {
         max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2 {
         max_size: NonZeroU64,
         #[serde(default)]
@@ -270,7 +270,6 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
-                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
@@ -444,7 +443,7 @@ max_events: 42
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
             r#"
-          type: disk
+          type: disk_v1
           max_size: 1024
           "#,
             BufferType::DiskV1 {
@@ -498,7 +497,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: disk_v2
+          type: disk
           max_size: 1024
           "#,
             BufferType::DiskV2 {
