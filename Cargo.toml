@@ -72,6 +72,7 @@ members = [
   "lib/enrichment",
   "lib/vector-buffers",
   "lib/vector-common",
+  "lib/vector-config",
   "lib/vector-core",
   "lib/dnsmsg-parser",
   "lib/fakedata",
