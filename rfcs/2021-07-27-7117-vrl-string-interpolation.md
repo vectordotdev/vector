@@ -52,14 +52,14 @@ foobar = upcase("foo bar")
 Also, the variable has to resolve to an exact string type, and nothing else:
 ```
 
-# not allowed
+### not allowed
 
 ```coffee
 number = 1
 "{{ number }}"
 ```
 
-# allowed
+### allowed
 
 ```coffee
 number = to_string(1)
