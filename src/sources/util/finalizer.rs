@@ -5,7 +5,8 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{future::Shared, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc;
 
-use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
+use crate::event::{BatchStatus, BatchStatusReceiver};
+use crate::shutdown::ShutdownSignal;
 
 /// The `OrderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order they are received
@@ -73,7 +74,9 @@ async fn run_finalizer<T>(
                 None => break,
             },
             finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                Some((_status, entry)) => apply_done(entry),
+                Some((status, entry)) => if status == BatchStatus::Delivered {
+                    apply_done(entry);
+                }
                 // The is_empty guard above prevents this from being reachable.
                 None => unreachable!(),
             },
@@ -82,8 +85,10 @@ async fn run_finalizer<T>(
     // We've either seen a shutdown signal or the new entry sender was
     // closed. Wait for the last statuses to come in before indicating
     // we are done.
-    while let Some((_status, entry)) = status_receivers.next().await {
-        apply_done(entry);
+    while let Some((status, entry)) = status_receivers.next().await {
+        if status == BatchStatus::Delivered {
+            apply_done(entry);
+        }
     }
     drop(shutdown);
 }
