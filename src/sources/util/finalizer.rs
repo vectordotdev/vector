@@ -1,6 +1,6 @@
-use std::{future::Future, pin::Pin, task::Poll};
+use std::{future::Future, marker::Unpin, pin::Pin, task::Poll};
 
-use futures::{future::Shared, stream::FuturesOrdered, FutureExt, StreamExt};
+use futures::{future::Shared, stream::FuturesOrdered, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc;
 
 use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
@@ -20,7 +20,12 @@ impl<T: Send + 'static> OrderedFinalizer<T> {
         apply_done: impl Fn(T) + Send + 'static,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown, receiver, apply_done));
+        tokio::spawn(run_finalizer(
+            shutdown,
+            receiver,
+            apply_done,
+            FuturesOrdered::default(),
+        ));
         Self {
             sender: Some(sender),
         }
@@ -39,9 +44,8 @@ async fn run_finalizer<T>(
     shutdown: Shared<ShutdownSignal>,
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: impl Fn(T),
+    mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,
 ) {
-    let mut status_receivers = FuturesOrdered::default();
-
     loop {
         tokio::select! {
             _ = shutdown.clone() => break,
@@ -68,6 +72,21 @@ async fn run_finalizer<T>(
         apply_done(entry);
     }
     drop(shutdown);
+}
+
+trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
+    fn is_empty(&self) -> bool;
+    fn push(&mut self, future: Fut);
+}
+
+impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+
+    fn push(&mut self, future: Fut) {
+        Self::push(self, future)
+    }
 }
 
 #[pin_project::pin_project]
