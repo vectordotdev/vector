@@ -2,23 +2,24 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
+    value::VrlValueConvert,
     vm::OpCode,
     Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
-    inner: BTreeMap<String, Expr>,
+    inner: Vec<(Expr, Expr)>,
 }
 
 impl Object {
-    pub fn new(inner: BTreeMap<String, Expr>) -> Self {
+    pub fn new(inner: Vec<(Expr, Expr)>) -> Self {
         Self { inner }
     }
 }
 
 impl Deref for Object {
-    type Target = BTreeMap<String, Expr>;
+    type Target = Vec<(Expr, Expr)>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -29,7 +30,10 @@ impl Expression for Object {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
-            .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
+            .map(|(key, expr)| {
+                expr.resolve(ctx)
+                    .and_then(|v| Ok((key.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(), v)))
+            })
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(Value::Object)
     }
@@ -37,7 +41,11 @@ impl Expression for Object {
     fn as_value(&self) -> Option<Value> {
         self.inner
             .iter()
-            .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
+            .map(|(key, expr)| {
+                expr.as_value().and_then(|v| {
+                    Some((key.as_value()?.try_bytes_utf8_lossy().ok()?.to_string(), v))
+                })
+            })
             .collect::<Option<BTreeMap<_, _>>>()
             .map(Value::Object)
     }
@@ -46,19 +54,29 @@ impl Expression for Object {
         let type_defs = self
             .inner
             .iter()
-            .map(|(k, expr)| (k.to_owned(), expr.type_def(state)))
-            .collect::<BTreeMap<_, _>>();
+            .map(|(k, expr)| {
+                Some((
+                    k.as_value()?.try_bytes_utf8_lossy().ok()?.to_string(),
+                    expr.type_def(state),
+                ))
+            })
+            .collect::<Option<BTreeMap<_, _>>>();
 
-        // If any of the stored expressions is fallible, the entire object is
-        // fallible.
-        let fallible = type_defs.values().any(TypeDef::is_fallible);
+        match type_defs {
+            None => TypeDef::object(BTreeMap::default()).fallible(),
+            Some(type_defs) => {
+                // If any of the stored expressions is fallible, the entire object is
+                // fallible.
+                let fallible = type_defs.values().any(TypeDef::is_fallible);
 
-        let collection = type_defs
-            .into_iter()
-            .map(|(field, type_def)| (field.into(), type_def.into()))
-            .collect::<BTreeMap<_, _>>();
+                let collection = type_defs
+                    .into_iter()
+                    .map(|(field, type_def)| (field.into(), type_def.into()))
+                    .collect::<BTreeMap<_, _>>();
 
-        TypeDef::object(collection).with_fallibility(fallible)
+                TypeDef::object(collection).with_fallibility(fallible)
+            }
+        }
     }
 
     fn compile_to_vm(
@@ -68,9 +86,10 @@ impl Expression for Object {
     ) -> Result<(), String> {
         for (key, value) in &self.inner {
             // Write the key as a constant
-            let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(keyidx);
+            //let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
+            //vm.write_opcode(OpCode::Constant);
+            //vm.write_primitive(keyidx);
+            key.compile_to_vm(vm, state)?;
 
             // Write the value
             value.compile_to_vm(vm, state)?;
@@ -101,6 +120,7 @@ impl fmt::Display for Object {
 
 impl From<BTreeMap<String, Expr>> for Object {
     fn from(inner: BTreeMap<String, Expr>) -> Self {
-        Self { inner }
+        todo!()
+        //Self { inner }
     }
 }

@@ -326,6 +326,10 @@ impl ArgumentList {
         &mut self,
         keyword: &'static str,
     ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
+        // This is needed for parse_groks aliases parameter.
+        todo!()
+
+        /*
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Container(Container {
@@ -338,6 +342,7 @@ impl ArgumentList {
                 }),
             })
             .transpose()
+        */
     }
 
     pub fn required_object(

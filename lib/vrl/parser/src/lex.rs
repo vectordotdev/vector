@@ -449,7 +449,7 @@ pub struct TemplateString(pub Vec<StringSegment>);
 
 impl TemplateString {
     /// Rewrites the ast for the template string to be a series of string concatenations
-    pub fn rewrite(&self, span: Span) -> crate::ast::Expr {
+    pub fn rewrite(&self) -> crate::ast::Expr {
         self.0
             .iter()
             .map(|node| -> crate::ast::Expr {
@@ -473,7 +473,7 @@ impl TemplateString {
                     ),
                 ))
             })
-            .unwrap()
+            .expect("template string has at least one element")
     }
 }
 

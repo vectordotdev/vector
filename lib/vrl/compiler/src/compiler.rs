@@ -105,7 +105,7 @@ impl<'a> Compiler<'a> {
         use literal::ErrorVariant::*;
 
         if let ast::Literal::String(template) = node.inner() {
-            self.compile_expr(Node::new(node.span(), template.rewrite(node.span())))
+            self.compile_expr(Node::new(node.span(), template.rewrite()))
         } else {
             let literal = Literal::try_from(node).unwrap_or_else(|err| {
                 let value = match &err.variant {
@@ -155,18 +155,20 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
-        todo!()
-        /*
         use std::collections::BTreeMap;
 
         let exprs = node
             .into_inner()
             .into_iter()
-            .map(|(k, expr)| (k.into_inner(), self.compile_expr(expr)))
-            .collect::<BTreeMap<_, _>>();
+            .map(|(k, expr)| {
+                (
+                    self.compile_expr(k.map(|template| template.rewrite())),
+                    self.compile_expr(expr),
+                )
+            })
+            .collect::<Vec<(_, _)>>();
 
         Object::new(exprs)
-        */
     }
 
     fn compile_if_statement(&mut self, node: Node<ast::IfStatement>) -> IfStatement {
