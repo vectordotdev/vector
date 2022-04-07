@@ -3,7 +3,7 @@ package metadata
 remap: functions: decrypt: {
 	category: "Cryptography"
 	description: """
-		Decryptes a string with a symmetric encryption algorithm.
+		Decrypts a string with a symmetric encryption algorithm.
 
 		Supported Algorithms:
 

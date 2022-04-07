@@ -195,10 +195,7 @@ impl Expression for EncryptFn {
         let algorithm = self.algorithm.resolve(ctx)?;
         let key = self.key.resolve(ctx)?;
 
-        let iv = match &self.iv {
-            None => None,
-            Some(iv) => Some(iv.resolve(ctx)?),
-        };
+        let iv = self.iv.as_ref().map(|iv| iv.resolve(ctx)).transpose()?;
 
         encrypt(plaintext, algorithm, key, iv)
     }
