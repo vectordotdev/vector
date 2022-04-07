@@ -24,8 +24,8 @@ impl InMemory {
                 when_full,
                 ..
             } => InMemory {
-                inner: VecDeque::with_capacity(*max_events),
-                capacity: *max_events,
+                inner: VecDeque::with_capacity(max_events.get()),
+                capacity: max_events.get(),
                 when_full: *when_full,
             },
             _ => unreachable!(),

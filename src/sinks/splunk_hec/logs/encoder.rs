@@ -82,7 +82,7 @@ impl HecLogsEncoder {
         match serde_json::to_vec(&hec_data) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(&SplunkEventEncodeError { error });
+                emit!(SplunkEventEncodeError { error });
                 None
             }
         }

@@ -52,7 +52,7 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,6 +78,10 @@ impl Function for SetSemanticMeaning {
 
         Ok(Box::new(SetSemanticMeaningFn))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+        Ok(Value::Null)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,7 +92,7 @@ impl Expression for SetSemanticMeaningFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

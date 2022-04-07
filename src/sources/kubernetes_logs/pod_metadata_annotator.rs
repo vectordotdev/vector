@@ -2,18 +2,16 @@
 
 #![deny(missing_docs)]
 
-use evmap::ReadHandle;
 use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
+use kube::runtime::reflector::{store::Store, ObjectRef};
 use serde::{Deserialize, Serialize};
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
+use crate::event::{Event, LogEvent};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -53,16 +51,13 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with pod metadata.
 pub struct PodMetadataAnnotator {
-    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    pods_state_reader: Store<Pod>,
     fields_spec: FieldsSpec,
 }
 
 impl PodMetadataAnnotator {
     /// Create a new [`PodMetadataAnnotator`].
-    pub fn new(
-        pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-        fields_spec: FieldsSpec,
-    ) -> Self {
+    pub const fn new(pods_state_reader: Store<Pod>, fields_spec: FieldsSpec) -> Self {
         Self {
             pods_state_reader,
             fields_spec,
@@ -77,9 +72,9 @@ impl PodMetadataAnnotator {
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
-        let guard = self.pods_state_reader.get(file_info.pod_uid)?;
-        let entry = guard.get_one()?;
-        let pod: &Pod = entry.as_ref();
+        let obj = ObjectRef::<Pod>::new(file_info.pod_name).within(file_info.pod_namespace);
+        let resource = self.pods_state_reader.get(&obj)?;
+        let pod: &Pod = resource.as_ref();
 
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
@@ -118,13 +113,13 @@ fn annotate_from_file_info(
     file_info: &LogFileInfo<'_>,
 ) {
     log.insert(
-        &fields_spec.container_name,
+        fields_spec.container_name.as_str(),
         file_info.container_name.to_owned(),
     );
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    for (ref key, ref val) in [
+    for (key, val) in [
         (&fields_spec.pod_name, &metadata.name),
         (&fields_spec.pod_namespace, &metadata.namespace),
         (&fields_spec.pod_uid, &metadata.uid),
@@ -132,59 +127,59 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     .iter()
     {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 
     if let Some(owner_references) = &metadata.owner_references {
         log.insert(
-            &fields_spec.pod_owner,
+            fields_spec.pod_owner.as_str(),
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
         );
     }
 
     if let Some(labels) = &metadata.labels {
         // Calculate and cache the prefix path.
-        let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
+        let prefix_path = parse_path(&fields_spec.pod_labels);
         for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone().into()));
-            log.insert_path(path, val.to_owned());
+            let mut path = prefix_path.clone().segments;
+            path.push(OwnedSegment::Field(key.clone()));
+            log.insert(&path, val.to_owned());
         }
     }
 
     if let Some(annotations) = &metadata.annotations {
-        let prefix_path = PathIter::new(fields_spec.pod_annotations.as_ref()).collect::<Vec<_>>();
+        let prefix_path = parse_path(&fields_spec.pod_annotations);
         for (key, val) in annotations.iter() {
-            let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone().into()));
-            log.insert_path(path, val.to_owned());
+            let mut path = prefix_path.clone().segments;
+            path.push(OwnedSegment::Field(key.clone()));
+            log.insert(&path, val.to_owned());
         }
     }
 }
 
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
-    for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
+    for (key, val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }
 
 fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
-    for (ref key, ref val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
+    for (key, val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 
-    for (ref key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
+    for (key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
         if let Some(val) = val {
             let inner: Vec<String> = val
                 .iter()
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
-            log.insert(key, inner);
+            log.insert(key.as_str(), inner);
         }
     }
 }
@@ -194,17 +189,17 @@ fn annotate_from_container_status(
     fields_spec: &FieldsSpec,
     container_status: &ContainerStatus,
 ) {
-    for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
+    for (key, val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }
 
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
-    for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
+    for (key, val) in [(&fields_spec.container_image, &container.image)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.as_str(), val.to_owned());
         }
     }
 }
@@ -253,10 +248,16 @@ mod tests {
                     log.insert("kubernetes.pod_name", "sandbox0-name");
                     log.insert("kubernetes.pod_namespace", "sandbox0-ns");
                     log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.sandbox0-label0", "val0");
-                    log.insert("kubernetes.pod_labels.sandbox0-label1", "val1");
-                    log.insert("kubernetes.pod_annotations.sandbox0-annotation0", "val0");
-                    log.insert("kubernetes.pod_annotations.sandbox0-annotation1", "val1");
+                    log.insert("kubernetes.pod_labels.\"sandbox0-label0\"", "val0");
+                    log.insert("kubernetes.pod_labels.\"sandbox0-label1\"", "val1");
+                    log.insert(
+                        "kubernetes.pod_annotations.\"sandbox0-annotation0\"",
+                        "val0",
+                    );
+                    log.insert(
+                        "kubernetes.pod_annotations.\"sandbox0-annotation1\"",
+                        "val1",
+                    );
                     log
                 },
             ),
@@ -297,8 +298,8 @@ mod tests {
                     log.insert("name", "sandbox0-name");
                     log.insert("ns", "sandbox0-ns");
                     log.insert("uid", "sandbox0-uid");
-                    log.insert("labels.sandbox0-label0", "val0");
-                    log.insert("labels.sandbox0-label1", "val1");
+                    log.insert("labels.\"sandbox0-label0\"", "val0");
+                    log.insert("labels.\"sandbox0-label1\"", "val1");
                     log
                 },
             ),
@@ -326,10 +327,10 @@ mod tests {
                     log.insert("kubernetes.pod_name", "sandbox0-name");
                     log.insert("kubernetes.pod_namespace", "sandbox0-ns");
                     log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert(r#"kubernetes.pod_labels.nested0\.label0"#, "val0");
-                    log.insert(r#"kubernetes.pod_labels.nested0\.label1"#, "val1");
-                    log.insert(r#"kubernetes.pod_labels.nested1\.label0"#, "val2");
-                    log.insert(r#"kubernetes.pod_labels.nested2\.label0\.deep0"#, "val3");
+                    log.insert(r#"kubernetes.pod_labels."nested0.label0""#, "val0");
+                    log.insert(r#"kubernetes.pod_labels."nested0.label1""#, "val1");
+                    log.insert(r#"kubernetes.pod_labels."nested1.label0""#, "val2");
+                    log.insert(r#"kubernetes.pod_labels."nested2.label0.deep0""#, "val3");
                     log
                 },
             ),

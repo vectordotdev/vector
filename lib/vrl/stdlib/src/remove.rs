@@ -1,6 +1,44 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
+fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
+    let path = match path {
+        Value::Array(path) => {
+            let mut lookup = LookupBuf::root();
+
+            for segment in path {
+                let segment = match segment {
+                    Value::Bytes(field) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                lookup.push_back(segment)
+            }
+
+            lookup
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }
+            .into())
+        }
+    };
+    let compact = compact.try_boolean()?;
+    value.target_remove(&path, compact)?;
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Remove;
 
@@ -104,7 +142,7 @@ impl Function for Remove {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -118,6 +156,14 @@ impl Function for Remove {
             compact,
         }))
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let path = args.required("path");
+        let compact = args.optional("compact").unwrap_or_else(|| value!(false));
+
+        remove(path, compact, value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -129,48 +175,14 @@ pub(crate) struct RemoveFn {
 
 impl Expression for RemoveFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut lookup = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let compact = self.compact.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-                for segment in path {
-                    let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either string or integer, not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    lookup.push_back(segment)
-                }
-
-                lookup
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::array(Collection::any()),
-                }
-                .into())
-            }
-        };
-
-        let compact = self.compact.resolve(ctx)?.try_boolean()?;
-
-        let mut value = self.value.resolve(ctx)?;
-        value.target_remove(&path, compact)?;
-
-        Ok(value)
+        remove(path, compact, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
         let mut td = TypeDef::from(Kind::empty()).fallible();

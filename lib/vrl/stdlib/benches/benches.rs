@@ -44,11 +44,14 @@ criterion_group!(
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
+              ip_ntop,
+              ip_pton,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
               is_array,
               is_boolean,
+              is_empty,
               is_float,
               is_integer,
               is_null,
@@ -110,6 +113,7 @@ criterion_group!(
               string,
               strip_ansi_escape_codes,
               strip_whitespace,
+              strlen,
               tally,
               tally_value,
               timestamp,
@@ -563,6 +567,34 @@ bench_function! {
 }
 
 bench_function! {
+    ip_ntop => vrl_stdlib::IpNtop;
+
+    ipv4 {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!("\x01\x02\x03\x04")),
+    }
+
+    ipv6 {
+        args: func_args![value: "102:304:506:708:90a:b0c:d0e:f10"],
+        want: Ok(value!("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")),
+    }
+}
+
+bench_function! {
+    ip_pton => vrl_stdlib::IpPton;
+
+    ipv4 {
+        args: func_args![value: "\x01\x02\x03\x04"],
+        want: Ok(value!("1.2.3.4")),
+    }
+
+    ipv6 {
+        args: func_args![value: "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"],
+        want: Ok(value!("102:304:506:708:90a:b0c:d0e:f10")),
+    }
+}
+
+bench_function! {
     ip_subnet => vrl_stdlib::IpSubnet;
 
     ipv4_mask {
@@ -639,6 +671,35 @@ bench_function! {
     boolean {
         args: func_args![value: true],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_empty => vrl_stdlib::IsEmpty;
+
+    empty_array {
+        args: func_args![value: value!([])],
+        want: Ok(true),
+    }
+
+    non_empty_array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    empty_object {
+        args: func_args![value: value!({})],
+        want: Ok(true),
+    }
+
+    non_empty_object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+
+    string {
+        args: func_args![value: "foo"],
+        want: Ok(false),
     }
 }
 
@@ -1993,6 +2054,15 @@ bench_function! {
             value:" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000}"
         ],
         want: Ok("❤❤ hi there ❤❤")
+    }
+}
+
+bench_function! {
+    strlen => vrl_stdlib::Strlen;
+
+    literal {
+        args: func_args![value: "ñandú"],
+        want: Ok(5)
     }
 }
 

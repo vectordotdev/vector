@@ -21,7 +21,7 @@ components: sinks: gcp_pubsub: {
 				common:       false
 				max_bytes:    10_000_000
 				max_events:   1000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -35,7 +35,6 @@ components: sinks: gcp_pubsub: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false

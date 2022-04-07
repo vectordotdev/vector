@@ -6,7 +6,7 @@ pub struct AddFieldsFieldOverwritten<'a> {
 }
 
 impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
     }
 }
@@ -17,7 +17,7 @@ pub struct AddFieldsFieldNotOverwritten<'a> {
 }
 
 impl<'a> InternalEvent for AddFieldsFieldNotOverwritten<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Field not overwritten.", field = %self.field, internal_log_rate_secs = 30);
     }
 }

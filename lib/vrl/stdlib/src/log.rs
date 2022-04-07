@@ -6,7 +6,7 @@ fn log(
     level: &Bytes,
     value: Value,
     span: vrl::diagnostic::Span,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Resolved {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
     match level.as_ref() {
         b"trace" => {
@@ -83,7 +83,7 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -114,7 +114,7 @@ impl Function for Log {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &FunctionCompileContext,
+        ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -184,7 +184,7 @@ impl Expression for LogFn {
         log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

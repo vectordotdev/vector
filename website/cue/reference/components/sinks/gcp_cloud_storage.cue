@@ -20,7 +20,7 @@ components: sinks: gcp_cloud_storage: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 300
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true
@@ -44,7 +44,6 @@ components: sinks: gcp_cloud_storage: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false

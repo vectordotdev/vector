@@ -1,14 +1,14 @@
 use bytes::Bytes;
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    LengthDelimitedDecoder,
+};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{self, Deserializer, Framer},
-        LengthDelimitedDecoder,
-    },
+    codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -100,11 +100,11 @@ impl decoding::format::Deserializer for VectorDeserializer {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(&VectorEventReceived { byte_size });
+                emit!(VectorEventReceived { byte_size });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&VectorProtoDecodeError { error: &error });
+                emit!(VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
             }
         }
@@ -115,13 +115,13 @@ impl decoding::format::Deserializer for VectorDeserializer {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = codecs::decoding::Error;
+    type Error = decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::LengthDelimited(LengthDelimitedDecoder::new()),
             Deserializer::Boxed(Box::new(VectorDeserializer)),
         )

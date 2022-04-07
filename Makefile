@@ -283,12 +283,27 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
+# nextest doesn't support running doc tests yet so this is split out as
+# `test-docs`
+# https://github.com/nextest-rs/nextest/issues/16
+#
+# criterion doesn't support the flags needed by nextest to run so these are left
+# out for now
+# https://github.com/bheisler/criterion.rs/issues/562
+#
+# `cargo test` lacks support for testing _just_ benches otherwise we'd have
+# a target for that
+# https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches codecs-benches language-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+
+.PHONY: test-docs
+test-docs: ## Run the docs test suite
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -309,6 +324,7 @@ test-integration: test-integration-eventstoredb_metrics test-integration-fluent 
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-datadog-traces test-integration-shutdown
 
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
@@ -321,6 +337,7 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
 
 .PHONY: test-integration-nats
@@ -330,7 +347,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nats start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nats stop
 endif
@@ -341,6 +358,7 @@ tests/data/dnstap/socket:
 
 .PHONY: test-integration-dnstap
 test-integration-dnstap: tests/data/dnstap/socket
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-dnstap-cleanup
@@ -350,6 +368,7 @@ test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
@@ -357,19 +376,11 @@ endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
-	@scripts/test-e2e-kubernetes.sh
-
-.PHONY: test-shutdown
-test-shutdown: ## Runs shutdown tests
-	make test-integration-shutdown
-	make test-shutdown-cleanup
-
-test-shutdown-cleanup:
-	docker run --rm -v ${PWD}:/code alpine:3 chown -R $(shell id -u):$(shell id -g) /code
+	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test cli --test-threads 4
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -433,7 +444,7 @@ check-all: check-scripts
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --keep-going --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -613,10 +624,6 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
-.PHONY: check-stdlib-features
-check-stdlib-features: ## Ensure VRL stdlib features build
-	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
-
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -639,10 +646,6 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
-
-.PHONY: slim-builds
-slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
 
 ifeq (${CI}, true)
 .PHONY: ci-sweep

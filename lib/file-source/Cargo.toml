@@ -31,7 +31,7 @@ default-features = false
 features = ["clock", "serde"]
 
 [dependencies.dashmap]
-version = "5.1"
+version = "5.2"
 default-features = false
 features = []
 
@@ -74,9 +74,8 @@ features = ["full"]
 criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.3.0"
-pretty_assertions = "1.1.0"
+pretty_assertions = "1.2.1"
 
 [[bench]]
 name = "buffer"
 harness = false
-test = true

@@ -12,6 +12,7 @@ use std::{
     fmt::Debug,
     io,
     marker::PhantomData,
+    num::NonZeroU64,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, AtomicUsize},
@@ -20,16 +21,14 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::task::AtomicWaker;
 use leveldb::{
     batch::{Batch, Writebatch},
     database::Database,
     iterator::Iterable,
     options::{Options, ReadOptions, WriteOptions},
 };
-use parking_lot::Mutex;
 use snafu::{ResultExt, Snafu};
-use tokio::time::Instant;
+use tokio::{sync::Notify, time::Instant};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -68,11 +67,11 @@ pub enum DataDirError {
 pub struct DiskV1Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: u64,
+    max_size: NonZeroU64,
 }
 
 impl DiskV1Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         DiskV1Buffer {
             id,
             data_dir,
@@ -95,16 +94,12 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
-        usage_handle.set_buffer_limits(Some(self.max_size), None);
+        usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
         let (writer, reader, acker) = open(&self.data_dir, &self.id, self.max_size, usage_handle)?;
 
-        Ok((
-            SenderAdapter::opaque(writer),
-            ReceiverAdapter::opaque(reader),
-            Some(acker),
-        ))
+        Ok((writer.into(), reader.into(), Some(acker)))
     }
 }
 
@@ -117,7 +112,7 @@ where
 pub(self) fn open<T>(
     data_dir: &Path,
     name: &str,
-    max_size: u64,
+    max_size: NonZeroU64,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError>
 where
@@ -340,13 +335,13 @@ where
 #[allow(clippy::cast_precision_loss)]
 pub fn build<T: Bufferable>(
     path: &Path,
-    max_size: u64,
+    max_size: NonZeroU64,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
     // The rest is used as a buffer which when filled triggers compaction.
-    let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
-    let max_size = max_size - max_uncompacted_size;
+    let max_uncompacted_size = max_size.get() / MAX_UNCOMPACTED_DENOMINATOR;
+    let max_size = max_size.get() - max_uncompacted_size;
 
     let initial_state = db_initial_state::<T>(path)?;
     usage_handle.increment_received_event_count_and_byte_size(
@@ -367,15 +362,15 @@ pub fn build<T: Bufferable>(
     let write_offset = initial_state.write_offset();
 
     let current_size = Arc::new(AtomicU64::new(initial_state.total_bytes));
-    let write_notifier = Arc::new(AtomicWaker::new());
-    let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
+    let read_waker = Arc::new(Notify::new());
+    let write_waker = Arc::new(Notify::new());
     let ack_counter = Arc::new(AtomicUsize::new(0));
-    let acker = create_disk_v1_acker(&ack_counter, &write_notifier);
+    let acker = create_disk_v1_acker(&ack_counter, &read_waker);
 
     let writer = Writer {
         db: Some(Arc::clone(&db)),
-        write_notifier: Arc::clone(&write_notifier),
-        blocked_write_tasks: Arc::clone(&blocked_write_tasks),
+        read_waker: Arc::clone(&read_waker),
+        write_waker: Arc::clone(&write_waker),
         offset: Arc::new(AtomicUsize::new(write_offset)),
         writebatch: Writebatch::new(),
         batch_size: 0,
@@ -387,8 +382,8 @@ pub fn build<T: Bufferable>(
 
     let reader = Reader {
         db,
-        write_notifier,
-        blocked_write_tasks,
+        read_waker,
+        write_waker,
         read_offset,
         compacted_offset: 0,
         delete_offset,

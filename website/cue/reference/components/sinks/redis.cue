@@ -20,7 +20,7 @@ components: sinks: redis: {
 				common:       true
 				max_bytes:    null
 				max_events:   1
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			encoding: {
 				enabled: true
@@ -34,13 +34,7 @@ components: sinks: redis: {
 				concurrency: 1
 				headers:     false
 			}
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled: false
 			to: {
 				service: services.redis
 				interface: {

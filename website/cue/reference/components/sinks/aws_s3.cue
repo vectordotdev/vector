@@ -20,7 +20,7 @@ components: sinks: aws_s3: components._aws & {
 				enabled:      true
 				common:       true
 				max_bytes:    10000000
-				timeout_secs: 300
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true
@@ -43,10 +43,9 @@ components: sinks: aws_s3: components._aws & {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.aws_s3

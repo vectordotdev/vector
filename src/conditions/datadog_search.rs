@@ -77,7 +77,7 @@ impl Filter<LogEvent> for EventFilter {
                 any_string_match("tags", move |value| value == field)
             }
             Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
-                Run::boxed(move |log: &LogEvent| log.get(&f).is_some())
+                Run::boxed(move |log: &LogEvent| log.get(f.as_str()).is_some())
             }
         }
     }
@@ -168,7 +168,7 @@ impl Filter<LogEvent> for EventFilter {
             // Facets are compared numerically if the value is numeric, or as strings otherwise.
             Field::Facet(f) => {
                 Run::boxed(
-                    move |log: &LogEvent| match (log.get(&f), &comparison_value) {
+                    move |log: &LogEvent| match (log.get(f.as_str()), &comparison_value) {
                         // Integers.
                         (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => {
                             match comparator {
@@ -268,7 +268,7 @@ where
 {
     let field = field.into();
 
-    Run::boxed(move |log: &LogEvent| match log.get(&field) {
+    Run::boxed(move |log: &LogEvent| match log.get(field.as_str()) {
         Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
         _ => false,
     })
@@ -283,7 +283,7 @@ where
 {
     let field = field.into();
 
-    Run::boxed(move |log: &LogEvent| match log.get(&field) {
+    Run::boxed(move |log: &LogEvent| match log.get(field.as_str()) {
         Some(Value::Array(values)) => func(values),
         _ => false,
     })

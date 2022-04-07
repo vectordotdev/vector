@@ -1,7 +1,7 @@
 use tracing::warn;
 use vrl::prelude::*;
 
-fn to_regex(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_regex(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let regex = regex::Regex::new(string.as_ref())
         .map_err(|err| format!("could not create regex: {}", err))
@@ -35,7 +35,7 @@ impl Function for ToRegex {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -62,7 +62,7 @@ impl Expression for ToRegexFn {
         to_regex(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::regex().fallible()
     }
 }

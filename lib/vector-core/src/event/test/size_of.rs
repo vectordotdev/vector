@@ -115,7 +115,7 @@ fn log_operation_maintains_size() {
                 Action::InsertFlat { key, value } => {
                     let new_value_sz = value.size_of();
                     let old_value_sz = log_event.get_flat(&key).map_or(0, ByteSizeOf::size_of);
-                    if !log_event.contains(&key) {
+                    if !log_event.contains(key.as_str()) {
                         current_size += key.size_of();
                     }
                     log_event.insert_flat(&key, value);
@@ -126,10 +126,10 @@ fn log_operation_maintains_size() {
                     assert_eq!(current_size, log_event.size_of());
                 }
                 Action::Contains { key } => {
-                    log_event.contains(key);
+                    log_event.contains(key.as_str());
                 }
                 Action::Remove { key } => {
-                    let value_sz = log_event.remove(&key).size_of();
+                    let value_sz = log_event.remove(key.as_str()).size_of();
                     current_size -= value_sz;
                     current_size -= key.size_of();
                 }

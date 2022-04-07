@@ -1,6 +1,42 @@
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
+fn get(value: Value, path: Value) -> Resolved {
+    let path = match path {
+        Value::Array(path) => {
+            let mut get = LookupBuf::root();
+
+            for segment in path {
+                let segment = match segment {
+                    Value::Bytes(field) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                get.push_back(segment)
+            }
+
+            get
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }
+            .into())
+        }
+    };
+    Ok(value.target_get(&path)?.unwrap_or(Value::Null))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Get;
 
@@ -89,7 +125,7 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -97,6 +133,13 @@ impl Function for Get {
         let path = arguments.required("path");
 
         Ok(Box::new(GetFn { value, path }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let path = args.required("path");
+
+        get(value, path)
     }
 }
 
@@ -108,47 +151,13 @@ pub(crate) struct GetFn {
 
 impl Expression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut get = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-                for segment in path {
-                    let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either string or integer, not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    get.push_back(segment)
-                }
-
-                get
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::array(Collection::any()),
-                }
-                .into())
-            }
-        };
-
-        Ok(self
-            .value
-            .resolve(ctx)?
-            .target_get(&path)?
-            .unwrap_or(Value::Null))
+        get(value, path)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::any().fallible()
     }
 }

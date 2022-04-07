@@ -221,7 +221,7 @@ where
         );
     }
 
-    /// Gets the marker ID offset for the the given ID.
+    /// Gets the marker ID offset for the given ID.
     ///
     /// If the given ID matches our next expected marker ID, then `MarkerOffset::Aligned` is
     /// returned.
@@ -305,7 +305,7 @@ where
     /// Likewise, when a caller inserts an unknown length marker, we cannot know its length until
     /// the next marker is added.  When that happens, we assume the given marker ID is monotonic,
     /// and thus that the length of the previous marker, which has an unknown length, must have a
-    /// length equal to the difference between the given marker ID and the the unknown length marker
+    /// length equal to the difference between the given marker ID and the unknown length marker
     /// ID.  We update the unknown length marker to reflect this.
     ///
     /// In both cases, the markers will have a length that indicates that the amount represents a

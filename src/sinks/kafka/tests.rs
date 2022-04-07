@@ -154,7 +154,7 @@ mod integration_test {
         crate::test_util::trace_init();
         let mut batch = BatchConfig::default();
         batch.max_events = Some(10);
-        batch.timeout_secs = Some(2);
+        batch.timeout_secs = Some(2.0);
 
         kafka_batch_options_overrides(batch, indexmap::indexmap! {}.into_iter().collect())
             .await
@@ -183,7 +183,7 @@ mod integration_test {
     async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
         crate::test_util::trace_init();
         let mut batch = BatchConfig::default();
-        batch.timeout_secs = Some(10);
+        batch.timeout_secs = Some(10.0);
 
         assert!(kafka_batch_options_overrides(
             batch,
@@ -283,11 +283,11 @@ mod integration_test {
             let headers_key = headers_key.clone();
             let mut header_values = BTreeMap::new();
             header_values.insert(
-                header_1_key.to_string(),
+                header_1_key.to_owned(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.for_each_log(move |log| {
-                log.insert(headers_key.clone(), header_values.clone());
+                log.insert(headers_key.as_str(), header_values.clone());
             });
             events
         });

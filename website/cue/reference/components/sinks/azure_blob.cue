@@ -20,7 +20,7 @@ components: sinks: azure_blob: {
 				enabled:      true
 				common:       true
 				max_bytes:    10_000_000
-				timeout_secs: 300
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true

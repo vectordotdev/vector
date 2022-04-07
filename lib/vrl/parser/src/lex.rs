@@ -233,9 +233,6 @@ pub enum Token<S> {
     // Reserved for future use.
     ReservedIdentifier(S),
 
-    // A token used by the internal parser unit tests.
-    InternalTest(S),
-
     InvalidToken(char),
 
     // keywords
@@ -320,8 +317,6 @@ impl<S> Token<S> {
 
             ReservedIdentifier(s) => ReservedIdentifier(f(s)),
 
-            InternalTest(s) => InternalTest(f(s)),
-
             InvalidToken(s) => InvalidToken(s),
 
             Else => Else,
@@ -375,7 +370,6 @@ where
             RegexLiteral(_) => "RegexLiteral",
             TimestampLiteral(_) => "TimestampLiteral",
             ReservedIdentifier(_) => "ReservedIdentifier",
-            InternalTest(_) => "InternalTest",
             InvalidToken(_) => "InvalidToken",
 
             Else => "Else",
@@ -514,10 +508,6 @@ impl<'input> Iterator for Lexer<'input> {
 
                     '_' if !self.test_peek(is_ident_continue) => {
                         Some(Ok(self.token(start, Underscore)))
-                    }
-
-                    '?' if self.test_peek(char::is_alphabetic) => {
-                        Some(Ok(self.internal_test(start)))
                     }
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
@@ -774,6 +764,21 @@ impl<'input> Lexer<'input> {
                         };
 
                         let ch = match &self.input[pos..] {
+                            s if s.starts_with('#') => {
+                                for (_, chr) in chars.by_ref() {
+                                    if chr == '\n' {
+                                        break;
+                                    }
+                                }
+                                match chars.peek().map(|(_, ch)| ch) {
+                                    Some(ch) => *ch,
+                                    None => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of comment.".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
                             s if s.starts_with('"') => {
                                 let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
@@ -993,13 +998,6 @@ impl<'input> Lexer<'input> {
         };
 
         (start, token, end)
-    }
-
-    fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
-        self.bump();
-        let (end, test) = self.take_while(start, char::is_alphabetic);
-
-        (start, Token::InternalTest(test), end)
     }
 
     fn quoted_literal(
@@ -1900,6 +1898,23 @@ mod test {
                 ("    ~~~~~    ", L(S::Raw("¡"))),
                 ("          ~  ", Operator("*")),
                 ("            ~", Identifier("a")),
+            ],
+        );
+    }
+
+    #[test]
+    fn comment_in_block() {
+        test(
+            data("if x {\n   # It's an apostrophe.\n   3\n}"),
+            vec![
+                ("~~                                    ", If),
+                ("   ~                                  ", Identifier("x")),
+                ("     ~                                ", LBrace),
+                ("      ~                               ", Newline),
+                ("                               ~      ", Newline),
+                ("                                   ~  ", IntegerLiteral(3)),
+                ("                                    ~ ", Newline),
+                ("                                     ~", RBrace),
             ],
         );
     }

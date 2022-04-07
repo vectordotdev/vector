@@ -46,7 +46,7 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+#[cfg(feature = "aws-config")]
 pub mod aws;
 #[cfg(feature = "codecs")]
 #[allow(unreachable_pub)]
@@ -54,7 +54,7 @@ pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
-pub mod graph;
+pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
@@ -63,6 +63,8 @@ pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
+pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -71,26 +73,25 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
-#[deny(unreachable_pub)]
-pub mod sink;
+pub(crate) mod sink;
 #[allow(unreachable_pub)]
 pub mod sinks;
 pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub mod stream;
+pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
-pub mod tcp;
+pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
 #[allow(unreachable_pub)]
-pub mod tls;
+pub(crate) mod tls;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub mod top;
+pub(crate) mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
@@ -145,4 +146,19 @@ pub mod built_info {
 
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
+}
+
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+    _name: &str,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    #[cfg(tokio_unstable)]
+    return tokio::task::Builder::new().name(_name).spawn(task);
+
+    #[cfg(not(tokio_unstable))]
+    tokio::spawn(task)
 }

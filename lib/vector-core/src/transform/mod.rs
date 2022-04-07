@@ -1,19 +1,21 @@
 use std::{collections::HashMap, pin::Pin};
 
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use vector_common::EventDataEq;
 
 use crate::{
     config::Output,
-    event::{Event, EventArray, EventContainer, EventRef},
+    event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
     fanout::{self, Fanout},
     ByteSizeOf,
 };
 
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
-pub use config::{ExpandType, TransformConfig, TransformContext};
+pub use config::{
+    ExpandType, InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext,
+};
 
 mod config;
 
@@ -170,8 +172,7 @@ pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
         T::IntoIter: Send,
     {
         self.transform(task.map(Into::into).boxed())
-            .map(EventContainer::into_events)
-            .flat_map(stream::iter)
+            .flat_map(into_event_stream)
             .boxed()
     }
 }
@@ -265,7 +266,7 @@ impl TransformOutputs {
                 .expect("mismatched outputs")
                 .send(primary)
                 .await;
-            emit(&EventsSent {
+            emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(DEFAULT_OUTPUT),
@@ -276,7 +277,7 @@ impl TransformOutputs {
             let byte_size = buf.size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await;
-            emit(&EventsSent {
+            emit(EventsSent {
                 count,
                 byte_size,
                 output: Some(key.as_ref()),
@@ -285,6 +286,7 @@ impl TransformOutputs {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TransformOutputsBuf {
     primary_buffer: Option<OutputBuffer>,
     named_buffers: HashMap<String, OutputBuffer>,
@@ -387,7 +389,7 @@ impl ByteSizeOf for TransformOutputsBuf {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct OutputBuffer(Vec<EventArray>);
 
 impl OutputBuffer {
@@ -446,10 +448,9 @@ impl OutputBuffer {
     }
 
     async fn send(&mut self, output: &mut Fanout) {
-        for array in self.0.drain(..) {
-            output.feed(array).await.expect("unit error");
+        for array in std::mem::take(&mut self.0) {
+            output.send(array).await;
         }
-        output.flush().await.expect("unit error");
     }
 
     fn iter_events(&self) -> impl Iterator<Item = EventRef> {
@@ -497,9 +498,7 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
         // This is an aweful lot of boxes
-        let stream = stream
-            .flat_map(|events| stream::iter(events.into_events()))
-            .boxed();
+        let stream = stream.flat_map(into_event_stream).boxed();
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }
 }

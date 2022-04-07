@@ -9,19 +9,16 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
-use memmap2::{MmapMut, MmapOptions};
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::{
-    fs::{self, OpenOptions},
-    io::AsyncWriteExt,
-    sync::Notify,
-};
+use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 
 use super::{
     backed_archive::BackedArchive,
     common::{DiskBufferConfig, MAX_FILE_ID},
+    io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
+    Filesystem,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
 
@@ -134,9 +131,11 @@ impl ArchivedLedgerState {
         self.writer_next_record_id.load(Ordering::Acquire)
     }
 
-    pub(super) fn increment_next_writer_record_id(&self, amount: u64) {
-        self.writer_next_record_id
+    pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
+        let previous = self
+            .writer_next_record_id
             .fetch_add(amount, Ordering::AcqRel);
+        previous.wrapping_add(amount)
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
@@ -201,13 +200,16 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger {
+pub struct Ledger<FS>
+where
+    FS: Filesystem,
+{
     // Buffer configuration.
-    config: DiskBufferConfig,
+    config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
     ledger_lock: LockFile,
     // Ledger state.
-    state: BackedArchive<MmapMut, LedgerState>,
+    state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
     total_buffer_size: AtomicU64,
     // Notifier for reader-related progress.
@@ -226,10 +228,18 @@ pub struct Ledger {
     usage_handle: BufferUsageHandle,
 }
 
-impl Ledger {
+impl<FS> Ledger<FS>
+where
+    FS: Filesystem,
+{
     /// Gets the configuration for the buffer that this ledger represents.
-    pub fn config(&self) -> &DiskBufferConfig {
+    pub fn config(&self) -> &DiskBufferConfig<FS> {
         &self.config
+    }
+
+    /// Gets the filesystem configured for this buffer.
+    pub fn filesystem(&self) -> &FS {
+        &self.config.filesystem
     }
 
     /// Gets the internal ledger state.
@@ -512,7 +522,13 @@ impl Ledger {
                 initial_buffer_size,
             );
     }
+}
 
+impl<FS> Ledger<FS>
+where
+    FS: Filesystem,
+    FS::File: Unpin,
+{
     /// Loads or creates a ledger for the given [`DiskBufferConfig`].
     ///
     /// If the ledger file does not yet exist, a default ledger state will be created and persisted
@@ -525,9 +541,9 @@ impl Ledger {
     /// operations, an error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip_all, level = "trace"))]
     pub(super) async fn load_or_create(
-        config: DiskBufferConfig,
+        config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<Ledger, LedgerLoadCreateError> {
+    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir)
             .await
@@ -536,6 +552,10 @@ impl Ledger {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
+        //
+        // TODO: It'd be nice to incorporate this within `Filesystem` to fully encapsulate _all_
+        // file I/O, but the code is so specific, including the drop guard for the lock file, that I
+        // don't know if it's worth it.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
         let mut ledger_lock = LockFile::open(&ledger_lock_path).context(IoSnafu)?;
         if !ledger_lock.try_lock().context(IoSnafu)? {
@@ -544,11 +564,9 @@ impl Ledger {
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = config.data_dir.join("buffer.db");
-        let mut ledger_handle = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&ledger_path)
+        let mut ledger_handle = config
+            .filesystem
+            .open_file_writable(&ledger_path)
             .await
             .context(IoSnafu)?;
 
@@ -575,16 +593,18 @@ impl Ledger {
                     Err(SerializeError::BackingStoreTooSmall(_, min_len)) => buf.resize(min_len, 0),
                 }
             }
+
+            // Now sync the file to ensure everything is on disk before proceeding.
+            ledger_handle.sync_all().await.context(IoSnafu)?;
         }
 
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
-        let ledger_handle = ledger_handle.into_std().await;
-        let ledger_mmap = unsafe {
-            MmapOptions::new()
-                .map_mut(&ledger_handle)
-                .context(IoSnafu)?
-        };
+        let ledger_mmap = config
+            .filesystem
+            .open_mmap_writable(&ledger_path)
+            .await
+            .context(IoSnafu)?;
         let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
             // Deserialized the ledger state without issue from an existing file.
             Ok(backed) => backed,
@@ -665,7 +685,10 @@ impl Ledger {
     }
 }
 
-impl fmt::Debug for Ledger {
+impl<FS> fmt::Debug for Ledger<FS>
+where
+    FS: Filesystem + fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
             .field("config", &self.config)
