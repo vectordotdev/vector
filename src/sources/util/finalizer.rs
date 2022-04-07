@@ -1,40 +1,46 @@
-use std::{future::Future, marker::Unpin, pin::Pin, task::Poll};
+use std::marker::{PhantomData, Unpin};
+use std::{future::Future, pin::Pin, task::Poll};
 
 use futures::{future::Shared, stream::FuturesOrdered, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc;
 
 use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
 
-/// The `OrderedFinalizer` framework here is a mechanism for marking
-/// events from a source as done in a single background task *in the
-/// order they are received from the source*. The type `T` is the
-/// source-specific data associated with each entry to be used to
-/// complete the finalization.
-pub(crate) struct OrderedFinalizer<T> {
+/// The `OrderedFinalizer` framework marks events from a source as
+/// done in a single background task *in the order they are received
+/// from the source* using `FinalizerSet`.
+pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
+
+/// The `FinalizerSet` framework here is a mechanism for marking
+/// events from a source as done in a single background task. The type
+/// `T` is the source-specific data associated with each entry to be
+/// used to complete the finalization.
+pub(crate) struct FinalizerSet<T, F> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
+    _finalizer: PhantomData<F>,
 }
 
-impl<T: Send + 'static> OrderedFinalizer<T> {
+impl<T, F> FinalizerSet<T, F>
+where
+    T: Send + 'static,
+    F: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
+{
     pub(crate) fn new(
         shutdown: Shared<ShutdownSignal>,
         apply_done: impl Fn(T) + Send + 'static,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(
-            shutdown,
-            receiver,
-            apply_done,
-            FuturesOrdered::default(),
-        ));
+        tokio::spawn(run_finalizer(shutdown, receiver, apply_done, F::default()));
         Self {
             sender: Some(sender),
+            _finalizer: Default::default(),
         }
     }
 
     pub(crate) fn add(&self, entry: T, receiver: BatchStatusReceiver) {
         if let Some(sender) = &self.sender {
             if let Err(error) = sender.send((receiver, entry)) {
-                error!(message = "OrderedFinalizer task ended prematurely.", %error);
+                error!(message = "FinalizerSet task ended prematurely.", %error);
             }
         }
     }
@@ -74,7 +80,7 @@ async fn run_finalizer<T>(
     drop(shutdown);
 }
 
-trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
+pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
     fn is_empty(&self) -> bool;
     fn push(&mut self, future: Fut);
 }
@@ -90,7 +96,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
 }
 
 #[pin_project::pin_project]
-struct FinalizerFuture<T> {
+pub(crate) struct FinalizerFuture<T> {
     receiver: BatchStatusReceiver,
     entry: Option<T>,
 }
