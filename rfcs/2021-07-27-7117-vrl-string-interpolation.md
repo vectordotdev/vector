@@ -28,16 +28,16 @@ We will allow interpolating only string variables in strings delimited by `"..."
 Syntax would be as follows:
 
 ```coffee
-"foo {bar}"
-```
-
-You can "escape" `{` and `}` to avoid interpolation:
-
-```coffee
 "foo {{bar}}"
 ```
 
-Alternatively raw strings can be used:
+You can "escape" `{` and `}` to avoid interpolation using `\`:
+
+```coffee
+"foo \{{bar\}}"
+```
+
+Alternatively raw strings can be used which would not template:
 
 ```coffee
 s'foo {bar}'
@@ -48,20 +48,22 @@ to be done before interpolating:
 
 ```coffee
 foobar = upcase("foo bar")
-"{foobar} BAZ"
+"{{ foobar }} BAZ"
 Also, the variable has to resolve to an exact string type, and nothing else:
 ```
 
 # not allowed
+
 ```coffee
 number = 1
-"{number}"
+"{{ number }}"
 ```
 
 # allowed
+
 ```coffee
 number = to_string(1)
-"{number}"
+"{{ number }}"
 ```
 
 ## Implementation
@@ -72,7 +74,7 @@ concatenation.
 The VRL parser will take a template literal string such as:
 
 ```coffee
-"The message is { message } and we { feeling } it"
+"The message is {{ message }} and we {{ feeling }} it"
 ```
 
 and create an AST identical to the AST for the following expression:
@@ -84,6 +86,21 @@ message +
 feeling +
 " it"
 ```
+
+### Fallibility
+
+Due to the way the format strings are implemented as expanding to to an expression
+they are automatically fallible if the variable used is not a string.
+
+```coffee
+> thing = 3
+> "The number is {{ thing }}" ?? "invalid string"
+
+"invalid string"
+```
+
+This has little use at present, but with future work where expanded types are
+allowed this could provide value.
 
 ## Rationale
 
@@ -139,26 +156,17 @@ Downsides are that the format strings are a hidden DSL themselves and there is
 a cognitive overhead involved in maintaining the position of the format tags
 within the string and the parameters passed to the function.
 
-### Fallibility
-
-F-strings could be fallible and their use could require any errors to be handled.
-
-```coffee
-f'The date is { .date: %v %R }' ?? "invalid date"
-```
-
 ### Output error text
 
 Rather than forcing the user to handle errors, if an error occurs the error text is output.
 For example:
 
 ```coffee
-f'This is some json { parse_json(.thing) }'
+"This is some json {{ parse_json(.thing) }'
 # This is some json function call error for "parse_json" at (0:18): unable to parse json: expected ident at line 1 column 2
 ```
 
 ### Use comprehensive f-strings
-
 
 We will be loosely basing our format strings on Pythons [f-strings](https://peps.python.org/pep-0498/).
 
@@ -184,17 +192,6 @@ f'Here is a curly brace -> {{'
 
 Since this is a new string type there are no backward compatibility issues.
 
-#### Format strings
-
-The format can be specified by adding format strings after a `:` in the string.
-
-For example to format date the following would be valid:
-
-```coffee
-ts = t'2020-10-21T16:00:00Z'
-f'The time is {ts : %v %R}'
-```
-
 #### Errors
 
 We do not want an f string to be fallible as this would cumbersome to the experience of using VRL.
@@ -203,7 +200,7 @@ Each template segment must be infallible in order for the string to compile. Err
 handled to provide alternative text if needed:
 
 ```coffee
-f'This is some json { parse_json(.thing) ?? "oops" }'
+"This is some json {{ parse_json(.thing) ?? "oops" }}'
 # This is some json oops
 ```
 
@@ -252,7 +249,7 @@ The current proposal only works with string variables. Future work can allow oth
 together with format strings
 
 ```coffee
-f'The message is message { number: %d } created at { timestamp: %v %R }'
+"The message is message {{ number: %d }} created at {{ timestamp: %v %R }}"
 ```
 
 ### Allow templates in dynamic paths
@@ -260,7 +257,7 @@ f'The message is message { number: %d } created at { timestamp: %v %R }'
 Namely, we can allow the following dynamic path operations:
 
 ```coffee
-.foo.f'{bar}'[index]
+.foo."{{ bar }}"[index]
 ```
 
 Where bar has to resolve to a string, and index has to resolve to an integer. Both variables are known
