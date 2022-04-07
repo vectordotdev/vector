@@ -247,31 +247,38 @@ mod tests {
 
     use futures_util::FutureExt;
     use tokio::{time, time::sleep};
-    use vector_core::event::BatchNotifier;
+    use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
 
-    use super::IndexerAcknowledgement;
-    use crate::{
-        shutdown::ShutdownSignal,
-        sources::splunk_hec::acknowledgements::{Channel, HecAcknowledgementsConfig},
-    };
+    use super::{Channel, HecAcknowledgementsConfig, IndexerAcknowledgement};
+    use crate::shutdown::ShutdownSignal;
 
     #[tokio::test]
     async fn test_channel_get_ack_id_and_acks_status() {
+        channel_get_ack_id_and_status(EventStatus::Delivered, true).await;
+    }
+
+    #[tokio::test]
+    async fn test_channel_get_ack_id_and_nacks_status() {
+        channel_get_ack_id_and_status(EventStatus::Rejected, false).await;
+    }
+
+    async fn channel_get_ack_id_and_status(status: EventStatus, result: bool) {
         let shutdown = ShutdownSignal::noop().shared();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let expected_ack_ids: Vec<u64> = (0..10).collect();
 
         for expected_ack_id in &expected_ack_ids {
-            let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
+            let (tx, batch_rx) = BatchNotifier::new_with_receiver();
             assert_eq!(*expected_ack_id, channel.get_ack_id(batch_rx));
+            EventFinalizer::new(tx).update_status(status);
         }
         // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
         assert!(channel
             .get_acks_status(&expected_ack_ids)
             .values()
-            .all(|status| *status));
+            .all(|&status| status == result));
     }
 
     #[tokio::test]
