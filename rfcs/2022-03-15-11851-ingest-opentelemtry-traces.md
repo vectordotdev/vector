@@ -139,6 +139,7 @@ top-level requirements:
 #### Source structure
 
 A new `opentelemetry` source with a named output `traces` (future extension would cover `metrics` then `logs`):
+
 - The gRPC variant would use Tonic to spawn a gRPC server (like the `vector` source in its v2 variation) and directly
   use the [offical gRPC service definitions][otlp-grpc-def], only the traces gRPC service will be accepted, this should be
   relatively easy to extend it to support metrics and logs gRPC services.
@@ -307,7 +308,11 @@ option.
 
 **Conclusion**: the implementation will stay around [./lib/vector-core/src/event/trace.rs][current-trace-in-vector], it
 will borrow most of the OpenTelemetry to allow straightforward trace conversion to the newer Vector internal
-representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog intake and the `trace agen`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for efficiency and convenience.
+representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace
+representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog
+intake and the `trace agen`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like
+trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for
+efficiency and convenience.
 Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
 be adressed separately. As an interim measure few fields may be exposed (At least trace ID & trace-wide tags), the spans
 list will not be exposed initially.
