@@ -32,19 +32,19 @@ remap: functions: encrypt: {
 
 	arguments: [
 		{
-			name: "plaintext"
+			name:        "plaintext"
 			description: "The string to encrypt."
 			required:    true
 			type: ["string"]
 		},
 		{
-			name: "algorithm"
+			name:        "algorithm"
 			description: "The algorithm to use."
 			required:    true
 			type: ["string"]
 		},
 		{
-			name: "key"
+			name:        "key"
 			description: "The key for encryption. The should be raw bytes of the key (not encoded). The length must match the algorithm requested."
 			required:    true
 			type: ["string"]
@@ -55,7 +55,7 @@ remap: functions: encrypt: {
 				The IV for encryption. The should be raw bytes of the IV (not encoded). The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				"""#
-			required:    false
+			required: false
 			type: ["string"]
 		},
 	]
