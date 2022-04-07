@@ -93,11 +93,11 @@ pub fn simple_trace_event() -> TraceEvent {
     t.insert("trace_id", Value::Integer(123));
     t.insert("spans", Value::Array(vec![Value::from(simple_span())]));
     t.insert(
-        "start_time".to_string(),
+        "start_time",
         Value::from(Utc.timestamp_nanos(1_431_648_000_000_002i64)),
     );
     t.insert(
-        "end_time".to_string(),
+        "end_time",
         Value::from(Utc.timestamp_nanos(1_431_648_000_000_003i64)),
     );
     t
