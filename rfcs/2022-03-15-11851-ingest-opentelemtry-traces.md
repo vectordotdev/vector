@@ -310,7 +310,7 @@ option.
 will borrow most of the OpenTelemetry to allow straightforward trace conversion to the newer Vector internal
 representation. Regarding `datadog_agent` source and `datadog_traces` sink the conversion to/from this newer trace
 representation will follow existing logic and ensure that standard usecases (like introducing Vector between the Datadog
-intake and the `trace agen`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like
+intake and the `trace agent`) do not signigicantly change the end-to-end behaviour. Some top-level information (Like
 trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for
 efficiency and convenience.
 Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
@@ -328,9 +328,15 @@ way forward is suggested:
   [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
 - Following the named outputs logic, an `apm_stats` output could be envisionned, this would make the APM stats flow
   explicit and allow another metrics sinks to just tap APM stats as APM stats would be plain Vector metrics.
-- The previous point also implies that the APM stats computation would happen in the source, the code should be fairly
-  generic as APM stats computation would logically takes the normalised traces as input.
-- The computation will be optional with a relevant configuration flag.
+- Depending on the use case it might be relevant to compute APM stats at different places:
+  - The previous point also implies that the APM stats computation may happen in the source, the code should be fairly
+    generic as APM stats computation would logically takes the normalised traces as input.
+  - If a trace flow undergoes heavy transformation it may be more relevant to do APM stats computation after the and
+    allow APM stats computation to happen in a dedicated transform that would sit after other transforms.
+- In all circumstances APM stats computation shall remain optional.
+
+**Conclusion**: APM stats computation shall be implemented so it can be used in multiple places to allow easy
+re-usability in many places like a dedicated transform, in a given source or event in a given sink.
 
 ## Rationale
 
