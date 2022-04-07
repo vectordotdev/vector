@@ -129,6 +129,7 @@ components: sinks: logdna: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

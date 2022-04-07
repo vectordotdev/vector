@@ -210,6 +210,7 @@ components: sinks: gcp_stackdriver_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

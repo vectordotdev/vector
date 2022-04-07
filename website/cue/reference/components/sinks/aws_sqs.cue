@@ -103,6 +103,7 @@ components: sinks: aws_sqs: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

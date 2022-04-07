@@ -72,6 +72,7 @@ components: sinks: datadog_traces: {
 	input: {
 		logs:    false
 		metrics: null
+		traces:  true
 	}
 
 	telemetry: metrics: {

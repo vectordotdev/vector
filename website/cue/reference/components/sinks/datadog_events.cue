@@ -61,6 +61,7 @@ components: sinks: datadog_events: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

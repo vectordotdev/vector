@@ -74,5 +74,6 @@ components: sinks: datadog_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 }
