@@ -1,15 +1,23 @@
 use std::marker::{PhantomData, Unpin};
 use std::{future::Future, pin::Pin, task::Poll};
 
-use futures::{future::Shared, stream::FuturesOrdered, FutureExt, Stream, StreamExt};
+use futures::stream::{FuturesOrdered, FuturesUnordered};
+use futures::{future::Shared, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc;
 
 use crate::{event::BatchStatusReceiver, shutdown::ShutdownSignal};
 
 /// The `OrderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order they are received
-/// from the source* using `FinalizerSet`.
+/// from the source*, using `FinalizerSet`.
+#[cfg(any(feature = "sources-file", feature = "sources-kafka",))]
 pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
+
+/// The `UnorderedFinalizer` framework marks events from a source as
+/// done in a single background task *in the order the finalization
+/// happens on the event batches*, using `FinalizerSet`.
+#[cfg(feature = "sources-splunk_hec")]
+pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
 
 /// The `FinalizerSet` framework here is a mechanism for marking
 /// events from a source as done in a single background task. The type
@@ -95,6 +103,16 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
     }
 }
 
+impl<Fut: Future> FuturesSet<Fut> for FuturesUnordered<Fut> {
+    fn is_empty(&self) -> bool {
+        Self::is_empty(self)
+    }
+
+    fn push(&mut self, future: Fut) {
+        Self::push(self, future)
+    }
+}
+
 #[pin_project::pin_project]
 pub(crate) struct FinalizerFuture<T> {
     receiver: BatchStatusReceiver,
@@ -105,8 +123,8 @@ impl<T> Future for FinalizerFuture<T> {
     type Output = (<BatchStatusReceiver as Future>::Output, T);
     fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let status = futures::ready!(self.receiver.poll_unpin(ctx));
-        // The use of this above in a `FuturesOrdered` will only take
-        // this once before dropping the future.
+        // The use of this above in a `Futures{Ordered|Unordered|`
+        // will only take this once before dropping the future.
         Poll::Ready((status, self.entry.take().unwrap_or_else(|| unreachable!())))
     }
 }

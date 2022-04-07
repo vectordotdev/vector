@@ -18,7 +18,7 @@ use warp::Rejection;
 use super::ApiError;
 use crate::{
     config::AcknowledgementsConfig, shutdown::ShutdownSignal,
-    sources::util::finalizer::OrderedFinalizer,
+    sources::util::finalizer::UnorderedFinalizer,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -164,14 +164,14 @@ pub struct Channel {
     last_used_timestamp: RwLock<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
-    ack_event_finalizer: OrderedFinalizer<u64>,
+    ack_event_finalizer: UnorderedFinalizer<u64>,
 }
 
 impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: Shared<ShutdownSignal>) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let ack_event_finalizer = OrderedFinalizer::new(shutdown, move |ack_id: u64| {
+        let ack_event_finalizer = UnorderedFinalizer::new(shutdown, move |ack_id: u64| {
             let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
             ack_ids_status.insert(ack_id);
             if ack_ids_status.len() > max_pending_acks_per_channel {
