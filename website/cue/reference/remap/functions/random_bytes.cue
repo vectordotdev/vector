@@ -24,9 +24,9 @@ remap: functions: random_bytes: {
 	examples: [
 		{
 			title: "Generate random base 64 encoded bytes"
-			source: """
+			source: #"""
 				encode_base64(random_bytes(16))
-				"""
+				"""#
 			return: "LNu0BBgUbh7XAlXbjSOomQ=="
 		},
 	]

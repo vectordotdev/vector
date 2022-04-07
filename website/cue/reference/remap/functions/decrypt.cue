@@ -77,7 +77,7 @@ remap: functions: decrypt: {
 				key = "16_byte_keyxxxxx";
 				decrypt!(ciphertext, "AES-128-CBC-PKCS7", key, iv: iv)
 				"""#
-			return: "super secret message"
+			return: "super_secret_message"
 		},
 	]
 }
