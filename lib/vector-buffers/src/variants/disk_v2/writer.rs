@@ -878,11 +878,6 @@ where
             //
             // Otherwise, wait for the reader to signal that they've made some progress.
             if !self.is_buffer_full() || !self.ready_to_write {
-                trace!(
-                    is_buffer_full = self.is_buffer_full(),
-                    ready_to_write = self.ready_to_write,
-                    "Here."
-                );
                 break;
             }
 
