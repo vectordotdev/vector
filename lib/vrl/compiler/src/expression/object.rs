@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
-    expression::{Expr, Resolved},
+    expression::{Expr, Literal, Resolved},
     value::VrlValueConvert,
     vm::OpCode,
     Context, Expression, State, TypeDef, Value,
@@ -120,7 +120,11 @@ impl fmt::Display for Object {
 
 impl From<BTreeMap<String, Expr>> for Object {
     fn from(inner: BTreeMap<String, Expr>) -> Self {
-        todo!()
-        //Self { inner }
+        let inner = inner
+            .into_iter()
+            .map(|(key, value)| (Literal::from(key).into(), value))
+            .collect::<Vec<_>>();
+
+        Self { inner }
     }
 }

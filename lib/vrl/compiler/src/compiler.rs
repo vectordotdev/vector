@@ -155,8 +155,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
-        use std::collections::BTreeMap;
-
         let exprs = node
             .into_inner()
             .into_iter()

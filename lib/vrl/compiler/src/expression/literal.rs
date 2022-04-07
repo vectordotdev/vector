@@ -48,7 +48,7 @@ impl TryFrom<Node<ast::Literal>> for Literal {
         let literal = match lit {
             // Template strings have to be rewritten and compiled as an
             // expression. Hence this variant should never be invoked.
-            String(v) => unreachable!(),
+            String(_) => unreachable!(),
             RawString(v) => Literal::String(Bytes::from(v)),
             Integer(v) => Literal::Integer(v),
             Float(v) => Literal::Float(v),

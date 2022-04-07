@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt,
-};
+use std::{collections::HashMap, fmt};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note};
@@ -325,11 +322,7 @@ impl ArgumentList {
     pub fn optional_object(
         &mut self,
         keyword: &'static str,
-    ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
-        // This is needed for parse_groks aliases parameter.
-        todo!()
-
-        /*
+    ) -> Result<Option<Vec<(Expr, Expr)>>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Container(Container {
@@ -342,13 +335,9 @@ impl ArgumentList {
                 }),
             })
             .transpose()
-        */
     }
 
-    pub fn required_object(
-        &mut self,
-        keyword: &'static str,
-    ) -> Result<BTreeMap<String, Expr>, Error> {
+    pub fn required_object(&mut self, keyword: &'static str) -> Result<Vec<(Expr, Expr)>, Error> {
         Ok(required(self.optional_object(keyword)?))
     }
 

@@ -222,6 +222,18 @@ impl Function for ParseGroks {
             .unwrap_or_default()
             .into_iter()
             .map(|(key, expr)| {
+                let key = key
+                    .as_value()
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "aliases",
+                        expr: key,
+                    })
+                    .map(|e| {
+                        e.try_bytes_utf8_lossy()
+                            .expect("should be a string")
+                            .into_owned()
+                    })?;
+
                 let alias = expr
                     .as_value()
                     .ok_or(vrl::function::Error::ExpectedStaticExpression {

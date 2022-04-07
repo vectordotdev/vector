@@ -168,11 +168,9 @@ impl TryFrom<Expr> for Value {
                     .iter()
                     .map(|(key, value)| {
                         Ok((
-                            key.clone()
-                                .as_value()
-                                .unwrap()
+                            Value::try_from(key.clone())?
                                 .try_bytes_utf8_lossy()
-                                .unwrap()
+                                .map_err(|_| key.clone())?
                                 .to_string(),
                             value.clone().try_into()?,
                         ))
