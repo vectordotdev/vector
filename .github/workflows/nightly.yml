@@ -266,7 +266,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
@@ -312,7 +312,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: target/artifacts
@@ -333,7 +333,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name:  vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
           path: target/artifacts
@@ -368,27 +368,27 @@ jobs:
         with:
           version: latest
           install: true
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
@@ -415,67 +415,67 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
           path: target/artifacts
@@ -495,27 +495,27 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
           path: target/artifacts
