@@ -107,7 +107,7 @@ impl Function for FindEnrichmentTableRecords {
             .try_bytes_utf8_lossy()
             .expect("table is not valid utf8")
             .into_owned();
-        let condition = arguments.required_object("condition")?;
+        let condition = arguments.required_static_object("condition")?;
 
         let select = arguments.optional("select");
 

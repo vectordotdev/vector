@@ -9036,6 +9036,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
+ "once_cell",
  "ordered-float",
  "paste",
  "regex",

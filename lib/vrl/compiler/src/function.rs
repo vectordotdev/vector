@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note};
@@ -9,7 +12,7 @@ use crate::{
         container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
-    value::{kind, Kind},
+    value::{kind, Kind, VrlValueConvert},
     vm::VmArgumentList,
     Context, ExpressionError, Span, Value,
 };
@@ -339,6 +342,35 @@ impl ArgumentList {
 
     pub fn required_object(&mut self, keyword: &'static str) -> Result<Vec<(Expr, Expr)>, Error> {
         Ok(required(self.optional_object(keyword)?))
+    }
+
+    pub fn required_static_object(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<BTreeMap<String, Expr>, Error> {
+        let object = required(self.optional_object(keyword)?);
+
+        let object = object
+            .into_iter()
+            .map(|(key, value)| {
+                let key = key
+                    .as_value()
+                    .ok_or_else(|| Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: key.clone(),
+                    })?
+                    .try_bytes_utf8_lossy()
+                    .map_err(|_| Error::UnexpectedExpression {
+                        keyword: "patterns",
+                        expected: "string",
+                        expr: key.clone(),
+                    })?
+                    .into_owned();
+                Ok((key, value))
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+
+        Ok(object)
     }
 
     pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {
