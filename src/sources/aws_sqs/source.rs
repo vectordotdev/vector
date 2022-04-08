@@ -138,7 +138,7 @@ impl SqsSource {
                     if self.delete_message {
                         match batch_receiver {
                             Some(receiver) => finalizer
-                                .unwrap_or_else(|| unreachable!())
+                                .expect("Finalizer must exist for the batch receiver to be created")
                                 .add(receipts_to_ack, receiver),
                             None => {
                                 delete_messages(
