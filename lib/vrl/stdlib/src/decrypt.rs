@@ -6,7 +6,7 @@ use ctr::Ctr64LE;
 use ofb::Ofb;
 use vrl::prelude::*;
 
-use crate::encrypt::{get_iv_bytes, get_key_bytes};
+use crate::encrypt::{get_iv_bytes, get_key_bytes, is_valid_algorithm};
 use aes::cipher::KeyIvInit;
 
 type Aes128Cbc = cbc::Decryptor<aes::Aes128>;
@@ -132,6 +132,17 @@ impl Function for Decrypt {
         let algorithm = arguments.required("algorithm");
         let key = arguments.required("key");
         let iv = arguments.required("iv");
+
+        if let Some(algorithm) = algorithm.as_value() {
+            if !is_valid_algorithm(algorithm.clone()) {
+                return Err(vrl::function::Error::InvalidArgument {
+                    keyword: "algorithm",
+                    value: algorithm,
+                    error: "Invalid algorithm",
+                }
+                .into());
+            }
+        }
 
         Ok(Box::new(DecryptFn {
             ciphertext,

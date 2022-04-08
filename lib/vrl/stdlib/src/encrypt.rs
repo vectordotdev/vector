@@ -79,6 +79,39 @@ macro_rules! encrypt_keystream {
     }};
 }
 
+pub(crate) fn is_valid_algorithm(algorithm: Value) -> bool {
+    match algorithm
+        .try_bytes_utf8_lossy()
+        .expect("already checked type")
+        .as_ref()
+        .to_uppercase()
+        .as_str()
+    {
+        "AES-256-CFB"
+        | "AES-192-CFB"
+        | "AES-128-CFB"
+        | "AES-256-OFB"
+        | "AES-192-OFB"
+        | "AES-128-OFB"
+        | "AES-256-CTR"
+        | "AES-192-CTR"
+        | "AES-128-CTR"
+        | "AES-256-CBC-PKCS7"
+        | "AES-192-CBC-PKCS7"
+        | "AES-128-CBC-PKCS7"
+        | "AES-256-CBC-ANSIX923"
+        | "AES-192-CBC-ANSIX923"
+        | "AES-128-CBC-ANSIX923"
+        | "AES-256-CBC-ISO7816"
+        | "AES-192-CBC-ISO7816"
+        | "AES-128-CBC-ISO7816"
+        | "AES-256-CBC-ISO10126"
+        | "AES-192-CBC-ISO10126"
+        | "AES-128-CBC-ISO10126" => true,
+        _ => false,
+    }
+}
+
 fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Value) -> Resolved {
     let plaintext = plaintext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
@@ -161,6 +194,17 @@ impl Function for Encrypt {
         let algorithm = arguments.required("algorithm");
         let key = arguments.required("key");
         let iv = arguments.required("iv");
+
+        if let Some(algorithm) = algorithm.as_value() {
+            if !is_valid_algorithm(algorithm.clone()) {
+                return Err(vrl::function::Error::InvalidArgument {
+                    keyword: "algorithm",
+                    value: algorithm,
+                    error: "Invalid algorithm",
+                }
+                .into());
+            }
+        }
 
         Ok(Box::new(EncryptFn {
             plaintext,
