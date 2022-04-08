@@ -241,13 +241,8 @@ impl JournaldSource {
                 );
             })?;
 
-        let mut on_stop = None;
-        let run = Box::pin(self.run(&mut checkpointer, &mut on_stop, start_journalctl));
+        let run = Box::pin(self.run(&mut checkpointer, start_journalctl));
         future::select(run, shutdown).await;
-
-        if let Some(stop) = on_stop {
-            stop();
-        }
 
         checkpointer.sync().await;
 
@@ -257,18 +252,14 @@ impl JournaldSource {
     async fn run<'a>(
         mut self,
         checkpointer: &'a mut StatefulCheckpointer,
-        on_stop: &'a mut Option<StopJournalctlFn>,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
             match start_journalctl(&checkpointer.cursor) {
-                Ok((stream, stop)) => {
-                    *on_stop = Some(stop);
+                Ok(RunningJournalctl(stream, stop)) => {
                     let should_restart = self.run_stream(stream, checkpointer).await;
-                    if let Some(stop) = on_stop.take() {
-                        stop();
-                    }
+                    stop();
                     if !should_restart {
                         return;
                     }
