@@ -331,7 +331,8 @@ pub fn file_source(
     let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            checkpoints.update(entry.file_id, entry.offset)
+            let checkpoints = checkpoints.clone();
+            async move { checkpoints.update(entry.file_id, entry.offset) }
         })
     });
 
