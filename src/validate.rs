@@ -16,12 +16,12 @@ const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
     #[clap(long)]
-    no_environment: bool,
+    pub no_environment: bool,
 
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
     #[clap(short, long)]
-    deny_warnings: bool,
+    pub deny_warnings: bool,
 
     /// Vector config files in TOML format to validate.
     #[clap(
@@ -30,7 +30,7 @@ pub struct Opts {
         env = "VECTOR_CONFIG_TOML",
         use_value_delimiter(true)
     )]
-    paths_toml: Vec<PathBuf>,
+    pub paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to validate.
     #[clap(
@@ -39,7 +39,7 @@ pub struct Opts {
         env = "VECTOR_CONFIG_JSON",
         use_value_delimiter(true)
     )]
-    paths_json: Vec<PathBuf>,
+    pub paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to validate.
     #[clap(
@@ -48,14 +48,14 @@ pub struct Opts {
         env = "VECTOR_CONFIG_YAML",
         use_value_delimiter(true)
     )]
-    paths_yaml: Vec<PathBuf>,
+    pub paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
     /// will be targeted.
     #[clap(env = "VECTOR_CONFIG", use_value_delimiter(true))]
-    paths: Vec<PathBuf>,
+    pub paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
@@ -117,7 +117,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {
@@ -270,7 +270,7 @@ fn remove_tmp_directory(path: PathBuf) {
     }
 }
 
-struct Formatter {
+pub struct Formatter {
     /// Width of largest printed line
     max_line_width: usize,
     /// Can empty line be printed
@@ -283,7 +283,7 @@ struct Formatter {
 }
 
 impl Formatter {
-    fn new(color: bool) -> Self {
+    pub fn new(color: bool) -> Self {
         Self {
             max_line_width: 0,
             print_space: false,

@@ -3,12 +3,13 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use parser::ast::Node;
 
-use crate::value::VrlValueConvert;
 use crate::{
     expression::{ExpressionError, Resolved},
+    state::{ExternalEnv, LocalEnv},
     value::Kind,
+    value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, Span, State, TypeDef, Value,
+    Context, Expression, Span, TypeDef, Value,
 };
 
 use super::Expr;
@@ -20,7 +21,11 @@ pub struct Abort {
 }
 
 impl Abort {
-    pub fn new(span: Span, message: Option<Node<Expr>>, state: &State) -> Result<Self, Error> {
+    pub fn new(
+        span: Span,
+        message: Option<Node<Expr>>,
+        state: (&LocalEnv, &ExternalEnv),
+    ) -> Result<Self, Error> {
         let message = message
             .map(|node| {
                 let (expr_span, expr) = node.take();
@@ -69,14 +74,14 @@ impl Expression for Abort {
         })
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         match &self.message {
             None => {

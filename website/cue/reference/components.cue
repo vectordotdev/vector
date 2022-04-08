@@ -333,11 +333,11 @@ components: {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
-				enabled:      bool
-				common:       bool
-				max_bytes?:   uint | null
-				max_events?:  uint | null
-				timeout_secs: uint16 | null
+				enabled:       bool
+				common?:       bool
+				max_bytes?:    uint | null
+				max_events?:   uint | null
+				timeout_secs?: float | null
 			}
 		}
 
@@ -421,11 +421,17 @@ components: {
 	#Input: {
 		logs:    bool
 		metrics: #MetricInput | null
+		traces:  bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
+		fields:      #Schema
+	}
+
+	#TraceOutput: {
+		description: string
 		fields:      #Schema
 	}
 
@@ -450,6 +456,7 @@ components: {
 	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+		traces?:  #TraceOutput
 	}
 
 	#Output: {

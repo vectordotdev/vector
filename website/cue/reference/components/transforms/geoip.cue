@@ -64,6 +64,7 @@ components: transforms: geoip: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

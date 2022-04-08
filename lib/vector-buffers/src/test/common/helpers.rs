@@ -44,7 +44,8 @@ where
     F: FnOnce(&Path) -> Fut,
     Fut: Future<Output = V>,
 {
-    let buf_dir = TempDir::new().expect("creating temp dir should never fail");
+    let buf_dir = TempDir::with_prefix("vector-buffers")
+        .expect("cannot recover from failure to create temp dir");
     f(buf_dir.path()).await
 }
 

@@ -20,7 +20,7 @@ components: sinks: redis: {
 				common:       true
 				max_bytes:    null
 				max_events:   1
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			encoding: {
 				enabled: true
@@ -110,6 +110,7 @@ components: sinks: redis: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

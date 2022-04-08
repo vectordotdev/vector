@@ -54,7 +54,7 @@ impl RemapConfig {
     ) -> Result<(
         vrl::Program,
         Vec<Box<dyn vrl::Function>>,
-        vrl::state::Compiler,
+        vrl::state::ExternalEnv,
     )> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
@@ -75,7 +75,7 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state = vrl::state::Compiler::new_with_kind(merged_schema_definition.into());
+        let mut state = vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.into());
         state.set_external_context(enrichment_tables);
 
         vrl::compile_with_state(&source, &functions, &mut state)
@@ -247,13 +247,13 @@ impl VrlRunner for AstRunner {
 
 impl Remap<VmRunner> {
     pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, state) = config.compile_vrl_program(
+        let (program, functions, mut state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
         let runtime = Runtime::default();
-        let vm = runtime.compile(functions, &program, state)?;
+        let vm = runtime.compile(functions, &program, &mut state)?;
         let runner = VmRunner {
             runtime,
             vm: Arc::new(vm),

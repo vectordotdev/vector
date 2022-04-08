@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
@@ -26,7 +26,7 @@ pub struct SplunkHecDefaultBatchSettings;
 impl SinkBatchSettings for SplunkHecDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Snafu)]

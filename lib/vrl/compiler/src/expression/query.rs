@@ -6,8 +6,9 @@ use value::{kind::remove, Kind};
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
     parser::ast::Ident,
+    state::{ExternalEnv, LocalEnv},
     vm::{self, OpCode},
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, TypeDef, Value,
 };
 
 #[derive(Clone, PartialEq)]
@@ -51,8 +52,11 @@ impl Query {
         }
     }
 
-    pub fn delete_type_def(&self, state: &mut State) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = state.target().as_mut() {
+    pub fn delete_type_def(
+        &self,
+        external: &mut ExternalEnv,
+    ) -> Result<Option<Kind>, remove::Error> {
+        if let Some(ref mut target) = external.target().as_mut() {
             let value = target.value.clone();
             let mut type_def = target.type_def.clone();
 
@@ -63,7 +67,7 @@ impl Query {
                 },
             );
 
-            state.update_target(assignment::Details { type_def, value });
+            external.update_target(assignment::Details { type_def, value });
 
             return result;
         }
@@ -106,7 +110,7 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Target::*;
 
         match &self.target {
@@ -118,7 +122,7 @@ impl Expression for Query {
                     return TypeDef::object(BTreeMap::default()).infallible();
                 }
 
-                match state.target() {
+                match state.1.target() {
                     None => TypeDef::any().infallible(),
                     Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
                 }
@@ -133,7 +137,7 @@ impl Expression for Query {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Write the target depending on what target we are trying to retrieve.
         let variable = match &self.target {

@@ -3,10 +3,11 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
-    expression::{Block, Expr, Resolved},
+    expression::{Expr, Resolved},
     parser::Node,
+    state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, State, TypeDef, Value,
+    Context, Expression, Span, TypeDef, Value,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;
@@ -17,9 +18,12 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Block>, state: &State) -> Result {
-        let (span, block) = node.take();
-        let type_def = block.type_def(state);
+    pub fn new(node: Node<Vec<Expr>>, state: (&LocalEnv, &ExternalEnv)) -> Result {
+        let (span, exprs) = node.take();
+        let type_def = exprs
+            .last()
+            .map(|expr| expr.type_def(state))
+            .unwrap_or_else(TypeDef::null);
 
         if type_def.is_fallible() {
             return Err(Error {
@@ -35,9 +39,7 @@ impl Predicate {
             });
         }
 
-        Ok(Self {
-            inner: block.into_inner(),
-        })
+        Ok(Self { inner: exprs })
     }
 
     pub fn new_unchecked(inner: Vec<Expr>) -> Self {
@@ -54,7 +56,7 @@ impl Expression for Predicate {
             .map(|mut v| v.pop().unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let mut type_defs = self
             .inner
             .iter()
@@ -74,10 +76,12 @@ impl Expression for Predicate {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> std::result::Result<(), String> {
+        let (local, external) = state;
+
         for inner in &self.inner {
-            inner.compile_to_vm(vm, state)?;
+            inner.compile_to_vm(vm, (local, external))?;
         }
         Ok(())
     }

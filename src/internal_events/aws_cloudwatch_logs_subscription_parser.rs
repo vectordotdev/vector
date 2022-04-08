@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, io_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -18,6 +18,11 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
         );
         counter!(
             "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -72,16 +77,19 @@ impl InternalEvent for AwsCloudwatchLogsEncoderError {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
+            error_code = io_error_code(&self.error),
             internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
+            "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
+            "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
         );
     }

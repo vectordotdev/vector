@@ -2,7 +2,6 @@ use aws_sdk_firehose::error::{
     DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
 };
 use aws_sdk_firehose::types::SdkError;
-use std::num::NonZeroU64;
 
 use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
 use aws_smithy_client::erase::DynConnector;
@@ -43,7 +42,7 @@ pub struct KinesisFirehoseDefaultBatchSettings;
 impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(MAX_PAYLOAD_EVENTS);
     const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_SIZE);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
