@@ -249,9 +249,9 @@ impl JournaldSource {
         Ok(())
     }
 
-    async fn run<'a>(
+    async fn run(
         mut self,
-        checkpointer: &'a mut StatefulCheckpointer,
+        checkpointer: &mut StatefulCheckpointer,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
