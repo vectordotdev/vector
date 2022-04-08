@@ -166,9 +166,11 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: "bytes"
 								enum: {
-									bytes:  "Events containing the byte frame as-is."
-									json:   "Events being parsed from a JSON string."
-									syslog: "Events being parsed from a Syslog message."
+									bytes:       "Events containing the byte frame as-is."
+									json:        "Events being parsed from a JSON string."
+									syslog:      "Events being parsed from a Syslog message."
+									native:      "Events being parsed from Vector's native protobuf format (EXPERIMENTAL)."
+									native_json: "Events being parsed from Vector's native JSON format (EXPERIMENTAL)."
 								}
 							}
 						}
