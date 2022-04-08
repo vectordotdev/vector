@@ -55,7 +55,7 @@ remap: functions: encrypt: {
 				The IV for encryption. The should be raw bytes of the IV (not encoded). The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				"""#
-			required: ytur
+			required: true
 			type: ["string"]
 		},
 	]
