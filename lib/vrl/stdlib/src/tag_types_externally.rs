@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use vector_common::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -47,7 +46,7 @@ impl Function for TagTypesExternally {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -83,7 +82,7 @@ impl Expression for TagTypesExternallyFn {
         Ok(tagged_externally)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match self.value.type_def(state) {
             td if td.is_array() => TypeDef::array(Collection::any()),
             td if td.is_null() => TypeDef::null(),
@@ -120,10 +119,7 @@ fn tag_type_externally(value: Value) -> Value {
     };
 
     if let Some(key) = key {
-        (btreemap! {
-            key => value
-        })
-        .into()
+        BTreeMap::from([(key.to_owned(), value)]).into()
     } else {
         value
     }

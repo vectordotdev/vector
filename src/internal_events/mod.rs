@@ -35,6 +35,8 @@ mod conditions;
 mod console;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
+#[cfg(feature = "sinks-datadog_traces")]
+mod datadog_traces;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
@@ -183,6 +185,8 @@ pub(crate) use self::coercer::*;
 pub(crate) use self::concat::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
+#[cfg(feature = "sinks-datadog_traces")]
+pub(crate) use self::datadog_traces::*;
 #[cfg(any(feature = "codecs"))]
 pub(crate) use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]

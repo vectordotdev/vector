@@ -1,4 +1,4 @@
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
@@ -20,7 +20,7 @@ pub(crate) struct SqsSinkDefaultBatchSettings;
 impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = Some(262_144);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Clone)]

@@ -48,9 +48,9 @@ const MAX_UNCOMPACTED_DENOMINATOR: u64 = 10;
 
 #[derive(Debug, Snafu)]
 pub enum DataDirError {
-    #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", data_dir))]
+    #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the Vector process can write to it", data_dir))]
     NotFound { data_dir: PathBuf },
-    #[snafu(display("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", data_dir))]
+    #[snafu(display("The configured data_dir {:?} is not writable by the Vector process, please ensure Vector can write to that directory", data_dir))]
     NotWritable { data_dir: PathBuf },
     #[snafu(display("Unable to look up data_dir {:?}: {:?}", data_dir, source))]
     Metadata {
@@ -68,6 +68,7 @@ pub struct DiskV1Buffer {
     id: String,
     data_dir: PathBuf,
     max_size: NonZeroU64,
+    is_migrating: bool,
 }
 
 impl DiskV1Buffer {
@@ -76,7 +77,24 @@ impl DiskV1Buffer {
             id,
             data_dir,
             max_size,
+            is_migrating: false,
         }
+    }
+
+    /// Configures this buffer to be used for migrations only.
+    ///
+    /// This configures certain behaviors:
+    /// - if the buffer doesn't exist, it won't automatically be created
+    /// - compaction is allowed to occur every 1 second, instead of the default of 60 seconds
+    pub fn set_migration_mode(&mut self) {
+        self.is_migrating = true;
+    }
+
+    /// Gets the path that this buffer will use for its data directory.
+    pub fn get_buffer_dir(&self) -> PathBuf {
+        // NOTE: I'm not a fan of this code duplicating how `open` generates the directory to use,
+        // but it's easily cross-checked and won't exist for much longer.
+        get_new_style_buffer_dir_path(&self.data_dir, self.id.as_str())
     }
 }
 
@@ -97,7 +115,13 @@ where
         usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
-        let (writer, reader, acker) = open(&self.data_dir, &self.id, self.max_size, usage_handle)?;
+        let (writer, reader, acker) = open(
+            &self.data_dir,
+            &self.id,
+            self.max_size,
+            self.is_migrating,
+            usage_handle,
+        )?;
 
         Ok((writer.into(), reader.into(), Some(acker)))
     }
@@ -113,6 +137,7 @@ pub(self) fn open<T>(
     data_dir: &Path,
     name: &str,
     max_size: NonZeroU64,
+    is_migrating: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError>
 where
@@ -149,12 +174,10 @@ where
     // because we might otherwise introduce old data that could mess up observability pipelines.
     //
     // For new users starting out cleanly with 0.19.0 or higher, there's no change in behavior.
-    let buffer_id = get_new_style_buffer_dir_name(name);
-    let path = data_dir.join(buffer_id);
+    let path = get_new_style_buffer_dir_path(data_dir, name);
     let path_exists = check_data_dir_exists(&path)?;
 
-    let old_buffer_id = get_old_style_buffer_dir_name(name);
-    let old_path = data_dir.join(old_buffer_id);
+    let old_path = get_old_style_buffer_dir_path(data_dir, name);
     let old_path_exists = check_data_dir_exists(&old_path)?;
 
     if old_path_exists {
@@ -169,7 +192,7 @@ where
             //
             // If there's no data in the old style path, though, we just delete the directory and move
             // on: no need to emit anything because nothing is being lost.
-            let old_buffer_state = db_initial_state::<T>(&old_path)?;
+            let old_buffer_state = db_initial_state::<T>(&old_path, false)?;
             if old_buffer_state.total_bytes != 0 || old_buffer_state.total_records != 0 {
                 // The old style path still has some data, so all we're going to do is warn the user
                 // that this is the case, since we don't want to risk reading older records that
@@ -207,7 +230,7 @@ where
         }
     }
 
-    build(&path, max_size, usage_handle)
+    build(&path, max_size, is_migrating, usage_handle)
 }
 
 #[derive(Default)]
@@ -233,12 +256,12 @@ impl BufferState {
 ///
 /// The state includes the necessary information to adjust buffer metrics (event count and bytes
 /// consumed) as well as information required for the writer to know the next key to write to.
-fn db_initial_state<T>(path: &Path) -> Result<BufferState, DataDirError>
+fn db_initial_state<T>(path: &Path, create_if_missing: bool) -> Result<BufferState, DataDirError>
 where
     T: Bufferable,
 {
     let mut options = Options::new();
-    options.create_if_missing = true;
+    options.create_if_missing = create_if_missing;
 
     let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
         data_dir: path.parent().expect("always a parent"),
@@ -333,9 +356,10 @@ where
 /// Function will fail if the permissions of `path` are not correct, if
 /// there is no space available on disk etc.
 #[allow(clippy::cast_precision_loss)]
-pub fn build<T: Bufferable>(
+fn build<T: Bufferable>(
     path: &Path,
     max_size: NonZeroU64,
+    is_migrating: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
@@ -343,14 +367,14 @@ pub fn build<T: Bufferable>(
     let max_uncompacted_size = max_size.get() / MAX_UNCOMPACTED_DENOMINATOR;
     let max_size = max_size.get() - max_uncompacted_size;
 
-    let initial_state = db_initial_state::<T>(path)?;
+    let initial_state = db_initial_state::<T>(path, !is_migrating)?;
     usage_handle.increment_received_event_count_and_byte_size(
         initial_state.total_events,
         initial_state.total_bytes,
     );
 
     let mut options = Options::new();
-    options.create_if_missing = true;
+    options.create_if_missing = !is_migrating;
 
     let db: Database<Key> = Database::open(path, options).with_context(|_| OpenSnafu {
         data_dir: path.parent().expect("always a parent"),
@@ -393,6 +417,7 @@ pub fn build<T: Bufferable>(
         uncompacted_size: 0,
         record_acks: OrderedAcknowledgements::from_acked(read_offset),
         buffer: VecDeque::new(),
+        is_migrating,
         last_compaction: Instant::now(),
         last_flush: Instant::now(),
         pending_read: None,
@@ -460,4 +485,14 @@ pub(self) fn get_new_style_buffer_dir_name(base: &str) -> String {
 
 pub(self) fn get_sidelined_old_style_buffer_dir_name(base: &str) -> String {
     format!("{}_buffer_old", base)
+}
+
+fn get_new_style_buffer_dir_path(base: &Path, id: &str) -> PathBuf {
+    let buffer_id = get_new_style_buffer_dir_name(id);
+    base.join(buffer_id)
+}
+
+fn get_old_style_buffer_dir_path(base: &Path, id: &str) -> PathBuf {
+    let buffer_id = get_old_style_buffer_dir_name(id);
+    base.join(buffer_id)
 }

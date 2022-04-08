@@ -102,6 +102,7 @@ components: transforms: aws_ec2_metadata: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	output: logs: log: {

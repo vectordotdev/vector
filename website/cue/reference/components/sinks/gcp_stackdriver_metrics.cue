@@ -20,7 +20,7 @@ components: sinks: gcp_stackdriver_metrics: {
 				enabled:      true
 				common:       false
 				max_events:   1
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -133,6 +133,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	how_it_works: {
