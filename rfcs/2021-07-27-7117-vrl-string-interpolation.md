@@ -89,7 +89,7 @@ feeling +
 
 ### Fallibility
 
-Due to the way the format strings are implemented as expanding to to an expression
+Due to the way the format strings are implemented as expanding to an expression
 they are automatically fallible if the variable used is not a string.
 
 ```coffee
