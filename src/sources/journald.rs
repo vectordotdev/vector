@@ -391,19 +391,17 @@ impl<'a> Batch<'a> {
                 byte_size: self.events.size_of(),
             });
 
-            if !self.events.is_empty() {
-                match self.source.out.send_batch(self.events).await {
-                    Ok(_) => {
-                        if let Some(receiver) = self.receiver {
-                            // Ignore the received status, we can't do anything with failures here.
-                            receiver.await;
-                        }
+            match self.source.out.send_batch(self.events).await {
+                Ok(_) => {
+                    if let Some(receiver) = self.receiver {
+                        // Ignore the received status, we can't do anything with failures here.
+                        receiver.await;
                     }
-                    Err(error) => {
-                        error!(message = "Could not send journald log.", %error);
-                        // `out` channel is closed, don't restart journalctl.
-                        self.exiting = Some(false);
-                    }
+                }
+                Err(error) => {
+                    error!(message = "Could not send journald log.", %error);
+                    // `out` channel is closed, don't restart journalctl.
+                    self.exiting = Some(false);
                 }
             }
 
