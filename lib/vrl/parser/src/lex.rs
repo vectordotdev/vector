@@ -1,6 +1,7 @@
 use std::{fmt, iter::Peekable, str::CharIndices};
 
 use diagnostic::{DiagnosticError, Label, Span};
+use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
 
@@ -473,7 +474,12 @@ impl TemplateString {
                     ),
                 ))
             })
-            .expect("template string has at least one element")
+            .unwrap_or_else(|| {
+                crate::ast::Expr::Literal(crate::ast::Node::new(
+                    diagnostic::Span::default(),
+                    crate::ast::Literal::RawString("".to_string()),
+                ))
+            })
     }
 }
 
@@ -502,14 +508,15 @@ impl fmt::Display for StringSegment {
     }
 }
 
+static TEMPLATE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{.*?\}").unwrap());
+
 impl StringLiteral<&str> {
     pub fn unescape(&self, span: Span) -> TemplateString {
         let text = unescape_string_literal(self.0);
 
         let mut result = Vec::new();
-        let regex = Regex::new(r"\{.*?\}").unwrap();
         let mut pos = 0;
-        for segment in regex.find_iter(&text) {
+        for segment in TEMPLATE_REGEX.find_iter(&text) {
             if segment.start() > pos {
                 let text = &text[pos..segment.start()];
                 result.push(StringSegment::Literal(text.to_string()));
