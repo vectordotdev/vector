@@ -1,4 +1,3 @@
-use aes::cipher::{AsyncStreamCipher, KeyIvInit};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
@@ -19,6 +18,7 @@ criterion_group!(
               contains,
               decode_base64,
               decode_percent,
+              decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
@@ -27,6 +27,7 @@ criterion_group!(
               encode_json,
               encode_logfmt,
               encode_percent,
+              encrypt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -135,7 +136,6 @@ criterion_group!(
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
               upcase,
-    bench_crypto
 );
 criterion_main!(benches);
 
@@ -144,7 +144,16 @@ bench_function! {
 
     test {
         args: func_args![algorithm: value!("AES-128-OFB"), plaintext: value!("plaintext"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
-        want: Ok(value!([1,2,3])),
+        want: Ok(value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf")),
+    }
+}
+
+bench_function! {
+    decrypt => vrl_stdlib::Decrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), ciphertext: value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!("plaintext")),
     }
 }
 
