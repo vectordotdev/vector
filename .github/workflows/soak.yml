@@ -241,7 +241,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download baseline image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: baseline-image
           path: /tmp
@@ -297,7 +297,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -327,7 +327,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download comparison image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: comparison-image
           path: /tmp
@@ -383,7 +383,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -423,7 +423,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -478,7 +478,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -517,7 +517,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
