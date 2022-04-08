@@ -1,6 +1,9 @@
 use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
 use aes::cipher::generic_array::GenericArray;
 use aes::cipher::{AsyncStreamCipher, BlockDecryptMut, StreamCipher};
+use cfb_mode::Decryptor as Cfb;
+use ctr::Ctr64LE;
+use ofb::Ofb;
 use vrl::prelude::*;
 
 use crate::encrypt::{get_iv_bytes, get_key_bytes};
@@ -51,15 +54,15 @@ fn decrypt(ciphertext: Value, algorithm: Value, key: Value, iv: Option<Value>) -
     let ciphertext = ciphertext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
-        "AES-256-CFB" => decrypt!(cfb_mode::Decryptor::<aes::Aes256>, ciphertext, key, iv),
-        "AES-192-CFB" => decrypt!(cfb_mode::Decryptor::<aes::Aes192>, ciphertext, key, iv),
-        "AES-128-CFB" => decrypt!(cfb_mode::Decryptor::<aes::Aes128>, ciphertext, key, iv),
-        "AES-256-OFB" => decrypt_keystream!(ofb::Ofb::<aes::Aes256>, ciphertext, key, iv),
-        "AES-192-OFB" => decrypt_keystream!(ofb::Ofb::<aes::Aes192>, ciphertext, key, iv),
-        "AES-128-OFB" => decrypt_keystream!(ofb::Ofb::<aes::Aes128>, ciphertext, key, iv),
-        "AES-256-CTR" => decrypt_keystream!(ctr::Ctr64LE::<aes::Aes256>, ciphertext, key, iv),
-        "AES-192-CTR" => decrypt_keystream!(ctr::Ctr64LE::<aes::Aes192>, ciphertext, key, iv),
-        "AES-128-CTR" => decrypt_keystream!(ctr::Ctr64LE::<aes::Aes128>, ciphertext, key, iv),
+        "AES-256-CFB" => decrypt!(Cfb::<aes::Aes256>, ciphertext, key, iv),
+        "AES-192-CFB" => decrypt!(Cfb::<aes::Aes192>, ciphertext, key, iv),
+        "AES-128-CFB" => decrypt!(Cfb::<aes::Aes128>, ciphertext, key, iv),
+        "AES-256-OFB" => decrypt_keystream!(Ofb::<aes::Aes256>, ciphertext, key, iv),
+        "AES-192-OFB" => decrypt_keystream!(Ofb::<aes::Aes192>, ciphertext, key, iv),
+        "AES-128-OFB" => decrypt_keystream!(Ofb::<aes::Aes128>, ciphertext, key, iv),
+        "AES-256-CTR" => decrypt_keystream!(Ctr64LE::<aes::Aes256>, ciphertext, key, iv),
+        "AES-192-CTR" => decrypt_keystream!(Ctr64LE::<aes::Aes192>, ciphertext, key, iv),
+        "AES-128-CTR" => decrypt_keystream!(Ctr64LE::<aes::Aes128>, ciphertext, key, iv),
         "AES-256-CBC-PKCS7" => decrypt_padded!(Aes256Cbc, Pkcs7, ciphertext, key, iv),
         "AES-192-CBC-PKCS7" => decrypt_padded!(Aes192Cbc, Pkcs7, ciphertext, key, iv),
         "AES-128-CBC-PKCS7" => decrypt_padded!(Aes128Cbc, Pkcs7, ciphertext, key, iv),

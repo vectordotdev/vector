@@ -1,6 +1,9 @@
 use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
 use aes::cipher::generic_array::GenericArray;
 use aes::cipher::{AsyncStreamCipher, BlockEncryptMut};
+use cfb_mode::Encryptor as Cfb;
+use ctr::Ctr64LE;
+use ofb::Ofb;
 use vrl::prelude::*;
 
 use aes::cipher::KeyIvInit;
@@ -26,6 +29,7 @@ pub(crate) fn get_key_bytes<const N: usize>(key: Value) -> Result<[u8; N]> {
 }
 
 pub(crate) fn get_iv_bytes<const N: usize>(iv: Option<Value>) -> Result<[u8; N]> {
+    // IV is currently optional, since algorithms may be added in the future that don't require it.
     let iv = match iv {
         Some(iv) => iv,
         None => return Err("iv parameter is required".to_string().into()),
@@ -53,7 +57,7 @@ macro_rules! encrypt {
             &GenericArray::from(get_iv_bytes($iv)?),
         )
         .encrypt_b2b($plaintext.as_ref(), buffer.as_mut())
-        .unwrap();
+        .expect("key/iv sizes were already checked");
         buffer
     }};
 }
@@ -76,7 +80,7 @@ macro_rules! encrypt_keystream {
             &GenericArray::from(get_iv_bytes($iv)?),
         )
         .apply_keystream_b2b($plaintext.as_ref(), buffer.as_mut())
-        .unwrap();
+        .expect("key/iv sizes were already checked");
         buffer
     }};
 }
@@ -85,15 +89,15 @@ fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Option<Value>) ->
     let plaintext = plaintext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
-        "AES-256-CFB" => encrypt!(cfb_mode::Encryptor::<aes::Aes256>, plaintext, key, iv),
-        "AES-192-CFB" => encrypt!(cfb_mode::Encryptor::<aes::Aes192>, plaintext, key, iv),
-        "AES-128-CFB" => encrypt!(cfb_mode::Encryptor::<aes::Aes128>, plaintext, key, iv),
-        "AES-256-OFB" => encrypt_keystream!(ofb::Ofb::<aes::Aes256>, plaintext, key, iv),
-        "AES-192-OFB" => encrypt_keystream!(ofb::Ofb::<aes::Aes192>, plaintext, key, iv),
-        "AES-128-OFB" => encrypt_keystream!(ofb::Ofb::<aes::Aes128>, plaintext, key, iv),
-        "AES-256-CTR" => encrypt_keystream!(ctr::Ctr64LE::<aes::Aes256>, plaintext, key, iv),
-        "AES-192-CTR" => encrypt_keystream!(ctr::Ctr64LE::<aes::Aes192>, plaintext, key, iv),
-        "AES-128-CTR" => encrypt_keystream!(ctr::Ctr64LE::<aes::Aes128>, plaintext, key, iv),
+        "AES-256-CFB" => encrypt!(Cfb::<aes::Aes256>, plaintext, key, iv),
+        "AES-192-CFB" => encrypt!(Cfb::<aes::Aes192>, plaintext, key, iv),
+        "AES-128-CFB" => encrypt!(Cfb::<aes::Aes128>, plaintext, key, iv),
+        "AES-256-OFB" => encrypt_keystream!(Ofb::<aes::Aes256>, plaintext, key, iv),
+        "AES-192-OFB" => encrypt_keystream!(Ofb::<aes::Aes192>, plaintext, key, iv),
+        "AES-128-OFB" => encrypt_keystream!(Ofb::<aes::Aes128>, plaintext, key, iv),
+        "AES-256-CTR" => encrypt_keystream!(Ctr64LE::<aes::Aes256>, plaintext, key, iv),
+        "AES-192-CTR" => encrypt_keystream!(Ctr64LE::<aes::Aes192>, plaintext, key, iv),
+        "AES-128-CTR" => encrypt_keystream!(Ctr64LE::<aes::Aes128>, plaintext, key, iv),
         "AES-256-CBC-PKCS7" => encrypt_padded!(Aes256Cbc, Pkcs7, plaintext, key, iv),
         "AES-192-CBC-PKCS7" => encrypt_padded!(Aes192Cbc, Pkcs7, plaintext, key, iv),
         "AES-128-CBC-PKCS7" => encrypt_padded!(Aes128Cbc, Pkcs7, plaintext, key, iv),
