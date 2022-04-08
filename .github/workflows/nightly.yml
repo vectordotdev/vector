@@ -26,7 +26,7 @@ jobs:
       - env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
@@ -50,7 +50,7 @@ jobs:
         run: |
           mv "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
              "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
@@ -67,15 +67,15 @@ jobs:
       - env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
           path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
@@ -93,7 +93,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
         run: make package-aarch64-unknown-linux-musl-all
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
@@ -111,15 +111,15 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default"
         run: make package-aarch64-unknown-linux-gnu-all
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
           path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
@@ -136,15 +136,15 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_armhf.deb
           path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
@@ -161,7 +161,7 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz"
@@ -190,7 +190,7 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
@@ -236,11 +236,11 @@ jobs:
         run: |
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"

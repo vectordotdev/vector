@@ -178,7 +178,7 @@ jobs:
           outputs: type=docker,dest=/tmp/baseline-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: baseline-image
           path: /tmp/baseline-image.tar
@@ -223,7 +223,7 @@ jobs:
           outputs: type=docker,dest=/tmp/comparison-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: comparison-image
           path: /tmp/comparison-image.tar
@@ -265,7 +265,7 @@ jobs:
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
@@ -351,7 +351,7 @@ jobs:
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
@@ -442,7 +442,7 @@ jobs:
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --mean-drift-percentage 7 \
                                          --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: soak-analysis
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
@@ -450,7 +450,7 @@ jobs:
       - name: Save PR number for subsequent workflow
         run: |
           echo ${{ github.event.number }} > /tmp/pr.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: pr-number
           path: /tmp/pr.txt
@@ -533,7 +533,7 @@ jobs:
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
 
       - name: Upload plots
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-captures-plots
           path: "${{ github.run_id }}-${{ github.run_attempt }}-captures/plots"
