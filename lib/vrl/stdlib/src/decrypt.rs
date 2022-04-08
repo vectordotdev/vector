@@ -50,7 +50,7 @@ macro_rules! decrypt_keystream {
     }};
 }
 
-fn decrypt(ciphertext: Value, algorithm: Value, key: Value, iv: Option<Value>) -> Resolved {
+fn decrypt(ciphertext: Value, algorithm: Value, key: Value, iv: Value) -> Resolved {
     let ciphertext = ciphertext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
@@ -109,7 +109,7 @@ impl Function for Decrypt {
             Parameter {
                 keyword: "iv",
                 kind: kind::BYTES,
-                required: false,
+                required: true,
             },
         ]
     }
@@ -131,7 +131,7 @@ impl Function for Decrypt {
         let ciphertext = arguments.required("ciphertext");
         let algorithm = arguments.required("algorithm");
         let key = arguments.required("key");
-        let iv = arguments.optional("iv");
+        let iv = arguments.required("iv");
 
         Ok(Box::new(DecryptFn {
             ciphertext,
@@ -145,7 +145,7 @@ impl Function for Decrypt {
         let ciphertext = args.required("ciphertext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
-        let iv = args.optional("iv");
+        let iv = args.required("iv");
         decrypt(ciphertext, algorithm, key, iv)
     }
 }
@@ -155,7 +155,7 @@ struct DecryptFn {
     ciphertext: Box<dyn Expression>,
     algorithm: Box<dyn Expression>,
     key: Box<dyn Expression>,
-    iv: Option<Box<dyn Expression>>,
+    iv: Box<dyn Expression>,
 }
 
 impl Expression for DecryptFn {
@@ -163,12 +163,7 @@ impl Expression for DecryptFn {
         let ciphertext = self.ciphertext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;
         let key = self.key.resolve(ctx)?;
-
-        let iv = match &self.iv {
-            None => None,
-            Some(iv) => Some(iv.resolve(ctx)?),
-        };
-
+        let iv = self.iv.resolve(ctx)?;
         decrypt(ciphertext, algorithm, key, iv)
     }
 

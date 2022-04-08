@@ -55,14 +55,13 @@ remap: functions: encrypt: {
 				The IV for encryption. The should be raw bytes of the IV (not encoded). The length must match the algorithm requested.
 				A new IV should be generated for every message. You can use `random_bytes` to generate a cryptographically secure random value.
 				"""#
-			required: false
+			required: ytur
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
 		"`algorithm` isn't a supported algorithm",
 		"`key` length doesn't match the key size required for the algorithm specified",
-		"`iv` was not provided for an algorithm that requires one",
 		"`iv` length doesn't match the iv size required for the algorithm specified",
 	]
 	return: types: ["string"]

@@ -28,13 +28,7 @@ pub(crate) fn get_key_bytes<const N: usize>(key: Value) -> Result<[u8; N]> {
     Ok(bytes.as_ref().try_into().unwrap())
 }
 
-pub(crate) fn get_iv_bytes<const N: usize>(iv: Option<Value>) -> Result<[u8; N]> {
-    // IV is currently optional, since algorithms may be added in the future that don't require it.
-    let iv = match iv {
-        Some(iv) => iv,
-        None => return Err("iv parameter is required".to_string().into()),
-    };
-
+pub(crate) fn get_iv_bytes<const N: usize>(iv: Value) -> Result<[u8; N]> {
     let bytes = iv.try_bytes()?;
     if bytes.len() != N {
         return Err(format!(
@@ -85,7 +79,7 @@ macro_rules! encrypt_keystream {
     }};
 }
 
-fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Option<Value>) -> Resolved {
+fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Value) -> Resolved {
     let plaintext = plaintext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
@@ -144,7 +138,7 @@ impl Function for Encrypt {
             Parameter {
                 keyword: "iv",
                 kind: kind::BYTES,
-                required: false,
+                required: true,
             },
         ]
     }
@@ -166,7 +160,7 @@ impl Function for Encrypt {
         let plaintext = arguments.required("plaintext");
         let algorithm = arguments.required("algorithm");
         let key = arguments.required("key");
-        let iv = arguments.optional("iv");
+        let iv = arguments.required("iv");
 
         Ok(Box::new(EncryptFn {
             plaintext,
@@ -180,7 +174,7 @@ impl Function for Encrypt {
         let plaintext = args.required("plaintext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
-        let iv = args.optional("iv");
+        let iv = args.required("iv");
         encrypt(plaintext, algorithm, key, iv)
     }
 }
@@ -190,7 +184,7 @@ struct EncryptFn {
     plaintext: Box<dyn Expression>,
     algorithm: Box<dyn Expression>,
     key: Box<dyn Expression>,
-    iv: Option<Box<dyn Expression>>,
+    iv: Box<dyn Expression>,
 }
 
 impl Expression for EncryptFn {
@@ -198,9 +192,7 @@ impl Expression for EncryptFn {
         let plaintext = self.plaintext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;
         let key = self.key.resolve(ctx)?;
-
-        let iv = self.iv.as_ref().map(|iv| iv.resolve(ctx)).transpose()?;
-
+        let iv = self.iv.resolve(ctx)?;
         encrypt(plaintext, algorithm, key, iv)
     }
 

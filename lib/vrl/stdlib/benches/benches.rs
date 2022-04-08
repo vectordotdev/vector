@@ -1,3 +1,4 @@
+use aes::cipher::{AsyncStreamCipher, KeyIvInit};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
@@ -133,9 +134,56 @@ criterion_group!(
               //unnest
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
-              upcase
+              upcase,
+    bench_crypto
 );
 criterion_main!(benches);
+
+fn bench_crypto(c: &mut Criterion) {
+    let mut group = c.benchmark_group("crypto");
+    // group.throughput(Throughput::Bytes(
+    //     lines.iter().fold(0, |sum, l| sum + l.len()) as u64,
+    // ));
+    //
+    // let input: Vec<Event> = lines.into_iter().map(|l| l.into()).collect();
+
+    group.bench_function("init", |b| {
+        let key = vec![0_u8; 16];
+        let iv = vec![0_u8; 16];
+
+        b.iter(|| {
+            cfb_mode::Encryptor::<aes::Aes128>::new(key.as_slice().into(), iv.as_slice().into());
+        });
+    });
+
+    group.bench_function("encrypt", |b| {
+        let key = vec![0_u8; 16];
+        let iv = vec![0_u8; 16];
+        let plaintext = b"fa34o7fahl4ugfna3glho38yhuf3fyg";
+
+        b.iter(|| {
+            let encrypter = cfb_mode::Encryptor::<aes::Aes128>::new(
+                key.as_slice().into(),
+                iv.as_slice().into(),
+            );
+            let mut buffer = vec![0; plaintext.len()];
+            encrypter
+                .encrypt_b2b(plaintext.as_ref(), buffer.as_mut())
+                .unwrap();
+        });
+    });
+
+    group.finish();
+}
+
+bench_function! {
+    encrypt => vrl_stdlib::Encrypt;
+
+    array {
+        args: func_args![algorithm: value!("AES-128-OFB"), plaintext: value!("plaintext"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!([1,2,3])),
+    }
+}
 
 bench_function! {
     append => vrl_stdlib::Append;
