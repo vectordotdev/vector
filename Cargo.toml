@@ -174,7 +174,7 @@ rmp-serde = { version = "1.0.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.9", default-features = false, features = ["std"] }
+prost = { version = "0.10", default-features = false, features = ["std"]  }
 
 # GCP
 goauth = { version = "0.11.1", default-features = false, optional = true }
@@ -278,7 +278,7 @@ syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
-tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "compression"] }
+tonic = { version = "0.7", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "compression"] }
 trust-dns-proto = { version = "0.21", features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -304,8 +304,8 @@ atty = "0.2.14"
 nix = "0.23.1"
 
 [build-dependencies]
-prost-build = { version = "0.9", optional = true }
-tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost", "compression"], optional = true }
+prost-build = { version = "0.10", optional = true }
+tonic-build = { version = "0.7", default-features = false, features = ["transport", "prost", "compression"], optional = true }
 
 [dev-dependencies]
 approx = "0.5.1"
