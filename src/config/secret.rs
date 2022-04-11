@@ -2,12 +2,16 @@ use std::collections::HashMap;
 
 use futures::executor;
 use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time::Duration};
 use typetag::serde;
 
 use super::{format, ComponentKey, Format};
+
+static COLLECTOR: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
 #[typetag::serde(tag = "type")]
 pub trait SecretBackend: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
@@ -66,21 +70,21 @@ fn retrieve_secrets(
 }
 
 fn do_replace(input: &str, secrets: HashMap<String, String>) -> String {
-    let re = Regex::new(r"SECRET\[([[:word:]]+\.[[:word:].]+)\]").unwrap();
-    re.replace_all(input, |caps: &Captures<'_>| {
-        caps.get(1)
-            .map(|k| secrets.get(k.as_str()))
-            .flatten()
-            .cloned()
-            .unwrap_or_else(|| "".to_string())
-    })
-    .into_owned()
+    COLLECTOR
+        .replace_all(input, |caps: &Captures<'_>| {
+            caps.get(1)
+                .and_then(|b| caps.get(2).map(|k| (b, k)))
+                .map(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
+                .flatten()
+                .cloned()
+                .unwrap_or_else(|| "".to_string())
+        })
+        .into_owned()
 }
 
 fn collect_secret_keys(input: &str) -> HashMap<String, Vec<String>> {
-    let re = Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap();
     let mut keys: HashMap<String, Vec<String>> = HashMap::new();
-    re.captures_iter(input).for_each(|cap| {
+    COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
             if let Some(keys) = keys.get_mut(backend.as_str()) {
                 keys.push(key.as_str().to_string());
