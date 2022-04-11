@@ -622,6 +622,7 @@ urls: {
 	windows_service:                                          "https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service"
 	woothee:                                                  "https://github.com/woothee/woothee"
 	yaml:                                                     "https://yaml.org/"
+	ytt:                                                      "https://carvel.dev/ytt/"
 	yum:                                                      "\(wikipedia)/wiki/Yum_(software)"
 	zlib:                                                     "https://www.zlib.net"
 	zstd:                                                     "https://zstd.net"

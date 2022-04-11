@@ -243,8 +243,8 @@ environment variable example.
 ### Formats
 
 Vector supports [TOML], [YAML], and [JSON] to ensure that Vector fits into your
-workflow. A side benefit of supporting JSON is that it enables you to use
-JSON-outputting data templating languages like [Jsonnet] and [Cue].
+workflow. A side benefit of supporting YAML and JSON is that they enable you to use
+data templating languages such as [ytt], [Jsonnet] and [Cue].
 
 #### Location
 
@@ -394,3 +394,4 @@ inputs = ["app*", "system_logs"]
 [jsonnet]: https://jsonnet.org
 [toml]: https://github.com/toml-lang/toml
 [yaml]: https://yaml.org
+[ytt]: https://carvel.dev/ytt/
