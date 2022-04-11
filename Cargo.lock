@@ -8906,6 +8906,7 @@ dependencies = [
 name = "vector_config"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
  "schemars",
  "serde",
  "serde_json",
