@@ -1,6 +1,3 @@
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
-
 use crate::{
     ast::{Function, FunctionArgument},
     grok_filter::GrokFilter,
@@ -18,13 +15,17 @@ use nom::{
     multi::{many_m_n, separated_list1},
     number::complete::double,
     sequence::{delimited, preceded, terminated, tuple},
-    IResult,
+    IResult, Slice,
 };
-use nom_regex::str::re_find;
+use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
+use std::collections::BTreeMap;
+use std::fmt::Formatter;
 use tracing::warn;
 use vrl_compiler::{Target, Value};
+
+static DEFAULT_FILTER_RE: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^[\w.\-_@]*").unwrap());
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     {
@@ -55,7 +56,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
             }
         } else {
             // default allowed unescaped symbols
-            Regex::new(r"^[\w.\-_@]*").unwrap()
+            DEFAULT_FILTER_RE.clone()
         };
 
         let quotes = if args_len > 2 {
@@ -161,6 +162,7 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
 
 type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
 
+#[inline]
 fn parse<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
@@ -185,6 +187,7 @@ fn parse<'a>(
 }
 
 /// Parse the line as a separated list of key value pairs.
+#[inline]
 fn parse_line<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
@@ -259,6 +262,7 @@ fn parse_key_value<'a>(
 }
 
 /// Parses quoted strings.
+#[inline]
 fn parse_quoted<'a>(
     quotes: &'a (char, char),
     field_terminator: &'a str,
@@ -281,10 +285,12 @@ fn parse_quoted<'a>(
 }
 
 /// A delimited value is all the text until our field_delimiter, or the rest of the string if it is the last value in the line,
+#[inline]
 fn parse_delimited<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> SResult<&'a str> {
     move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
 }
 
+#[inline]
 fn quoted<'a>(
     quotes: &'a [(char, char)],
     delimiter: &'a str,
@@ -301,13 +307,30 @@ fn quoted<'a>(
     }
 }
 
+fn re_find<'a, E>(re: &'a Regex) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E>
+where
+    E: nom::error::ParseError<&'a str>,
+{
+    move |i| {
+        if let Some(m) = re.find(i) {
+            Ok((i.slice(m.end()..), i.slice(m.start()..m.end())))
+        } else {
+            Err(nom::Err::Error(E::from_error_kind(
+                i,
+                nom::error::ErrorKind::RegexpFind,
+            )))
+        }
+    }
+}
+
 /// Parses an input while it matches a given regex, otherwise skips an input until the next field delimiter
+#[inline]
 fn match_re_or_empty<'a>(
     value_re: &'a Regex,
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> SResult<&'a str> {
     move |input| {
-        re_find::<'a, (&'a str, nom::error::ErrorKind)>(value_re.clone())(input)
+        re_find::<'a, (&'a str, nom::error::ErrorKind)>(value_re)(input)
             .or_else(|_| parse_delimited(field_delimiter)(input).map(|(rest, _v)| (rest, "")))
     }
 }
@@ -317,6 +340,7 @@ fn match_re_or_empty<'a>(
 ///
 /// 1. The value is quoted - parse until the end quote
 /// 2. Otherwise we parse until regex matches
+#[inline]
 fn parse_value<'a>(
     field_delimiter: &'a str,
     quotes: &'a [(char, char)],
@@ -382,7 +406,7 @@ fn parse_key<'a>(
     quotes: &'a [(char, char)],
     re: &'a Regex,
 ) -> impl Fn(&'a str) -> SResult<&'a str> {
-    move |input| alt((quoted(quotes, key_value_delimiter), re_find(re.to_owned())))(input)
+    move |input| alt((quoted(quotes, key_value_delimiter), re_find(re)))(input)
 }
 
 #[cfg(test)]
