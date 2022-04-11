@@ -83,11 +83,9 @@ impl BufferUsageHandle {
     /// If the component itself is not configured to drop events, this call does nothing.
     pub fn try_increment_dropped_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
         if let Some(dropped_event_data) = &self.state.dropped_event_data {
+            dropped_event_data.count.fetch_add(count, Ordering::Relaxed);
             dropped_event_data
-                .dropped_event_count
-                .fetch_add(count, Ordering::Relaxed);
-            dropped_event_data
-                .dropped_event_size
+                .size
                 .fetch_add(byte_size, Ordering::Relaxed);
         }
     }
@@ -105,20 +103,17 @@ pub struct BufferUsageData {
     max_size_events: AtomicUsize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct BufferUsageDroppedEventData {
-    dropped_event_count: AtomicU64,
-    dropped_event_size: AtomicU64,
+    count: AtomicU64,
+    size: AtomicU64,
 }
 
 impl BufferUsageData {
     pub fn new(mode: WhenFull, idx: usize) -> Self {
         let dropped_event_data = match mode {
             WhenFull::Block | WhenFull::Overflow => None,
-            WhenFull::DropNewest => Some(BufferUsageDroppedEventData {
-                dropped_event_count: AtomicU64::new(0),
-                dropped_event_size: AtomicU64::new(0),
-            }),
+            WhenFull::DropNewest => Some(Default::default()),
         };
 
         Self {
@@ -142,11 +137,11 @@ impl BufferUsageData {
             dropped_event_count: self
                 .dropped_event_data
                 .as_ref()
-                .map(|inner| inner.dropped_event_count.load(Ordering::Relaxed)),
+                .map(|inner| inner.count.load(Ordering::Relaxed)),
             dropped_event_size: self
                 .dropped_event_data
                 .as_ref()
-                .map(|inner| inner.dropped_event_size.load(Ordering::Relaxed)),
+                .map(|inner| inner.size.load(Ordering::Relaxed)),
             max_size_bytes: self.max_size_bytes.load(Ordering::Relaxed),
             max_size_events: self.max_size_events.load(Ordering::Relaxed),
         }
@@ -237,12 +232,8 @@ impl BufferUsage {
                     if let Some(dropped_event_data) = &stage.dropped_event_data {
                         emit(EventsDropped {
                             idx: stage.idx,
-                            count: dropped_event_data
-                                .dropped_event_count
-                                .swap(0, Ordering::Relaxed),
-                            byte_size: dropped_event_data
-                                .dropped_event_size
-                                .swap(0, Ordering::Relaxed),
+                            count: dropped_event_data.count.swap(0, Ordering::Relaxed),
+                            byte_size: dropped_event_data.size.swap(0, Ordering::Relaxed),
                         });
                     }
                 }
