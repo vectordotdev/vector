@@ -78,12 +78,17 @@ impl BufferUsageHandle {
             .fetch_add(byte_size, Ordering::Relaxed);
     }
 
-    /// Attempts to increment the count of dropped events for this buffer component.
+    /// Attempts to increment the number of dropped events (and their total size) for this buffer component.
     ///
     /// If the component itself is not configured to drop events, this call does nothing.
-    pub fn try_increment_dropped_event_count(&self, count: u64) {
-        if let Some(dropped_event_count) = &self.state.dropped_event_count {
-            dropped_event_count.fetch_add(count, Ordering::Relaxed);
+    pub fn try_increment_dropped_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
+        if let Some(dropped_event_data) = &self.state.dropped_event_data {
+            dropped_event_data
+                .dropped_event_count
+                .fetch_add(count, Ordering::Relaxed);
+            dropped_event_data
+                .dropped_event_size
+                .fetch_add(byte_size, Ordering::Relaxed);
         }
     }
 }
@@ -95,16 +100,25 @@ pub struct BufferUsageData {
     received_byte_size: AtomicU64,
     sent_event_count: AtomicU64,
     sent_byte_size: AtomicU64,
-    dropped_event_count: Option<AtomicU64>,
+    dropped_event_data: Option<BufferUsageDroppedEventData>,
     max_size_bytes: AtomicU64,
     max_size_events: AtomicUsize,
 }
 
+#[derive(Debug)]
+struct BufferUsageDroppedEventData {
+    dropped_event_count: AtomicU64,
+    dropped_event_size: AtomicU64,
+}
+
 impl BufferUsageData {
     pub fn new(mode: WhenFull, idx: usize) -> Self {
-        let dropped_event_count = match mode {
+        let dropped_event_data = match mode {
             WhenFull::Block | WhenFull::Overflow => None,
-            WhenFull::DropNewest => Some(AtomicU64::new(0)),
+            WhenFull::DropNewest => Some(BufferUsageDroppedEventData {
+                dropped_event_count: AtomicU64::new(0),
+                dropped_event_size: AtomicU64::new(0),
+            }),
         };
 
         Self {
@@ -113,7 +127,7 @@ impl BufferUsageData {
             received_byte_size: AtomicU64::new(0),
             sent_event_count: AtomicU64::new(0),
             sent_byte_size: AtomicU64::new(0),
-            dropped_event_count,
+            dropped_event_data,
             max_size_bytes: AtomicU64::new(0),
             max_size_events: AtomicUsize::new(0),
         }
@@ -126,9 +140,13 @@ impl BufferUsageData {
             sent_event_count: self.sent_event_count.load(Ordering::Relaxed),
             sent_byte_size: self.sent_byte_size.load(Ordering::Relaxed),
             dropped_event_count: self
-                .dropped_event_count
+                .dropped_event_data
                 .as_ref()
-                .map(|inner| inner.load(Ordering::Relaxed)),
+                .map(|inner| inner.dropped_event_count.load(Ordering::Relaxed)),
+            dropped_event_size: self
+                .dropped_event_data
+                .as_ref()
+                .map(|inner| inner.dropped_event_size.load(Ordering::Relaxed)),
             max_size_bytes: self.max_size_bytes.load(Ordering::Relaxed),
             max_size_events: self.max_size_events.load(Ordering::Relaxed),
         }
@@ -142,6 +160,7 @@ pub struct BufferUsageSnapshot {
     pub sent_event_count: u64,
     pub sent_byte_size: u64,
     pub dropped_event_count: Option<u64>,
+    pub dropped_event_size: Option<u64>,
     pub max_size_bytes: u64,
     pub max_size_events: usize,
 }
@@ -215,10 +234,15 @@ impl BufferUsage {
                         byte_size: stage.sent_byte_size.swap(0, Ordering::Relaxed),
                     });
 
-                    if let Some(dropped_event_count) = &stage.dropped_event_count {
+                    if let Some(dropped_event_data) = &stage.dropped_event_data {
                         emit(EventsDropped {
                             idx: stage.idx,
-                            count: dropped_event_count.swap(0, Ordering::Relaxed),
+                            count: dropped_event_data
+                                .dropped_event_count
+                                .swap(0, Ordering::Relaxed),
+                            byte_size: dropped_event_data
+                                .dropped_event_size
+                                .swap(0, Ordering::Relaxed),
                         });
                     }
                 }
