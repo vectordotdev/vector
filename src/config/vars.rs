@@ -42,44 +42,30 @@ pub fn interpolate(
                                 def_or_err
                             }
                         }
-                        "-" => {
-                            if let Some(v) = val {
-                                v
-                            } else {
-                                def_or_err
-                            }
-                        }
+                        "-" => val.unwrap_or(def_or_err),
                         ":?" => {
                             if matches!(val, Some(v) if !v.is_empty()) {
                                 val.unwrap()
                             } else {
                                 errors.push(format!(
-                                "Non-empty env var required in config. name = {:?}, error = {:?}",
-                                name, def_or_err
-                            ));
-                                ""
-                            }
-                        }
-                        "?" => {
-                            if let Some(v) = val {
-                                v
-                            } else {
-                                errors.push(format!(
-                                    "Missing env var required in config. name = {:?}, error = {:?}",
+                                    "Non-empty env var required in config. name = {:?}, error = {:?}",
                                     name, def_or_err
                                 ));
                                 ""
                             }
                         }
-                        _ => {
-                            if let Some(v) = val {
-                                v
-                            } else {
-                                warnings
-                                    .push(format!("Unknown env var in config. name = {:?}", name));
-                                ""
-                            }
-                        }
+                        "?" => val.unwrap_or_else(|| {
+                            errors.push(format!(
+                                "Missing env var required in config. name = {:?}, error = {:?}",
+                                name, def_or_err
+                            ));
+                            ""
+                        }),
+                        _ => val.unwrap_or_else(|| {
+                            warnings
+                                .push(format!("Unknown env var in config. name = {:?}", name));
+                            ""
+                        }),
                     }
                 })
                 .unwrap_or("$")
