@@ -1,10 +1,14 @@
 use std::io;
 
+#[cfg(feature = "codecs")]
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
 use super::Encoder;
+#[cfg(feature = "codecs")]
+use super::EncodingConfigMigrator;
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -151,6 +155,26 @@ impl Encoder<Vec<Event>> for StandardEncodings {
         written += n;
 
         Ok(written)
+    }
+}
+
+#[cfg(feature = "codecs")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct StandardEncodingsMigrator;
+
+#[cfg(feature = "codecs")]
+impl EncodingConfigMigrator for StandardEncodingsMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            StandardEncodings::Text => RawMessageSerializerConfig::new().into(),
+            StandardEncodings::Json | StandardEncodings::Ndjson => {
+                JsonSerializerConfig::new().into()
+            }
+        }
     }
 }
 
