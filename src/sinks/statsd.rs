@@ -275,10 +275,7 @@ mod test {
     use bytes::Bytes;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
-    use tokio_util::{
-        codec::{BytesCodec, Encoder as _},
-        udp::UdpFramed,
-    };
+    use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
