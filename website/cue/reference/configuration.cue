@@ -253,9 +253,9 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Currently, only the exec backend is supported. Multiple backend can be configured. To signify
+				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
 				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
-				will then be replaced by the secret retrieve from the relevant backend.
+				will then be replaced by the secret retrieved from the relevant backend.
 				"""
 			required: false
 			type: object: options: {
