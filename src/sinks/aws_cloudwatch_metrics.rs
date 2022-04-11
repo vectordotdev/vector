@@ -1,6 +1,5 @@
 use std::{
     collections::BTreeMap,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -17,8 +16,8 @@ use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
 use crate::aws::RegionOrEndpoint;
+use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -48,7 +47,7 @@ pub struct CloudWatchMetricsDefaultBatchSettings;
 impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

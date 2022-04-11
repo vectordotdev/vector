@@ -50,7 +50,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                     let host = get_authority(&host)?;
                     let tls = tls
                         .or_else(default_certs)
-                        .ok_or(DockerError::NoCertPathError)?;
+                        .ok_or(DockerError::NoHomePathError)?;
                     Docker::connect_with_ssl(
                         &host,
                         &tls.key_file,

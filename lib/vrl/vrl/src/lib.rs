@@ -18,7 +18,7 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
-    let mut state = state::Compiler::new();
+    let mut state = state::ExternalEnv::default();
 
     compile_with_state(source, fns, &mut state)
 }
@@ -26,7 +26,7 @@ pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
 pub fn compile_with_state(
     source: &str,
     fns: &[Box<dyn Function>],
-    state: &mut state::Compiler,
+    state: &mut state::ExternalEnv,
 ) -> compiler::Result {
     let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;
 

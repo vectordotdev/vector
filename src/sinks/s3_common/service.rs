@@ -16,7 +16,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::internal_events::AwsSdkBytesSent;
+use crate::internal_events::AwsBytesSent;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -67,10 +67,10 @@ impl DriverResponse for S3Response {
     }
 }
 
-/// Wrapper for the Rusoto S3 client.
+/// Wrapper for the AWS SDK S3 client.
 ///
 /// Provides a `tower::Service`-compatible wrapper around the native
-/// `rusoto_s3::S3Client`, allowing it to be composed within a Tower "stack",
+/// AWS SDK S3 Client, allowing it to be composed within a Tower "stack",
 /// such that we can easily and transparently provide retries, concurrency
 /// limits, rate limits, and more.
 #[derive(Clone)]
@@ -148,7 +148,7 @@ impl Service<S3Request> for S3Service {
                 .await;
 
             result.map(|_inner| {
-                emit!(AwsSdkBytesSent {
+                emit!(AwsBytesSent {
                     byte_size: request_size,
                     region,
                 });

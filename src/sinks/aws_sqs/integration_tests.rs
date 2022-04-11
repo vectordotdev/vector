@@ -9,7 +9,7 @@ use tokio::time::{sleep, Duration};
 
 use super::config::{Encoding, SqsSinkConfig};
 use super::sink::SqsSink;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::sqs::SqsClientBuilder;
 use crate::config::{ProxyConfig, SinkContext};

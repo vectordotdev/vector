@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_logs: components._aws_new_sdk & {
+components: sinks: aws_cloudwatch_logs: components._aws & {
 	title: "AWS Cloudwatch Logs"
 
 	classes: {
@@ -21,7 +21,7 @@ components: sinks: aws_cloudwatch_logs: components._aws_new_sdk & {
 				common:       false
 				max_bytes:    1048576
 				max_events:   10000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -43,10 +43,9 @@ components: sinks: aws_cloudwatch_logs: components._aws_new_sdk & {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.aws_cloudwatch_logs
@@ -106,6 +105,7 @@ components: sinks: aws_cloudwatch_logs: components._aws_new_sdk & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

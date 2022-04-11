@@ -40,7 +40,6 @@ components: sources: datadog_agent: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -170,6 +169,16 @@ components: sources: datadog_agent: {
 			counter:      output._passthrough_counter
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
+		}
+		traces: {
+			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
+			fields: {
+				spans: {
+					description: "The list of spans composing the trace."
+					required:    true
+					type: array: items: type: object: options: {}
+				}
+			}
 		}
 	}
 

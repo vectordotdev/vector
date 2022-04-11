@@ -122,6 +122,7 @@ components: transforms: pipelines: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	examples: [

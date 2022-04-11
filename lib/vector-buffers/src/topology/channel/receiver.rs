@@ -54,7 +54,7 @@ impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
-    async fn next(&mut self) -> Option<T> {
+    pub(crate) async fn next(&mut self) -> Option<T> {
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
             ReceiverAdapter::DiskV1(reader) => reader.next().await,

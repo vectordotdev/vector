@@ -209,6 +209,7 @@ scopes:
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related
+  - gcp_stackdriver_metrics sink # Anything `gcp_stackdriver_metrics` sink related
   - honeycomb sink # Anything `honeycomb` sink related
   - http sink # Anything `http` sink related
   - humio_logs sink # Anything `humio_logs` sink related

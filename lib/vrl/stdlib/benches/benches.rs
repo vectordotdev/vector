@@ -113,6 +113,7 @@ criterion_group!(
               string,
               strip_ansi_escape_codes,
               strip_whitespace,
+              strlen,
               tally,
               tally_value,
               timestamp,
@@ -2053,6 +2054,15 @@ bench_function! {
             value:" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000}"
         ],
         want: Ok("❤❤ hi there ❤❤")
+    }
+}
+
+bench_function! {
+    strlen => vrl_stdlib::Strlen;
+
+    literal {
+        args: func_args![value: "ñandú"],
+        want: Ok(5)
     }
 }
 
