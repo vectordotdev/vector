@@ -129,7 +129,7 @@ tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 console-subscriber = { version = "0.1.3", optional = true }
 
 # Tracing
-tracing = { version = "0.1.32", default-features = false }
+tracing = { version = "0.1.33", default-features = false }
 tracing-core = { version = "0.1.24", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-subscriber = { version = "0.3.10", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
