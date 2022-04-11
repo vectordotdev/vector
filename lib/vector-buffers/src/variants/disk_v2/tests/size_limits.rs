@@ -9,7 +9,7 @@ use super::{
     create_buffer_v2_with_max_record_size,
 };
 use crate::{
-    assert_buffer_is_empty, assert_buffer_size, assert_enough_bytes_written,
+    assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
     test::common::{install_tracing_helpers, with_temp_dir, SizedRecord},
 };
@@ -59,7 +59,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 }
 
 #[tokio::test]
-#[ignore] // hanging indefinitely
+#[ignore]
 async fn writer_waits_when_buffer_is_full() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {
@@ -286,7 +286,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create our buffer with and arbitrarily low max buffer size, and two write sizes that
+            // Create our buffer with an arbitrarily low max buffer size, and two write sizes that
             // will both fit just under the limit but will provide no chance for another write to
             // fit.  This will trigger data file rollover when we attempt the second write.
             //
@@ -377,7 +377,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create our buffer with and arbitrarily low max buffer size, and two write sizes that
+            // Create our buffer with an arbitrarily low max buffer size, and two write sizes that
             // will both fit just under the limit but will provide no chance for another write to
             // fit.
             //
@@ -415,6 +415,63 @@ async fn writer_try_write_returns_when_buffer_is_full() {
 
             let second_write_result = assert_ready!(second_record_write.poll());
             assert_eq!(second_write_result, Some(SizedRecord(second_write_size)));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_can_validate_last_write_when_buffer_is_full() {
+    let _a = install_tracing_helpers();
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create our buffer with an arbitrarily low max buffer size, such that it's full after a
+            // single write.
+            let (mut writer, _, _, ledger) =
+                create_buffer_v2_with_max_buffer_size(data_dir.clone(), 100).await;
+            let first_write_size = 92;
+            let second_write_size = 96;
+
+            assert_buffer_is_empty!(ledger);
+
+            // First write should always complete because we haven't written anything yet, so we
+            // haven't exceed our total buffer size limit yet, or the size limit of the data file
+            // itself.  We do need this write to be big enough to exceed the total buffer size
+            // limit, though.
+            let first_record = SizedRecord(first_write_size);
+            let first_write_result = writer
+                .try_write_record(first_record)
+                .await
+                .expect("write should not fail");
+            assert_eq!(first_write_result, None);
+            writer.flush().await.expect("flush should not fail");
+
+            // This write should return immediately because will have exceeded our 100 byte total
+            // buffer size limit handily with the first write we did, but since it's a fallible
+            // write attempt, it can already tell that the write will not fit anyways:
+            let mut second_record_write = spawn(async {
+                let record = SizedRecord(second_write_size);
+                writer
+                    .try_write_record(record)
+                    .await
+                    .expect("write should not fail")
+            });
+
+            let second_write_result = assert_ready!(second_record_write.poll());
+            assert_eq!(second_write_result, Some(SizedRecord(second_write_size)));
+
+            // Now that we know that the buffer is truly full, close it and reopen it. Even though
+            // it's full, this should succeed because being full should not block things like
+            // reading/validating the last write, etc.
+            drop(second_record_write);
+            drop(writer);
+            drop(ledger);
+
+            let (_, _, _, ledger) =
+                create_buffer_v2_with_max_buffer_size::<_, SizedRecord>(data_dir, 100).await;
+            assert_buffer_records!(ledger, 1);
         }
     })
     .await;

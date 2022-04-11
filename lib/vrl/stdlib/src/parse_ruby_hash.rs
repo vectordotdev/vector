@@ -45,7 +45,7 @@ impl Function for ParseRubyHash {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,7 +78,7 @@ impl Expression for ParseRubyHashFn {
         parse_ruby_hash(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }

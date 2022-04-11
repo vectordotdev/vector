@@ -132,7 +132,7 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "extracing_field",
+            "error_code" => "extracing_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );

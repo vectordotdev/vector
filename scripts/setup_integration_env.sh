@@ -6,7 +6,6 @@ set -o pipefail
 # SUMMARY
 #
 #  Sets up Vector integration test environments
-
 if [ $# -ne 2 ]
 then
     echo "Usage: $0 {integration_test_suite} {stop|start}" 1>&2; exit 1;

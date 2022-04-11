@@ -2,7 +2,7 @@ use aws_sdk_sqs::error::SendMessageError;
 use aws_sdk_sqs::types::SdkError;
 
 use super::service::SendMessageResponse;
-use crate::aws::aws_sdk::is_retriable_error;
+use crate::aws::is_retriable_error;
 use crate::sinks::util::retries::RetryLogic;
 
 #[derive(Debug, Clone)]

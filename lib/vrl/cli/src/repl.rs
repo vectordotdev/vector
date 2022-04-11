@@ -13,7 +13,11 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value, VrlRuntime};
+use vrl::{
+    diagnostic::Formatter,
+    state::{self, ExternalEnv},
+    value, Runtime, Target, Value, VrlRuntime,
+};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -46,7 +50,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
-    let mut compiler_state = state::Compiler::default();
+    let mut external_state = state::ExternalEnv::default();
     let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
@@ -104,7 +108,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                     objects.get_mut(index),
                     &mut rt,
                     command,
-                    &mut compiler_state,
+                    &mut external_state,
                     timezone,
                     vrl_runtime,
                 );
@@ -136,7 +140,7 @@ fn resolve(
     object: Option<&mut impl Target>,
     runtime: &mut Runtime,
     program: &str,
-    state: &mut state::Compiler,
+    state: &mut state::ExternalEnv,
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
@@ -161,9 +165,11 @@ fn execute(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
+    let mut state = ExternalEnv::default();
+
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime.compile(stdlib::all(), &program, Default::default())?;
+            let vm = runtime.compile(stdlib::all(), &program, &mut state)?;
             runtime
                 .run_vm(&vm, object, timezone)
                 .map_err(|err| err.to_string())
@@ -271,7 +277,7 @@ impl Validator for Repl {
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
-        let mut compiler_state = state::Compiler::default();
+        let mut external_state = state::ExternalEnv::default();
         let mut rt = Runtime::new(state::Runtime::default());
         let target: Option<&mut Value> = None;
 
@@ -279,7 +285,7 @@ impl Validator for Repl {
             target,
             &mut rt,
             ctx.input(),
-            &mut compiler_state,
+            &mut external_state,
             &timezone,
             VrlRuntime::Ast,
         ) {

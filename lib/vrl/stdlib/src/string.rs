@@ -42,7 +42,7 @@ impl Function for String {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -67,7 +67,7 @@ impl Expression for StringFn {
         string(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_bytes = !self.value.type_def(state).is_bytes();
 
         TypeDef::bytes().with_fallibility(non_bytes)

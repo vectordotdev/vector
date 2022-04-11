@@ -8,7 +8,12 @@ use parser::ast::{self, Node};
 use regex::Regex;
 use value::ValueRegex;
 
-use crate::{expression::Resolved, vm::OpCode, Context, Expression, Span, State, TypeDef, Value};
+use crate::{
+    expression::Resolved,
+    state::{ExternalEnv, LocalEnv},
+    vm::OpCode,
+    Context, Expression, Span, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -71,7 +76,7 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Literal::*;
 
         let type_def = match self {
@@ -90,7 +95,7 @@ impl Expression for Literal {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        _state: &mut crate::state::Compiler,
+        _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Add the literal as a constant.
         let constant = vm.add_constant(self.to_value());

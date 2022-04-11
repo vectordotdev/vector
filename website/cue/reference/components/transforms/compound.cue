@@ -68,6 +68,7 @@ components: transforms: compound: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	examples: [

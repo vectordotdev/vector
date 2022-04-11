@@ -239,7 +239,7 @@ EOF
 
 ## Create stream
 
-With the the S3 bucket and IAM role in place, we can create our delivery stream.
+With the S3 bucket and IAM role in place, we can create our delivery stream.
 
 ```bash
 $ aws firehose create-delivery-stream --delivery-stream-name ${FIREHOSE_DELIVERY_STREAM} \

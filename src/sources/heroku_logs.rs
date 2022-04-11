@@ -7,16 +7,17 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use tokio_util::codec::Decoder;
+use tokio_util::codec::Decoder as _;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext, SourceDescription,
@@ -24,9 +25,7 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, StreamDecodingError,
-    },
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
 };
 
@@ -71,7 +70,7 @@ impl GenerateConfig for LogplexConfig {
 #[derive(Clone, Default)]
 struct LogplexSource {
     query_parameters: Vec<String>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl HttpSource for LogplexSource {
@@ -154,7 +153,7 @@ impl SourceConfig for LogplexCompatConfig {
 }
 
 fn decode_message(
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     body: Bytes,
     header_map: HeaderMap,
 ) -> Result<Vec<Event>, ErrorMessage> {
@@ -208,7 +207,7 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
+fn body_to_events(decoder: Decoder, body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
@@ -220,7 +219,7 @@ fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
         .collect()
 }
 
-fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event; 1]> {
+fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
     let mut events = SmallVec::<[Event; 1]>::new();

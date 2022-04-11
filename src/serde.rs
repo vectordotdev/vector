@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 #[cfg(feature = "codecs")]
-use crate::codecs::{
+use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
 };
@@ -99,65 +99,45 @@ impl<V: 'static> Fields<V> {
     }
 }
 
-/// Handling of ASCII characters in `u8` fields via `serde`s `with` attribute.
-pub mod ascii_char {
-    use serde::{de, Deserialize, Deserializer, Serializer};
+/// Structure to handle when a configuration field can be a value
+/// or a list of values.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let character = char::deserialize(deserializer)?;
-        if character.is_ascii() {
-            Ok(character as u8)
-        } else {
-            Err(de::Error::custom(format!(
-                "invalid character: {}, expected character in ASCII range",
-                character
-            )))
+impl<T: ToString> OneOrMany<T> {
+    pub fn stringify(&self) -> OneOrMany<String> {
+        match self {
+            Self::One(value) => value.to_string().into(),
+            Self::Many(values) => values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .into(),
         }
     }
+}
 
-    pub fn serialize<S>(character: &u8, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_char(*character as char)
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(list) => list,
+        }
     }
+}
 
-    #[cfg(test)]
-    mod tests {
-        use serde::{Deserialize, Serialize};
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        Self::One(value)
+    }
+}
 
-        #[derive(Deserialize, Serialize)]
-        struct Foo {
-            #[serde(with = "super")]
-            character: u8,
-        }
-
-        #[test]
-        fn test_deserialize_ascii_valid() {
-            let foo = serde_json::from_str::<Foo>(r#"{ "character": "\n" }"#).unwrap();
-            assert_eq!(foo.character, b'\n');
-        }
-
-        #[test]
-        fn test_deserialize_ascii_invalid_range() {
-            assert!(serde_json::from_str::<Foo>(r#"{ "character": "💩" }"#).is_err());
-        }
-
-        #[test]
-        fn test_deserialize_ascii_invalid_character() {
-            assert!(serde_json::from_str::<Foo>(r#"{ "character": 0 }"#).is_err());
-        }
-
-        #[test]
-        fn test_serialize_ascii() {
-            let foo = Foo { character: b'\n' };
-            assert_eq!(
-                serde_json::to_string(&foo).unwrap(),
-                r#"{"character":"\n"}"#
-            );
-        }
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Many(value)
     }
 }

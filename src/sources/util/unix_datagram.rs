@@ -1,6 +1,7 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
@@ -8,14 +9,14 @@ use tracing::field;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs,
+    codecs::Decoder,
     event::Event,
     internal_events::{
         BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
+    sources::Source,
     SourceSender,
 };
 
@@ -26,7 +27,7 @@ use crate::{
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     max_length: usize,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
@@ -52,7 +53,7 @@ pub fn build_unix_datagram_source(
 async fn listen(
     socket: UnixDatagram,
     max_length: usize,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,

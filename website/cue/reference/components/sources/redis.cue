@@ -7,13 +7,7 @@ components: sources: redis: {
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled:        false
 			from: {
 				service: services.redis
 				interface: {

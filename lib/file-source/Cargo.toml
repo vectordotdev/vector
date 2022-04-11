@@ -36,7 +36,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "~1.8.0"
+version = "~1.8.1"
 default-features = false
 features = ["serde"]
 
@@ -74,7 +74,7 @@ features = ["full"]
 criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.3.0"
-pretty_assertions = "1.2.0"
+pretty_assertions = "1.2.1"
 
 [[bench]]
 name = "buffer"
