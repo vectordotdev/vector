@@ -1,6 +1,6 @@
 use codecs::{
     encoding::{Framer, FramingConfig, SerializerConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoder, RawMessageSerializerConfig,
+    BytesEncoder, JsonSerializerConfig, NewlineDelimitedEncoder, RawMessageSerializerConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -95,7 +95,12 @@ impl SinkConfig for SocketSinkConfig {
         let encoding = self.encoding.clone();
         let transformer = encoding.transformer();
         let (framer, serializer) = encoding.encoding();
-        let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+        let framer = framer.unwrap_or_else(|| match self.mode {
+            Mode::Tcp(_) => NewlineDelimitedEncoder::new().into(),
+            Mode::Udp(_) => BytesEncoder::new().into(),
+            #[cfg(unix)]
+            Mode::Unix(_) => NewlineDelimitedEncoder::new().into(),
+        });
         let encoder = Encoder::<Framer>::new(framer, serializer);
         match &self.mode {
             Mode::Tcp(config) => config.build(cx, transformer, encoder),
