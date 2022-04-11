@@ -5,10 +5,9 @@ use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 
-use crate::aws::{create_client, ClientBuilder};
-use crate::sinks::util::ServiceBuilderExt;
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_cloudwatch_logs::{
@@ -16,8 +15,10 @@ use crate::{
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -60,13 +61,14 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
     pub group_name: Template,
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
@@ -114,7 +116,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 self.clone(),
                 client.clone(),
             ));
-        let encoding = self.encoding.clone();
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.clone().encoding();
+        let encoder = Encoder::<()>::new(serializer);
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {
             batcher_settings,
@@ -122,7 +126,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 group_template: self.group_name.clone(),
                 stream_template: self.stream_name.clone(),
                 log_schema: log_schema().clone(),
-                encoding,
+                transformer,
+                encoder,
             },
             acker: cx.acker(),
             service: svc,
@@ -152,7 +157,7 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 
 fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
-        encoding: e.into(),
+        encoding: EncodingConfig::from(e).into(),
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
