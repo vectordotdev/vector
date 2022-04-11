@@ -13,6 +13,11 @@ use nom::{
 };
 use vrl::{prelude::*, Value};
 
+fn parse_ruby_hash(value: Value) -> Resolved {
+    let input = value.try_bytes_utf8_lossy()?;
+    parse(&input)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;
 
@@ -40,7 +45,7 @@ impl Function for ParseRubyHash {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -55,6 +60,11 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_ruby_hash(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,11 +75,10 @@ struct ParseRubyHashFn {
 impl Expression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let input = value.try_bytes_utf8_lossy()?;
-        parse(&input)
+        parse_ruby_hash(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }

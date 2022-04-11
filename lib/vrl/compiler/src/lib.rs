@@ -26,14 +26,14 @@ pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::Program;
-pub(crate) use state::Compiler as State;
+use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
 pub type Result = std::result::Result<Program, compiler::Errors>;
 
 /// The choice of available runtimes.
-#[derive(Deserialize, Serialize, Debug, Copy, Clone)]
+#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
     Ast,
@@ -73,8 +73,8 @@ impl Display for VrlRuntime {
 
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
 pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
-    let mut state = State::default();
-    compile_with_state(ast, fns, &mut state)
+    let mut external = ExternalEnv::default();
+    compile_with_state(ast, fns, &mut external)
 }
 
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]
@@ -87,9 +87,9 @@ pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
 pub fn compile_with_state(
     ast: parser::Program,
     fns: &[Box<dyn Function>],
-    state: &mut State,
+    state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns, state).compile(ast)
+    compiler::Compiler::new(fns).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.

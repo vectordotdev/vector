@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 
 use futures::FutureExt;
 use indoc::indoc;
@@ -34,7 +34,7 @@ use crate::{
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogLogsDefaultBatchSettings;
@@ -42,8 +42,7 @@ pub struct DatadogLogsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
-    const TIMEOUT_SECS: NonZeroU64 =
-        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+    const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

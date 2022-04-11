@@ -3,11 +3,7 @@ use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
-fn parse_regex(
-    value: Value,
-    numeric_groups: bool,
-    pattern: &Regex,
-) -> std::result::Result<Value, ExpressionError> {
+fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     let parsed = pattern
@@ -47,7 +43,7 @@ impl Function for ParseRegex {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -91,7 +87,7 @@ impl Function for ParseRegex {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -114,11 +110,7 @@ impl Function for ParseRegex {
         }
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let pattern = args
             .required_any("pattern")
             .downcast_ref::<regex::Regex>()
@@ -150,7 +142,7 @@ impl Expression for ParseRegexFn {
         parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
 }

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use vrl::{function::Error, prelude::*};
 
-fn to_unix_timestamp(value: Value, unit: Unit) -> std::result::Result<Value, ExpressionError> {
+fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {
     let ts = value.try_timestamp()?;
     let time = match unit {
         Unit::Seconds => ts.timestamp(),
@@ -57,7 +57,7 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -77,7 +77,7 @@ impl Function for ToUnixTimestamp {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -175,7 +175,7 @@ impl Expression for ToUnixTimestampFn {
         to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

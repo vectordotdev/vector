@@ -20,7 +20,7 @@ components: sinks: sematext_metrics: {
 				enabled:      true
 				common:       false
 				max_events:   20
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -68,6 +68,7 @@ components: sinks: sematext_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	telemetry: metrics: {

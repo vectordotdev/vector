@@ -8,11 +8,13 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../vrl" }
-lookup_lib = {package = "lookup", path = "../../lookup" }
-datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+value = { path = "../../value", default-features = false }
+
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
-value = { path = "../../value"}
+datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
+vector_common = { path = "../../vector-common", default-features = false, optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -23,7 +25,7 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.8.0", default-features = false, optional = true}
+indexmap = { version = "~1.8.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
@@ -42,14 +44,14 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
-utf8-width = { version = "0.1.5", optional = true }
-vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
+utf8-width = { version = "0.1.6", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
-criterion = "0.3"
 chrono-tz = "0.6"
+criterion = "0.3"
 value = { path = "../../value", features = ["test"]}
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [features]
 default = [
@@ -88,10 +90,13 @@ default = [
     "ip_cidr_contains",
     "ip_subnet",
     "ip_ntoa",
+    "ip_ntop",
+    "ip_pton",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
     "is_boolean",
+    "is_empty",
     "is_float",
     "is_integer",
     "is_null",
@@ -154,6 +159,7 @@ default = [
     "string",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "strlen",
     "tally",
     "tally_value",
     "tag_types_externally",
@@ -178,7 +184,7 @@ default = [
 append = []
 array = []
 assert = []
-assert_eq = []
+assert_eq = ["vector_common/conversion"]
 boolean = []
 ceil = []
 compact = []
@@ -202,7 +208,7 @@ floor = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
-get = []
+get = ["lookup_lib"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
@@ -210,11 +216,14 @@ integer = []
 ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
 ip_ntoa = []
+ip_ntop = []
+ip_pton = ["bytes"]
 ip_subnet = ["once_cell", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 is_array = []
 is_boolean = []
+is_empty = []
 is_float = []
 is_integer = []
 is_null = []
@@ -229,14 +238,14 @@ log = ["tracing"]
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex", "lookup_lib"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 object = []
 parse_apache_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_aws_alb_log = ["nom"]
-parse_aws_cloudwatch_log_subscription_message = ["serde_json", "vector_common/aws_cloudwatch_logs_subscription", "vector_common/btreemap", "chrono"]
+parse_aws_cloudwatch_log_subscription_message = ["serde_json", "vector_common/aws_cloudwatch_logs_subscription", "chrono"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_csv = ["csv"]
@@ -263,11 +272,11 @@ parse_user_agent = ["woothee","uaparser","once_cell"]
 parse_xml = ["roxmltree", "once_cell", "regex"]
 push = []
 redact = ["once_cell", "regex"]
-remove = ["vector_common/btreemap"]
+remove = ["lookup_lib"]
 replace = ["regex"]
 reverse_dns = ["dns-lookup"]
 round = []
-set = ["vector_common/btreemap"]
+set = ["lookup_lib"]
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
@@ -277,7 +286,8 @@ starts_with = ["utf8-width"]
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
-tag_types_externally = ["vector_common/btreemap", "chrono", "regex"]
+strlen = []
+tag_types_externally = ["chrono", "regex"]
 tally = []
 tally_value = []
 timestamp = []
@@ -293,7 +303,7 @@ to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
 unique = ["indexmap"]
-unnest = []
+unnest = ["lookup_lib"]
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 

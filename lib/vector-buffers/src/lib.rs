@@ -24,6 +24,7 @@ use encoding::Encodable;
 pub mod encoding;
 
 mod internal_events;
+
 #[cfg(test)]
 pub mod test;
 pub mod topology;
@@ -81,4 +82,19 @@ impl<T> Bufferable for T where
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
+}
+
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+    _name: &str,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    #[cfg(tokio_unstable)]
+    return tokio::task::Builder::new().name(_name).spawn(task);
+
+    #[cfg(not(tokio_unstable))]
+    tokio::spawn(task)
 }

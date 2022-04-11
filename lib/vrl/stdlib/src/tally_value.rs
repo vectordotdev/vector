@@ -1,5 +1,10 @@
 use vrl::prelude::*;
 
+fn tally_value(array: Value, value: Value) -> Resolved {
+    let array = array.try_array()?;
+    Ok(array.iter().filter(|&v| v == &value).count().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct TallyValue;
 
@@ -18,7 +23,7 @@ impl Function for TallyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -42,6 +47,13 @@ impl Function for TallyValue {
             },
         ]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let array = args.required("array");
+        let value = args.required("value");
+
+        tally_value(array, value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,13 +64,13 @@ pub(crate) struct TallyValueFn {
 
 impl Expression for TallyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let array = self.array.resolve(ctx)?.try_array()?;
+        let array = self.array.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
 
-        Ok(array.iter().filter(|&v| v == &value).count().into())
+        tally_value(array, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

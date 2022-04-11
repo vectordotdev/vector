@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -7,10 +8,7 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
         SourceDescription,
@@ -20,7 +18,6 @@ use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     tls::TlsConfig,
     SourceSender,
 };
@@ -127,14 +124,14 @@ async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
     _connection: nats::asynk::Connection,
     subscription: nats::asynk::Subscription,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: msg.data.len(),
             protocol: "tcp",
         });
@@ -143,7 +140,7 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&NatsEventsReceived {
+                    emit!(NatsEventsReceived {
                         byte_size: events.size_of(),
                         count
                     });
@@ -159,11 +156,11 @@ async fn nats_source(
                     });
 
                     out.send_batch(events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `crate::codecs`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

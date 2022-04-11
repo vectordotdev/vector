@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
+use codecs::{
+    decoding::{Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
 use serde::{Deserialize, Serialize};
 
 use super::StatsdDeserializer;
 use crate::{
-    codecs::{
-        decoding::{Deserializer, Framer},
-        Decoder, NewlineDelimitedDecoder,
-    },
+    codecs::Decoder,
     shutdown::ShutdownSignal,
     sources::{util::build_unix_stream_source, Source},
     SourceSender,

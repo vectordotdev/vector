@@ -20,14 +20,11 @@ mod aws_ec2_metadata;
 mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-mod aws_kinesis_streams;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
 mod batch;
-mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
 mod common;
@@ -36,10 +33,10 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sinks-datadog_events")]
-mod datadog_events;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
+#[cfg(feature = "sinks-datadog_traces")]
+mod datadog_traces;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
@@ -121,8 +118,6 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-#[cfg(feature = "transforms-route")]
-mod route;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -134,6 +129,7 @@ mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
 mod stdin;
+#[cfg(feature = "sources-syslog")]
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
@@ -181,22 +177,16 @@ pub(crate) use self::aws_ec2_metadata::*;
 pub(crate) use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
-#[cfg(feature = "sinks-aws_kinesis_streams")]
-pub(crate) use self::aws_kinesis_streams::*;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sources-aws_s3",))]
+#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
-#[cfg(feature = "sinks-blackhole")]
-pub(crate) use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub(crate) use self::concat::*;
-#[cfg(feature = "sinks-console")]
-pub(crate) use self::console::*;
-#[cfg(feature = "sinks-datadog_events")]
-pub(crate) use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
+#[cfg(feature = "sinks-datadog_traces")]
+pub(crate) use self::datadog_traces::*;
 #[cfg(any(feature = "codecs"))]
 pub(crate) use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
@@ -228,7 +218,6 @@ pub(crate) use self::geoip::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
-    feature = "sinks-http",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
     feature = "sources-aws_ecs_metrics",
@@ -289,8 +278,6 @@ pub(crate) use self::remap::*;
 pub(crate) use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub(crate) use self::rename_fields::*;
-#[cfg(feature = "transforms-route")]
-pub(crate) use self::route::*;
 #[cfg(feature = "transforms-sample")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
@@ -336,7 +323,7 @@ pub(crate) use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
+        vector_core::internal_event::emit(vector_core::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })

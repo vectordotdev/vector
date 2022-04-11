@@ -2,11 +2,7 @@ use std::ops::Range;
 
 use vrl::prelude::*;
 
-fn slice(
-    start: i64,
-    end: Option<i64>,
-    value: Value,
-) -> std::result::Result<Value, ExpressionError> {
+fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {
     let range = |len: i64| -> Result<Range<usize>> {
         let start = match start {
             start if start < 0 => start + len,
@@ -93,7 +89,7 @@ impl Function for Slice {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -135,7 +131,7 @@ impl Expression for SliceFn {
         slice(start, end, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = TypeDef::from(Kind::empty()).fallible();
 
         match self.value.type_def(state) {

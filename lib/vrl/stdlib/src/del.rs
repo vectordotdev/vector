@@ -1,9 +1,6 @@
 use vrl::prelude::*;
 
-fn del(
-    query: &expression::Query,
-    ctx: &mut Context,
-) -> std::result::Result<Value, ExpressionError> {
+fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
     if query.is_external() {
         return Ok(ctx
@@ -82,7 +79,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -94,7 +91,7 @@ impl Function for Del {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -165,18 +162,19 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::any()
     }
 
     fn update_state(
         &mut self,
-        state: &mut state::Compiler,
+        _local: &mut state::LocalEnv,
+        external: &mut state::ExternalEnv,
     ) -> std::result::Result<(), ExpressionError> {
         // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
         // supported.
         if self.query.is_external() {
-            match self.query.delete_type_def(state) {
+            match self.query.delete_type_def(external) {
                 Err(value::kind::remove::Error::RootPath)
                 | Err(value::kind::remove::Error::CoalescedPath)
                 | Err(value::kind::remove::Error::NegativeIndexPath) => {

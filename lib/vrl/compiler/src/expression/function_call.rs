@@ -7,9 +7,10 @@ use crate::{
     expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{ArgumentList, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
+    state::{ExternalEnv, LocalEnv},
     value::Kind,
     vm::OpCode,
-    Context, Expression, Function, Resolved, Span, State, TypeDef,
+    Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
 #[derive(Clone)]
@@ -39,7 +40,8 @@ impl FunctionCall {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &[Box<dyn Function>],
-        state: &mut State,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
@@ -119,7 +121,7 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
-            let argument_type_def = argument.type_def(state);
+            let argument_type_def = argument.type_def((local, external));
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -168,22 +170,25 @@ impl FunctionCall {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let external_context = state.swap_external_context(AnyMap::new());
+        let external_context = external.swap_external_context(AnyMap::new());
 
         let mut compile_ctx =
             FunctionCompileContext::new(call_span).with_external_context(external_context);
 
         let mut expr = function
-            .compile(state, &mut compile_ctx, list)
+            .compile((local, external), &mut compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
-        let _ = state.swap_external_context(compile_ctx.into_external_context());
+        let _ = external.swap_external_context(compile_ctx.into_external_context());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error && !maybe_fallible_arguments && !expr.type_def(state).is_fallible() {
+        if abort_on_error
+            && !maybe_fallible_arguments
+            && !expr.type_def((local, external)).is_fallible()
+        {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
@@ -191,10 +196,11 @@ impl FunctionCall {
         }
 
         // Update the state if necessary.
-        expr.update_state(state).map_err(|err| Error::UpdateState {
-            call_span,
-            error: err.to_string(),
-        })?;
+        expr.update_state(local, external)
+            .map_err(|err| Error::UpdateState {
+                call_span,
+                error: err.to_string(),
+            })?;
 
         Ok(Self {
             abort_on_error,
@@ -315,7 +321,7 @@ impl Expression for FunctionCall {
         })
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let mut type_def = self.expr.type_def(state);
 
         // If one of the arguments only partially matches the function type
@@ -385,14 +391,24 @@ impl Expression for FunctionCall {
         type_def
     }
 
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        (local, external): (&mut LocalEnv, &mut ExternalEnv),
+    ) -> Result<(), String> {
         // Resolve the arguments so they are in the order defined in the function.
         let args = match vm.function(self.function_id) {
             Some(fun) => self.resolve_arguments(fun)?,
             None => return Err(format!("Function {} not found.", self.function_id)),
         };
 
-        let compile_ctx = FunctionCompileContext::new(self.span);
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = external.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(self.span).with_external_context(external_context);
 
         for (keyword, argument) in &args {
             let fun = vm.function(self.function_id).unwrap();
@@ -401,7 +417,7 @@ impl Expression for FunctionCall {
             // Call `compile_argument` for functions that need to perform any compile time processing
             // on the argument.
             match fun
-                .compile_argument(&args, &compile_ctx, keyword, argument)
+                .compile_argument(&args, &mut compile_ctx, keyword, argument)
                 .map_err(|err| err.to_string())?
             {
                 Some(stat) => {
@@ -414,7 +430,7 @@ impl Expression for FunctionCall {
                     Some(argument) => {
                         // Compile the argument, `MoveParameter` will move the result of the expression onto the
                         // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm)?;
+                        argument.compile_to_vm(vm, (local, external))?;
                         vm.write_opcode(OpCode::MoveParameter);
                     }
                     None => {
@@ -425,6 +441,9 @@ impl Expression for FunctionCall {
                 },
             }
         }
+
+        // Re-insert the external context into the compiler state.
+        let _ = external.swap_external_context(compile_ctx.into_external_context());
 
         // Call the function with the given id.
         vm.write_opcode(OpCode::Call);
@@ -808,6 +827,7 @@ impl DiagnosticError for Error {
 mod tests {
     use crate::{
         expression::{Expr, Literal},
+        state::ExternalEnv,
         value::kind,
     };
 
@@ -821,7 +841,7 @@ mod tests {
             todo!()
         }
 
-        fn type_def(&self, _state: &crate::State) -> TypeDef {
+        fn type_def(&self, _state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
             TypeDef::null().infallible()
         }
     }
@@ -860,11 +880,19 @@ mod tests {
 
         fn compile(
             &self,
-            _state: &crate::State,
+            _state: (&mut LocalEnv, &mut ExternalEnv),
             _ctx: &mut FunctionCompileContext,
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
+        }
+
+        fn call_by_vm(
+            &self,
+            _ctx: &mut Context,
+            _args: &mut crate::vm::VmArgumentList,
+        ) -> Result<value::Value, ExpressionError> {
+            unimplemented!()
         }
     }
 
@@ -880,13 +908,17 @@ mod tests {
     }
 
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
+        let mut local = LocalEnv::default();
+        let mut external = ExternalEnv::default();
+
         FunctionCall::new(
             Span::new(0, 0),
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
             arguments,
             &[Box::new(TestFn) as _],
-            &mut Default::default(),
+            &mut local,
+            &mut external,
         )
         .unwrap()
     }

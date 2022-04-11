@@ -79,6 +79,7 @@ scopes:
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
   - apt platform # Anything `apt` platform related
+  - arm platform # Anything `arm` platform related
   - arm64 platform # Anything `arm64` platform related
   - centos platform # Anything `centos` platform related
   - debian platform # Anything `debian` platform related
@@ -129,6 +130,7 @@ scopes:
   - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
+  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
   - heroku_logs source # Anything `heroku_logs` source related
@@ -207,6 +209,7 @@ scopes:
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related
+  - gcp_stackdriver_metrics sink # Anything `gcp_stackdriver_metrics` sink related
   - honeycomb sink # Anything `honeycomb` sink related
   - http sink # Anything `http` sink related
   - humio_logs sink # Anything `humio_logs` sink related

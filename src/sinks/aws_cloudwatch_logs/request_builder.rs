@@ -48,7 +48,7 @@ impl CloudwatchRequestBuilder {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingError {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("group"),
                     drop_event: true,
@@ -60,7 +60,7 @@ impl CloudwatchRequestBuilder {
         let stream = match self.stream_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingError {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("stream"),
                     drop_event: true,
@@ -80,13 +80,13 @@ impl CloudwatchRequestBuilder {
         self.encoding.apply_rules(&mut event);
         let mut message_bytes = vec![];
         if let Err(error) = self.encoding.encode_input(event, &mut message_bytes) {
-            emit!(&AwsCloudwatchLogsEncoderError { error });
+            emit!(AwsCloudwatchLogsEncoderError { error });
             return None;
         }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
         if message.len() > MAX_MESSAGE_SIZE {
-            emit!(&AwsCloudwatchLogsMessageSizeError {
+            emit!(AwsCloudwatchLogsMessageSizeError {
                 size: message.len(),
                 max_size: MAX_MESSAGE_SIZE,
             });

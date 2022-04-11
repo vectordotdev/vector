@@ -90,7 +90,7 @@ fn eventstoredb(
 
                 match client.send(req).await {
                     Err(error) => {
-                        emit!(&EventStoreDbMetricsHttpError {
+                        emit!(EventStoreDbMetricsHttpError {
                             error: error.into(),
                         });
                         continue;
@@ -100,20 +100,20 @@ fn eventstoredb(
                         let bytes = match hyper::body::to_bytes(resp.into_body()).await {
                             Ok(b) => b,
                             Err(error) => {
-                                emit!(&EventStoreDbMetricsHttpError {
+                                emit!(EventStoreDbMetricsHttpError {
                                     error: error.into(),
                                 });
                                 continue;
                             }
                         };
-                        emit!(&BytesReceived {
+                        emit!(BytesReceived {
                             byte_size: bytes.len(),
                             protocol: "http",
                         });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
-                                emit!(&EventStoreDbStatsParsingError { error });
+                                emit!(EventStoreDbStatsParsingError { error });
                                 continue;
                             }
 
@@ -122,10 +122,10 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = metrics.size_of();
 
-                                emit!(&EventStoreDbMetricsEventsReceived { count, byte_size });
+                                emit!(EventStoreDbMetricsEventsReceived { count, byte_size });
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
-                                    emit!(&StreamClosedError { count, error });
+                                    emit!(StreamClosedError { count, error });
                                     break;
                                 }
                             }

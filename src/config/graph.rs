@@ -37,22 +37,25 @@ impl Graph {
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false)
+        Self::new_inner(sources, transforms, sinks, expansions, false)
     }
 
     pub fn new_unchecked(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, expansions, true).expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
@@ -93,7 +96,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -101,7 +104,7 @@ impl Graph {
 
         for (id, config) in sinks.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -119,12 +122,18 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
             });
+            Ok(())
+        } else if let Some(expanded) = expansions.get(from) {
+            for item in expanded {
+                self.add_input(item, to, available_inputs, expansions)?;
+            }
             Ok(())
         } else {
             let output_type = match self.nodes.get(to) {
@@ -407,7 +416,8 @@ mod test {
 
         fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs)
+            let expansions = IndexMap::new();
+            self.add_input(input, &node.into(), &available_inputs, &expansions)
         }
     }
 

@@ -1,5 +1,22 @@
 use vrl::prelude::*;
 
+fn to_syslog_level(value: Value) -> Resolved {
+    let value = value.try_integer()?;
+    // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
+    let level = match value {
+        0 => "emerg",
+        1 => "alert",
+        2 => "crit",
+        3 => "err",
+        4 => "warning",
+        5 => "notice",
+        6 => "info",
+        7 => "debug",
+        _ => return Err(format!("severity level {} not valid", value).into()),
+    };
+    Ok(level.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ToSyslogLevel;
 
@@ -35,13 +52,18 @@ impl Function for ToSyslogLevel {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToSyslogLevelFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        to_syslog_level(value)
     }
 }
 
@@ -52,25 +74,12 @@ struct ToSyslogLevelFn {
 
 impl Expression for ToSyslogLevelFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_integer()?;
+        let value = self.value.resolve(ctx)?;
 
-        // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
-        let level = match value {
-            0 => "emerg",
-            1 => "alert",
-            2 => "crit",
-            3 => "err",
-            4 => "warning",
-            5 => "notice",
-            6 => "info",
-            7 => "debug",
-            _ => return Err(format!("severity level {} not valid", value).into()),
-        };
-
-        Ok(level.into())
+        to_syslog_level(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

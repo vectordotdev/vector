@@ -4,31 +4,31 @@
 
 use std::path::PathBuf;
 
-use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
+use kube::runtime::reflector::{store::Store, ObjectRef};
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
+use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
-    pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-    namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
+    pod_state: Store<Pod>,
+    namespace_state: Store<Namespace>,
     exclude_paths: Vec<glob::Pattern>,
 }
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
     pub fn new(
-        pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-        namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
+        pod_state: Store<Pod>,
+        namespace_state: Store<Namespace>,
         exclude_paths: Vec<glob::Pattern>,
     ) -> Self {
         Self {
-            pods_state_reader,
-            namespace_state_reader,
+            pod_state,
+            namespace_state,
             exclude_paths,
         }
     }
@@ -38,42 +38,26 @@ impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Vec<PathBuf> {
-        let read_ref = match self.pods_state_reader.read() {
-            Some(v) => v,
-            None => {
-                // The state is not initialized or gone, fallback to using an
-                // empty array.
-                // TODO: consider `panic`ing here instead - fail-fast approach
-                // is always better if possible, but it's not clear if it's
-                // a sane strategy here.
-                warn!(message = "Unable to read the state of the pods.");
-                return Vec::new();
-            }
-        };
+        let state = self.pod_state.state();
 
-        read_ref
+        state
             .into_iter()
             // filter out pods where we haven't fetched the namespace metadata yet
             // they will be picked up on a later run
-            .filter(|(uid, values)| {
-                let pod: &Pod = values
-                    .get_one()
-                    .expect("we are supposed to be working with single-item values only")
-                    .as_ref();
-                trace!(message = "Verifying Namespace metadata for pod.", uid = ?uid);
+            .filter(|pod| {
+                trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod);
                 if let Some(namespace) = pod.metadata.namespace.as_ref() {
-                    self.namespace_state_reader.get(namespace).is_some()
+                    self.namespace_state
+                        .get(&ObjectRef::<Namespace>::new(namespace))
+                        .is_some()
                 } else {
                     false
                 }
             })
-            .flat_map(|(uid, values)| {
-                let pod = values
-                    .get_one()
-                    .expect("we are supposed to be working with single-item values only");
-                trace!(message = "Providing log paths for pod.", uid = ?uid);
-                let paths_iter = list_pod_log_paths(real_glob, pod);
-                exclude_paths(paths_iter, &self.exclude_paths)
+            .flat_map(|pod| {
+                trace!(message = "Providing log paths for pod.", pod = ?pod);
+                let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
+                exclude_paths(paths_iter, &self.exclude_paths).collect::<Vec<_>>()
             })
             .collect()
     }

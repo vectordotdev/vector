@@ -2,13 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        Decoder,
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,

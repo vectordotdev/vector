@@ -106,7 +106,7 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     ///
     /// Depending on the normalizer, a metric may or may not be returned.  In the case of converting
     /// a metric from absolute to incremental, a metric must be seen twice in order to generate an
-    /// incremental delta, so the first call for the the same metric would return `None` while the
+    /// incremental delta, so the first call for the same metric would return `None` while the
     /// second call would return `Some(...)`.
     pub fn apply(&mut self, metric: Metric) -> Option<Metric> {
         self.normalizer.apply_state(&mut self.state, metric)
