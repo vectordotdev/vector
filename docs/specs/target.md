@@ -38,7 +38,7 @@ Vector supports a number of installation targets that can be categorized into:
 
 The primary differentiator between the two being that Virtual/Physical Machines
 provide a single node as the deployment target, whereas Orchestration Platforms
-allow for a scheduler to deploy Vector across a number nodes. These categories
+allow for a scheduler to deploy Vector across a number of nodes. These categories
 have their own requirements for each
 [Deployment Architecture](#3-deployment-architectures).
 
