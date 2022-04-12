@@ -29,7 +29,6 @@ sources:
     type: opentelemetry
     address: "[::]:8081"
     mode: grpc
-    traces_stats: true # Traces stats would be compliant with APM stats
 
 transforms:
   set_key:
@@ -42,7 +41,6 @@ transforms:
         set_metadata_field("datadog_api_key", key)
       inputs:
        - otlp.traces # Would exclusively emit traces
-       - otlp.traces_stats # Would exclusively emit metrics
 
 sinks:
   dd_trace:
@@ -86,8 +84,8 @@ N/A
 - Support `opentelemetry` source to `datadog_traces` sink forwarding by dealing with:
   - Traces normalization to a single format inside Vector
   - Conversion to/from this format in all traces sources/sinks
-- APM stats computation logic, with an implementation for the `opentelemetry` sources, applicable for all traces
-  sources. It will come with a knob to turn it on/off.
+- APM stats computation logic, with an implementation fully function for traces from both the `opentelemetry` and the
+  `datadog_agent` sources.
 
 ### Out of scope
 
@@ -111,7 +109,6 @@ sources:
     type: opentelemetry
     address: "[::]:8081"
     mode: grpc
-    traces_stats: true # Traces stats would be compliant with APM stats
 
 sinks:
   dd_trace:
@@ -119,7 +116,6 @@ sinks:
     default_api_key: 12345678abcdef
     inputs:
      - otlp.traces # Would exclusively emit traces
-     - otlp.traces_stats # Would exclusively emit metrics
 ```
 
 And it should just work.
@@ -288,10 +284,10 @@ This makes the opposite conversion a bit complicated if we want it to be complet
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
 some of the OpenTelemetry contruct ends up being stored as tags or annotations in other formats.
 
-Anyway the OpenTelemtry to Datadog traces conversion is dictacted by existing implementation in both the `trace-agent`
+Anyway the OpenTelemtry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
 consideration applies for APM stats computation, as [official implementations][apm-stats-computation] already provides a
-reference that define what should be done to get the same result with Vector in the loop. The other way, from Datadog to
+reference that defines what should be done to get the same result with Vector in the loop. The other way, from Datadog to
 OpenTelemetry is less common as of today but while implementing conversions we shall ensure that the following path is
 idempotent:
 
@@ -319,24 +315,30 @@ list will not be exposed initially.
 
 #### APM stats computation
 
-The APM stats computation can be seen as a generic way to compute some statistics on a trace flow, thus the following
-way forward is suggested:
+The APM stats computation can be seen as a generic way to compute some statistics on a traces flow, the following key
+points have been discussed:
 
+- While [APM stats][apm-stats-proto] may be useful outside Datadog context, as they are somehow standard metrics, and
+  they could theoritically be useful to any metric backends, but as of today it seems unlikely that this will ever
+  happen. So third-party usage of APM stats won't be addressed until there is demand for it.
+- APM stats are essentially a Datadog things, and if metrics should be extracted from traces at some point in the
+  feature this would probably materialize as a `traces_to_metric` transform, but the exact scope and the usefulness of
+  such a transform remains to be determined. But this will be unrelated to APM stats.
+- Considering the user experience, it appears that not exposing any APM stats consideration in Vector config is a safe
+  conservative choice. That being said APM stats coming out of Vector shall remain relevant in all circumstances. Based
+  on the fact that first identified usecases revolve around routing and filtering the most convenient location to do APM
+  Stats computation is directly in the `datadog_traces` sink. The major issue is around sampling, statistically speaking
+  distribution metrics wont be impacted, but other metrics (like counter/gauge) will, note that if the sampling rate is
+  known it would still be possible to get an original value estimate for those metrics. Anywat this has to be
+  documented.
 - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
   Datadog products with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
   computation is hooked [there][apm-stats-computation] in the Datadog exporter. But as this is go code it relies on the
   [Agent codebase][agent-code-for-otlp-exporter] to do the [actual computation][agent-handle-span].
-- Following the named outputs logic, an `apm_stats` output could be envisionned, this would make the APM stats flow
-  explicit and allow another metrics sinks to just tap APM stats as APM stats would be plain Vector metrics.
-- Depending on the use case it might be relevant to compute APM stats at different places:
-  - The previous point also implies that the APM stats computation may happen in the source, the code should be fairly
-    generic as APM stats computation would logically takes the normalised traces as input.
-  - If a trace flow undergoes heavy transformation it may be more relevant to do APM stats computation after the and
-    allow APM stats computation to happen in a dedicated transform that would sit after other transforms.
-- In all circumstances APM stats computation shall remain optional.
 
-**Conclusion**: APM stats computation shall be implemented so it can be used in multiple places to allow easy
-re-usability in many places like a dedicated transform, in a given source or event in a given sink.
+**Conclusion**: APM stats computation will follow what's done in the [Datadog OTLP exporter][apm-stats-computation] and
+the computation will happen against the outgoing traces stream directly in the `datadog_traces` sink. Incoming APM stats
+received in the `datadog_agent` will then be ignored.
 
 ## Rationale
 
@@ -386,6 +388,7 @@ N/A
 [otlp-grpc-def]: https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto/collector
 [otlp-http]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp
 [apm-stats-computation]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/datadogexporter/stats.go#L30
+[apm-stats-proto]: https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/pb/stats.proto#L55-L70
 [agent-code-for-otlp-exporter]: https://pkg.go.dev/github.com/DataDog/datadog-agent/pkg/trace/exportable@v0.0.0-20201016145401-4646cf596b02
 [agent-handle-span]: https://github.com/DataDog/datadog-agent/blob/4646cf596b0242a7741328bd518a807b01db28c6/pkg/trace/exportable/stats/statsraw.go#L192
 [dd-traces-proto]: https://github.com/DataDog/datadog-agent/tree/main/pkg/trace/pb
