@@ -18,6 +18,7 @@ criterion_group!(
               contains,
               decode_base64,
               decode_percent,
+              decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
@@ -26,6 +27,7 @@ criterion_group!(
               encode_json,
               encode_logfmt,
               encode_percent,
+              encrypt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -133,9 +135,27 @@ criterion_group!(
               //unnest
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
-              upcase
+              upcase,
 );
 criterion_main!(benches);
+
+bench_function! {
+    encrypt => vrl_stdlib::Encrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), plaintext: value!("plaintext"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf")),
+    }
+}
+
+bench_function! {
+    decrypt => vrl_stdlib::Decrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), ciphertext: value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!("plaintext")),
+    }
+}
 
 bench_function! {
     append => vrl_stdlib::Append;

@@ -40,6 +40,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
+name = "aes"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe0133578c0986e1fe3dfcd4af1cc5b2dd6c3dbf534d69916ce16a2701d40ba"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cipher",
+ "cpufeatures",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1204,6 +1215,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
+name = "block-padding"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a90ec2df9600c28a01c56c4784c9207a96d2451833aeceb8cc97e4c9548bb78"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "blocking"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1406,6 +1426,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26b52a9543ae338f279b96b0b9fed9c8093744685043739079ce85cd58f289a6"
+dependencies = [
+ "cipher",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1427,6 +1456,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4aedb84272dbe89af497cf81375129abda4fc0a9e7c5d317498c15cc30c0d27"
 dependencies = [
  "nom 5.1.2",
+]
+
+[[package]]
+name = "cfb-mode"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b258c89d55316f606923b53511d0d41c20c4a2d440e5e56dd7185267aa98bd0e"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]
@@ -1486,6 +1524,16 @@ dependencies = [
  "num-traits",
  "once_cell",
  "regex",
+]
+
+[[package]]
+name = "cipher"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1873270f8f7942c191139cb8a40fd228da6c3fd2fc376d7e92d47aa14aeb59e"
+dependencies = [
+ "crypto-common",
+ "inout",
 ]
 
 [[package]]
@@ -1955,6 +2003,15 @@ checksum = "ccc0a48a9b826acdf4028595adc9db92caea352f7af011a3034acd172a52a0aa"
 dependencies = [
  "quote 1.0.10",
  "syn 1.0.84",
+]
+
+[[package]]
+name = "ctr"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d14f329cfbaf5d0e06b5e87fff7e265d2673c5ea7d2c27691a2c107db1442a0"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]
@@ -3588,6 +3645,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inout"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0c10553d664a4d0bcff9f4215d0aac67a639cc68ef660840afe309b807bc9f5"
+dependencies = [
+ "block-padding 0.3.2",
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "input_buffer"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5051,6 +5118,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67ac1d3f9a1d3616fd9a60c8d74296f22406a238b6a72f5cc1e6f314df4ffbf9"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ofb"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cc40678e045ff4eb1666ea6c0f994b133c31f673c09aed292261b6d5b6963a0"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]
@@ -9119,14 +9195,18 @@ dependencies = [
 name = "vrl-stdlib"
 version = "0.1.0"
 dependencies = [
+ "aes",
  "anyhow",
  "base64 0.13.0",
  "bytes 1.1.0",
+ "cbc",
+ "cfb-mode",
  "chrono",
  "chrono-tz",
  "cidr-utils",
  "criterion",
  "csv",
+ "ctr",
  "datadog-filter",
  "datadog-grok",
  "datadog-search-syntax",
@@ -9138,8 +9218,10 @@ dependencies = [
  "lookup",
  "md-5 0.10.1",
  "nom 7.1.1",
+ "ofb",
  "once_cell",
  "percent-encoding",
+ "rand 0.8.5",
  "regex",
  "roxmltree",
  "rust_decimal",
