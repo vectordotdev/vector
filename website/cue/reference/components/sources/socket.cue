@@ -80,7 +80,7 @@ components: sources: socket: {
 			category: "Context"
 			common:   true
 			description: """
-				The key name added to each event representing the port. If empty, this context is not added.
+				The key name added to each event representing the peer source port. If empty, this context is not added.
 				"""
 			required: false
 			type: string: {
