@@ -92,6 +92,7 @@ jobs:
           export COEFFICIENT_OF_VARIATION="0.3"
           export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
+
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
@@ -174,6 +175,8 @@ jobs:
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/baseline-image.tar
 
@@ -219,6 +222,8 @@ jobs:
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/comparison-image.tar
 
@@ -230,7 +235,7 @@ jobs:
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
-    runs-on: [self-hosted, linux, x64, soak]
+    runs-on: [linux, soak, soak-runner]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
@@ -261,7 +266,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
+                                  --replicas 15 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
@@ -270,9 +275,9 @@ jobs:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-baseline:
@@ -316,7 +321,7 @@ jobs:
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
-    runs-on: [self-hosted, linux, x64, soak]
+    runs-on: [linux, soak, soak-runner]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
@@ -347,7 +352,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
+                                  --replicas 15 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
@@ -356,9 +361,9 @@ jobs:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-comparison:
