@@ -94,38 +94,41 @@ requirements, the following requirements define support for this architecture:
 
 - Architecture
   - MUST deploy as a service with reserved/dedicated resources.
-  - MUST deploy with a persistent disk that is available between deployments.
-  - MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
-    which largely covers the aggregator architecture
-    [design recommendations][aggregator_architecture].
-    in order to achieve durability with disk buffers and source checkpoints.
-  - SHOULD deploy within one Cluster or VPC at a time.
+  - SHOULD deploy with a persistent disk that is available between deployments by default,
+     MUST be overridable by the user if they do not want a persistent disk.
+  - MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration].
   - Configured Vector ports, including non-default user configured ports,
     SHOULD be automatically accessible within the Cluster or VPC.
   - Configured Vector sources, including non-default user configured sources,
     SHOULD be automatically discoverable via target service discovery
     mechanisms.
 - Sizing
-  - MUST deploy in a way that takes full advantage of all system resources.
+  - MUST have dedicated/reserved resources that cannot be stolen by other services, preventing
+     the "noisy neighbor" problem to the degree possible.
   - The Vector service SHOULD NOT be artificially limited with resource
     limiters such as cgroups.
-  - SHOULD request 8 vCPUs, MUST be overridable by the user.
-  - SHOULD request 2 GiB of memory per vCPU (16 GiB in this case), MUST be
-    overridable by the user.
-  - SHOULD request 6 GiB of disk space per vCPU (48 GiB in this case), MUST be
-    overridable by the user.
+  - SHOULD require 8 vCPUs by default, MUST be overridable by the user.
+  - SHOULD require 2 GiB of memory per vCPU (16 GiB in this case) by default,
+     MUST be overridable by the user.
+  - SHOULD request 36 GiB of disk space per vCPU by default (288 GiB in this case),
+     MUST be overridable by the user.
 
 The following are additional requirements for Orchestration Platform installation
 targets:
 
 - High Availability
-  - SHOULD deploy across multiple nodes, MUST be overridable by the user.
-  - SHOULD deploy across multiple availability zones, MUST be overridable by the user.
+  - SHOULD deploy across multiple nodes by default, MUST be overridable by the user.
+  - SHOULD deploy across multiple availability zones by default, MUST be overridable by the user.
 - Scaling
-  - MUST deploy along with a load balancer to enable horizontal autoscaling.
+  - SHOULD provide facilities for provisioning a load balancer to enable horizontal scaling
+     out of the box. MUST be overridable by the user.
+     - Cloud-managed load balancers (i.e., AWS NLB) SHOULD be supported in addition to
+        self-managed load balancers (i.e., HAProxy).
+     - Cloud-managed load balancers SHOULD be prioritized by default over self-managed
+        load balancers.
+     - Network load balancers (layer-4) SHOULD be prioritized over HTTP load balancers (layer-7)
   - Autoscaling SHOULD be enabled by default, driven by an average of 85%
-    CPU utilization.
-  - Autoscaling SHOULD have a stabilization period of 5 minutes.
+    CPU utilization and a stabilization period of 5 minutes.
 
 ### 6. Unified Architecture
 
