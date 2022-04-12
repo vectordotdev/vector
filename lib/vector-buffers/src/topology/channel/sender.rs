@@ -242,7 +242,10 @@ impl<T: Bufferable> BufferSender<T> {
                 }
 
                 if was_dropped {
-                    instrumentation.try_increment_dropped_event_count(item_count as u64);
+                    instrumentation.try_increment_dropped_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
                 }
             }
         }
