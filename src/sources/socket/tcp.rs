@@ -64,7 +64,6 @@ impl TcpConfig {
         }
     }
 
-    #[cfg(test)]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,

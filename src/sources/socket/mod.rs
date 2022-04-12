@@ -43,7 +43,6 @@ impl SocketConfig {
         tcp_config.into()
     }
 
-    #[cfg(test)]
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
@@ -287,7 +286,7 @@ mod test {
             event.as_log()[log_schema().host_key()],
             addr.ip().to_string().into()
         );
-        assert_eq!(event.as_log()["port"], addr.port().to_string().into());
+        assert_eq!(event.as_log()["port"], addr.port().into());
 
         SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
@@ -708,7 +707,7 @@ mod test {
             events[0].as_log()[log_schema().host_key()],
             from.ip().to_string().into()
         );
-        assert_eq!(events[0].as_log()["port"], from.port().to_string().into());
+        assert_eq!(events[0].as_log()["port"], from.port().into());
     }
 
     #[tokio::test]

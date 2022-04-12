@@ -70,7 +70,6 @@ impl UdpConfig {
         self.receive_buffer_bytes
     }
 
-    #[cfg(test)]
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,

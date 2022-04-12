@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -107,7 +108,7 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         let now = Value::from(chrono::Utc::now());
         for event in events {
             let log = event.as_mut_log();
@@ -124,7 +125,7 @@ impl TcpSource for LogstashSource {
                     .unwrap_or_else(|| now.clone());
                 log.insert(log_schema().timestamp_key(), timestamp);
             }
-            log.try_insert(log_schema().host_key(), host.clone());
+            log.try_insert(log_schema().host_key(), host.ip().to_string());
         }
     }
 
