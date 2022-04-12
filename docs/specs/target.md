@@ -71,8 +71,9 @@ architectures:
 ### 4. Agent Architecture
 
 The [agent architecture][agent_architecture] deploys Vector on each individual
-node for local data collection. Along with general [hardening](#7-hardening)
-requirements, the following requirements define support for this architecture:
+node for distributed data collection and processing. Along with general
+[hardening](#7-hardening) requirements, the following requirements define support
+for this architecture:
 
 - Architecture
   - MUST deploy as a daemon on existing nodes, one Vector process per node.
