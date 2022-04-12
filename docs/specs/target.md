@@ -77,9 +77,7 @@ for this architecture:
 
 - Architecture
   - MUST deploy as a daemon on existing nodes, one Vector process per node.
-  - MUST deploy with Vector's [default agent configuration][default_agent_configuration]
-    which largely covers the agent architecture
-    [design recommendations][agent_architecture].
+  - MUST deploy with Vector's [default agent configuration][default_agent_configuration].
 - Sizing
   - MUST deploy as a good infrastructure citizen, giving resource priority to
     other services on the same node.
