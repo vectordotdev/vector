@@ -6,7 +6,7 @@ use crate::internal_events::UnixSocketFileDeleteError;
 pub fn change_socket_permissions(path: &Path, perms: Option<u32>) -> crate::Result<()> {
     if let Some(mode) = perms {
         match fs::set_permissions(path, fs::Permissions::from_mode(mode)) {
-            Ok(_) => info!(message = "Socket permissions updated.", permission = mode),
+            Ok(_) => debug!(message = "Socket permissions updated.", permission = mode),
             Err(e) => {
                 if let Err(error) = remove_file(path) {
                     emit!(UnixSocketFileDeleteError { path, error });
