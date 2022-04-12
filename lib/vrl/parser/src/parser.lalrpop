@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use crate::ast::*;
+use crate::template_string::TemplateString;
 use crate::lex::*;
 use diagnostic::span;
 use std::collections::BTreeMap;
@@ -485,7 +486,7 @@ pub Literal: Literal = {
 
 String: TemplateString = Sp<"string literal"> => {
     let Node { span, node } = <>;
-    node.unescape(span)
+    node.template(span)
 };
 
 RawString: String = "raw string literal" => <>.unescape();

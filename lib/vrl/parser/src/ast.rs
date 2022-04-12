@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{lex::TemplateString, Error};
+use crate::{template_string::TemplateString, Error};
 
 // -----------------------------------------------------------------------------
 // node

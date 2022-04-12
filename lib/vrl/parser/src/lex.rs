@@ -1,9 +1,9 @@
 use std::{fmt, iter::Peekable, str::CharIndices};
 
 use diagnostic::{DiagnosticError, Label, Span};
-use once_cell::sync::Lazy;
 use ordered_float::NotNan;
-use regex::Regex;
+
+use crate::template_string::{StringSegment, TemplateString};
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
@@ -445,101 +445,69 @@ pub struct StringLiteral<S>(pub S);
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct RawStringLiteral<S>(pub S);
 
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Hash)]
-pub struct TemplateString(pub Vec<StringSegment>);
-
-impl TemplateString {
-    /// Rewrites the ast for the template string to be a series of string concatenations
-    pub fn rewrite(&self) -> crate::ast::Expr {
-        self.0
-            .iter()
-            .map(|node| -> crate::ast::Expr {
-                match node {
-                    StringSegment::Literal(s) => crate::ast::Expr::Literal(crate::ast::Node::new(
-                        diagnostic::Span::default(),
-                        crate::ast::Literal::RawString(s.clone()),
-                    )),
-                    StringSegment::Template(s, span) => crate::ast::Expr::Variable(
-                        crate::ast::Node::new(*span, crate::ast::Ident::new(s)),
-                    ),
-                }
-            })
-            .reduce(|accum, item| {
-                crate::ast::Expr::Op(crate::ast::Node::new(
-                    diagnostic::Span::default(),
-                    crate::ast::Op(
-                        Box::new(crate::ast::Node::new(diagnostic::Span::default(), accum)),
-                        crate::ast::Node::new(diagnostic::Span::default(), crate::ast::Opcode::Add),
-                        Box::new(crate::ast::Node::new(diagnostic::Span::default(), item)),
-                    ),
-                ))
-            })
-            .unwrap_or_else(|| {
-                crate::ast::Expr::Literal(crate::ast::Node::new(
-                    diagnostic::Span::default(),
-                    crate::ast::Literal::RawString("".to_string()),
-                ))
-            })
-    }
-}
-
-impl fmt::Display for TemplateString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for segment in &self.0 {
-            segment.fmt(f)?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Hash)]
-pub enum StringSegment {
-    Literal(String),
-    Template(String, Span),
-}
-
-impl fmt::Display for StringSegment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StringSegment::Literal(s) => write!(f, "{}", s),
-            StringSegment::Template(s, _) => write!(f, "{}", s),
-        }
-    }
-}
-
-static TEMPLATE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{.*?\}").unwrap());
-
 impl StringLiteral<&str> {
-    pub fn unescape(&self, span: Span) -> TemplateString {
-        let text = unescape_string_literal(self.0);
+    /// Takes the string and splits it into segments of literals and templates.
+    /// A templated section is delimited by `{{..}}`. ``{{` can be escaped using
+    /// `/{{.../}}`.
+    pub fn template(&self, span: Span) -> TemplateString {
+        let mut segments = Vec::new();
 
-        let mut result = Vec::new();
+        let chars = self.0.chars().collect::<Vec<_>>();
+        let mut template = false;
+        let mut current = String::new();
+
         let mut pos = 0;
-        for segment in TEMPLATE_REGEX.find_iter(&text) {
-            if segment.start() > pos {
-                let text = &text[pos..segment.start()];
-                result.push(StringSegment::Literal(text.to_string()));
+        while pos < chars.len() {
+            match chars[pos] {
+                '}' if template && chars.get(pos + 1) == Some(&'}') => {
+                    // Handle closing template `}}`.
+                    if !current.is_empty() {
+                        let seg = std::mem::take(&mut current);
+                        segments.push(StringSegment::Template(
+                            seg.trim().to_string(),
+                            Span::new(span.start() + pos, span.start() + pos + seg.len()),
+                        ));
+                    }
+                    template = false;
+                    pos += 2;
+                }
+                '\\' if !template
+                    && chars.get(pos + 1) == Some(&'{')
+                    && chars.get(pos + 2) == Some(&'{') =>
+                {
+                    // Handle open escape `/{{`.
+                    current.push_str(r#"{{"#);
+                    pos += 3;
+                }
+                '\\' if !template
+                    && chars.get(pos + 1) == Some(&'}')
+                    && chars.get(pos + 2) == Some(&'}') =>
+                {
+                    // Handle close escape
+                    current.push_str(r#"}}"#);
+                    pos += 3;
+                }
+                '{' if !template && chars.get(pos + 1) == Some(&'{') => {
+                    // Handle start of template.
+                    if !current.is_empty() {
+                        let seg = std::mem::take(&mut current);
+                        segments.push(StringSegment::Literal(unescape_string_literal(&seg)));
+                    }
+                    template = true;
+                    pos += 2;
+                }
+                chr => {
+                    current.push(chr);
+                    pos += 1;
+                }
             }
-
-            let template = &text[segment.start() + 1..segment.end() - 1].trim();
-            result.push(StringSegment::Template(
-                template.to_string(),
-                Span::new(
-                    span.start() + segment.start() + 1,
-                    span.start() + segment.end() + 1,
-                ),
-            ));
-            pos = segment.end();
         }
 
-        if pos < text.len() {
-            // Push the remaining literal text.
-            let literal = &text[pos..text.len()];
-            result.push(StringSegment::Literal(literal.to_string()));
+        if !template && !current.is_empty() {
+            segments.push(StringSegment::Literal(unescape_string_literal(&current)));
         }
 
-        TemplateString(result)
+        TemplateString(segments)
     }
 }
 
@@ -1201,6 +1169,8 @@ impl<'input> Lexer<'input> {
             Some((_, 'n')) => Ok(()),
             Some((_, 'r')) => Ok(()),
             Some((_, 't')) => Ok(()),
+            Some((_, '{')) => Ok(()),
+            Some((_, '}')) => Ok(()),
             Some((start, ch)) => Err(Error::EscapeChar {
                 start,
                 ch: Some(ch),
@@ -1352,7 +1322,7 @@ mod test {
                 (r#"                          ~~~~~~"#, L(S(r#"\"\""#))),
             ],
         );
-        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string())]), StringLiteral(r#"\"\""#).unescape(Span::default()));
+        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string())]), StringLiteral(r#"\"\""#).template(Span::default()));
     }
 
     #[test]
@@ -1362,7 +1332,7 @@ mod test {
                                   bar""#);
 
         match lexer.next() {
-            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string())]), s.unescape(Span::default())),
+            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string())]), s.template(Span::default())),
             _ => panic!("Not a string literal"),
         }
     }
@@ -2031,14 +2001,14 @@ mod test {
 
     #[test]
     fn unescape_string_literal() {
-        let string = StringLiteral("zork { zonk } zoog");
+        let string = StringLiteral("zork {{ zonk }} zoog");
         assert_eq!(
             TemplateString(vec![
                 StringSegment::Literal("zork ".to_string()),
                 StringSegment::Template("zonk".to_string(), Span::new(5, 13)),
                 StringSegment::Literal(" zoog".to_string()),
             ]),
-            string.unescape(Span::new(0, 18))
+            string.template(Span::new(0, 18))
         );
     }
 }

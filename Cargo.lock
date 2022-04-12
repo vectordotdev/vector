@@ -9039,7 +9039,6 @@ dependencies = [
  "once_cell",
  "ordered-float",
  "paste",
- "regex",
  "test-case",
  "thiserror",
  "vrl-diagnostic",
