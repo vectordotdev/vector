@@ -1,4 +1,4 @@
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;

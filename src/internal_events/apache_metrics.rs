@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
@@ -55,10 +55,10 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",
-            endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            endpoint = %self.endpoint,
         );
         debug!(
             message = %format!("Parse error:\n\n{}\n\n", self.error),
@@ -85,20 +85,19 @@ impl InternalEvent for ApacheMetricsResponseError<'_> {
     fn emit(self) {
         error!(
             message = "HTTP error response.",
-            endpoint = %self.endpoint,
-            code = %self.code,
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
+            error_code = %http_error_code(self.code.as_u16()),
             endpoint = %self.endpoint,
-            error = %self.code,
+            internal_log_rate_secs = 10,
         );
         counter!("http_error_response_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
+            "error_code" => http_error_code(self.code.as_u16()),
             "endpoint" => self.endpoint.to_owned(),
-            "code" => self.code.to_string(),
         );
     }
 }
@@ -113,10 +112,10 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
     fn emit(self) {
         error!(
             message = "HTTP request processing error.",
-            endpoint = %self.endpoint,
             error = ?self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
+            endpoint = %self.endpoint,
         );
         counter!("http_request_errors_total", 1);
         counter!(
@@ -124,7 +123,6 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
-            "error" => self.error.to_string(),
         );
     }
 }

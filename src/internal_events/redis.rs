@@ -29,7 +29,7 @@ impl<'a> RedisSendEventError<'a> {
     pub fn new(error: &'a redis::RedisError) -> Self {
         Self {
             error,
-            error_code: error.code().unwrap_or_default().to_string(),
+            error_code: error.code().unwrap_or("UNKNOWN").to_string(),
         }
     }
 }
@@ -63,7 +63,7 @@ pub struct RedisReceiveEventError {
 
 impl From<redis::RedisError> for RedisReceiveEventError {
     fn from(error: redis::RedisError) -> Self {
-        let error_code = error.code().unwrap_or_default().to_string();
+        let error_code = error.code().unwrap_or("UNKNOWN").to_string();
         Self { error, error_code }
     }
 }

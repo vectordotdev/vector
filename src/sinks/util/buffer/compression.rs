@@ -59,18 +59,6 @@ impl fmt::Display for Compression {
     }
 }
 
-#[cfg(feature = "rusoto_core")]
-impl From<Compression> for rusoto_core::encoding::ContentEncoding {
-    fn from(compression: Compression) -> Self {
-        match compression {
-            Compression::None => rusoto_core::encoding::ContentEncoding::Identity,
-            Compression::Gzip(level) => {
-                rusoto_core::encoding::ContentEncoding::Gzip(None, level.level())
-            }
-        }
-    }
-}
-
 impl<'de> de::Deserialize<'de> for Compression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

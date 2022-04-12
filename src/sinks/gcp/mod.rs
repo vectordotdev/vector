@@ -158,6 +158,7 @@ fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>>
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct GcpTypedResource {
     pub r#type: String,
+    #[serde(flatten)]
     pub labels: std::collections::HashMap<String, String>,
 }
 

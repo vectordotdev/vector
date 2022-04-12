@@ -5,7 +5,7 @@ use std::{
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
     errors::Error as DockerError,
-    service::{ContainerInspectResponse, SystemEventsResponse},
+    service::{ContainerInspectResponse, EventMessage},
     system::EventsOptions,
     Docker,
 };
@@ -239,7 +239,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -290,7 +290,7 @@ impl DockerLogsSourceCore {
 struct DockerLogsSource {
     esb: EventStreamBuilder,
     /// event stream from docker
-    events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
+    events: Pin<Box<dyn Stream<Item = Result<EventMessage, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo coming from event stream futures
@@ -451,7 +451,7 @@ impl DockerLogsSource {
 
                             emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
-                            let id = ContainerId::new(id);
+                            let id = ContainerId::new(id.to_owned());
 
                             // Update container status
                             match action.as_str() {

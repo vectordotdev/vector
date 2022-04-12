@@ -21,7 +21,7 @@ components: sinks: loki: {
 				common:       false
 				max_bytes:    1_000_000
 				max_events:   100_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -43,7 +43,6 @@ components: sinks: loki: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -163,6 +162,7 @@ components: sinks: loki: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

@@ -86,7 +86,7 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -155,11 +155,11 @@ impl Expression for UnnestFn {
         unnest(path, ctx)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => match state.target_kind().cloned().map(TypeDef::from) {
+            Target::External => match state.1.target_kind().cloned().map(TypeDef::from) {
                 Some(root_type_def) => invert_array_at_path(&root_type_def, self.path.path()),
                 None => self.path.type_def(state).restrict_array().add_null(),
             },
@@ -545,7 +545,8 @@ mod tests {
             ),
         ];
 
-        let compiler = state::Compiler::new_with_kind(Kind::object(btreemap! {
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
             "hostname" => Kind::bytes(),
             "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
                 Field::from("message") => Kind::bytes(),
@@ -558,7 +559,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def(&compiler);
+            let got_typedef = func.type_def((&local, &external));
 
             let got = func
                 .resolve(&mut ctx)

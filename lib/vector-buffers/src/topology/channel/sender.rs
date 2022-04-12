@@ -48,7 +48,7 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    async fn send(&mut self, item: T) -> Result<(), ()> {
+    pub(crate) async fn send(&mut self, item: T) -> Result<(), ()> {
         match self {
             Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
             Self::DiskV1(writer) => {
@@ -68,7 +68,7 @@ where
         }
     }
 
-    async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
+    pub(crate) async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
@@ -98,7 +98,7 @@ where
         }
     }
 
-    async fn flush(&mut self) -> Result<(), ()> {
+    pub(crate) async fn flush(&mut self) -> Result<(), ()> {
         match self {
             Self::InMemory(_) => Ok(()),
             Self::DiskV1(writer) => {

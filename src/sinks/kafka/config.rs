@@ -100,7 +100,7 @@ impl KafkaSinkConfig {
                         value,
                         "Applying batch option as librdkafka option."
                     );
-                    client_config.set(key, &(value * 1000).to_string());
+                    client_config.set(key, &((value * 1000.0).round().to_string()));
                 }
                 if let Some(value) = self.batch.max_events {
                     // Maximum number of messages batched in one MessageSet. The total MessageSet size is

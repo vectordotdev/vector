@@ -27,6 +27,8 @@ mod contains;
 mod decode_base64;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
+#[cfg(feature = "decrypt")]
+mod decrypt;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -41,6 +43,8 @@ mod encode_key_value;
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
 mod encode_percent;
+#[cfg(feature = "encrypt")]
+mod encrypt;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -193,6 +197,8 @@ mod parse_user_agent;
 mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
+#[cfg(feature = "random_bytes")]
+mod random_bytes;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "remove")]
@@ -223,6 +229,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "strlen")]
+mod strlen;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
 #[cfg(feature = "tally")]
@@ -288,6 +296,8 @@ pub use contains::Contains;
 pub use decode_base64::DecodeBase64;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
+#[cfg(feature = "decrypt")]
+pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -302,6 +312,8 @@ pub use encode_key_value::EncodeKeyValue;
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
 pub use encode_percent::EncodePercent;
+#[cfg(feature = "encrypt")]
+pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -446,6 +458,8 @@ pub use parse_xml::ParseXml;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
+#[cfg(feature = "random_bytes")]
+pub use random_bytes::RandomBytes;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
 #[cfg(feature = "remove")]
@@ -474,6 +488,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "strlen")]
+pub use strlen::Strlen;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "tally")]
@@ -535,6 +551,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        #[cfg(feature = "decrypt")]
+        Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -549,6 +567,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]
         Box::new(EncodePercent),
+        #[cfg(feature = "encrypt")]
+        Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
@@ -697,6 +717,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
+        #[cfg(feature = "random_bytes")]
+        Box::new(RandomBytes),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "remove")]
@@ -727,6 +749,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "strlen")]
+        Box::new(Strlen),
         #[cfg(feature = "tally")]
         Box::new(Tally),
         #[cfg(feature = "tally_value")]

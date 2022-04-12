@@ -70,12 +70,17 @@ impl VectorService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
+        compression: bool,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let proto_client = proto_vector::Client::new(HyperSvc {
+        let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
         });
+
+        if compression {
+            proto_client = proto_client.send_gzip();
+        }
         Self {
             client: proto_client,
             protocol,
