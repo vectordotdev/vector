@@ -151,7 +151,7 @@ components: sources: socket: {
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
 			port: {
-				description: "The peer port."
+				description: "The peer source port."
 				required:    false
 				common:      true
 				type: uint: {
