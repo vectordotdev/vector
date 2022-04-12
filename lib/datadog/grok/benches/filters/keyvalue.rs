@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
+    black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion,
+    SamplingMode,
 };
 use datadog_grok::filters::keyvalue::{apply_filter, KeyValueFilter};
 use regex::Regex;
@@ -29,7 +30,7 @@ fn apply_filter_bench(c: &mut Criterion) {
                 (value, filter)
             },
             |(value, filter): (Value, KeyValueFilter)| {
-                let _ = apply_filter(&value, &filter);
+                black_box(apply_filter(&value, &filter));
             },
             BatchSize::SmallInput,
         )
@@ -51,7 +52,7 @@ fn apply_filter_bench(c: &mut Criterion) {
                 (value, filter)
             },
             |(value, filter): (Value, KeyValueFilter)| {
-                let _ = apply_filter(&value, &filter);
+                black_box(apply_filter(&value, &filter));
             },
             BatchSize::SmallInput,
         )
