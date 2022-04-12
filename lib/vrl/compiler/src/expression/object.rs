@@ -63,7 +63,16 @@ impl Expression for Object {
             .collect::<Option<BTreeMap<_, _>>>();
 
         match type_defs {
-            None => TypeDef::object(BTreeMap::default()).fallible(),
+            None => {
+                // We can't get the full typedef of the object as the keys aren't fully deterimined,
+                // but we can at least still get the fallibility from the value expressions.
+                let fallible = self
+                    .inner
+                    .iter()
+                    .any(|(_, expr)| expr.type_def(state).is_fallible());
+
+                TypeDef::object(BTreeMap::default()).with_fallibility(fallible)
+            }
             Some(type_defs) => {
                 // If any of the stored expressions is fallible, the entire object is
                 // fallible.
