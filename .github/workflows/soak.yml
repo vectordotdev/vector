@@ -140,9 +140,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    # separate soak builder group seems to not pick up jobs
-    # runs-on: [linux, soak, soak-builder]
-    runs-on: [linux, test]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -187,9 +185,7 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    # separate soak builder group seems to not pick up jobs
-    # runs-on: [linux, soak, soak-builder]
-    runs-on: [linux, test]
+    runs-on: [linux, soak, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
