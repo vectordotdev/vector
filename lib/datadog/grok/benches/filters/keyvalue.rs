@@ -30,7 +30,7 @@ fn apply_filter_bench(c: &mut Criterion) {
                 (value, filter)
             },
             |(value, filter): (Value, KeyValueFilter)| {
-                black_box(apply_filter(&value, &filter));
+                let _ = black_box(apply_filter(&value, &filter));
             },
             BatchSize::SmallInput,
         )
@@ -52,7 +52,7 @@ fn apply_filter_bench(c: &mut Criterion) {
                 (value, filter)
             },
             |(value, filter): (Value, KeyValueFilter)| {
-                black_box(apply_filter(&value, &filter));
+                let _ = black_box(apply_filter(&value, &filter));
             },
             BatchSize::SmallInput,
         )
