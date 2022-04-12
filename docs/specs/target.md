@@ -81,7 +81,7 @@ for this architecture:
 - Sizing
   - MUST deploy as a good infrastructure citizen, giving resource priority to
     other services on the same node.
-  - SHOULD be limited to 2 vCPUs, MUST be overridable by the user.
+  - SHOULD be limited to 1 vCPUs by default, MUST be overridable by the user.
   - SHOULD be limited to 2 GiB of memory per vCPU (4 GiB in this case), MUST be
     overridable by the user.
   - SHOULD be limited to 1 GiB of disk space, MUST be overridable by the user.
