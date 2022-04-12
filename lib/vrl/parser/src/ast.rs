@@ -516,7 +516,7 @@ impl fmt::Display for Object {
         let exprs = self
             .0
             .iter()
-            .map(|(k, v)| format!(r#""{}": {}"#, k.to_string(), v))
+            .map(|(k, v)| format!(r#""{}": {}"#, k, v))
             .collect::<Vec<_>>()
             .join(", ");
 

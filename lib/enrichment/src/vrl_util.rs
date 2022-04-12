@@ -152,21 +152,22 @@ pub(crate) fn index_from_args(
             })
         })
         .unwrap()
-        .into_iter()
+        .iter()
         .map(|(key, value)| {
             let key = key
                 .as_value()
                 .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
-                    keyword: "patterns",
+                    keyword: "key",
                     expr: key.clone(),
                 })?
                 .try_bytes_utf8_lossy()
                 .map_err(|_| vrl::function::Error::UnexpectedExpression {
-                    keyword: "patterns",
+                    keyword: "key",
                     expected: "string",
                     expr: key.clone(),
                 })?
                 .into_owned();
+
             Ok((key, value.clone()))
         })
         .collect::<std::result::Result<BTreeMap<_, _>, vrl::function::Error>>()?;
