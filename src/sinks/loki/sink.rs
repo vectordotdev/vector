@@ -3,14 +3,13 @@ use std::{collections::HashMap, num::NonZeroUsize};
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
-use tower::Service;
 use vector_common::encode_logfmt;
 use vector_core::{
     buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
+    stream::BatcherSettings,
     ByteSizeOf,
 };
 
@@ -29,7 +28,7 @@ use crate::{
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::{EncodingConfig, EncodingConfiguration},
-        service::ServiceBuilderExt,
+        service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
     },
     template::Template,
@@ -313,22 +312,16 @@ impl RecordFilter {
     }
 }
 
-pub struct LokiSink<S> {
+pub struct LokiSink {
     acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
-    service: S,
+    service: Svc<LokiService, LokiRetryLogic>,
 }
 
-impl<S> LokiSink<S>
-where
-    S: Service<LokiRequest> + Send + 'static,
-    S::Future: Send + 'static,
-    S::Response: DriverResponse + Send + 'static,
-    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
-{
+impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         let compression = config.compression;
@@ -429,13 +422,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<S> StreamSink<Event> for LokiSink<S>
-where
-    S: Service<LokiRequest> + Send + 'static,
-    S::Future: Send + 'static,
-    S::Response: DriverResponse + Send + 'static,
-    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
-{
+impl StreamSink<Event> for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
