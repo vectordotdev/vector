@@ -43,7 +43,7 @@ impl Function for ParseRegex {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -142,7 +142,7 @@ impl Expression for ParseRegexFn {
         parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
 }

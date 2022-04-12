@@ -170,6 +170,16 @@ components: sources: datadog_agent: {
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
 		}
+		traces: {
+			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
+			fields: {
+				spans: {
+					description: "The list of spans composing the trace."
+					required:    true
+					type: array: items: type: object: options: {}
+				}
+			}
+		}
 	}
 
 	how_it_works: {

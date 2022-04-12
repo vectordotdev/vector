@@ -4,6 +4,7 @@
 mod test_enrichment;
 
 use std::str::FromStr;
+use std::time::Instant;
 
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -39,6 +40,10 @@ pub struct Cmd {
     /// during the test run.
     #[clap(short, long)]
     logging: bool,
+
+    /// When enabled, show run duration for each individual test.
+    #[clap(short, long)]
+    timings: bool,
 
     #[clap(short = 'z', long)]
     timezone: Option<String>,
@@ -148,16 +153,24 @@ fn main() {
         functions.append(&mut enrichment::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
-        let mut state = vrl::state::Compiler::new();
+        let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(test_enrichment.clone());
 
+        let compile_start = Instant::now();
         let program = vrl::compile_with_state(&test.source, &functions, &mut state);
+        let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
 
+        let compile_timing_fmt = cmd
+            .timings
+            .then(|| format!("comp: {:>9.3?}", compile_end))
+            .unwrap_or_default();
+
         match program {
             Ok(program) => {
+                let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
                     functions,
@@ -168,6 +181,15 @@ fn main() {
                     state,
                     test_enrichment,
                 );
+                let run_end = run_start.elapsed();
+
+                let timings_fmt = cmd
+                    .timings
+                    .then(|| format!(" ({}, run: {:>9.3?})", compile_timing_fmt, run_end))
+                    .unwrap_or_default();
+
+                let timings_color = if run_end.as_millis() > 10 { 1 } else { 245 };
+                let timings = Colour::Fixed(timings_color).paint(timings_fmt);
 
                 match result {
                     Ok(got) => {
@@ -202,9 +224,9 @@ fn main() {
                             };
 
                             if got == want {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                print!("{}{}", Colour::Green.bold().paint("OK"), timings,);
                             } else {
-                                println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                                print!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;
 
                                 if !cmd.no_diff {
@@ -217,6 +239,8 @@ fn main() {
 
                                 failed = true;
                             }
+
+                            println!();
                         }
 
                         if cmd.verbose {
@@ -236,7 +260,7 @@ fn main() {
                             if (test.result_approx && compare_partial_diagnostic(&got, &want))
                                 || got == want
                             {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                             } else if matches!(err, Terminate::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
@@ -249,7 +273,7 @@ fn main() {
 
                                 let got = vrl_value_to_json_value(test.object.clone());
                                 if got == want {
-                                    println!("{} (abort)", Colour::Green.bold().paint("OK"));
+                                    println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                                 } else {
                                     println!("{} (abort)", Colour::Red.bold().paint("FAILED"));
                                     failed_count += 1;
@@ -296,7 +320,13 @@ fn main() {
                     if (test.result_approx && compare_partial_diagnostic(&got, &want))
                         || got == want
                     {
-                        println!("{}", Colour::Green.bold().paint("OK"));
+                        let timings_fmt = cmd
+                            .timings
+                            .then(|| format!(" ({})", compile_timing_fmt))
+                            .unwrap_or_default();
+                        let timings = Colour::Fixed(245).paint(timings_fmt);
+
+                        println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                     } else {
                         println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
                         failed_count += 1;
@@ -333,12 +363,12 @@ fn run_vrl(
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-    state: vrl::state::Compiler,
+    mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, &program, state).unwrap();
+            let vm = runtime.compile(functions, &program, &mut state).unwrap();
             test_enrichment.finish_load();
             runtime.run_vm(&vm, &mut test.object, &timezone)
         }

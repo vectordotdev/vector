@@ -241,34 +241,25 @@ impl JournaldSource {
                 );
             })?;
 
-        let mut on_stop = None;
-        let run = Box::pin(self.run(&mut checkpointer, &mut on_stop, start_journalctl));
+        let run = Box::pin(self.run(&mut checkpointer, start_journalctl));
         future::select(run, shutdown).await;
-
-        if let Some(stop) = on_stop {
-            stop();
-        }
 
         checkpointer.sync().await;
 
         Ok(())
     }
 
-    async fn run<'a>(
+    async fn run(
         mut self,
-        checkpointer: &'a mut StatefulCheckpointer,
-        on_stop: &'a mut Option<StopJournalctlFn>,
+        checkpointer: &mut StatefulCheckpointer,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
             match start_journalctl(&checkpointer.cursor) {
-                Ok((stream, stop)) => {
-                    *on_stop = Some(stop);
+                Ok(RunningJournal(stream, stop)) => {
                     let should_restart = self.run_stream(stream, checkpointer).await;
-                    if let Some(stop) = on_stop.take() {
-                        stop();
-                    }
+                    stop();
                     if !should_restart {
                         return;
                     }
@@ -400,19 +391,17 @@ impl<'a> Batch<'a> {
                 byte_size: self.events.size_of(),
             });
 
-            if !self.events.is_empty() {
-                match self.source.out.send_batch(self.events).await {
-                    Ok(_) => {
-                        if let Some(receiver) = self.receiver {
-                            // Ignore the received status, we can't do anything with failures here.
-                            receiver.await;
-                        }
+            match self.source.out.send_batch(self.events).await {
+                Ok(_) => {
+                    if let Some(receiver) = self.receiver {
+                        // Ignore the received status, we can't do anything with failures here.
+                        receiver.await;
                     }
-                    Err(error) => {
-                        error!(message = "Could not send journald log.", %error);
-                        // `out` channel is closed, don't restart journalctl.
-                        self.exiting = Some(false);
-                    }
+                }
+                Err(error) => {
+                    error!(message = "Could not send journald log.", %error);
+                    // `out` channel is closed, don't restart journalctl.
+                    self.exiting = Some(false);
                 }
             }
 
@@ -429,24 +418,17 @@ impl<'a> Batch<'a> {
 ///
 /// Code uses `start_journalctl` below,
 /// but we need this type to implement fake journald source in testing.
-type StartJournalctlFn = Box<
-    dyn Fn(
-            &Option<String>, // cursor
-        ) -> crate::Result<(
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        )> + Send
-        + Sync,
->;
+type StartJournalctlFn =
+    Box<dyn Fn(&Option<String>) -> crate::Result<RunningJournal> + Send + Sync>;
 
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
-fn start_journalctl(
-    command: &mut Command,
-) -> crate::Result<(
+struct RunningJournal(
     BoxStream<'static, Result<Bytes, BoxedFramingError>>,
     StopJournalctlFn,
-)> {
+);
+
+fn start_journalctl(command: &mut Command) -> crate::Result<RunningJournal> {
     let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
     let stream = FramedRead::new(
@@ -460,7 +442,7 @@ fn start_journalctl(
         let _ = kill(pid, Signal::SIGTERM);
     });
 
-    Ok((stream, stop))
+    Ok(RunningJournal(stream, stop))
 }
 
 fn create_command(
@@ -796,12 +778,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn new(
-            checkpoint: &Option<String>,
-        ) -> (
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        ) {
+        fn new(checkpoint: &Option<String>) -> RunningJournal {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -814,7 +791,7 @@ mod tests {
                 }
             }
 
-            (Box::pin(journal), Box::new(|| ()))
+            RunningJournal(Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -1037,7 +1014,7 @@ mod tests {
             out: tx,
             acknowledgements: true,
         };
-        let (stream, _stop) = FakeJournal::new(&checkpointer.cursor);
+        let RunningJournal(stream, _stop) = FakeJournal::new(&checkpointer.cursor);
         let mut handle = tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer));
 
         // Drive the journal until it waits for the acknowledgement.

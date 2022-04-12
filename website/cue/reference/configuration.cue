@@ -360,8 +360,8 @@ configuration: {
 			title: "Formats"
 			body:  """
 				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
-				ensure Vector fits into your workflow. A side benefit of supporting JSON is the
-				enablement of data templating languages like [Jsonnet](\(urls.jsonnet)) and
+				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
+				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
 				"""
 		}

@@ -2,9 +2,10 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Literal, Resolved},
+    state::{ExternalEnv, LocalEnv},
     value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,7 +51,7 @@ impl Expression for Object {
             .map(Value::Object)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let type_defs = self
             .inner
             .iter()
@@ -91,17 +92,16 @@ impl Expression for Object {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
+        let (local, external) = state;
+
         for (key, value) in &self.inner {
-            // Write the key as a constant
-            //let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
-            //vm.write_opcode(OpCode::Constant);
-            //vm.write_primitive(keyidx);
-            key.compile_to_vm(vm, state)?;
+            // Write the key
+            key.compile_to_vm(vm, (local, external))?;
 
             // Write the value
-            value.compile_to_vm(vm, state)?;
+            value.compile_to_vm(vm, (local, external))?;
         }
 
         vm.write_opcode(OpCode::CreateObject);

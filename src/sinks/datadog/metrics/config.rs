@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use serde::{Deserialize, Serialize};
@@ -46,7 +44,7 @@ pub struct DatadogMetricsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(2) };
+    const TIMEOUT_SECS: f64 = 2.0;
 }
 
 #[derive(Debug, Snafu)]
