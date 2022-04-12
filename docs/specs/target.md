@@ -133,11 +133,11 @@ targets:
 ### 6. Unified Architecture
 
 The [unified architecture][unified_architecture] deploys Vector on each
-individual node for local data collection, as well as onto dedicated nodes for
-data aggregation. The requirements for both the [agent](#4-agent-architecture)
-and the [aggregator](#5-aggregator-architecture) apply to this architecture.
-This architecture SHOULD NOT be installed on Virtual/Physical Machine targets
-as there is little added benefit.
+individual node as an agent and as a separate service as an aggregator.
+The requirements for both the [agent](#4-agent-architecture) and the
+[aggregator](#5-aggregator-architecture) apply to this architecture.
+This architecture SHOULD NOT be installed on Virtual/Physical Machine
+targets as there is little added benefit.
 
 ## 7. Hardening
 
