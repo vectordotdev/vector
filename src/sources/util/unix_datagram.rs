@@ -37,9 +37,7 @@ pub fn build_unix_datagram_source(
     let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
     info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 
-    if let Err(e) = change_socket_permissions(&listen_path, socket_file_mode) {
-        return Err(e);
-    }
+    change_socket_permissions(&listen_path, socket_file_mode)?;
 
     Ok(Box::pin(async move {
         let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;

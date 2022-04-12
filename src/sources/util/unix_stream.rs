@@ -44,9 +44,7 @@ pub fn build_unix_stream_source(
     let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
     info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
-    if let Err(e) = change_socket_permissions(&listen_path, socket_file_mode) {
-        return Err(e);
-    }
+    change_socket_permissions(&listen_path, socket_file_mode)?;
 
     Ok(Box::pin(async move {
         let connection_open = OpenGauge::new();
