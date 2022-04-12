@@ -113,7 +113,7 @@ impl BufferUsageData {
     pub fn new(mode: WhenFull, idx: usize) -> Self {
         let dropped_event_data = match mode {
             WhenFull::Block | WhenFull::Overflow => None,
-            WhenFull::DropNewest => Some(Default::default()),
+            WhenFull::DropNewest => Some(BufferUsageDroppedEventData::default()),
         };
 
         Self {
