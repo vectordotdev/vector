@@ -93,8 +93,7 @@ dedicated nodes for data aggregation. Along with general [hardening](#7-hardenin
 requirements, the following requirements define support for this architecture:
 
 - Architecture
-  - SHOULD deploy as a service on dedicated nodes, Vector is the only service
-    on the node.
+  - MUST deploy as a service with reserved/dedicated resources.
   - MUST deploy with a persistent disk that is available between deployments.
   - MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration]
     which largely covers the aggregator architecture
