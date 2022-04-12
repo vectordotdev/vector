@@ -116,13 +116,6 @@ requirements, the following requirements define support for this architecture:
     overridable by the user.
   - SHOULD request 6 GiB of disk space per vCPU (48 GiB in this case), MUST be
     overridable by the user.
-  - SHOULD use the following instances if deployed in a listed cloud.
-    - AWS SHOULD default to `c6g.2xlarge` instances with 48 GiB of EBS `io2`
-      disk space.
-    - Azure SHOULD default to `f8` instances with 48 GiB of standard SSD disk
-      space.
-    - GCP SHOULD default to `c2` instances with 8 vCPUS, 16 GiB of memory, and
-      48 GiB of SSD persisted disk space.
 
 The following are additional requirements for Orchestration Platform installation
 targets:
