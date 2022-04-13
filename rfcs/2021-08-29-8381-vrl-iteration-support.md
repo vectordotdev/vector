@@ -119,7 +119,7 @@ To start, we’ll introduce _3_ iteration functions:
 * `map_values`
 * `for_each`
 
-These functions are sufficient to resolve [all reported use-cases][use-cases]
+These functions are sufficient to resolve [all reported use-cases](#use-cases)
 users have for iteration in VRL.
 
 More functions can be added in the future (e.g. `any`, `filter`, `reduce`, etc),
@@ -129,7 +129,7 @@ functions when sufficient demand requires it.
 How each function handles iteration depends on the implementation of the
 function, but in general, the functions take a closure, which gets resolved for
 each item within the iterated collection. For function-specific details, see the
-”[Functions][functions]” chapter.
+”[Functions](#functions)” chapter.
 
 Function closures are tied to the function-call, meaning you cannot pass around
 closures in variables. This prevents tail-call recursion, which in turn prevents
@@ -148,7 +148,7 @@ Because VRL does not support defining custom functions, and because we do not
 support tail-call recursion, there is no way to use VRL’s syntax to do any
 direct or indirect recursion during iteration.
 
-However, as the [examples][use-cases] section shows, there is a clear need for
+However, as the [examples](#use-cases) section shows, there is a clear need for
 multi-level recursion when mapping observability data.
 
 To support this, each function implementation itself can allow for recursive
@@ -156,7 +156,7 @@ behavior, either by default, or depending on function-call arguments.
 
 For the starting set of iteration functions, all function support recursion, by
 providing an optional `recursive: bool` function parameter. See the description
-of the individual [functions][] for more details on this.
+of the individual [functions](#functions) for more details on this.
 
 #### Functions
 
