@@ -74,8 +74,13 @@ use crate::{
 };
 
 #[cfg(feature = "codecs")]
-pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator, Transformer};
+pub use adapter::{
+    EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
+    EncodingConfigWithFramingMigrator, Transformer,
+};
 pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+#[cfg(feature = "codecs")]
+pub use codec::{StandardEncodingsMigrator, StandardEncodingsWithFramingMigrator};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};

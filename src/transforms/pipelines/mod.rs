@@ -57,9 +57,6 @@
 //! expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 //! (`my_pipelines.logs.transforms.foo`).
 mod config;
-// mod expander;
-// mod filter;
-// mod router;
 
 use crate::{
     conditions::is_log::IsLogConfig,
