@@ -92,6 +92,7 @@ jobs:
           export COEFFICIENT_OF_VARIATION="0.3"
           export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
+
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
@@ -270,9 +271,9 @@ jobs:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-baseline:
@@ -356,9 +357,9 @@ jobs:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-comparison:
