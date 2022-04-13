@@ -175,8 +175,6 @@ jobs:
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/baseline-image.tar
 
@@ -222,8 +220,6 @@ jobs:
           file: soaks/Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/comparison-image.tar
 
@@ -235,7 +231,7 @@ jobs:
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
-    runs-on: [linux, soak, soak-runner]
+    runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
@@ -266,7 +262,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 15 \
+                                  --replicas 4 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
@@ -321,7 +317,7 @@ jobs:
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
-    runs-on: [linux, soak, soak-runner]
+    runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
@@ -352,7 +348,7 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 15 \
+                                  --replicas 4 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
