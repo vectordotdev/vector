@@ -166,7 +166,7 @@ Map each individual key of an object to a different key.
 
 ###### function signature
 
-```
+```coffee
 map_keys(value: object, recursive: bool) -> |string| { string }
 ```
 
@@ -188,7 +188,7 @@ Map each individual value of an object or array to a different value.
 
 ###### function signature
 
-```
+```coffee
 map_values(value: object|array, recursive: bool) -> |any| { any }
 ```
 
@@ -205,7 +205,7 @@ Iterate over objects or arrays, without mutating any data.
 
 ###### function signature
 
-```
+```coffee
 for_each(value: object|array, recursive: bool) -> |string OR integer, any| { any }
 ```
 
@@ -322,7 +322,7 @@ individual use-cases, this list shows one available solution per use-case.
    .items = map_values(.items) -> |value| { value.foo = .foo; value }
    ```
 
-9. ["zip" an array of objects with fields `key` and `value` into one object]()
+9. ["zip" an array of objects with fields `key` and `value` into one object](https://discord.com/channels/742820443487993987/764187584452493323/905803048851505174)
 
    ```coffee
    data = [{ "key": "name", "value": "value" }, { "key": "key", "value": "otherValue" }]
@@ -394,7 +394,7 @@ individual use-cases, this list shows one available solution per use-case.
    }
    ```
 
-16. [map key/value pairs to object with ”key” and ”value” fields]()
+16. [map key/value pairs to object with ”key” and ”value” fields](https://discord.com/channels/742820443487993987/746070591097798688/832684085771370587)
 
    ```coffee
    . = { "labels": { "key1": "value1", "key2": "value2" } }
@@ -591,7 +591,7 @@ Let's break this down:
     nested objects and arrays. It defaults to `false`.
 * A closure-like expression is expected as part of the function call, but after
   the closing `)`.
-  * This takes the form of ` -> |...| { expression }`.
+  * This takes the form of `-> |...| { expression }`.
   * The function can dictate the number and types of arguments in `|...|`.
   * In this case, it’s a single argument, that is always of type `string`.
   * The expression has to return a single `string` value, representing the new
@@ -1246,7 +1246,7 @@ object if you can't use `.`, and goes against the rules as laid out in the
 
 ## Outstanding Questions
 
-_None_
+None.
 
 ## Plan Of Attack
 
