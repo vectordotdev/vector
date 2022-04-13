@@ -324,7 +324,7 @@ impl fmt::Display for Literal {
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
-            RawString(v) => write!(f, r#""{}""#, v),
+            RawString(v) => write!(f, r#"s'{}'"#, v),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
