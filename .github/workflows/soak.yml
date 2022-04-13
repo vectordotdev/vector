@@ -278,7 +278,7 @@ jobs:
 
   detect-erratic-baseline:
     name: Erratic detection - baseline
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -364,7 +364,7 @@ jobs:
 
   detect-erratic-comparison:
     name: Erratic detection - comparison
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-comparison
@@ -403,7 +403,7 @@ jobs:
 
   analyze-results:
     name: Soak analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -458,7 +458,7 @@ jobs:
 
   detect-regressions:
     name: Regression analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -497,7 +497,7 @@ jobs:
 
   plot-analysis:
     name: Plot analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
