@@ -23,7 +23,7 @@ interpreted as described in the [terminology document][terminology_document].
 In its simplest form, installing Vector consists of downloading the binary and
 making it executable, but leaves much to be desired for users looking to
 integrate Vector in real-world production environments. To adhere with Vector's
-["reduce decisions" design principle], Vector must also be opinionated about how
+["reduce decisions" design principle][reduce_decisions], Vector must also be opinionated about how
 it's deployed, providing easy facilities for adopting Vector's
 [reference architectures][reference_architectures],
 [achieving high availability][high_availability], and [hardening][hardening]
@@ -176,6 +176,7 @@ targets as there is little added benefit.
 [default_aggregator_configuration]: https://vector.dev/docs/reference/configuration/default/aggregator.yaml
 [hardening]: https://vector.dev/docs/setup/going-to-prod/hardening/
 [high_availability]: https://vector.dev/docs/setup/going-to-prod/high-availability/
+[reduce_decisions]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md#be-opinionated--reduce-decisions
 [reference_architectures]: https://vector.dev/docs/setup/going-to-prod/arch/
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
 [terminology_document]: https://vector.dev/docs/reference/glossary/
