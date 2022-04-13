@@ -1,10 +1,17 @@
 use std::io;
 
+#[cfg(feature = "codecs")]
+use codecs::{
+    encoding::{FramingConfig, SerializerConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
+};
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
 use super::Encoder;
+#[cfg(feature = "codecs")]
+use super::{EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -151,6 +158,48 @@ impl Encoder<Vec<Event>> for StandardEncodings {
         written += n;
 
         Ok(written)
+    }
+}
+
+#[cfg(feature = "codecs")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct StandardEncodingsMigrator;
+
+#[cfg(feature = "codecs")]
+impl EncodingConfigMigrator for StandardEncodingsMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            StandardEncodings::Text => RawMessageSerializerConfig::new().into(),
+            StandardEncodings::Json | StandardEncodings::Ndjson => {
+                JsonSerializerConfig::new().into()
+            }
+        }
+    }
+}
+
+#[cfg(feature = "codecs")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
+/// `SerializerConfig` based encoding system.
+pub struct StandardEncodingsWithFramingMigrator;
+
+#[cfg(feature = "codecs")]
+impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            StandardEncodings::Text => (None, RawMessageSerializerConfig::new().into()),
+            StandardEncodings::Json => (None, JsonSerializerConfig::new().into()),
+            StandardEncodings::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
     }
 }
 
