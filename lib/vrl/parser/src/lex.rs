@@ -465,7 +465,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Template(
                             seg.trim().to_string(),
-                            Span::new(span.start() + pos, span.start() + pos + seg.len()),
+                            Span::new(span.start() + pos - seg.len() - 1, span.start() + pos + 3),
                         ));
                     }
                     template = false;
@@ -2005,10 +2005,10 @@ mod test {
         assert_eq!(
             TemplateString(vec![
                 StringSegment::Literal("zork ".to_string()),
-                StringSegment::Template("zonk".to_string(), Span::new(5, 13)),
+                StringSegment::Template("zonk".to_string(), Span::new(6, 16)),
                 StringSegment::Literal(" zoog".to_string()),
             ]),
-            string.template(Span::new(0, 18))
+            string.template(Span::new(0, 20))
         );
     }
 }
