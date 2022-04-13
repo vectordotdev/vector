@@ -162,7 +162,7 @@ async fn run(
     let listener = tls_settings.bind(&address).await?;
     let stream = listener.accept_stream().map(|result| {
         result.map(|socket| {
-            let peer_addr = socket.connect_info().remote_addr.ip();
+            let peer_addr = socket.connect_info().remote_addr;
             socket.after_read(move |byte_size| {
                 emit!(TcpBytesReceived {
                     byte_size,
