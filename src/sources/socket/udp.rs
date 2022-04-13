@@ -33,6 +33,7 @@ pub struct UdpConfig {
     #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
     host_key: Option<String>,
+    port_key: Option<String>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
@@ -43,6 +44,10 @@ pub struct UdpConfig {
 impl UdpConfig {
     pub const fn host_key(&self) -> &Option<String> {
         &self.host_key
+    }
+
+    pub const fn port_key(&self) -> &Option<String> {
+        &self.port_key
     }
 
     pub const fn framing(&self) -> &FramingConfig {
@@ -70,6 +75,7 @@ impl UdpConfig {
             address,
             max_length: crate::serde::default_max_length(),
             host_key: None,
+            port_key: Some(String::from("port")),
             receive_buffer_bytes: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -81,6 +87,7 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
+    port_key: Option<String>,
     receive_buffer_bytes: Option<usize>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
@@ -141,6 +148,10 @@ pub fn udp(
                                         log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
                                         log.try_insert(log_schema().timestamp_key(), now);
                                         log.try_insert(host_key.as_str(), address.ip().to_string());
+
+                                        if let Some(port_key) = &port_key {
+                                            log.try_insert(port_key.as_str(), address.port());
+                                        }
                                     }
                                 }
 
