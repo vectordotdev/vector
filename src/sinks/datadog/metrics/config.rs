@@ -179,7 +179,7 @@ impl DatadogMetricsConfig {
         &self,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint();
-        let series_endpoint = build_uri(&base_uri, "/api/v1/series")?;
+        let series_endpoint =  build_uri("http://localhost:8080", "")?;
         let sketches_endpoint = build_uri(&base_uri, "/api/beta/sketches")?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
