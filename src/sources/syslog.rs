@@ -205,8 +205,8 @@ impl TcpSource for SyslogTcpSource {
         )
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
-        handle_events(events, &self.host_key, Some(host));
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
+        handle_events(events, &self.host_key, Some(host.ip().to_string().into()));
     }
 
     fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {

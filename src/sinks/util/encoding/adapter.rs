@@ -9,19 +9,18 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::marker::PhantomData;
 
 /// Trait used to migrate from a sink-specific `Codec` enum to the new
-/// `FramingConfig`/`SerializerConfig` encoding configuration.
+/// `SerializerConfig` encoding configuration.
 pub trait EncodingConfigMigrator {
     /// The sink-specific encoding type to be migrated.
     type Codec;
 
-    /// Returns the framing/serializer configuration that is functionally equivalent to the given
-    /// legacy codec.
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig);
+    /// Returns the serializer configuration that is functionally equivalent to the given legacy
+    /// codec.
+    fn migrate(codec: &Self::Codec) -> SerializerConfig;
 }
 
 /// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
-/// `FramingConfig`/`SerializerConfig` encoding configuration - while keeping
-/// backwards-compatibility.
+/// `SerializerConfig` encoding configuration while keeping backwards-compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
@@ -61,9 +60,8 @@ where
         + Clone,
 {
     /// Create a new encoding configuration.
-    pub fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
+    pub fn new(encoding: SerializerConfig) -> Self {
         Self::Encoding(EncodingConfig {
-            framing,
             encoding: EncodingWithTransformationConfig {
                 encoding,
                 only_fields: None,
@@ -87,6 +85,119 @@ where
     LegacyEncodingConfig: EncodingConfiguration + Debug + Clone,
     Migrator: EncodingConfigMigrator<Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec>
         + Debug
+        + Clone,
+{
+    /// Build a `Transformer` that applies the encoding rules to an event before serialization.
+    pub fn transformer(&self) -> Transformer {
+        match self {
+            Self::Encoding(config) => Transformer {
+                only_fields: config.encoding.only_fields.clone(),
+                except_fields: config.encoding.except_fields.clone(),
+                timestamp_format: config.encoding.timestamp_format,
+            },
+            Self::LegacyEncodingConfig(config) => Transformer {
+                only_fields: config.encoding.only_fields().clone(),
+                except_fields: config.encoding.except_fields().clone(),
+                timestamp_format: *config.encoding.timestamp_format(),
+            },
+        }
+    }
+
+    /// Build the serializer for this configuration.
+    pub fn encoding(self) -> Serializer {
+        match self {
+            Self::Encoding(config) => config.encoding.encoding.build(),
+            Self::LegacyEncodingConfig(config) => {
+                Migrator::migrate(config.encoding.codec()).build()
+            }
+        }
+    }
+}
+
+/// Trait used to migrate from a sink-specific `Codec` enum to the new
+/// `FramingConfig`/`SerializerConfig` encoding configuration.
+pub trait EncodingConfigWithFramingMigrator {
+    /// The sink-specific encoding type to be migrated.
+    type Codec;
+
+    /// Returns the framing/serializer configuration that is functionally equivalent to the given
+    /// legacy codec.
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig);
+}
+
+/// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
+/// `FramingConfig`/`SerializerConfig` encoding configuration while keeping backwards-compatibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<
+            Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec,
+        > + Debug
+        + Clone,
+{
+    /// The legacy sink-specific encoding configuration.
+    LegacyEncodingConfig(LegacyEncodingConfigWrapper<LegacyEncodingConfig, Migrator>),
+    /// The encoding configuration.
+    Encoding(EncodingConfigWithFraming),
+}
+
+impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
+    for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<
+            Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec,
+        > + Debug
+        + Clone,
+{
+    fn from(encoding: LegacyEncodingConfig) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper {
+            encoding,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<LegacyEncodingConfig, Migrator>
+    EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<
+            Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec,
+        > + Debug
+        + Clone,
+{
+    /// Create a new encoding configuration.
+    pub fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
+        Self::Encoding(EncodingConfigWithFraming {
+            framing,
+            encoding: EncodingWithTransformationConfig {
+                encoding,
+                only_fields: None,
+                except_fields: None,
+                timestamp_format: None,
+            },
+        })
+    }
+
+    /// Create a legacy sink-specific encoding configuration.
+    pub fn legacy(encoding: LegacyEncodingConfig) -> Self {
+        Self::LegacyEncodingConfig(LegacyEncodingConfigWrapper {
+            encoding,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<LegacyEncodingConfig, Migrator>
+    EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+where
+    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone,
+    Migrator: EncodingConfigWithFramingMigrator<
+            Codec = <LegacyEncodingConfig as EncodingConfiguration>::Codec,
+        > + Debug
         + Clone,
 {
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
@@ -136,6 +247,11 @@ pub struct LegacyEncodingConfigWrapper<EncodingConfig, Migrator> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncodingConfig {
+    encoding: EncodingWithTransformationConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncodingConfigWithFraming {
     framing: Option<FramingConfig>,
     encoding: EncodingWithTransformationConfig,
 }
@@ -236,6 +352,27 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_encoding_with_framing_and_transformation() {
+        let string = r#"
+            {
+                "encoding": {
+                    "codec": "raw_message",
+                    "only_fields": ["a.b[0]"],
+                    "except_fields": ["ignore_me"],
+                    "timestamp_format": "unix"
+                }
+            }
+        "#;
+
+        let config = serde_json::from_str::<EncodingConfigWithFraming>(string).unwrap();
+        let encoding = config.encoding;
+
+        assert_eq!(encoding.only_fields, Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(encoding.except_fields, Some(vec!["ignore_me".to_owned()]));
+        assert_eq!(encoding.timestamp_format.unwrap(), TimestampFormat::Unix);
+    }
+
+    #[test]
     fn deserialize_new_config() {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
         #[serde(rename_all = "snake_case")]
@@ -249,7 +386,7 @@ mod tests {
         impl EncodingConfigMigrator for Migrator {
             type Codec = LegacyEncoding;
 
-            fn migrate(_: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+            fn migrate(_: &Self::Codec) -> SerializerConfig {
                 panic!()
             }
         }
@@ -270,6 +407,43 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_new_config_with_framing() {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum LegacyEncoding {
+            Foo,
+        }
+
+        #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+        struct Migrator;
+
+        impl EncodingConfigWithFramingMigrator for Migrator {
+            type Codec = LegacyEncoding;
+
+            fn migrate(_: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+                panic!()
+            }
+        }
+
+        let string = r#"{ "encoding": { "codec": "raw_message" } }"#;
+
+        let config = serde_json::from_str::<
+            EncodingConfigWithFramingAdapter<
+                crate::sinks::util::EncodingConfig<LegacyEncoding>,
+                Migrator,
+            >,
+        >(string)
+        .unwrap();
+
+        let encoding = match config {
+            EncodingConfigWithFramingAdapter::Encoding(encoding) => encoding.encoding.encoding,
+            EncodingConfigWithFramingAdapter::LegacyEncodingConfig(_) => panic!(),
+        };
+
+        assert!(matches!(encoding, SerializerConfig::RawMessage));
+    }
+
+    #[test]
     fn deserialize_legacy_config() {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
         #[serde(rename_all = "snake_case")]
@@ -283,7 +457,7 @@ mod tests {
         impl EncodingConfigMigrator for Migrator {
             type Codec = LegacyEncoding;
 
-            fn migrate(_: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+            fn migrate(_: &Self::Codec) -> SerializerConfig {
                 panic!()
             }
         }
