@@ -21,11 +21,11 @@ use crate::{
     http::{HttpClient, HttpError},
     signal::{SignalRx, SignalTo},
     sinks::datadog::metrics::DatadogMetricsConfig,
-    sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
+    sources::{internal_metrics::InternalMetricsConfig},
 };
 use vector_core::config::proxy::ProxyConfig;
 
-static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
+// static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
@@ -291,25 +291,25 @@ pub async fn try_attach(
         sleep(Duration::from_secs(datadog.retry_interval_secs as u64)).await;
     }
 
-    let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
+    // let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
-    let mut host_metrics =
-        HostMetricsConfig::enterprise(config_version, &datadog.configuration_key);
+    // let mut host_metrics =
+    //     HostMetricsConfig::enterprise(config_version, &datadog.configuration_key);
     let mut internal_metrics =
         InternalMetricsConfig::enterprise(config_version, &datadog.configuration_key);
 
     // Override default scrape intervals.
-    host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
+    // host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
     internal_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
 
-    config.sources.insert(
-        host_metrics_id.component.clone(),
-        SourceOuter::new(host_metrics),
-    );
+    // config.sources.insert(
+    //     host_metrics_id.component.clone(),
+    //     SourceOuter::new(host_metrics),
+    // );
     config.sources.insert(
         internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
@@ -321,7 +321,7 @@ pub async fn try_attach(
     config.sinks.insert(
         datadog_metrics_id,
         SinkOuter::new(
-            vec![host_metrics_id, internal_metrics_id],
+            vec![internal_metrics_id],
             Box::new(datadog_metrics),
         ),
     );
