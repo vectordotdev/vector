@@ -122,11 +122,11 @@ targets:
 - Scaling
   - SHOULD provide facilities for provisioning a load balancer to enable horizontal scaling
      out of the box. MUST be overridable by the user.
-     - Cloud-managed load balancers (i.e., AWS NLB) SHOULD be supported in addition to
+    - Cloud-managed load balancers (i.e., AWS NLB) SHOULD be supported in addition to
         self-managed load balancers (i.e., HAProxy).
-     - Cloud-managed load balancers SHOULD be prioritized by default over self-managed
+    - Cloud-managed load balancers SHOULD be prioritized by default over self-managed
         load balancers.
-     - Network load balancers (layer-4) SHOULD be prioritized over HTTP load balancers (layer-7)
+    - Network load balancers (layer-4) SHOULD be prioritized over HTTP load balancers (layer-7)
   - Autoscaling SHOULD be enabled by default, driven by an average of 85%
     CPU utilization and a stabilization period of 5 minutes.
 
