@@ -18,7 +18,7 @@ use vector_core::{
 use super::{
     config::{Encoding, LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
-    service::{LokiRequest, LokiService},
+    service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
     config::{log_schema, SinkContext},
@@ -30,6 +30,7 @@ use crate::{
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::{EncodingConfig, EncodingConfiguration},
+        service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
     },
     template::Template,
@@ -323,20 +324,40 @@ impl RecordFilter {
     }
 }
 
-#[derive(Clone)]
 pub struct LokiSink {
     acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
-    service: LokiService,
+    service: Svc<LokiService, LokiRetryLogic>,
 }
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         let compression = config.compression;
+
+        // if Vector is configured to allow events with out of order timestamps, then then we can
+        // safely enable concurrency settings.
+        //
+        // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
+        // timestamps across requests. We used to support concurrency across partitions (Loki
+        // streams) but this was lost in #9506. Rather than try to re-add it, since Loki no longer
+        // requires in-order processing for version >= 2.4, instead we just keep the static limit
+        // of 1 for now.
+        let request_limits = match config.out_of_order_action {
+            OutOfOrderAction::Accept => config.request.unwrap_with(&Default::default()),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                let mut settings = config.request.unwrap_with(&Default::default());
+                settings.concurrency = Some(1);
+                settings
+            }
+        };
+
+        let service = tower::ServiceBuilder::new()
+            .settings(request_limits, LokiRetryLogic)
+            .service(LokiService::new(client, config.endpoint, config.auth)?);
 
         Ok(Self {
             acker: cx.acker(),
@@ -353,17 +374,22 @@ impl LokiSink {
             },
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
-            service: LokiService::new(client, config.endpoint, config.auth)?,
+            service,
         })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = tower::ServiceBuilder::new()
-            .concurrency_limit(1)
-            .service(self.service);
-
         let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
+
+        // out_of_order_action's that require a complete ordering are limited to building 1 request
+        // at a time
+        let request_builder_concurrency = match self.out_of_order_action {
+            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                NonZeroUsize::new(1).expect("static")
+            }
+        };
 
         let sink = input
             .map(|event| encoder.encode_event(event))
@@ -391,7 +417,7 @@ impl LokiSink {
                     None
                 }
             })
-            .request_builder(NonZeroUsize::new(1), self.request_builder)
+            .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -401,7 +427,7 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service, self.acker);
+            .into_driver(self.service, self.acker);
 
         sink.run().await
     }
