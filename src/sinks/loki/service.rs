@@ -15,8 +15,28 @@ use vector_core::{
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::{Compression, UriSerde},
+    sinks::util::{retries::RetryLogic, Compression, UriSerde},
 };
+
+#[derive(Clone)]
+pub struct LokiRetryLogic;
+
+impl RetryLogic for LokiRetryLogic {
+    type Error = LokiError;
+    type Response = LokiResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            LokiError::ServerError { code } => match *code {
+                StatusCode::TOO_MANY_REQUESTS => true,
+                StatusCode::NOT_IMPLEMENTED => false,
+                _ if code.is_server_error() => true,
+                _ => false,
+            },
+            LokiError::HttpError { .. } => true,
+        }
+    }
+}
 
 #[derive(Debug, Snafu)]
 pub enum LokiError {
@@ -46,6 +66,7 @@ impl DriverResponse for LokiResponse {
     }
 }
 
+#[derive(Clone)]
 pub struct LokiRequest {
     pub compression: Compression,
     pub batch_size: usize,
