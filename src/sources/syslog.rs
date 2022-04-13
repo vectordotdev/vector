@@ -58,7 +58,10 @@ pub enum Mode {
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix { path: PathBuf },
+    Unix {
+        path: PathBuf,
+        socket_file_mode: Option<u32>,
+    },
 }
 
 impl SyslogConfig {
@@ -138,7 +141,10 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => {
+            Mode::Unix {
+                path,
+                socket_file_mode,
+            } => {
                 let decoder = Decoder::new(
                     Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
                         self.max_length,
@@ -146,13 +152,14 @@ impl SourceConfig for SyslogConfig {
                     Deserializer::Syslog(SyslogDeserializer),
                 );
 
-                Ok(build_unix_stream_source(
+                build_unix_stream_source(
                     path,
+                    socket_file_mode,
                     decoder,
                     move |events, host| handle_events(events, &host_key, host),
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
         }
     }
@@ -450,6 +457,28 @@ mod test {
         )
         .unwrap();
         assert!(matches!(config.mode, Mode::Unix { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_unix_permissions() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "unix"
+            path = "127.0.0.1:1235"
+            socket_file_mode = 0o777
+          "#,
+        )
+        .unwrap();
+        let socket_file_mode = match config.mode {
+            Mode::Unix {
+                path: _,
+                socket_file_mode,
+            } => socket_file_mode,
+            _ => panic!("expected Mode::Unix"),
+        };
+
+        assert_eq!(socket_file_mode, Some(0o777));
     }
 
     #[test]

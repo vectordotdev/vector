@@ -142,8 +142,9 @@ impl SourceConfig for SocketConfig {
                     config.decoding.clone(),
                 )
                 .build();
-                Ok(unix::unix_datagram(
+                unix::unix_datagram(
                     config.path,
+                    config.socket_file_mode,
                     config
                         .max_length
                         .unwrap_or_else(crate::serde::default_max_length),
@@ -151,7 +152,7 @@ impl SourceConfig for SocketConfig {
                     decoder,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
@@ -173,13 +174,14 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix_stream(
+                unix::unix_stream(
                     config.path,
+                    config.socket_file_mode,
                     host_key,
                     decoder,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
         }
     }
@@ -233,6 +235,7 @@ mod test {
     use {
         super::{unix::UnixConfig, Mode},
         futures::{SinkExt, Stream},
+        std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
             io::AsyncWriteExt,
@@ -864,6 +867,19 @@ mod test {
         .unwrap()
     }
 
+    #[cfg(unix)]
+    fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
+        toml::from_str::<SocketConfig>(&format!(
+            r#"
+               mode = "{}"
+               path = "/does/not/exist"
+               socket_file_mode = 0o777
+            "#,
+            mode
+        ))
+        .unwrap()
+    }
+
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
@@ -921,6 +937,33 @@ mod test {
     fn parses_unix_datagram_config() {
         let config = parses_unix_config("unix_datagram");
         assert!(matches!(config.mode, Mode::UnixDatagram { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_unix_datagram_perms() {
+        let config = parses_unix_config_file_mode("unix_datagram");
+        assert!(matches!(config.mode, Mode::UnixDatagram { .. }));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_permissions() {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let (tx, _) = SourceSender::new_test();
+
+        let mut config = UnixConfig::new(in_path.clone());
+        config.socket_file_mode = Some(0o555);
+        let mode = Mode::UnixDatagram(config);
+        let server = SocketConfig { mode }
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        let meta = std::fs::metadata(in_path).unwrap();
+        // S_IFSOCK   0140000   socket
+        assert_eq!(0o140555, meta.permissions().mode());
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -988,8 +1031,35 @@ mod test {
 
     #[cfg(unix)]
     #[test]
+    fn parses_new_unix_datagram_perms() {
+        let config = parses_unix_config_file_mode("unix_stream");
+        assert!(matches!(config.mode, Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn parses_old_unix_stream_config() {
         let config = parses_unix_config("unix");
         assert!(matches!(config.mode, Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_permissions() {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let (tx, _) = SourceSender::new_test();
+
+        let mut config = UnixConfig::new(in_path.clone());
+        config.socket_file_mode = Some(0o421);
+        let mode = Mode::UnixStream(config);
+        let server = SocketConfig { mode }
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        let meta = std::fs::metadata(in_path).unwrap();
+        // S_IFSOCK   0140000   socket
+        assert_eq!(0o140421, meta.permissions().mode());
     }
 }
