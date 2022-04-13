@@ -2147,12 +2147,12 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "chrono-tz",
+ "criterion",
  "itertools",
  "lalrpop",
  "lalrpop-util",
  "lookup",
  "nom 7.1.1",
- "nom-regex",
  "once_cell",
  "onig",
  "ordered-float",
@@ -4974,16 +4974,6 @@ checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "nom-regex"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72e5c7731c4c1370b61604ed52a2475e861aac9e08dec9f23903d4ddfdc91c18"
-dependencies = [
- "nom 7.1.1",
- "regex",
 ]
 
 [[package]]
