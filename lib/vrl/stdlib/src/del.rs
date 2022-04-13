@@ -79,7 +79,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::Compiler,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -162,19 +162,18 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::any()
     }
 
     fn update_state(
         &mut self,
-        _local: &mut state::LocalEnv,
-        external: &mut state::ExternalEnv,
+        state: &mut state::Compiler,
     ) -> std::result::Result<(), ExpressionError> {
         // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
         // supported.
         if self.query.is_external() {
-            match self.query.delete_type_def(external) {
+            match self.query.delete_type_def(state) {
                 Err(value::kind::remove::Error::RootPath)
                 | Err(value::kind::remove::Error::CoalescedPath)
                 | Err(value::kind::remove::Error::NegativeIndexPath) => {

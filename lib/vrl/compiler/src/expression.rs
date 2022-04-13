@@ -4,10 +4,7 @@ use std::fmt;
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 
-use crate::{
-    state::{ExternalEnv, LocalEnv},
-    vm, Context, Span, TypeDef, Value,
-};
+use crate::{vm, Context, Span, State, TypeDef, Value};
 
 mod abort;
 mod array;
@@ -62,7 +59,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     fn compile_to_vm(
         &self,
         _vm: &mut vm::Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
+        _state: &mut crate::state::Compiler,
     ) -> Result<(), String> {
         Ok(())
     }
@@ -77,15 +74,11 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to its [`TypeDef`] type definition.
     ///
     /// This method is executed at compile-time.
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef;
+    fn type_def(&self, state: &crate::State) -> TypeDef;
 
     /// Updates the state if necessary.
     /// By default it does nothing.
-    fn update_state(
-        &mut self,
-        _local: &mut LocalEnv,
-        _external: &mut ExternalEnv,
-    ) -> Result<(), ExpressionError> {
+    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
         Ok(())
     }
 
@@ -224,7 +217,7 @@ impl Expression for Expr {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &State) -> TypeDef {
         use Expr::*;
 
         match self {
@@ -245,7 +238,7 @@ impl Expression for Expr {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &mut crate::state::Compiler,
     ) -> Result<(), String> {
         use Expr::*;
 

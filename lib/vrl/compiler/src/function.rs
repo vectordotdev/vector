@@ -12,7 +12,6 @@ use crate::{
         container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
-    state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
     vm::VmArgumentList,
     Context, ExpressionError, Span, Value,
@@ -53,7 +52,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &super::State,
         info: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;

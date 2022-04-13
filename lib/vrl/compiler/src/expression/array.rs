@@ -2,9 +2,8 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,7 +42,7 @@ impl Expression for Array {
             .map(Value::Array)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &State) -> TypeDef {
         let type_defs = self
             .inner
             .iter()
@@ -66,14 +65,12 @@ impl Expression for Array {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &mut crate::state::Compiler,
     ) -> Result<(), String> {
-        let (local, external) = state;
-
         // Evaluate each of the elements of the array, the result of each
         // will be added to the stack.
         for value in self.inner.iter().rev() {
-            value.compile_to_vm(vm, (local, external))?;
+            value.compile_to_vm(vm, state)?;
         }
 
         vm.write_opcode(OpCode::CreateArray);

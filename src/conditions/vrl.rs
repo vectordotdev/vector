@@ -50,7 +50,7 @@ impl ConditionConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::ExternalEnv::default();
+        let mut state = vrl::state::Compiler::new();
         state.set_external_context(enrichment_tables.clone());
 
         let program = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
@@ -63,7 +63,7 @@ impl ConditionConfig for VrlConfig {
 
         match self.runtime {
             VrlRuntime::Vm => {
-                let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
+                let vm = Arc::new(Runtime::default().compile(functions, &program, state)?);
                 Ok(Condition::VrlVm(VrlVm {
                     source: self.source.clone(),
                     vm,

@@ -1,11 +1,10 @@
 use std::fmt;
 
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{Block, Expr, Literal, Predicate, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, State, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,7 +20,7 @@ impl IfStatement {
         let predicate = Predicate::new_unchecked(vec![Expr::Literal(literal)]);
 
         let literal = Literal::Null;
-        let consequent = Block::new(vec![Expr::Literal(literal)], LocalEnv::default());
+        let consequent = Block::new(vec![Expr::Literal(literal)]);
 
         Self {
             predicate,
@@ -45,7 +44,7 @@ impl Expression for IfStatement {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &State) -> TypeDef {
         let type_def = self.consequent.type_def(state);
 
         match &self.alternative {
@@ -57,12 +56,10 @@ impl Expression for IfStatement {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &mut crate::state::Compiler,
     ) -> Result<(), String> {
-        let (local, external) = state;
-
         // Write the predicate which will leave the result on the stack.
-        self.predicate.compile_to_vm(vm, (local, external))?;
+        self.predicate.compile_to_vm(vm, state)?;
 
         // If the value is false, we want to jump to the alternative block.
         // We need to store this jump as it will need updating when we know where
@@ -71,7 +68,7 @@ impl Expression for IfStatement {
         vm.write_opcode(OpCode::Pop);
 
         // Write the consequent block.
-        self.consequent.compile_to_vm(vm, (local, external))?;
+        self.consequent.compile_to_vm(vm, state)?;
 
         // After the consequent block we want to jump over the alternative.
         let continue_jump = vm.emit_jump(OpCode::Jump);
@@ -82,7 +79,7 @@ impl Expression for IfStatement {
 
         if let Some(alternative) = &self.alternative {
             // Write the alternative block.
-            alternative.compile_to_vm(vm, (local, external))?;
+            alternative.compile_to_vm(vm, state)?;
         } else {
             // No alternative resolves to Null.
             let null = vm.add_constant(Value::Null);

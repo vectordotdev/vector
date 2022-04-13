@@ -46,9 +46,8 @@ fn benchmark_kind_display(c: &mut Criterion) {
         let tz = TimeZone::default();
         let functions = vrl_stdlib::all();
         let program = vrl::compile(source.code, &functions).unwrap();
-        let mut external_env = state::ExternalEnv::default();
         let vm = runtime
-            .compile(functions, &program, &mut external_env)
+            .compile(functions, &program, Default::default())
             .unwrap();
 
         group.bench_with_input(BenchmarkId::new("Vm", source.name), &vm, |b, vm| {

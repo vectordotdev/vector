@@ -2,9 +2,8 @@ use std::fmt;
 
 use crate::{
     expression::{Not, Resolved},
-    state::{ExternalEnv, LocalEnv},
     vm::Vm,
-    Context, Expression, TypeDef,
+    Context, Expression, State, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,7 +31,7 @@ impl Expression for Unary {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &State) -> TypeDef {
         use Variant::*;
 
         match &self.variant {
@@ -43,7 +42,7 @@ impl Expression for Unary {
     fn compile_to_vm(
         &self,
         vm: &mut Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &mut crate::state::Compiler,
     ) -> std::result::Result<(), String> {
         match &self.variant {
             Variant::Not(v) => {

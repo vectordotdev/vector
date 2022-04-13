@@ -25,7 +25,7 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::Compiler,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
@@ -45,7 +45,7 @@ impl Expression for UuidV4Fn {
         uuid_v4()
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

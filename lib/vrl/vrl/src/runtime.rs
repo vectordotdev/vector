@@ -1,5 +1,4 @@
 use compiler::{
-    state::{ExternalEnv, LocalEnv},
     vm::{OpCode, Vm},
     ExpressionError, Function,
 };
@@ -117,13 +116,12 @@ impl Runtime {
         &self,
         fns: Vec<Box<dyn Function>>,
         program: &Program,
-        external: &mut ExternalEnv,
+        mut state: state::Compiler,
     ) -> Result<Vm, String> {
-        let mut local = LocalEnv::default();
         let mut vm = Vm::new(fns);
 
         for expr in program.iter() {
-            expr.compile_to_vm(&mut vm, (&mut local, external))?;
+            expr.compile_to_vm(&mut vm, &mut state)?;
         }
 
         vm.write_opcode(OpCode::Return);
