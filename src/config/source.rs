@@ -19,8 +19,6 @@ pub struct SourceOuter {
     pub(crate) inner: Box<dyn SourceConfig>,
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
-    #[serde(default, skip)]
-    pub log_namespace: bool,
 }
 
 impl SourceOuter {
@@ -29,7 +27,6 @@ impl SourceOuter {
             inner: Box::new(source),
             proxy: Default::default(),
             sink_acknowledgements: false,
-            log_namespace: false,
         }
     }
 }
@@ -58,7 +55,6 @@ pub struct SourceContext {
     pub out: SourceSender,
     pub proxy: ProxyConfig,
     pub acknowledgements: bool,
-    pub log_namespace: bool,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
@@ -122,7 +118,11 @@ impl SourceContext {
     /// Gets the log namespacing to use. The passed in value is from the source itself
     /// and will override any global default if it's set.
     pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
-        if namespace.unwrap_or(self.log_namespace) {
+        println!(
+            "Source: {:?}   Global: {:?}",
+            namespace, self.globals.log_namespace
+        );
+        if namespace.unwrap_or(self.globals.log_namespace) {
             LogNamespace::Vector
         } else {
             LogNamespace::Legacy

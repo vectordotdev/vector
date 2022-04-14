@@ -47,6 +47,7 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    pub log_namespace: bool,
 }
 
 impl GlobalOptions {

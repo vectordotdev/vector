@@ -223,7 +223,6 @@ pub async fn build_pieces(
             out: pipeline,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
             acknowledgements: source.sink_acknowledgements,
-            log_namespace: source.log_namespace,
             schema_definitions,
         };
         let server = match source.inner.build(context).await {

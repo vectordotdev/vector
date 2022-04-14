@@ -176,6 +176,8 @@ impl Application {
                         .await
                         .map_err(handle_config_errors)?;
 
+                println!("Confg: {:?}", config);
+
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
                 }
