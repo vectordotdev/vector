@@ -4,6 +4,7 @@ mod encoding_config;
 #[cfg(any(
     feature = "sources-aws_sqs",
     feature = "sources-file",
+    feature = "sources-journald",
     feature = "sources-kafka",
     feature = "sources-splunk_hec"
 ))]

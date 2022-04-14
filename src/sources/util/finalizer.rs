@@ -11,7 +11,11 @@ use crate::shutdown::ShutdownSignal;
 /// The `OrderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order they are received
 /// from the source*, using `FinalizerSet`.
-#[cfg(any(feature = "sources-file", feature = "sources-kafka",))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-journald",
+    feature = "sources-kafka",
+))]
 pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
 
 /// The `UnorderedFinalizer` framework marks events from a source as
