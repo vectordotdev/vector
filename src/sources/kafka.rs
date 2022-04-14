@@ -183,8 +183,19 @@ async fn kafka_source(
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
-    let mut finalizer = acknowledgements
-        .then(|| OrderedFinalizer::new(shutdown.clone(), mark_done(Arc::clone(&consumer))));
+    let mut finalizer = acknowledgements.then(|| {
+        let consumer = Arc::clone(&consumer);
+        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
+            let consumer = Arc::clone(&consumer);
+            async move {
+                if let Err(error) =
+                    consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                {
+                    emit!(KafkaOffsetUpdateError { error });
+                }
+            }
+        })
+    });
     let mut stream = consumer.stream().take_until(shutdown);
     let schema = log_schema();
 
@@ -327,14 +338,6 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
             topic: msg.topic().into(),
             partition: msg.partition(),
             offset: msg.offset(),
-        }
-    }
-}
-
-fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
-    move |entry| {
-        if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-            emit!(KafkaOffsetUpdateError { error });
         }
     }
 }

@@ -4,6 +4,7 @@
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
     feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces",
     feature = "enterprise"
 ))]
 pub(crate) mod datadog;

@@ -2,8 +2,9 @@ use std::fmt;
 
 use crate::{
     expression::Resolved,
+    state::{ExternalEnv, LocalEnv},
     vm::{OpCode, Vm},
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -14,14 +15,14 @@ impl Expression for Noop {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 
     fn compile_to_vm(
         &self,
         vm: &mut Vm,
-        _state: &mut crate::state::Compiler,
+        _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Noop just adds a Null to the stack.
         let constant = vm.add_constant(Value::Null);

@@ -136,6 +136,7 @@ components: sinks: prometheus_exporter: {
 			set:          false
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

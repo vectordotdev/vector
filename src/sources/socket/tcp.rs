@@ -22,6 +22,7 @@ pub struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     host_key: Option<String>,
+    port_key: Option<String>,
     tls: Option<TlsConfig>,
     receive_buffer_bytes: Option<usize>,
     framing: Option<FramingConfig>,
@@ -41,6 +42,7 @@ impl TcpConfig {
         max_length: Option<usize>,
         shutdown_timeout_secs: u64,
         host_key: Option<String>,
+        port_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
         framing: Option<FramingConfig>,
@@ -53,6 +55,7 @@ impl TcpConfig {
             max_length,
             shutdown_timeout_secs,
             host_key,
+            port_key,
             tls,
             receive_buffer_bytes,
             framing,
@@ -68,6 +71,7 @@ impl TcpConfig {
             max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
+            port_key: Some(String::from("port")),
             tls: None,
             receive_buffer_bytes: None,
             framing: None,
@@ -160,7 +164,7 @@ impl TcpSource for RawTcpSource {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: std::net::SocketAddr) {
         let now = Utc::now();
 
         for event in events {
@@ -174,7 +178,10 @@ impl TcpSource for RawTcpSource {
                     .as_deref()
                     .unwrap_or_else(|| log_schema().host_key());
 
-                log.try_insert(host_key, host.clone());
+                log.try_insert(host_key, host.ip().to_string());
+                if let Some(port_key) = &self.config.port_key {
+                    log.try_insert(port_key.as_str(), host.port());
+                }
             }
         }
     }

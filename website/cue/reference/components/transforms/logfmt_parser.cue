@@ -61,6 +61,7 @@ components: transforms: logfmt_parser: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [

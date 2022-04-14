@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, io_error_code};
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
@@ -49,12 +49,14 @@ impl InternalEvent for ExecFailedError<'_> {
             command = %self.command,
             error = ?self.error,
             error_type = error_type::COMMAND_FAILED,
+            error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
         );
         counter!(
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
+            "error_code" => io_error_code(&self.error),
             "stage" => error_stage::RECEIVING,
         );
         // deprecated

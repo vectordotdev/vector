@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    num::NonZeroU64,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -37,7 +34,7 @@ pub struct InfluxDbLogsDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

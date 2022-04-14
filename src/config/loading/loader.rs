@@ -221,7 +221,7 @@ where
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
-        if let Ok(Some((_, table, warnings))) = self.load_file(path, format) {
+        if let Some((_, table, warnings)) = self.load_file(path, format)? {
             self.merge(table, None)?;
             Ok(warnings)
         } else {

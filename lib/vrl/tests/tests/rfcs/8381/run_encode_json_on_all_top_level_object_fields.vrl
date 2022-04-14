@@ -1,0 +1,11 @@
+# SKIP
+# object: { "foo": true, "bar": { "baz": 12 } }
+# result: { "foo": true, "bar": "{ \"baz\": 12 }" }
+
+map_values(.) -> |value| {
+  if value.is_object() {
+    encode_json(value)
+  } else {
+    value
+  }
+}

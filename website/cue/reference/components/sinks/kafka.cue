@@ -139,6 +139,7 @@ components: sinks: kafka: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	how_it_works: components._kafka.how_it_works
