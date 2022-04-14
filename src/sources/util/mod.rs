@@ -2,6 +2,7 @@
 mod body_decoding;
 mod encoding_config;
 #[cfg(any(
+    feature = "sources-aws_sqs",
     feature = "sources-file",
     feature = "sources-kafka",
     feature = "sources-splunk_hec"

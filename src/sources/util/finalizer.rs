@@ -17,32 +17,33 @@ pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFu
 /// The `UnorderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order the finalization
 /// happens on the event batches*, using `FinalizerSet`.
-#[cfg(feature = "sources-splunk_hec")]
+#[cfg(any(feature = "sources-aws_sqs", feature = "sources-splunk_hec"))]
 pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
 
 /// The `FinalizerSet` framework here is a mechanism for marking
 /// events from a source as done in a single background task. The type
 /// `T` is the source-specific data associated with each entry to be
 /// used to complete the finalization.
-pub(crate) struct FinalizerSet<T, F> {
+pub(crate) struct FinalizerSet<T, S> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
-    _finalizer: PhantomData<F>,
+    _phantom: PhantomData<S>,
 }
 
-impl<T, F> FinalizerSet<T, F>
+impl<T, S> FinalizerSet<T, S>
 where
     T: Send + 'static,
-    F: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
+    S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
-    pub(crate) fn new(
-        shutdown: Shared<ShutdownSignal>,
-        apply_done: impl Fn(T) + Send + 'static,
-    ) -> Self {
+    pub(crate) fn new<F, Fut>(shutdown: Shared<ShutdownSignal>, apply_done: F) -> Self
+    where
+        F: Fn(T) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown, receiver, apply_done, F::default()));
+        tokio::spawn(run_finalizer(shutdown, receiver, apply_done, S::default()));
         Self {
             sender: Some(sender),
-            _finalizer: Default::default(),
+            _phantom: Default::default(),
         }
     }
 
@@ -55,10 +56,10 @@ where
     }
 }
 
-async fn run_finalizer<T>(
+async fn run_finalizer<T, F: Future<Output = ()>>(
     shutdown: Shared<ShutdownSignal>,
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
-    apply_done: impl Fn(T),
+    apply_done: impl Fn(T) -> F,
     mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,
 ) {
     loop {
@@ -75,7 +76,7 @@ async fn run_finalizer<T>(
             },
             finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
                 Some((status, entry)) => if status == BatchStatus::Delivered {
-                    apply_done(entry);
+                    apply_done(entry).await;
                 }
                 // The is_empty guard above prevents this from being reachable.
                 None => unreachable!(),
@@ -87,7 +88,7 @@ async fn run_finalizer<T>(
     // we are done.
     while let Some((status, entry)) = status_receivers.next().await {
         if status == BatchStatus::Delivered {
-            apply_done(entry);
+            apply_done(entry).await;
         }
     }
     drop(shutdown);
