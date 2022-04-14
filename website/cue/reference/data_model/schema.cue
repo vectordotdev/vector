@@ -349,4 +349,41 @@ data_model: schema: {
 			}
 		}
 	}
+
+	trace: {
+		common: true
+		description: """
+			A Vector trace event is a vendor agnostic trace representation.
+			It is similar to a Vector log event but it contains a list of spans
+			"""
+		required: false
+		type: object: {
+			examples: [
+				{
+					"start_time": "2022-01-01T14:54:15+00:00"
+					"end_time":   "2022-01-01T14:54:16+00:00"
+					spans: [
+						{
+							"resource":  "operations.of.interest"
+							"span_id":   6117722358867084000
+							"parent_id": 0
+						},
+					]
+				},
+			]
+			options: {
+				"*": {
+					common:      true
+					description: "An arbitrary set of key/value pairs."
+					required:    false
+					type: "*": {}
+				}
+				spans: {
+					description: "The list of spans."
+					required:    true
+					type: array: items: type: object: options: {}
+				}
+			}
+		}
+	}
 }

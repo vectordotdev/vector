@@ -4,19 +4,22 @@ use crate::{
 };
 use bytes::BytesMut;
 use codecs::{
-    encoding::{Error, Framer, FramingConfig, Serializer, SerializerConfig},
+    encoding::{Error, Framer, Serializer},
     NewlineDelimitedEncoder, RawMessageSerializer,
 };
-use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder as _;
 
 #[derive(Debug, Clone)]
 /// An encoder that can encode structured events into byte frames.
-pub struct Encoder {
+pub struct Encoder<Framer>
+where
+    Framer: Clone,
+{
     framer: Framer,
     serializer: Serializer,
 }
 
-impl Default for Encoder {
+impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedEncoder::new()),
@@ -25,7 +28,29 @@ impl Default for Encoder {
     }
 }
 
-impl Encoder {
+impl Default for Encoder<()> {
+    fn default() -> Self {
+        Self {
+            framer: (),
+            serializer: Serializer::RawMessage(RawMessageSerializer::new()),
+        }
+    }
+}
+
+impl<Framer> Encoder<Framer>
+where
+    Framer: Clone,
+{
+    // Serialize the event.
+    fn serialize(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
+        self.serializer.encode(event, buffer).map_err(|error| {
+            emit!(EncoderSerializeFailed { error: &error });
+            Error::SerializingError(error)
+        })
+    }
+}
+
+impl Encoder<Framer> {
     /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
     /// from a structured event, and the `Framer` to wrap these into a byte
     /// frame.
@@ -44,21 +69,30 @@ impl Encoder {
     }
 }
 
-impl tokio_util::codec::Encoder<Event> for Encoder {
+impl Encoder<()> {
+    /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
+    /// from a structured event.
+    pub const fn new(serializer: Serializer) -> Self {
+        Self {
+            framer: (),
+            serializer,
+        }
+    }
+
+    /// Get the serializer.
+    pub const fn serializer(&self) -> &Serializer {
+        &self.serializer
+    }
+}
+
+impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
     type Error = Error;
 
-    fn encode(&mut self, item: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let len = buffer.len();
-
         let mut payload = buffer.split_off(len);
 
-        // Serialize the event.
-        self.serializer
-            .encode(item, &mut payload)
-            .map_err(|error| {
-                emit!(EncoderSerializeFailed { error: &error });
-                Error::SerializingError(error)
-            })?;
+        self.serialize(event, &mut payload)?;
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
@@ -72,31 +106,18 @@ impl tokio_util::codec::Encoder<Event> for Encoder {
     }
 }
 
-/// Config used to build an `Encoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EncodingConfig {
-    /// The framing config.
-    framing: FramingConfig,
-    /// The encoding config.
-    encoding: SerializerConfig,
-}
+impl tokio_util::codec::Encoder<Event> for Encoder<()> {
+    type Error = Error;
 
-impl EncodingConfig {
-    /// Creates a new `EncodingConfig` with the provided `FramingConfig` and
-    /// `SerializerConfig`.
-    pub const fn new(framing: FramingConfig, encoding: SerializerConfig) -> Self {
-        Self { framing, encoding }
-    }
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        let len = buffer.len();
+        let mut payload = buffer.split_off(len);
 
-    /// Builds an `Encoder` from the provided configuration.
-    pub const fn build(self) -> Encoder {
-        // Build the framer.
-        let framer = self.framing.build();
+        self.serialize(event, &mut payload)?;
 
-        // Build the serializer.
-        let serializer = self.encoding.build();
+        buffer.unsplit(payload);
 
-        Encoder::new(framer, serializer)
+        Ok(())
     }
 }
 
@@ -164,7 +185,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_encode_events_sink_empty() {
-        let encoder = Encoder::new(
+        let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
             Serializer::RawMessage(RawMessageSerializer::new()),
         );
@@ -183,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_encode_events_sink_non_empty() {
-        let encoder = Encoder::new(
+        let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
             Serializer::RawMessage(RawMessageSerializer::new()),
         );
@@ -202,7 +223,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_encode_events_sink_empty_handle_framing_error() {
-        let encoder = Encoder::new(
+        let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
             Serializer::RawMessage(RawMessageSerializer::new()),
         );
@@ -222,7 +243,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
-        let encoder = Encoder::new(
+        let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
             Serializer::RawMessage(RawMessageSerializer::new()),
         );

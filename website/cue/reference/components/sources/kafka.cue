@@ -7,13 +7,7 @@ components: sources: kafka: {
 		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled:        false
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false

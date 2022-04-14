@@ -1,0 +1,6 @@
+# SKIP
+# object: { "answers": [{ "class":"IN", "ttl":"264" }, { "class":"IN", "ttl":"264" }], "other":"data" }
+# result: { "answers": [{ "class":"IN" }, { "class":"IN" }], "other":"data" }
+
+.answers = map_values(.answers) -> |value| { del(value.ttl); value }
+.

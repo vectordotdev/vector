@@ -11,10 +11,12 @@ use std::{
 use crossbeam_queue::SegQueue;
 use parking_lot::Mutex;
 use proptest::{prop_assert, prop_assert_eq, proptest};
+use temp_dir::TempDir;
 use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
+    test::common::install_tracing_helpers,
     variants::disk_v2::{
         common::MAX_FILE_ID, writer::RecordWriter, Buffer, DiskBufferConfig, WriterError,
     },
@@ -180,6 +182,10 @@ impl FileModel {
 
     fn flushed_size(&self) -> u64 {
         self.flushed_bytes.load(Ordering::SeqCst)
+    }
+
+    fn unflushed_size(&self) -> u64 {
+        self.unflushed_bytes.load(Ordering::SeqCst)
     }
 }
 
@@ -524,7 +530,6 @@ struct WriterModel {
     ledger: Arc<LedgerModel>,
     current_file: Option<FileModel>,
     current_file_size: u64,
-    unflushed_bytes: u64,
     state: WriterModelState,
     record_writer: RecordWriter<Cursor<Vec<u8>>, Record>,
 }
@@ -544,7 +549,6 @@ impl WriterModel {
             ledger,
             current_file: None,
             current_file_size: 0,
-            unflushed_bytes: 0,
             state: WriterModelState::Idle,
             record_writer,
         };
@@ -568,7 +572,6 @@ impl WriterModel {
 
     fn reset(&mut self) {
         self.current_file = None;
-        self.unflushed_bytes = 0;
         self.current_file_size = 0;
     }
 
@@ -596,7 +599,11 @@ impl WriterModel {
 
     fn is_ready(&mut self) -> bool {
         // If our buffer size is over the maximum buffer size, we have to wait for reader progress:
-        if self.ledger.get_buffer_size() >= self.ledger.config().max_buffer_size {
+        let unflushed_bytes = self
+            .current_file
+            .as_ref()
+            .map_or(0, FileModel::unflushed_size);
+        if self.ledger.get_buffer_size() + unflushed_bytes >= self.ledger.config().max_buffer_size {
             return false;
         }
 
@@ -765,11 +772,21 @@ impl BufferModel {
 
 proptest! {
     #[test]
-    fn model_check(config in arb_buffer_config(), actions in arb_actions(0..64)) {
+    fn model_check(mut config in arb_buffer_config(), actions in arb_actions(0..64)) {
         let rt = Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("should not fail to build runtime");
+
+        let _a = install_tracing_helpers();
+        info!("New model.");
+
+        // We generate a new temporary directory and overwrite the data directory in the buffer
+        // configuration. This allows us to use a utility that will generate a random directory each
+        // time -- parallel runs of this test can't clobber each other anymore -- but also ensure
+        // that the directory is cleaned up when the test run is over.
+        let buf_dir = TempDir::with_prefix("vector-buffers-disk-v2-model").expect("creating temp dir should never fail");
+        config.data_dir = buf_dir.path().to_path_buf();
 
         rt.block_on(async move {
             // This model tries to encapsulate all of the behavior of the disk buffer v2

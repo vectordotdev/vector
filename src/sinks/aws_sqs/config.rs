@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
 use crate::{
-    aws::aws_sdk::create_client,
+    aws::create_client,
     aws::{AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},

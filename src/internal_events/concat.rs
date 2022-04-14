@@ -27,7 +27,6 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
         );
         counter!(
             "component_errors_total", 1,
-            "error" => "Substring error.",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

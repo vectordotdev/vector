@@ -32,7 +32,7 @@ pub mod service_control {
 
     use crate::{
         internal_events::{
-            WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
+            WindowsServiceDoesNotExistError, WindowsServiceInstall, WindowsServiceRestart,
             WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
         },
         vector_windows::{NO_ERROR, SERVICE_TYPE},
@@ -281,7 +281,7 @@ pub mod service_control {
         let service = service_manager
             .open_service(&service_def.name, access)
             .map_err(|e| {
-                emit!(WindowsServiceDoesNotExist {
+                emit!(WindowsServiceDoesNotExistError {
                     name: &*service_def.name.to_string_lossy(),
                 });
                 e
@@ -376,7 +376,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
-                        while signal_tx.try_send(SignalTo::Shutdown).is_err() {}
+                        while signal_tx.send(SignalTo::Shutdown).is_err() {}
                         ServiceControlHandlerResult::NoError
                     }
 
