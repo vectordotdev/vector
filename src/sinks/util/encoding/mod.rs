@@ -57,7 +57,6 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
-#[cfg(feature = "codecs")]
 mod adapter;
 mod codec;
 mod config;
@@ -66,24 +65,23 @@ mod with_default;
 
 use std::{fmt::Debug, io, sync::Arc};
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
 
-#[cfg(feature = "codecs")]
 pub use adapter::{
     EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
     EncodingConfigWithFramingMigrator, Transformer,
 };
-pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
-#[cfg(feature = "codecs")]
-pub use codec::{StandardEncodingsMigrator, StandardEncodingsWithFramingMigrator};
+pub use codec::{
+    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
+    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
+};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
+use serde::{Deserialize, Serialize};
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {

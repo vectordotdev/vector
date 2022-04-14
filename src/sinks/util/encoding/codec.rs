@@ -1,6 +1,5 @@
 use std::io;
 
-#[cfg(feature = "codecs")]
 use codecs::{
     encoding::{FramingConfig, SerializerConfig},
     JsonSerializerConfig, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
@@ -9,9 +8,7 @@ use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
-use super::Encoder;
-#[cfg(feature = "codecs")]
-use super::{EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
+use super::{Encoder, EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -161,13 +158,11 @@ impl Encoder<Vec<Event>> for StandardEncodings {
     }
 }
 
-#[cfg(feature = "codecs")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
 /// encoding system.
 pub struct StandardEncodingsMigrator;
 
-#[cfg(feature = "codecs")]
 impl EncodingConfigMigrator for StandardEncodingsMigrator {
     type Codec = StandardEncodings;
 
@@ -181,13 +176,11 @@ impl EncodingConfigMigrator for StandardEncodingsMigrator {
     }
 }
 
-#[cfg(feature = "codecs")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
 /// `SerializerConfig` based encoding system.
 pub struct StandardEncodingsWithFramingMigrator;
 
-#[cfg(feature = "codecs")]
 impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator {
     type Codec = StandardEncodings;
 
