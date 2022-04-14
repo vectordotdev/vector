@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use socket2::SockRef;
 use vector_core::ByteSizeOf;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 
@@ -111,7 +111,7 @@ where
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn handle_events(&self, _events: &mut [Event], _host: Bytes) {}
+    fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
@@ -204,7 +204,7 @@ where
                                 receive_buffer_bytes,
                                 source,
                                 tripwire,
-                                peer_addr.ip(),
+                                peer_addr,
                                 out,
                                 acknowledgements,
                                 request_limiter,
@@ -233,7 +233,7 @@ async fn handle_stream<T>(
     receive_buffer_bytes: Option<usize>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    peer_addr: IpAddr,
+    peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
@@ -273,7 +273,6 @@ async fn handle_stream<T>(
     });
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
-    let host = Bytes::from(peer_addr.to_string());
 
     loop {
         let mut permit = tokio::select! {
@@ -335,7 +334,7 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        source.handle_events(&mut events, host.clone());
+                        source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {
