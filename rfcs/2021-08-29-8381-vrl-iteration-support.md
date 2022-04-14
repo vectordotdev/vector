@@ -260,8 +260,8 @@ individual use-cases, this list shows one available solution per use-case.
    data = del(.data)
    metrics = []
    for_each(data) -> |key, value| {
-     .value = value
-     metrics = push(metrics, .)
+     metric = set(., [key], value)
+     metrics = push(metrics, metric)
    }
    ```
 
@@ -286,7 +286,8 @@ individual use-cases, this list shows one available solution per use-case.
    for_each(array) -> |_index, value| { if value == 2 { any_two = true } }
    ```
 
-   **NOTE** This is a good use-case for `any` and `all` iteration functions:
+   **NOTE** This is a good use-case for future `any` and `all` iteration
+   functions:
 
    ```coffee
    any_two = any(array) -> |_index, value| { value == 2 }
@@ -1305,6 +1306,23 @@ Or ensuring all elements adhere to a condition:
 
 Some additional suggestions include `flatten`, `partition`, `fold`, `any`,
 `find`, `max`, `min`, etc...
+
+Potential list of future functions
+
+- `flatten`
+- `partition`
+- `fold`
+- `any`
+- `all`
+- `find`
+- `max`
+- `min`
+- `replace_keys`
+- `to_entries`
+- `from_entries`
+- `map_to_array`
+- `zip`
+- `chain`
 
 ### Schema Support
 
