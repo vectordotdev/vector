@@ -292,6 +292,7 @@ jobs:
           fi
         # https://github.com/actions/checkout/issues/760
       - name: work around permission issue
+        run: git config --global --add safe.directory /__w/vector/vector
       - name: checkout
         uses: actions/checkout@v3
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
