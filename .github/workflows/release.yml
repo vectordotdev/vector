@@ -96,7 +96,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: vector_${{ env.VECTOR_VERSION }}-1_arm64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
+          path: "./target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
       - uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
