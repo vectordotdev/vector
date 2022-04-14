@@ -158,7 +158,7 @@ impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b [BorrowedSegment<'a>] {
+impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
