@@ -135,7 +135,6 @@ pub async fn load_from_paths_with_provider(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    println!("Builder: {:#?}", builder);
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
