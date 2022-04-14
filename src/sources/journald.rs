@@ -624,7 +624,7 @@ impl Finalizer {
         shutdown: Shared<ShutdownSignal>,
     ) -> Self {
         if acknowledgements {
-            Self::Async(OrderedFinalizer::new(shutdown.clone(), move |cursor| {
+            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
                 let checkpointer = checkpointer.clone();
                 async move {
                     checkpointer.lock().await.set(cursor).await;
@@ -723,7 +723,7 @@ impl SharedCheckpointer {
         Self(Arc::new(Mutex::new(c)))
     }
 
-    async fn lock<'a>(&'a self) -> MutexGuard<'a, StatefulCheckpointer> {
+    async fn lock(&self) -> MutexGuard<'_, StatefulCheckpointer> {
         self.0.lock().await
     }
 }
