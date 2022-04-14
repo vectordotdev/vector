@@ -77,6 +77,13 @@ impl<T> Node<T> {
 
         (span.start(), node, span.end())
     }
+
+    pub fn as_deref(&self) -> &T::Target
+    where
+        T: Deref,
+    {
+        self.as_ref().deref()
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Node<T> {

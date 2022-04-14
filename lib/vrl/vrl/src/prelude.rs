@@ -8,7 +8,7 @@ pub use compiler::{
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
-pub use compiler::expression::FunctionClosure as Closure;
+pub use compiler::expression::FunctionClosure;
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 

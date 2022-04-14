@@ -29,7 +29,7 @@ pub(crate) struct Builder<'a> {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
     closure: Option<(Vec<Node<Ident>>, closure::Input)>,
     list: ArgumentList,
-    function: &'a Box<dyn Function>,
+    function: &'a dyn Function,
 }
 
 impl<'a> Builder<'a> {
@@ -297,7 +297,7 @@ impl<'a> Builder<'a> {
             arguments: Arc::new(arguments),
             closure,
             list,
-            function,
+            function: function.as_ref(),
         })
     }
 

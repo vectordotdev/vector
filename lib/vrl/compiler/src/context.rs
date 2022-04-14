@@ -2,6 +2,7 @@ use vector_common::TimeZone;
 
 use crate::{state::Runtime, Target};
 
+#[derive(Debug)]
 pub struct Context<'a> {
     target: &'a mut dyn Target,
     state: &'a mut Runtime,

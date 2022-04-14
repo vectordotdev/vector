@@ -227,7 +227,7 @@ impl Function for Map {
 struct MapFn {
     value: Box<dyn Expression>,
     recursive: Option<Box<dyn Expression>>,
-    closure: Closure,
+    closure: FunctionClosure,
 }
 
 impl Expression for MapFn {

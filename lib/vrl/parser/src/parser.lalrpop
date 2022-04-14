@@ -393,12 +393,14 @@ FunctionClosure: FunctionClosure = {
 #[inline]
 ClosureVariables: Vec<Node<Ident>> = {
     "||" => vec![],
-    "|" <variables: CommaMultiline<Sp<"identifier">>?> "|" =>
-        variables
-            .unwrap_or_default()
-            .into_iter()
-            .map(|variable| variable.map(|s| Ident(s.to_owned())))
-            .collect()
+    "|" <variables: CommaMultiline<ClosureVariable>?> "|" =>
+        variables.unwrap_or_default()
+};
+
+#[inline]
+ClosureVariable: Node<Ident> = {
+    Sp<Ident> => <>,
+    Sp<"_"> => <>.map(|s| Ident("".to_owned())),
 };
 
 // -----------------------------------------------------------------------------

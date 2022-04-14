@@ -57,6 +57,8 @@ mod flatten;
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "for_each")]
+mod for_each;
 #[cfg(feature = "format_int")]
 mod format_int;
 #[cfg(feature = "format_number")]
@@ -123,8 +125,8 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
-#[cfg(feature = "map")]
-mod map;
+// #[cfg(feature = "map")]
+// mod map;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -274,16 +276,14 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "array")]
-pub use crate::array::Array;
-#[cfg(feature = "map")]
-pub use crate::map::Map;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]
 pub use append::Append;
+#[cfg(feature = "array")]
+pub use array::Array;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "assert_eq")]
@@ -330,6 +330,8 @@ pub use flatten::Flatten;
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "for_each")]
+pub use for_each::ForEach;
 #[cfg(feature = "format_int")]
 pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
@@ -390,6 +392,8 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+// #[cfg(feature = "map")]
+// pub use map::Map;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
@@ -535,8 +539,6 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        #[cfg(feature = "map")]
-        Box::new(Map),
         #[cfg(feature = "array")]
         Box::new(Array),
         #[cfg(feature = "append")]
@@ -589,6 +591,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "for_each")]
+        Box::new(ForEach),
         #[cfg(feature = "format_int")]
         Box::new(FormatInt),
         #[cfg(feature = "format_number")]
@@ -649,6 +653,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
+        // #[cfg(feature = "map")]
+        // Box::new(Map),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "match_any")]

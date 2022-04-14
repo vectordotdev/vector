@@ -44,6 +44,14 @@ impl Value {
         }
     }
 
+    /// Returns self as `Vec<Value>`, only if self is `Value::Array`.
+    pub fn into_array(self) -> Option<Vec<Self>> {
+        match self {
+            Value::Array(array) => Some(array),
+            _ => None,
+        }
+    }
+
     /// Returns self as a `Vec<Value>`.
     ///
     /// # Panics
