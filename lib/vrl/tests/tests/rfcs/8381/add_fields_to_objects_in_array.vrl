@@ -1,0 +1,6 @@
+# SKIP
+# object: { "foo": "bar", "items": [{}, {}] }
+# result: { "foo": "bar", "items": [{ "foo": "bar" }, { "foo": "bar" }] }
+
+.items = map_values(.items) -> |value| { value.foo = .foo; value }
+.

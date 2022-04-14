@@ -1,0 +1,16 @@
+# SKIP
+# object: { "foo": true, "bar": "bar", "baz": "", "qux": { "quux": "" }, "quux": [true] }
+# result: [
+#   ["foo", "bar", "baz", "qux", "quux"],
+#   [true, "bar", "", { "quux": "" }, [true]],
+# ]
+
+keys = []
+values = []
+
+for_each(.) -> |key, value| {
+  keys = push(keys, key)
+  values = push(values, value)
+}
+
+[keys, values]
