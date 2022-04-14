@@ -1,6 +1,5 @@
 ---
-# data_dir: /vector-data-dir
-data_dir: /tmp/vector
+data_dir: /vector-data-dir
 api:
   enabled: true
   address: "[::]:8686"
