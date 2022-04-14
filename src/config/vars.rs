@@ -35,24 +35,20 @@ pub fn interpolate(
                 .map(|name| {
                     let val = vars.get(name).map(|v| v.as_str());
                     match flags {
-                        ":-" => {
-                            if matches!(val, Some(v) if !v.is_empty()) {
-                                val.unwrap()
-                            } else {
-                                def_or_err
-                            }
-                        }
+                        ":-" => match val {
+                            Some(v) if !v.is_empty() => v,
+                            _ => def_or_err,
+                        },
                         "-" => val.unwrap_or(def_or_err),
-                        ":?" => {
-                            if matches!(val, Some(v) if !v.is_empty()) {
-                                val.unwrap()
-                            } else {
+                        ":?" => match val {
+                            Some(v) if !v.is_empty() => v,
+                            _ => {
                                 errors.push(format!(
                                     "Non-empty env var required in config. name = {:?}, error = {:?}",
                                     name, def_or_err
                                 ));
                                 ""
-                            }
+                            },
                         }
                         "?" => val.unwrap_or_else(|| {
                             errors.push(format!(
