@@ -253,7 +253,7 @@ pub fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
-    for (component_key, source) in config.sources.iter() {
+    for (component_key, source) in config.sources() {
         new_components.insert(
             component_key.clone(),
             Component::Source(source::Source(source::Data {
@@ -274,7 +274,7 @@ pub fn update_config(config: &Config) {
     }
 
     // Transforms
-    for (component_key, transform) in config.transforms.iter() {
+    for (component_key, transform) in config.transforms() {
         new_components.insert(
             component_key.clone(),
             Component::Transform(transform::Transform(transform::Data {
@@ -292,7 +292,7 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (component_key, sink) in config.sinks.iter() {
+    for (component_key, sink) in config.sinks() {
         new_components.insert(
             component_key.clone(),
             Component::Sink(sink::Sink(sink::Data {
