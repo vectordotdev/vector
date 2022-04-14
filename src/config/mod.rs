@@ -138,13 +138,11 @@ impl Config {
         self.sinks.get(id)
     }
 
-    pub fn inputs_for_node(&self, id: &ComponentKey) -> impl Iterator<Item = &OutputId> {
+    pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| &t.inputs)
-            .or_else(|| self.sinks.get(id).map(|s| &s.inputs))
-            .unwrap()
-            .iter()
+            .map(|t| t.inputs.as_slice())
+            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
     }
 
     /// Expand a logical component id (i.e. from the config file) into the ids of the

@@ -644,6 +644,8 @@ impl RunningTopology {
         let old_inputs = self
             .config
             .inputs_for_node(key)
+            .expect("node exists")
+            .iter()
             .cloned()
             .collect::<HashSet<_>>();
 
@@ -686,7 +688,7 @@ impl RunningTopology {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
 
-        let old_inputs = self.config.inputs_for_node(key);
+        let old_inputs = self.config.inputs_for_node(key).expect("node exists");
 
         for input in old_inputs {
             if let Some(output) = self.outputs.get_mut(input) {
