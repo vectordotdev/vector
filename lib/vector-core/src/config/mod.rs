@@ -7,9 +7,13 @@ mod id;
 mod log_schema;
 pub mod proxy;
 
+use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+use lookup::lookup_v2::Path;
+use lookup::path;
+use value::Value;
 
 use crate::schema;
 
@@ -162,5 +166,49 @@ impl From<Option<bool>> for AcknowledgementsConfig {
 impl From<bool> for AcknowledgementsConfig {
     fn from(enabled: bool) -> Self {
         Some(enabled).into()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum LogNamespace {
+    /// Vector native namespacing
+    ///
+    /// Deserialized data is placed in "body"
+    /// Extra data is placed in "metadata"
+    Vector,
+
+    /// This is the legacy namespacing.
+    ///
+    /// All data is set in the root of the event. Since this can lead
+    /// to collisions, deserialized data has priority over metadata
+    Legacy,
+}
+
+impl LogNamespace {
+    pub fn insert_metadata<'a>(
+        &self,
+        log: &mut LogEvent,
+        key: impl Path<'a>,
+        value: impl Into<Value>,
+    ) {
+        match self {
+            LogNamespace::Vector => {
+                log.insert(path!("metadata").concat(key), value);
+            }
+            LogNamespace::Legacy => {
+                log.try_insert(key, value);
+            }
+        }
+    }
+
+    pub fn add_body_namespace(&self, log: &mut LogEvent) {
+        match self {
+            LogNamespace::Legacy => { /* do nothing. Deserialized data stays on the root */ }
+            LogNamespace::Vector => {
+                let map = log.as_map_mut();
+                let value = std::mem::take(map);
+                map.insert("body".to_owned(), value.into());
+            }
+        }
     }
 }

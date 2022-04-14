@@ -7,8 +7,8 @@ use codecs::decoding::{
     format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer,
     DeserializerConfig, Error, Framer, FramingConfig, NewlineDelimitedDecoder,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use vector_core::config::LogNamespace;
 
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
@@ -16,6 +16,7 @@ use smallvec::SmallVec;
 pub struct Decoder {
     framer: Framer,
     deserializer: Deserializer,
+    log_namespace: LogNamespace,
 }
 
 impl Default for Decoder {
@@ -23,6 +24,7 @@ impl Default for Decoder {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             deserializer: Deserializer::Bytes(BytesDeserializer::new()),
+            log_namespace: LogNamespace::Legacy,
         }
     }
 }
@@ -35,7 +37,14 @@ impl Decoder {
         Self {
             framer,
             deserializer,
+            log_namespace: LogNamespace::Legacy,
         }
+    }
+
+    /// Sets the path prefix where all deserialized data will be placed
+    pub fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
+        self.log_namespace = log_namespace;
+        self
     }
 
     /// Handles the framing result and parses it into a structured event, if
@@ -61,11 +70,25 @@ impl Decoder {
         // Parse structured events from the byte frame.
         self.deserializer
             .parse(frame)
-            .map(|event| Some((event, byte_size)))
+            .map(|mut events| {
+                self.add_body_namespace(&mut events);
+                Some((events, byte_size))
+            })
             .map_err(|error| {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)
             })
+    }
+
+    fn add_body_namespace(&self, events: &mut SmallVec<[Event; 1]>) {
+        for event in events {
+            match event {
+                Event::Log(log) => {
+                    self.log_namespace.add_body_namespace(log);
+                }
+                _ => { /* only logs support namespacing */ }
+            }
+        }
     }
 }
 
@@ -85,29 +108,39 @@ impl tokio_util::codec::Decoder for Decoder {
 }
 
 /// Config used to build a `Decoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct DecodingConfig {
     /// The framing config.
     framing: FramingConfig,
     /// The decoding config.
     decoding: DeserializerConfig,
+    /// The path prefix used for all deserialized data
+    log_namespace: LogNamespace,
 }
 
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
     pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
-        Self { framing, decoding }
+        Self {
+            framing,
+            decoding,
+            // TODO: Make this a parameter once all sources support overriding the log namespace
+            log_namespace: LogNamespace::Legacy,
+        }
+    }
+
+    /// Sets the path prefix where all deserialized data will be placed
+    pub fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
+        self.log_namespace = log_namespace;
+        self
     }
 
     /// Builds a `Decoder` from the provided configuration.
     pub fn build(self) -> Decoder {
-        // Build the framer.
         let framer = self.framing.build();
-
-        // Build the deserializer.
         let deserializer = self.decoding.build();
 
-        Decoder::new(framer, deserializer)
+        Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace)
     }
 }

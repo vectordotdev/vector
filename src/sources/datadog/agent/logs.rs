@@ -4,10 +4,11 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
+use warp::{filters::BoxedFilter, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
@@ -26,7 +27,7 @@ pub(crate) fn build_warp_filter(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
-        .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
+        .and(warp::path!("v1" / "input" / ..).or(warp::path!("api" / "v2" / "logs" / ..)))
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
@@ -90,18 +91,32 @@ pub(crate) fn decode_log_body(
     for message in messages {
         let mut decoder = source.decoder.clone();
         let mut buffer = BytesMut::new();
-        buffer.put(message.message);
+        buffer.put(message.message.clone());
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert_flat("status", message.status.clone());
-                            log.try_insert_flat("timestamp", message.timestamp);
-                            log.try_insert_flat("hostname", message.hostname.clone());
-                            log.try_insert_flat("service", message.service.clone());
-                            log.try_insert_flat("ddsource", message.ddsource.clone());
-                            log.try_insert_flat("ddtags", message.ddtags.clone());
+                            let namespace = &source.log_namespace;
+                            namespace.insert_metadata(log, path!("status"), message.status.clone());
+                            namespace.insert_metadata(log, path!("timestamp"), message.timestamp);
+                            namespace.insert_metadata(
+                                log,
+                                path!("hostname"),
+                                message.hostname.clone(),
+                            );
+                            namespace.insert_metadata(
+                                log,
+                                path!("service"),
+                                message.service.clone(),
+                            );
+                            namespace.insert_metadata(
+                                log,
+                                path!("ddsource"),
+                                message.ddsource.clone(),
+                            );
+                            namespace.insert_metadata(log, path!("ddtags"), message.ddtags.clone());
+
                             log.try_insert_flat(
                                 source.log_schema_source_type_key,
                                 Bytes::from("datadog_agent"),

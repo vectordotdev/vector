@@ -133,15 +133,11 @@ impl LogEvent {
         util::log::contains(self.as_map(), path)
     }
 
-    pub fn insert<'a>(
-        &mut self,
-        path: impl Path<'a>,
-        value: impl Into<Value> + Debug,
-    ) -> Option<Value> {
+    pub fn insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) -> Option<Value> {
         util::log::insert(self.as_map_mut(), path, value.into())
     }
 
-    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }

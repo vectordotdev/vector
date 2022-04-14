@@ -18,6 +18,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -60,6 +61,8 @@ struct DatadogAgentConfig {
     disable_traces: bool,
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
+    #[serde(default = "crate::serde::default_none")]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -75,6 +78,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
+            log_namespace: Some(true),
         })
         .unwrap()
     }
@@ -84,6 +88,7 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
         let logs_schema_definition = cx
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
@@ -97,7 +102,10 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered metrics schema required")
             .clone();
 
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone())
+            .with_log_namespace(log_namespace)
+            .build();
+
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
             self.store_api_key,
@@ -105,6 +113,7 @@ impl SourceConfig for DatadogAgentConfig {
             tls.http_protocol_name(),
             logs_schema_definition,
             metrics_schema_definition,
+            log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
@@ -215,6 +224,7 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_schema_host_key: &'static str,
     pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
+    pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
@@ -255,6 +265,7 @@ impl DatadogAgentSource {
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
         metrics_schema_definition: schema::Definition,
+        log_namespace: LogNamespace,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -269,6 +280,7 @@ impl DatadogAgentSource {
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
             metrics_schema_definition: Arc::new(metrics_schema_definition),
+            log_namespace,
         }
     }
 
