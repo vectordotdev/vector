@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use futures::executor;
 use indexmap::IndexMap;
@@ -6,9 +6,14 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time::Duration};
+use toml::value::Table;
 use typetag::serde;
 
-use super::{format, ComponentKey, Format};
+use super::{format, prepare_input, Format};
+use crate::config::{
+    loading::{ComponentHint, Process},
+    ComponentKey,
+};
 
 static COLLECTOR: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
@@ -16,6 +21,24 @@ static COLLECTOR: Lazy<Regex> =
 #[typetag::serde(tag = "type")]
 pub trait SecretBackend: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn retrieve(&mut self, secret_keys: Vec<String>) -> crate::Result<HashMap<String, String>>;
+}
+
+pub struct SecretBackendLoader {
+    backends: SecretBackends,
+}
+
+impl Process for SecretBackendLoader {
+    fn prepare<R: Read>(
+        &self,
+        input: R,
+        format: Format,
+    ) -> Result<(String, Vec<String>), Vec<String>> {
+        prepare_input(input, format)
+    }
+
+    fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -52,6 +75,7 @@ fn retrieve_secrets(
                 vec![]
             },
             Some(backend) => {
+                debug!("Retrieving secret for backend: {}", backend_name);
                 match backend.retrieve(keys) {
                     Err(e) => {
                         warnings.push(e.to_string());
@@ -59,6 +83,7 @@ fn retrieve_secrets(
                     },
                     Ok(s) => {
                         s.into_iter().map(|(k, v)| {
+                            trace!("Successfully retrieved secret: {}.{}", backend_name, k);
                             (format!("{}.{}", backend_name, k), v)
                         }).collect::<Vec<(String, String)>>()
                     }
@@ -77,7 +102,7 @@ fn do_replace(input: &str, secrets: HashMap<String, String>) -> String {
                 .map(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
                 .flatten()
                 .cloned()
-                .unwrap_or_else(|| "".to_string())
+                .unwrap_or_else(|| "foo".to_string())
         })
         .into_owned()
 }

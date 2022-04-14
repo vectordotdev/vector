@@ -29,7 +29,6 @@ mod id;
 mod loading;
 pub mod provider;
 mod schema;
-mod secret;
 mod sink;
 mod source;
 mod transform;
@@ -45,9 +44,8 @@ pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load_source_from_paths, merge_path_lists, process_paths, SecretBackend, CONFIG_PATHS,
 };
-pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
 pub use transform::{TransformDescription, TransformOuter};
