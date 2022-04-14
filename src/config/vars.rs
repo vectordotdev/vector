@@ -27,8 +27,8 @@ pub fn interpolate(
 
     let interpolated = re
         .replace_all(input, |caps: &Captures<'_>| {
-            let flags = caps.get(3).map(|m| m.as_str()).unwrap_or("");
-            let def_or_err = caps.get(4).map(|m| m.as_str()).unwrap_or("");
+            let flags = caps.get(3).map(|m| m.as_str()).unwrap_or_default();
+            let def_or_err = caps.get(4).map(|m| m.as_str()).unwrap_or_default();
             caps.get(1)
                 .or_else(|| caps.get(2))
                 .map(|m| m.as_str())
