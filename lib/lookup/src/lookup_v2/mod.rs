@@ -4,7 +4,6 @@ use crate::lookup_v2::jit::{JitLookup, JitPath};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
-use std::marker::PhantomData;
 use std::slice::Iter;
 
 /// Syntactic sugar for creating a pre-parsed path.
@@ -95,23 +94,21 @@ pub trait Path<'a>: Clone {
 
     fn segment_iter(&self) -> Self::Iter;
 
-    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<'a, Self, T> {
+    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
         PathConcat {
             a: self.clone(),
             b: path,
-            _phantom: PhantomData::default(),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct PathConcat<'a, A, B> {
+pub struct PathConcat<A, B> {
     a: A,
     b: B,
-    _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a, A: Path<'a>, B: Path<'a>> Path<'a> for PathConcat<'a, A, B> {
+impl<'a, A: Path<'a>, B: Path<'a>> Path<'a> for PathConcat<A, B> {
     type Iter = std::iter::Chain<A::Iter, B::Iter>;
 
     fn segment_iter(&self) -> Self::Iter {
