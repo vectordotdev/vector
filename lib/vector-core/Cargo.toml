@@ -60,7 +60,7 @@ vector_common = { path = "../vector-common" }
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 
 [build-dependencies]
-prost-build = "0.9"
+prost-build = "0.10"
 
 [dev-dependencies]
 base64 = "0.13.0"

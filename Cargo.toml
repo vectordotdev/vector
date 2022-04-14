@@ -304,7 +304,7 @@ atty = "0.2.14"
 nix = "0.23.1"
 
 [build-dependencies]
-prost-build = { version = "0.9", optional = true }
+prost-build = { version = "0.10", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost", "compression"], optional = true }
 
 [dev-dependencies]

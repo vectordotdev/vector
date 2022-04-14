@@ -5867,7 +5867,7 @@ dependencies = [
  "nom 7.1.1",
  "num_enum",
  "prost 0.9.0",
- "prost-build 0.9.0",
+ "prost-build 0.10.1",
  "prost-types 0.9.0",
  "snafu",
  "vector_common",
@@ -5968,6 +5968,28 @@ dependencies = [
  "petgraph 0.6.0",
  "prost 0.9.0",
  "prost-types 0.9.0",
+ "regex",
+ "tempfile",
+ "which 4.2.2",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "120fbe7988713f39d780a58cf1a7ef0d7ef66c6d87e5aa3438940c05357929f4"
+dependencies = [
+ "bytes 1.1.0",
+ "cfg-if 1.0.0",
+ "cmake",
+ "heck 0.4.0",
+ "itertools",
+ "lazy_static",
+ "log",
+ "multimap",
+ "petgraph 0.6.0",
+ "prost 0.10.0",
+ "prost-types 0.10.0",
  "regex",
  "tempfile",
  "which 4.2.2",
@@ -8961,7 +8983,7 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.9.0",
- "prost-build 0.9.0",
+ "prost-build 0.10.1",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -9172,7 +9194,7 @@ dependencies = [
  "pretty_assertions",
  "proptest",
  "prost 0.9.0",
- "prost-build 0.9.0",
+ "prost-build 0.10.1",
  "prost-types 0.9.0",
  "quickcheck",
  "rand 0.8.5",
