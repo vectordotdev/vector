@@ -1309,20 +1309,20 @@ Some additional suggestions include `flatten`, `partition`, `fold`, `any`,
 
 Potential list of future functions
 
-- `flatten`
-- `partition`
-- `fold`
-- `any`
-- `all`
-- `find`
-- `max`
-- `min`
-- `replace_keys`
-- `to_entries`
-- `from_entries`
-- `map_to_array`
-- `zip`
-- `chain`
+* `flatten`
+* `partition`
+* `fold`
+* `any`
+* `all`
+* `find`
+* `max`
+* `min`
+* `replace_keys`
+* `to_entries`
+* `from_entries`
+* `map_to_array`
+* `zip`
+* `chain`
 
 ### Schema Support
 
