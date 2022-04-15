@@ -10,7 +10,7 @@ releases: "0.21.0": {
 			description: """
 				We are [in the process](https://github.com/vectordotdev/vector/pull/11802) of adding a source for
 				ingesting data from the OpenTelemetry collector and OpenTelemetry compatible tools. We are starting with
-				traces, since this has stabelized, but will move on to metrics and logs.
+				traces, since this has stabilized, but will move on to metrics and logs.
 
 				We'll also be adding an OpenTelemetry sink for forwarding data from Vector to OpenTelemetry-compatible APIs.
 				"""
@@ -20,7 +20,7 @@ releases: "0.21.0": {
 			description: """
 				We continue to be in the process of ensuring that all Vector components report a consistent set of
 				metrics to make it easier to monitor the performance of Vector.  These metrics are outlined in this new
-				[instrumentation specification](\(urls.specs_instrumentation)).
+				[instrumentation specification](\(urls.specs_instrumentation).
 				"""
 		},
 		{
