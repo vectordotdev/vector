@@ -4,7 +4,7 @@ use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
 use regex::Regex;
 use std::fmt::Formatter;
-use tracing::error;
+use tracing::warn;
 use vrl_compiler::Value;
 
 /// converts Joda time format to strptime format
@@ -248,12 +248,12 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         .expect("this regex should always contain tz group")
                         .as_str();
                     let tz: Tz = tz.parse().map_err(|error| {
-                        error!(message = "Error parsing tz", tz = %tz, % error);
+                        warn!(message = "Error parsing tz", tz = %tz, % error);
                         GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
                     })?;
                     let naive_date = NaiveDateTime::parse_from_str(&value, &filter.strp_format).map_err(|error|
                         {
-                            error!(message = "Error parsing date", value = %value, format = %filter.strp_format, % error);
+                            warn!(message = "Error parsing date", value = %value, format = %filter.strp_format, % error);
                             GrokRuntimeError::FailedToApplyFilter(
                                 filter.to_string(),
                                 value.to_string(),
@@ -278,7 +278,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // parse as a tz-aware complete date/time
                         Ok(DateTime::parse_from_str(&value, &filter.strp_format)
                             .map_err(|error| {
-                                error!(message = "Error parsing date", date = %value, % error);
+                                warn!(message = "Error parsing date", date = %value, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),
@@ -292,7 +292,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // try parsing as a naive datetime
                         if let Some(tz) = &filter.target_tz {
                             let tzs = parse_timezone(tz).map_err(|error| {
-                                error!(message = "Error parsing tz", tz = %tz, % error);
+                                warn!(message = "Error parsing tz", tz = %tz, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),
@@ -320,7 +320,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // try parsing as a naive date
                         let nd = NaiveDate::parse_from_str(&value, &filter.strp_format).map_err(
                             |error| {
-                                error!(message = "Error parsing date", date = %value, % error);
+                                warn!(message = "Error parsing date", date = %value, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),
