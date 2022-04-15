@@ -530,6 +530,21 @@ mod tests {
                 "Nov 16 2020 13:41:29 GMT",
                 Ok(Value::Integer(1605534089000)),
             ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSSS"):field}"#,
+                "2019-11-25 11:21:32.6282",
+                Ok(Value::Integer(1574680892628)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZ"):field}"#,
+                "2016-09-02T15:02:29.648Z",
+                Ok(Value::Integer(1472828549648)),
+            ),
+            (
+                r#"%{date("yyMMdd HH:mm:ss"):field}"#,
+                "171113 14:14:20",
+                Ok(Value::Integer(1510582460000)),
+            ),
         ]);
 
         // check error handling
