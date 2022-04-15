@@ -30,27 +30,27 @@ pub async fn custom_reflector<K, W>(
                         match event {
                             // Immediately reoncile `Applied` event
                             watcher::Event::Applied(_) => {
-                                trace!("Processing Applied event");
+                                trace!("Processing Applied event.");
                                 store.apply_watcher_event(&event);
                             }
                             // Delay reconciling any `Deleted` events
                             watcher::Event::Deleted(_) => {
-                                trace!("Queuing Deleted event");
+                                trace!("Queuing Deleted event.");
                                 delay_queue.insert(event.to_owned(), delay_deletion);
                             }
                             // Clear all delayed events on `Restarted` events
                             watcher::Event::Restarted(_) => {
-                                trace!("Processing Restarted event");
+                                trace!("Processing Restarted event.");
                                 delay_queue.clear();
                                 store.apply_watcher_event(&event);
                             }
                         }
                     },
                     Some(Err(error)) => {
-                        warn!("Watcher stream got an error: {:?}", error);
+                        warn!(message = "Watcher stream got an error.", error = ?error);
                     },
                     None => {
-                        info!("Watcher stream has terminated");
+                        info!("Watcher stream has terminated.");
                         break;
                     },
                 }
@@ -58,17 +58,17 @@ pub async fn custom_reflector<K, W>(
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
                     Some(Ok(event)) => {
-                        trace!("Processing Deleted event");
+                        trace!("Processing Deleted event.");
                         store.apply_watcher_event(&event.into_inner());
                     },
                     Some(Err(error)) => {
-                        warn!("DelayQueue stream got an error: {:?}", error);
+                        warn!("DelayQueue stream got an error.", error = ?error);
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
                     // no items in the queue.
                     None => {
-                        error!("Polled the DelayQueue while it was empty");
+                        error!("Polled the DelayQueue while it was empty.");
                     },
                 }
             }
