@@ -62,7 +62,7 @@ pub async fn custom_reflector<K, W>(
                         store.apply_watcher_event(&event.into_inner());
                     },
                     Some(Err(error)) => {
-                        warn!("DelayQueue stream got an error.", error = ?error);
+                        warn!(message = "DelayQueue stream got an error.", error = ?error);
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
