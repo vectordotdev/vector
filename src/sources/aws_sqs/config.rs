@@ -4,7 +4,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsOptions;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{AcknowledgementsConfig, Output, SourceConfig, SourceContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
@@ -77,7 +77,7 @@ impl SourceConfig for AwsSqsConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

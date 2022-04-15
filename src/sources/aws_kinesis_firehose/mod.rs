@@ -8,8 +8,8 @@ use warp::Filter;
 use crate::{
     codecs::DecodingConfig,
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
+        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
@@ -86,7 +86,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

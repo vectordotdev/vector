@@ -1,9 +1,6 @@
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -101,7 +98,7 @@ impl SourceConfig for RedisSourceConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
