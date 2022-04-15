@@ -47,6 +47,10 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
+            if value.is_empty() {
+                continue;
+            }
+
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
@@ -115,6 +119,7 @@ mod tests {
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
+    use tracing_test::traced_test;
     use vector_common::btreemap;
 
     #[test]
@@ -895,6 +900,19 @@ mod tests {
                  "subfield2" =>  Value::Integer(1)
             })
         );
+    }
+
+    #[test]
+    #[traced_test]
+    fn does_not_emit_error_log_on_alternatives_with_filters() {
+        test_full_grok(vec![(
+            r#"(%{integer:field}|%{data:field})"#,
+            "abc",
+            Ok(Value::from(btreemap! {
+                "field" =>  Value::Bytes("abc".into()),
+            })),
+        )]);
+        assert!(!logs_contain("Error applying filter"));
     }
 
     #[test]
