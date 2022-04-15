@@ -24,26 +24,53 @@ pub async fn custom_reflector<K, W>(
     let mut delay_queue = DelayQueue::default();
     loop {
         tokio::select! {
-            Some(Ok(event)) = stream.next() => {
-                match event {
-                    watcher::Event::Applied(_) => {
-                        // Immediately apply event
-                        store.apply_watcher_event(&event);
-                    }
-                    watcher::Event::Deleted(_) => {
-                        // Delay reconciling any `Deleted` events
-                        delay_queue.insert(event.to_owned(), delay_deletion);
-                    }
-                    watcher::Event::Restarted(_) => {
-                        // Clear all delayed events when the cache is refreshed
-                        delay_queue.clear();
-                        store.apply_watcher_event(&event);
-                    }
+            result = stream.next() => {
+                match result {
+                    Some(Ok(event)) => {
+                        match event {
+                            // Immediately reoncile `Applied` event
+                            watcher::Event::Applied(_) => {
+                                trace!("Processing Applied event");
+                                store.apply_watcher_event(&event);
+                            }
+                            // Delay reconciling any `Deleted` events
+                            watcher::Event::Deleted(_) => {
+                                trace!("Queuing Deleted event");
+                                delay_queue.insert(event.to_owned(), delay_deletion);
+                            }
+                            // Clear all delayed events on `Restarted` events
+                            watcher::Event::Restarted(_) => {
+                                trace!("Processing Restarted event");
+                                delay_queue.clear();
+                                store.apply_watcher_event(&event);
+                            }
+                        }
+                    },
+                    Some(Err(error)) => {
+                        warn!("Watcher stream got an error: {:?}", error);
+                    },
+                    None => {
+                        info!("Watcher stream has terminated");
+                        break;
+                    },
                 }
             }
-            // When the Deleted event expires from the queue pass it to the store
-            Some(Ok(event)) = delay_queue.next() => {
-                store.apply_watcher_event(&event.into_inner())
+            result = delay_queue.next(), if !delay_queue.is_empty() => {
+                match result {
+                    Some(Ok(event)) => {
+                        trace!("Processing Deleted event");
+                        store.apply_watcher_event(&event.into_inner());
+                    },
+                    Some(Err(error)) => {
+                        warn!("DelayQueue stream got an error: {:?}", error);
+                    },
+                    // DelayQueue returns None if the queue is exhausted,
+                    // however we disable the DelayQueue branch if there are
+                    // no items in the queue.
+                    None => {
+                        error!("Polled the DelayQueue while it was empty");
+                    },
+                }
             }
         }
     }
