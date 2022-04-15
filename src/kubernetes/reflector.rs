@@ -16,7 +16,7 @@ pub async fn custom_reflector<K, W>(
     stream: W,
     delay_deletion: Duration,
 ) where
-    K: Resource + Clone,
+    K: Resource + Clone + std::fmt::Debug,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
@@ -30,45 +30,48 @@ pub async fn custom_reflector<K, W>(
                         match event {
                             // Immediately reoncile `Applied` event
                             watcher::Event::Applied(_) => {
-                                trace!("Processing Applied event.");
+                                trace!(message = "Processing Applied event.", ?event);
                                 store.apply_watcher_event(&event);
                             }
                             // Delay reconciling any `Deleted` events
                             watcher::Event::Deleted(_) => {
-                                trace!("Queuing Deleted event.");
+                                trace!(message = "Queuing Deleted event.", ?event);
                                 delay_queue.insert(event.to_owned(), delay_deletion);
                             }
                             // Clear all delayed events on `Restarted` events
                             watcher::Event::Restarted(_) => {
-                                trace!("Processing Restarted event.");
+                                trace!(message = "Processing Restarted event.", ?event);
                                 delay_queue.clear();
                                 store.apply_watcher_event(&event);
                             }
                         }
                     },
                     Some(Err(error)) => {
-                        warn!(message = "Watcher stream got an error.", error = ?error);
+                        warn!(message = "Watcher Stream received an error. Retrying.", ?error);
                     },
+                    // The watcher stream should never yield `None`
+                    // https://docs.rs/kube-runtime/0.71.0/src/kube_runtime/watcher.rs.html#234-237
                     None => {
-                        info!("Watcher stream has terminated.");
-                        break;
+                        unreachable!("a watcher Xtream never ends");
                     },
                 }
             }
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
                     Some(Ok(event)) => {
-                        trace!("Processing Deleted event.");
+                        trace!(message = "Processing Deleted event.", ?event);
                         store.apply_watcher_event(&event.into_inner());
                     },
-                    Some(Err(error)) => {
-                        warn!(message = "DelayQueue stream got an error.", error = ?error);
+                    // DelayQueue should never return an Err, resolved upstream
+                    // https://github.com/tokio-rs/tokio/pull/4241
+                    Some(Err(_)) => {
+                        unreachable!("a DelayQueue never returns an error");
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
                     // no items in the queue.
                     None => {
-                        error!("Polled the DelayQueue while it was empty.");
+                        unreachable!("an empty DelayQueue is never polled");
                     },
                 }
             }
