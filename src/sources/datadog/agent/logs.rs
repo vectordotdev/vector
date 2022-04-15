@@ -121,6 +121,7 @@ pub(crate) fn decode_log_body(
                                 source.log_schema_source_type_key,
                                 Bytes::from("datadog_agent"),
                             );
+
                             log.try_insert_flat(source.log_schema_timestamp_key, now);
                             if let Some(k) = &api_key {
                                 log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));

@@ -61,7 +61,7 @@ struct DatadogAgentConfig {
     disable_traces: bool,
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
-    #[serde(default = "crate::serde::default_none")]
+    #[serde(default)]
     log_namespace: Option<bool>,
 }
 

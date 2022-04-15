@@ -118,11 +118,10 @@ impl SourceContext {
     /// Gets the log namespacing to use. The passed in value is from the source itself
     /// and will override any global default if it's set.
     pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
-        if namespace.unwrap_or(self.globals.log_namespace) {
-            LogNamespace::Vector
-        } else {
-            LogNamespace::Legacy
-        }
+        namespace
+            .or(self.globals.log_namespace)
+            .unwrap_or(false)
+            .into()
     }
 }
 

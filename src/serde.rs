@@ -16,10 +16,6 @@ pub const fn default_false() -> bool {
     false
 }
 
-pub const fn default_none<T>() -> Option<T> {
-    None
-}
-
 /// The default max length of the input buffer.
 ///
 /// Any input exceeding this limit will be discarded.

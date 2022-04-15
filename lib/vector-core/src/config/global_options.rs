@@ -1,5 +1,6 @@
 use std::{fs::DirBuilder, path::PathBuf};
 
+use crate::config::LogNamespace;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -28,6 +29,7 @@ pub(crate) enum DataDirError {
     },
 }
 
+// If this is modified, make sure those changes are reflected in the `ConfigBuilder::append` function!
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
@@ -47,7 +49,8 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
-    pub log_namespace: bool,
+
+    pub log_namespace: Option<bool>,
 }
 
 impl GlobalOptions {

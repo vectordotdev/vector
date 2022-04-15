@@ -226,6 +226,14 @@ impl ConfigBuilder {
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
 
+        if self.global.log_namespace.is_some() && with.global.log_namespace.is_some() {
+            if self.global.log_namespace != with.global.log_namespace {
+                errors.push("conflicting values for 'log_namespace' found".to_owned());
+            }
+        }
+
+        self.global.log_namespace = self.global.log_namespace.or(with.global.log_namespace);
+
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
         } else if with.global.data_dir != default_data_dir()
