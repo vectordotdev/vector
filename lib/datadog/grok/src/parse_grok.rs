@@ -46,29 +46,27 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::Object(BTreeMap::new());
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (name, value) in matches.iter() {
-            if value.is_empty() {
-                continue;
-            }
-
-            let mut value = Some(Value::from(value));
+        for (name, match_str) in matches.iter() {
+            let mut value = Some(Value::from(match_str));
 
             if let Some(GrokField {
                 lookup: field,
                 filters,
             }) = grok_rule.fields.get(name)
             {
-                filters.iter().for_each(|filter| {
-                    if let Some(ref v) = value {
-                        match apply_filter(v, filter) {
-                            Ok(v) => value = Some(v),
-                            Err(error) => {
-                                warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
-                                value = None;
+                if !match_str.is_empty() {
+                    filters.iter().for_each(|filter| {
+                        if let Some(ref v) = value {
+                            match apply_filter(v, filter) {
+                                Ok(v) => value = Some(v),
+                                Err(error) => {
+                                    warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
+                                    value = None;
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
 
                 if let Some(value) = value {
                     match value {
@@ -906,10 +904,11 @@ mod tests {
     #[traced_test]
     fn does_not_emit_error_log_on_alternatives_with_filters() {
         test_full_grok(vec![(
-            r#"(%{integer:field}|%{data:field})"#,
+            r#"(%{integer:field_int}|%{data:field_str})"#,
             "abc",
             Ok(Value::from(btreemap! {
-                "field" =>  Value::Bytes("abc".into()),
+                "field_int" =>  Value::Bytes("".into()),
+                "field_str" =>  Value::Bytes("abc".into()),
             })),
         )]);
         assert!(!logs_contain("Error applying filter"));
