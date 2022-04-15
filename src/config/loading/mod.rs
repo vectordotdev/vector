@@ -255,7 +255,7 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    Ok(vars::interpolate(&source_string, &vars))
+    vars::interpolate(&source_string, &vars)
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
