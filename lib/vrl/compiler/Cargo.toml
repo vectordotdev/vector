@@ -25,12 +25,13 @@ expr-literal = []
 expr-op = []
 expr-query = []
 expr-unary = []
-llvm = ["inkwell"]
+llvm = ["precompiled", "inkwell"]
 
 [dependencies]
 core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
+precompiled = { path = "./precompiled", optional = true }
 lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 value = { path = "../../value" }

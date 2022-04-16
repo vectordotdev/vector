@@ -1,9 +1,0 @@
-[package]
-name = "precompiled"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-vrl-core = { path = "../../../core", default-features = false }
-
-[workspace]

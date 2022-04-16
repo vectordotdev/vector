@@ -198,6 +198,7 @@ pub extern "C" fn vrl_expression_query_target_external_impl(
         .target_get(path)
         .ok()
         .flatten()
+        .map(|value| value.clone())
         .unwrap_or(Value::Null));
 }
 
@@ -209,5 +210,6 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .target_get(path)
         .ok()
         .flatten()
+        .map(|value| value.clone())
         .unwrap_or(Value::Null));
 }

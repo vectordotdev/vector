@@ -5688,6 +5688,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
+name = "precompiled"
+version = "0.0.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "precompiled-sys"
+version = "0.0.0"
+dependencies = [
+ "vrl-core",
+]
+
+[[package]]
 name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9112,6 +9126,7 @@ dependencies = [
  "lookup",
  "ordered-float 3.0.0",
  "paste",
+ "precompiled",
  "regex",
  "serde",
  "thiserror",

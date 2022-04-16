@@ -1,0 +1,10 @@
+[package]
+name = "precompiled-sys"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+vrl-core = { path = "../../../core" }

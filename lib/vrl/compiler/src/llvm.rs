@@ -8,7 +8,7 @@ use lookup::LookupBuf;
 use parser::ast::Ident;
 use std::collections::HashMap;
 
-static PRECOMPILED: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/precompiled.bc"));
+static PRECOMPILED: &[u8] = precompiled::LLVM_BITCODE;
 
 pub struct Context<'ctx> {
     context: &'ctx inkwell::context::Context,

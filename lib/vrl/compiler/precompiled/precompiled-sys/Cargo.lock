@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "std"
-version = "0.1.0"
+name = "precompiled"
+version = "0.0.0"
