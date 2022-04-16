@@ -92,7 +92,7 @@ impl Expression for Variable {
             .build_unconditional_branch(variable_begin_block);
         ctx.builder().position_at_end(variable_begin_block);
 
-        let fn_ident = "vrl_expression_variable_impl";
+        let fn_ident = "vrl_target_assign";
         let fn_impl = ctx
             .module()
             .get_function(fn_ident)

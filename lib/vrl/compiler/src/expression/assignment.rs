@@ -323,7 +323,7 @@ impl Target {
                 // Get the provided path, or else insert into the variable
                 // without any path appended and return early.
                 if path.is_root() {
-                    let fn_ident = "vrl_expression_assignment_target_insert_internal_impl";
+                    let fn_ident = "vrl_target_assign";
                     let fn_impl = ctx
                         .module()
                         .get_function(fn_ident)
