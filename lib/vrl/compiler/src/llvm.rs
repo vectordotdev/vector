@@ -1,24 +1,129 @@
-use crate::Resolved;
+use crate::{
+    state::{ExternalEnv, LocalEnv},
+    Program, Resolved,
+};
 use inkwell::{
-    builder::Builder,
+    execution_engine::{ExecutionEngine, FunctionLookupError, JitFunction},
+    memory_buffer::MemoryBuffer,
     module::Module,
+    passes::{PassManager, PassManagerBuilder},
     values::{FunctionValue, GlobalValue, PointerValue},
+    OptimizationLevel,
 };
 use lookup::LookupBuf;
 use parser::ast::Ident;
 use std::collections::HashMap;
 
-static PRECOMPILED: &[u8] = precompiled::LLVM_BITCODE;
+static VRL_EXECUTE_SYMBOL: &str = "vrl_execute";
+
+pub struct Builder(inkwell::context::Context);
+
+impl Builder {
+    pub fn new() -> Result<Self, String> {
+        inkwell::targets::Target::initialize_native(
+            &inkwell::targets::InitializationConfig::default(),
+        )?;
+
+        Ok(Self(inkwell::context::Context::create()))
+    }
+
+    pub fn compile(
+        &self,
+        state: (&LocalEnv, &ExternalEnv),
+        program: &Program,
+    ) -> Result<Context, String> {
+        let symbols = precompiled::symbols();
+        // Force the compiler to keep these function symbols.
+        unsafe { std::ptr::read_volatile(&symbols) };
+        let context = &self.0;
+        let buffer =
+            MemoryBuffer::create_from_memory_range(precompiled::LLVM_BITCODE, "precompiled");
+        let module = Module::parse_bitcode_from_buffer(&buffer, context)
+            .map_err(|string| string.to_string())?;
+        module.set_name("vrl");
+        let builder = context.create_builder();
+        let function = module.get_function(VRL_EXECUTE_SYMBOL).ok_or(format!(
+            r#"failed getting function "{}" from module"#,
+            VRL_EXECUTE_SYMBOL
+        ))?;
+        let context_ref = function.get_nth_param(0).unwrap().into_pointer_value();
+        let result_ref = function.get_nth_param(1).unwrap().into_pointer_value();
+
+        for block in function.get_basic_blocks() {
+            block.remove_from_function().unwrap();
+        }
+
+        let start = context.append_basic_block(function, "start");
+        builder.position_at_end(start);
+
+        let execution_engine = module
+            .create_jit_execution_engine(OptimizationLevel::Aggressive)
+            .map_err(|string| string.to_string())?;
+
+        let mut context = Context {
+            context,
+            module,
+            builder,
+            function,
+            execution_engine,
+            context_ref,
+            result_ref,
+            variable_map: Default::default(),
+            variables: Default::default(),
+            resolved_map: Default::default(),
+            resolveds: Default::default(),
+            lookup_buf_map: Default::default(),
+            lookup_bufs: Default::default(),
+        };
+
+        for expression in program.iter() {
+            expression.emit_llvm(state, &mut context)?;
+        }
+
+        for variable_ref in &context.variables {
+            let fn_ident = "vrl_resolved_drop";
+            let fn_impl = context
+                .module
+                .get_function(fn_ident)
+                .unwrap_or_else(|| panic!(r#"failed to get "{}" function"#, fn_ident));
+            context
+                .builder
+                .build_call(fn_impl, &[(*variable_ref).into()], fn_ident);
+        }
+
+        context.builder().build_return(None);
+
+        #[allow(clippy::print_stdout)]
+        {
+            let dir = std::env::temp_dir();
+            let file = [dir, "vrl.ll".into()]
+                .iter()
+                .collect::<std::path::PathBuf>();
+
+            println!("LLVM IR -> {}", file.display());
+            context.module.print_to_file(&file).unwrap();
+        }
+
+        if !context.function.verify(true) {
+            return Err(format!(
+                "Generated code for VRL function failed verification:\n{:?}",
+                context.function
+            ));
+        }
+
+        Ok(context)
+    }
+}
 
 pub struct Context<'ctx> {
     context: &'ctx inkwell::context::Context,
     module: Module<'ctx>,
-    builder: Builder<'ctx>,
+    builder: inkwell::builder::Builder<'ctx>,
     function: FunctionValue<'ctx>,
+    execution_engine: ExecutionEngine<'ctx>,
     context_ref: PointerValue<'ctx>,
     result_ref: PointerValue<'ctx>,
     variable_map: HashMap<Ident, usize>,
-    // TODO: Emit code to drop variables when finishing the module.
     variables: Vec<PointerValue<'ctx>>,
     resolved_map: HashMap<Resolved, usize>,
     resolveds: Vec<GlobalValue<'ctx>>,
@@ -35,7 +140,7 @@ impl<'ctx> Context<'ctx> {
         &self.module
     }
 
-    pub fn builder(&self) -> &Builder<'ctx> {
+    pub fn builder(&self) -> &inkwell::builder::Builder<'ctx> {
         &self.builder
     }
 
@@ -175,18 +280,58 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn build_alloca_resolved(&self, name: &str) -> inkwell::values::PointerValue<'ctx> {
-        let resolved_type_identifier =
-            "std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>";
         let resolved_type = self
-            .module
-            .get_struct_type(resolved_type_identifier)
-            .unwrap_or_else(|| {
-                panic!(
-                    r#"failed getting type "{}" from module"#,
-                    resolved_type_identifier
-                )
-            });
-
+            .function
+            .get_nth_param(1)
+            .unwrap()
+            .get_type()
+            .into_pointer_type()
+            .get_element_type()
+            .into_struct_type();
         self.builder.build_alloca(resolved_type, name)
+    }
+
+    pub fn optimize(&self) -> Result<(), String> {
+        let pass_manager = PassManager::create(());
+        let pass_manager_builder = PassManagerBuilder::create();
+        pass_manager_builder.set_optimization_level(OptimizationLevel::Aggressive);
+        pass_manager_builder.populate_module_pass_manager(&pass_manager);
+
+        pass_manager.run_on(&self.module);
+
+        #[allow(clippy::print_stdout)]
+        {
+            let dir = std::env::temp_dir();
+            let file = [dir, "vrl.opt.ll".into()]
+                .iter()
+                .collect::<std::path::PathBuf>();
+
+            println!("LLVM IR -> {}", file.display());
+            self.module.print_to_file(&file).unwrap();
+        }
+
+        if !self.function.verify(false) {
+            self.function.print_to_stderr();
+            Err("Generated code for VRL function failed verification".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn get_jit_function(
+        &self,
+    ) -> Result<
+        JitFunction<'ctx, unsafe extern "C" fn(&mut core::Context, &mut crate::Resolved)>,
+        FunctionLookupError,
+    > {
+        unsafe { self.execution_engine.get_function(VRL_EXECUTE_SYMBOL) }.map(
+            |function: JitFunction<
+                'ctx,
+                unsafe extern "C" fn(
+                    &'static mut core::Context<'static>,
+                    &'static mut crate::Resolved,
+                ),
+            >| unsafe { std::mem::transmute(function) },
+        )
     }
 }
