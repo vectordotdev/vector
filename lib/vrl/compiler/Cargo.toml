@@ -9,6 +9,7 @@ publish = false
 core = { package = "vrl-core", path = "../core" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
+precompiled = { path = "./precompiled", optional = true }
 lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 value = { path = "../../value" }
@@ -39,5 +40,5 @@ harness = false
 
 [features]
 default = ["llvm"]
-llvm = ["inkwell"]
+llvm = ["precompiled", "inkwell"]
 test = []

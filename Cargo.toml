@@ -86,6 +86,8 @@ members = [
   "lib/value",
   "lib/vrl/cli",
   "lib/vrl/compiler",
+  "lib/vrl/compiler/precompiled",
+  "lib/vrl/compiler/precompiled/precompiled-sys",
   "lib/vrl/core",
   "lib/vrl/diagnostic",
   "lib/vrl/parser",
