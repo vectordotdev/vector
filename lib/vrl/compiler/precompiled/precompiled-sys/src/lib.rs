@@ -10,14 +10,18 @@ use vrl_core::{
 #[no_mangle]
 pub extern "C" fn vrl_execute(context: &mut Context, result: &mut Resolved) {}
 
+/// # Safety
+/// TODO.
 #[no_mangle]
-pub extern "C" fn vrl_resolved_initialize(result: *mut Resolved) {
-    unsafe { result.write(Ok(Value::Null)) };
+pub unsafe extern "C" fn vrl_resolved_initialize(result: *mut Resolved) {
+    result.write(Ok(Value::Null));
 }
 
+/// # Safety
+/// TODO.
 #[no_mangle]
-pub extern "C" fn vrl_resolved_drop(result: *mut Resolved) {
-    drop(unsafe { result.read() });
+pub unsafe extern "C" fn vrl_resolved_drop(result: *mut Resolved) {
+    drop(result.read());
 }
 
 #[no_mangle]
@@ -47,14 +51,18 @@ pub extern "C" fn vrl_resolved_boolean_is_true(result: &Resolved) -> bool {
         .expect("VRL value must be boolean")
 }
 
+/// # Safety
+/// TODO.
 #[no_mangle]
-pub extern "C" fn vrl_btree_map_initialize(map: *mut BTreeMap<String, Value>) {
-    unsafe { map.write(Default::default()) };
+pub unsafe extern "C" fn vrl_btree_map_initialize(map: *mut BTreeMap<String, Value>) {
+    map.write(Default::default());
 }
 
+/// # Safety
+/// TODO.
 #[no_mangle]
-pub extern "C" fn vrl_btree_map_drop(map: *mut BTreeMap<String, Value>) {
-    drop(unsafe { map.read() });
+pub unsafe extern "C" fn vrl_btree_map_drop(map: *mut BTreeMap<String, Value>) {
+    drop(map.read());
 }
 
 #[no_mangle]
@@ -65,7 +73,7 @@ pub extern "C" fn vrl_target_assign(value: &Resolved, target: &mut Resolved) {
 #[no_mangle]
 pub extern "C" fn vrl_btree_map_insert(
     map: &mut BTreeMap<String, Value>,
-    key: &String,
+    #[allow(clippy::ptr_arg)] key: &String,
     result: &mut Resolved,
 ) {
     let result = {
