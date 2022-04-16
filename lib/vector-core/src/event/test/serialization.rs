@@ -163,7 +163,7 @@ fn back_and_forth_through_bytes() {
 }
 
 #[test]
-fn serialization() {
+fn timestamp_handling() {
     let mut event = Event::from("raw log line");
     event.as_mut_log().insert("foo", "bar");
     event.as_mut_log().insert("bar", "baz");
@@ -180,6 +180,12 @@ fn serialization() {
 
     let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
     assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
+
+    let roundtripped: LogEvent = serde_json::from_value(actual_all).unwrap();
+    assert_eq!(
+        "timestamp",
+        roundtripped.get("timestamp").unwrap().kind_str()
+    );
 }
 
 #[test]
