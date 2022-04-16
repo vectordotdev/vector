@@ -313,7 +313,7 @@ impl Target {
                 let path = match path {
                     Some(path) => path,
                     None => {
-                        let fn_ident = "vrl_expression_assignment_target_insert_internal_impl";
+                        let fn_ident = "vrl_target_assign";
                         let fn_impl = ctx
                             .module()
                             .get_function(fn_ident)

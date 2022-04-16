@@ -58,6 +58,11 @@ pub extern "C" fn vrl_btree_map_drop(map: *mut BTreeMap<String, Value>) {
 }
 
 #[no_mangle]
+pub extern "C" fn vrl_target_assign(value: &Resolved, target: &mut Resolved) {
+    *target = value.clone()
+}
+
+#[no_mangle]
 pub extern "C" fn vrl_btree_map_insert(
     map: &mut BTreeMap<String, Value>,
     key: &String,
@@ -89,14 +94,6 @@ pub extern "C" fn vrl_expression_abort_impl(
         span: *span,
         message,
     });
-}
-
-#[no_mangle]
-pub extern "C" fn vrl_expression_assignment_target_insert_internal_impl(
-    value: &Resolved,
-    target: &mut Resolved,
-) {
-    *target = value.clone()
 }
 
 #[no_mangle]
@@ -213,9 +210,4 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .ok()
         .flatten()
         .unwrap_or(Value::Null));
-}
-
-#[no_mangle]
-pub extern "C" fn vrl_expression_variable_impl(value: &Resolved, target: &mut Resolved) {
-    *target = value.clone()
 }
