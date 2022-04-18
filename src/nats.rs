@@ -11,41 +11,36 @@ pub enum NatsConfigError {
     TlsMissingKey,
     #[snafu(display("NATS TLS Config Error: missing cert"))]
     TlsMissingCert,
-    #[snafu(display("Missing configuration for auth strategy: {}", strategy))]
-    AuthStrategyMissingConfiguration { strategy: NatsAuthStrategy },
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum NatsAuthStrategy {
-    #[derivative(Default)]
-    UserPassword,
-    Token,
-    CredentialsFile,
-    Nkey,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "strategy")]
+pub(crate) enum NatsAuthConfig {
+    UserPassword {
+        user_password: NatsAuthUserPassword,
+    },
+    Token {
+        token: NatsAuthToken,
+    },
+    CredentialsFile {
+        credentials_file: NatsAuthCredentialsFile,
+    },
+    Nkey {
+        nkey: NatsAuthNKey,
+    },
 }
 
-impl std::fmt::Display for NatsAuthStrategy {
+impl std::fmt::Display for NatsAuthConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use NatsAuthStrategy::*;
-        match self {
-            UserPassword => write!(f, "user_password"),
-            Token => write!(f, "token"),
-            CredentialsFile => write!(f, "credentials_file"),
-            Nkey => write!(f, "nkey"),
-        }
+        use NatsAuthConfig::*;
+        let word = match self {
+            UserPassword { .. } => "user_password",
+            Token { .. } => "token",
+            CredentialsFile { .. } => "credentials_file",
+            Nkey { .. } => "nkey",
+        };
+        write!(f, "{}", word)
     }
-}
-
-#[derive(Default, Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub(crate) struct NatsAuthConfig {
-    pub(crate) strategy: NatsAuthStrategy,
-    pub(crate) user_password: Option<NatsAuthUserPassword>,
-    pub(crate) token: Option<NatsAuthToken>,
-    pub(crate) credentials_file: Option<NatsAuthCredentialsFile>,
-    pub(crate) nkey: Option<NatsAuthNKey>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -76,47 +71,24 @@ pub(crate) struct NatsAuthNKey {
 
 impl NatsAuthConfig {
     pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
-        match self.strategy {
-            NatsAuthStrategy::UserPassword => self
-                .user_password
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_user_pass(&config.user, &config.password))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
+        match self {
+            NatsAuthConfig::UserPassword { user_password } => Ok(
+                nats::asynk::Options::with_user_pass(&user_password.user, &user_password.password),
+            ),
+            NatsAuthConfig::CredentialsFile { credentials_file } => Ok(
+                nats::asynk::Options::with_credentials(&credentials_file.path),
+            ),
+            NatsAuthConfig::Nkey { nkey } => nkeys::KeyPair::from_seed(&nkey.seed)
+                .context(AuthConfigSnafu)
+                .map(|kp| {
+                    // The following unwrap is safe because the only way the sign method can fail is if
+                    // keypair does not contain a seed. We are constructing the keypair from a seed in
+                    // the preceding line.
+                    nats::asynk::Options::with_nkey(&nkey.nkey, move |nonce| {
+                        kp.sign(nonce).unwrap()
+                    })
                 }),
-            NatsAuthStrategy::CredentialsFile => self
-                .credentials_file
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_credentials(&config.path))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                }),
-            NatsAuthStrategy::Nkey => self
-                .nkey
-                .as_ref()
-                .map(|config| {
-                    nkeys::KeyPair::from_seed(&config.seed)
-                        .context(AuthConfigSnafu)
-                        .map(|kp| {
-                            // The following unwrap is safe because the only way the sign method can fail is if
-                            // keypair does not contain a seed. We are constructing the keypair from a seed in
-                            // the preceding line.
-                            nats::asynk::Options::with_nkey(&config.nkey, move |nonce| {
-                                kp.sign(nonce).unwrap()
-                            })
-                        })
-                })
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                })
-                .and_then(std::convert::identity),
-            NatsAuthStrategy::Token => self
-                .token
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_token(&config.value))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                }),
+            NatsAuthConfig::Token { token } => Ok(nats::asynk::Options::with_token(&token.value)),
         }
     }
 }
