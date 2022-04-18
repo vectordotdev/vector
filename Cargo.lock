@@ -8830,7 +8830,6 @@ dependencies = [
  "indoc",
  "lookup",
  "mlua",
- "once_cell",
  "ordered-float",
  "quickcheck",
  "regex",

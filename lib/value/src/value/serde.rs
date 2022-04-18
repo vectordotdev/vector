@@ -2,18 +2,13 @@ use std::{collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 use ordered_float::NotNan;
-use regex::Regex;
 use serde::{
     de::{Error as SerdeError, MapAccess, SeqAccess, Visitor},
     {Deserialize, Serialize, Serializer},
 };
 
 use crate::value::{timestamp_to_string, StdError, Value};
-
-static RFC3339_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?Z\z").unwrap());
 
 impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
@@ -118,26 +113,18 @@ impl<'de> Deserialize<'de> for Value {
             where
                 E: serde::de::Error,
             {
-                Ok((*RFC3339_RE)
-                    .is_match(value)
-                    .then(|| DateTime::parse_from_rfc3339(value).ok())
-                    .flatten()
-                    .map_or_else(
-                        || Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
-                        |dt| Value::Timestamp(dt.with_timezone(&Utc)),
-                    ))
+                Ok(DateTime::parse_from_rfc3339(value).ok().map_or_else(
+                    || Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
+                    |dt| Value::Timestamp(dt.with_timezone(&Utc)),
+                ))
             }
 
             #[inline]
             fn visit_string<E>(self, value: String) -> Result<Value, E> {
-                Ok((*RFC3339_RE)
-                    .is_match(&value)
-                    .then(|| DateTime::parse_from_rfc3339(&value).ok())
-                    .flatten()
-                    .map_or_else(
-                        || Value::Bytes(value.into()),
-                        |dt| Value::Timestamp(dt.with_timezone(&Utc)),
-                    ))
+                Ok(DateTime::parse_from_rfc3339(&value).ok().map_or_else(
+                    || Value::Bytes(value.into()),
+                    |dt| Value::Timestamp(dt.with_timezone(&Utc)),
+                ))
             }
 
             #[inline]
