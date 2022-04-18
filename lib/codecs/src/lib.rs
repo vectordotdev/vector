@@ -17,8 +17,8 @@ pub use decoding::{
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
-    JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializer, RawMessageSerializerConfig,
+    BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
+    JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
+    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
+    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig,
 };

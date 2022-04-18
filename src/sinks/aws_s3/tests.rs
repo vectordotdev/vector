@@ -335,7 +335,7 @@ mod integration_tests {
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         let mut batch = BatchConfig::default();
         batch.max_events = Some(batch_size);
-        batch.timeout_secs = Some(5);
+        batch.timeout_secs = Some(5.0);
 
         S3SinkConfig {
             bucket: bucket.to_string(),

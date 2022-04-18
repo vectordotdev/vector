@@ -12,6 +12,8 @@ pub mod events;
 pub mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
+#[cfg(feature = "sinks-datadog_traces")]
+pub mod traces;
 
 /// Gets the API endpoint for validating credentials.
 ///

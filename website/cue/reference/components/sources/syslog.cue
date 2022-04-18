@@ -97,6 +97,7 @@ components: sources: syslog: {
 				examples: ["/path/to/socket"]
 			}
 		}
+		socket_file_mode: sources.socket.configuration.socket_file_mode
 		connection_limit: {
 			common:        false
 			description:   "The max number of TCP connections that will be processed."

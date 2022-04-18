@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
-    num::NonZeroU64,
     task::Poll,
 };
 
@@ -51,7 +50,7 @@ pub struct InfluxDbDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

@@ -6,8 +6,8 @@ use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
+use std::collections::BTreeMap;
 use tracing::warn;
-use vector_common::btreemap;
 use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -43,7 +43,7 @@ pub fn parse_grok(
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
-    let mut parsed = Value::from(btreemap! {});
+    let mut parsed = Value::Object(BTreeMap::new());
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
@@ -115,6 +115,7 @@ mod tests {
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
+    use vector_common::btreemap;
 
     #[test]
     fn parses_simple_grok() {

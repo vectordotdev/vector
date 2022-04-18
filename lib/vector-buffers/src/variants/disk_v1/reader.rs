@@ -77,6 +77,8 @@ pub struct Reader<T> {
     pub(crate) buffer: VecDeque<(Key, Vec<u8>)>,
     /// Limit on uncompacted_size after which we trigger compaction.
     pub(crate) max_uncompacted_size: u64,
+    /// Whether or not this reader is being used solely for migrating to a disk v2 buffer.
+    pub(crate) is_migrating: bool,
     /// Last time that compaction was triggered.
     pub(crate) last_compaction: Instant,
     /// Last time that delete flush was triggered.
@@ -310,6 +312,16 @@ impl<T> Reader<T> {
         //     cases.
         let timed_trigger = self.last_compaction.elapsed() >= MIN_TIME_UNCOMPACTED
             && self.uncompacted_size > self.get_buffer_size();
+        // 3. When this reader is being used solely to migrate to a disk v2 buffer.  When this is
+        //    happening, we want to allow compaction to occur rapidly as reads are taking place so
+        //    that the buffer can start to reclaim disk space as we essentially shift the records
+        //    over to the new buffer. This lets us avoid having to store an entirely second copy of
+        //    the v1 buffer, as migrations can easily complete before the normal compaction interval is
+        //    reached, and we don't want to rely on hitting some ratio of uncompact to max buffer
+        //    size for it to trigger.
+        let migration_compaction_interval = Duration::from_secs(1);
+        let migration_trigger =
+            self.is_migrating && self.last_compaction.elapsed() >= migration_compaction_interval;
 
         // Basic requirement to avoid leaving ldb files behind.
         // See:
@@ -318,7 +330,7 @@ impl<T> Reader<T> {
         //         https://github.com/syndtr/goleveldb/issues/166
         let min_size = self.uncompacted_size >= MIN_UNCOMPACTED_SIZE;
 
-        if min_size && (max_trigger || timed_trigger) {
+        if min_size && (max_trigger || timed_trigger || migration_trigger) {
             self.uncompacted_size = 0;
 
             debug!("Compacting disk buffer.");
