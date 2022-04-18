@@ -113,16 +113,16 @@ impl<'de> Deserialize<'de> for Value {
             where
                 E: serde::de::Error,
             {
-                Ok(DateTime::parse_from_rfc3339(value).ok().map_or_else(
-                    || Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
+                Ok(DateTime::parse_from_rfc3339(value).map_or_else(
+                    |_err| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
                     |dt| Value::Timestamp(dt.with_timezone(&Utc)),
                 ))
             }
 
             #[inline]
             fn visit_string<E>(self, value: String) -> Result<Value, E> {
-                Ok(DateTime::parse_from_rfc3339(&value).ok().map_or_else(
-                    || Value::Bytes(value.into()),
+                Ok(DateTime::parse_from_rfc3339(&value).map_or_else(
+                    |_err| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
                     |dt| Value::Timestamp(dt.with_timezone(&Utc)),
                 ))
             }
