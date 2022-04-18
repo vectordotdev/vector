@@ -16,14 +16,14 @@ pub enum NatsConfigError {
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NatsAuthStrategy {
     #[derivative(Default)]
     UserPassword,
     Token,
     CredentialsFile,
-    NKey,
+    Nkey,
 }
 
 impl std::fmt::Display for NatsAuthStrategy {
@@ -33,7 +33,7 @@ impl std::fmt::Display for NatsAuthStrategy {
             UserPassword => write!(f, "user_password"),
             Token => write!(f, "token"),
             CredentialsFile => write!(f, "credentials_file"),
-            NKey => write!(f, "nkey"),
+            Nkey => write!(f, "nkey"),
         }
     }
 }
@@ -91,7 +91,7 @@ impl NatsAuthConfig {
                 .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
                     strategy: self.strategy,
                 }),
-            NatsAuthStrategy::NKey => self
+            NatsAuthStrategy::Nkey => self
                 .nkey
                 .as_ref()
                 .map(|config| {
@@ -159,5 +159,150 @@ pub(crate) fn from_tls_auth_config(
             };
             Ok(nats_options)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_auth(s: &str) -> Result<nats::asynk::Options, crate::Error> {
+        toml::from_str(s)
+            .map_err(Into::into)
+            .and_then(|config: NatsAuthConfig| config.to_nats_options().map_err(Into::into))
+    }
+
+    #[test]
+    fn auth_user_password_ok() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.user = "username"
+            user_password.password = "password"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_user_password_missing_user() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.password = "password"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_user_password_missing_password() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.user = "username"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_user_password_missing_all() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            token.value = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_token_ok() {
+        parse_auth(
+            r#"
+            strategy = "token"
+            token.value = "token"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_token_missing() {
+        parse_auth(
+            r#"
+            strategy = "token"
+            user_password.user = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_credentials_file_ok() {
+        parse_auth(
+            r#"
+            strategy = "credentials_file"
+            credentials_file.path = "/path/to/nowhere"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_credentials_file_missing() {
+        parse_auth(
+            r#"
+            strategy = "credentials_file"
+            token.value = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_ok() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
+            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_nkey_missing_nkey() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_missing_seed() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_missing_both() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            user_password.user = "foobar"
+            "#,
+        )
+        .unwrap_err();
     }
 }
