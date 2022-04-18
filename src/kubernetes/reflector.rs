@@ -52,7 +52,7 @@ pub async fn custom_reflector<K, W>(
                     // The watcher stream should never yield `None`
                     // https://docs.rs/kube-runtime/0.71.0/src/kube_runtime/watcher.rs.html#234-237
                     None => {
-                        unreachable!("a watcher Xtream never ends");
+                        unreachable!("a watcher Stream never ends");
                     },
                 }
             }
