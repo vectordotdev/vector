@@ -643,8 +643,9 @@ impl RunningTopology {
         let trans_inputs = self.config.transforms.get(key).map(|t| &t.inputs);
         let old_inputs = sink_inputs
             .or(trans_inputs)
-            .unwrap()
+            .cloned()
             .iter()
+            .flatten()
             .cloned()
             .collect::<HashSet<_>>();
 
