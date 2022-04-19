@@ -69,26 +69,12 @@ impl Decoder {
 
         // Parse structured events from the byte frame.
         self.deserializer
-            .parse(frame)
-            .map(|mut events| {
-                self.add_body_namespace(&mut events);
-                Some((events, byte_size))
-            })
+            .parse(frame, self.log_namespace)
+            .map(|mut events| Some((events, byte_size)))
             .map_err(|error| {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)
             })
-    }
-
-    fn add_body_namespace(&self, events: &mut SmallVec<[Event; 1]>) {
-        for event in events {
-            match event {
-                Event::Log(log) => {
-                    self.log_namespace.add_body_namespace(log);
-                }
-                _ => { /* only logs support namespacing */ }
-            }
-        }
     }
 }
 

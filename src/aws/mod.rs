@@ -56,6 +56,8 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     }
 }
 
+pub fn is_retriable_std_error(error: &dyn std::error::Error) -> bool {}
+
 pub trait ClientBuilder {
     type ConfigBuilder;
     type Client;

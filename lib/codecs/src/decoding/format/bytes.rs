@@ -2,6 +2,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent},
@@ -60,9 +61,20 @@ impl BytesDeserializer {
 }
 
 impl Deserializer for BytesDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         let mut log = LogEvent::default();
-        log.insert(self.log_schema_message_key, bytes);
+        match log_namespace {
+            LogNamespace::Vector => {
+                log.insert(LogNamespace::VECTOR_DATA_KEY, bytes);
+            }
+            LogNamespace::Legacy => {
+                log.insert(self.log_schema_message_key, bytes);
+            }
+        }
         Ok(smallvec![log.into()])
     }
 }

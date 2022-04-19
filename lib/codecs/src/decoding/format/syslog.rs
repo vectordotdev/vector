@@ -6,6 +6,7 @@ use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::Kind;
 
 use super::Deserializer;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::log_schema,
     event::{Event, Value},
@@ -53,7 +54,11 @@ impl SyslogDeserializerConfig {
 pub struct SyslogDeserializer;
 
 impl Deserializer for SyslogDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
         let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;

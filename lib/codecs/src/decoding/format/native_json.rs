@@ -4,6 +4,7 @@ use smallvec::{smallvec, SmallVec};
 use value::Kind;
 
 use super::Deserializer;
+use vector_core::config::LogNamespace;
 use vector_core::{event::Event, schema};
 
 /// Config used to build a `NativeJsonDeserializer`.
@@ -28,7 +29,11 @@ impl NativeJsonDeserializerConfig {
 pub struct NativeJsonDeserializer;
 
 impl Deserializer for NativeJsonDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {

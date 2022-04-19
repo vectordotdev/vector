@@ -6,6 +6,7 @@ use codecs::{
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::Decoder,
@@ -96,11 +97,16 @@ impl VectorConfig {
 struct VectorDeserializer;
 
 impl decoding::format::Deserializer for VectorDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
                 emit!(VectorEventReceived { byte_size });
+
                 Ok(smallvec![event])
             }
             Err(error) => {

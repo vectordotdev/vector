@@ -11,7 +11,7 @@ use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::path;
 use value::Value;
 
@@ -201,6 +201,11 @@ impl Default for LogNamespace {
 }
 
 impl LogNamespace {
+    pub const VECTOR_DATA_KEY: &'static [BorrowedSegment<'static>; 1] =
+        &[BorrowedSegment::field("data")];
+    pub const VECTOR_METADATA_KEY: &'static [BorrowedSegment<'static>; 1] =
+        &[BorrowedSegment::field("metadata")];
+
     pub fn insert_metadata<'a>(
         &self,
         log: &mut LogEvent,
@@ -209,11 +214,22 @@ impl LogNamespace {
     ) {
         match self {
             LogNamespace::Vector => {
-                log.insert(path!("metadata").concat(key), value);
+                log.insert(Self::VECTOR_METADATA_KEY.concat(key), value);
             }
             LogNamespace::Legacy => {
                 log.try_insert(key, value);
             }
+        }
+    }
+
+    pub fn new_log_from_data(&self, value: impl Into<Value>) -> crate::Result<LogEvent> {
+        match self {
+            LogNamespace::Vector => {
+                let mut log = LogEvent::default();
+                log.insert(Self::VECTOR_DATA_KEY, value);
+                Ok(log)
+            }
+            LogNamespace::Legacy => LogEvent::try_from(value.into()),
         }
     }
 

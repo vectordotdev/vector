@@ -39,6 +39,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                         error!(message = "Put logs service unavailable.", %error);
                         true
                     }
+                    PutLogEventsErrorKind::Unhandled(err) => {}
                     _ => false,
                 },
                 SdkError::DispatchFailure(_err) => {
@@ -46,7 +47,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
                     true
                 }
 
-                SdkError::ResponseError { err: _, raw } => {
+                SdkError::ResponseError { err, raw } => {
                     let status = raw.http().status();
                     if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
                         let body = raw.http().body().bytes().unwrap_or(&[]);

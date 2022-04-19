@@ -37,6 +37,7 @@ mod unix;
 use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
+use vector_core::config::LogNamespace;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
@@ -158,7 +159,11 @@ impl SourceConfig for StatsdConfig {
 pub(crate) struct StatsdDeserializer;
 
 impl decoding::format::Deserializer for StatsdDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         emit!(BytesReceived {
             protocol: "udp",
             byte_size: bytes.len(),

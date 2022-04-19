@@ -225,10 +225,10 @@ pub enum BorrowedSegment<'a> {
 }
 
 impl BorrowedSegment<'_> {
-    pub fn field(value: &str) -> BorrowedSegment {
+    pub const fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
     }
-    pub fn index(value: usize) -> BorrowedSegment<'static> {
+    pub const fn index(value: usize) -> BorrowedSegment<'static> {
         BorrowedSegment::Index(value)
     }
     pub fn is_field(&self) -> bool {

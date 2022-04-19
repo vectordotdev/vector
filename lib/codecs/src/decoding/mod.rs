@@ -25,6 +25,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
+use vector_core::config::LogNamespace;
 use vector_core::{event::Event, schema};
 
 /// An error that occurred while decoding structured events from a byte stream /
@@ -292,15 +293,19 @@ pub enum Deserializer {
 }
 
 impl format::Deserializer for Deserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         match self {
-            Deserializer::Bytes(deserializer) => deserializer.parse(bytes),
-            Deserializer::Json(deserializer) => deserializer.parse(bytes),
+            Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
-            Deserializer::Syslog(deserializer) => deserializer.parse(bytes),
-            Deserializer::Native(deserializer) => deserializer.parse(bytes),
-            Deserializer::NativeJson(deserializer) => deserializer.parse(bytes),
-            Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
+            Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }

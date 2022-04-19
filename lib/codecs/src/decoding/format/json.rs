@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::convert::TryInto;
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::{config::log_schema, event::Event, schema};
 
 /// Config used to build a `JsonDeserializer`.
@@ -50,7 +51,11 @@ impl JsonDeserializer {
 }
 
 impl Deserializer for JsonDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {
@@ -60,24 +65,34 @@ impl Deserializer for JsonDeserializer {
         let json: serde_json::Value = serde_json::from_slice(&bytes)
             .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
 
-        let mut events = match json {
-            serde_json::Value::Array(values) => values
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![json.try_into()?],
-        };
-
-        let timestamp = Utc::now();
-
-        for event in &mut events {
-            let log = event.as_mut_log();
-            let timestamp_key = log_schema().timestamp_key();
-
-            if !log.contains(timestamp_key) {
-                log.insert(timestamp_key, timestamp);
+        let events = match log_namespace {
+            LogNamespace::Vector => {
+                // TODO: Should this still split arrays into multiple events?
+                smallvec![Event::from(log_namespace.new_log_from_data(json)?)]
             }
-        }
+            LogNamespace::Legacy => {
+                let mut events = match json {
+                    serde_json::Value::Array(values) => values
+                        .into_iter()
+                        .map(TryInto::try_into)
+                        .collect::<Result<SmallVec<[Event; 1]>, _>>(
+                    )?,
+                    _ => smallvec![json.try_into()?],
+                };
+
+                let timestamp = Utc::now();
+
+                for event in &mut events {
+                    let log = event.as_mut_log();
+                    let timestamp_key = log_schema().timestamp_key();
+
+                    if !log.contains(timestamp_key) {
+                        log.insert(timestamp_key, timestamp);
+                    }
+                }
+                events
+            }
+        };
 
         Ok(events)
     }

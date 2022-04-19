@@ -2,6 +2,7 @@ use bytes::Bytes;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_core::config::LogNamespace;
 use vector_core::{
     event::{proto, Event, EventArray, EventContainer},
     schema,
@@ -30,7 +31,11 @@ impl NativeDeserializerConfig {
 pub struct NativeDeserializer;
 
 impl Deserializer for NativeDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         if bytes.is_empty() {
             Ok(smallvec![])
         } else {
