@@ -8,7 +8,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use lookup::lookup_v2::Path;
+use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -112,6 +112,10 @@ impl LogEvent {
 
     pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
         self.fields.get_by_path_v2(key)
+    }
+
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.fields.get_by_path(path)
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
