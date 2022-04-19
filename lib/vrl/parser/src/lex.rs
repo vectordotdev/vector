@@ -509,6 +509,10 @@ impl StringLiteral<&str> {
 
         TemplateString(segments)
     }
+
+    pub fn unescape(&self) -> String {
+        unescape_string_literal(self.0)
+    }
 }
 
 impl RawStringLiteral<&str> {

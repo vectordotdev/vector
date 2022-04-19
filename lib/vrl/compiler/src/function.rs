@@ -13,7 +13,7 @@ use crate::{
     },
     parser::Node,
     state::{ExternalEnv, LocalEnv},
-    value::{kind, Kind, VrlValueConvert},
+    value::{kind, Kind},
     vm::VmArgumentList,
     Context, ExpressionError, Span, Value,
 };
@@ -326,7 +326,7 @@ impl ArgumentList {
     pub fn optional_object(
         &mut self,
         keyword: &'static str,
-    ) -> Result<Option<Vec<(Expr, Expr)>>, Error> {
+    ) -> Result<Option<BTreeMap<String, Expr>>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Container(Container {
@@ -341,37 +341,11 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_object(&mut self, keyword: &'static str) -> Result<Vec<(Expr, Expr)>, Error> {
-        Ok(required(self.optional_object(keyword)?))
-    }
-
-    pub fn required_static_object(
+    pub fn required_object(
         &mut self,
         keyword: &'static str,
     ) -> Result<BTreeMap<String, Expr>, Error> {
-        let object = required(self.optional_object(keyword)?);
-
-        let object = object
-            .into_iter()
-            .map(|(key, value)| {
-                let key = key
-                    .as_value()
-                    .ok_or_else(|| Error::ExpectedStaticExpression {
-                        keyword: "patterns",
-                        expr: key.clone(),
-                    })?
-                    .try_bytes_utf8_lossy()
-                    .map_err(|_| Error::UnexpectedExpression {
-                        keyword: "patterns",
-                        expected: "string",
-                        expr: key.clone(),
-                    })?
-                    .into_owned();
-                Ok((key, value))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-
-        Ok(object)
+        Ok(required(self.optional_object(keyword)?))
     }
 
     pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {

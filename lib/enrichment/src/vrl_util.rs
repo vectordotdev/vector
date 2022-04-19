@@ -74,15 +74,7 @@ pub(crate) fn add_index(
         .filter_map(|(field, value)| match value {
             expression::Expr::Container(expression::Container {
                 variant: expression::Variant::Object(map),
-            }) if map
-                .iter()
-                .any(|(key, _)| key.as_value() == Some(Value::Bytes("from".into())))
-                && map
-                    .iter()
-                    .any(|(key, _)| key.as_value() == Some(Value::Bytes("to".into()))) =>
-            {
-                None
-            }
+            }) if map.contains_key("from") && map.contains_key("to") => None,
             _ => Some(field.as_ref()),
         })
         .collect::<Vec<_>>();
@@ -151,29 +143,10 @@ pub(crate) fn index_from_args(
                 _ => None,
             })
         })
-        .unwrap()
-        .iter()
-        .map(|(key, value)| {
-            let key = key
-                .as_value()
-                .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
-                    keyword: "key",
-                    expr: key.clone(),
-                })?
-                .try_bytes_utf8_lossy()
-                .map_err(|_| vrl::function::Error::UnexpectedExpression {
-                    keyword: "key",
-                    expected: "string",
-                    expr: key.clone(),
-                })?
-                .into_owned();
-
-            Ok((key, value.clone()))
-        })
-        .collect::<std::result::Result<BTreeMap<_, _>, vrl::function::Error>>()?;
+        .unwrap();
 
     let index = Some(
-        add_index(registry, &table, case_sensitive, &condition)
+        add_index(registry, &table, case_sensitive, condition)
             .map_err(|err| Box::new(err) as Box<_>)?,
     );
 

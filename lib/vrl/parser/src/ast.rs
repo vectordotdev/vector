@@ -509,7 +509,7 @@ impl IntoIterator for Array {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
-pub struct Object(pub(crate) BTreeMap<Node<TemplateString>, Node<Expr>>);
+pub struct Object(pub(crate) BTreeMap<Node<String>, Node<Expr>>);
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -538,8 +538,8 @@ impl fmt::Debug for Object {
 }
 
 impl IntoIterator for Object {
-    type Item = (Node<TemplateString>, Node<Expr>);
-    type IntoIter = std::collections::btree_map::IntoIter<Node<TemplateString>, Node<Expr>>;
+    type Item = (Node<String>, Node<Expr>);
+    type IntoIter = std::collections::btree_map::IntoIter<Node<String>, Node<Expr>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

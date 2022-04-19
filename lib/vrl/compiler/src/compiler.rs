@@ -200,16 +200,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>, external: &mut ExternalEnv) -> Object {
+        use std::collections::BTreeMap;
+
         let exprs = node
             .into_inner()
             .into_iter()
-            .map(|(k, expr)| {
-                (
-                    self.compile_expr(k.map(|template| template.rewrite()), external),
-                    self.compile_expr(expr, external),
-                )
-            })
-            .collect::<Vec<(_, _)>>();
+            .map(|(k, expr)| (k.into_inner(), self.compile_expr(expr, external)))
+            .collect::<BTreeMap<_, _>>();
 
         Object::new(exprs)
     }

@@ -1,26 +1,25 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use crate::{
-    expression::{Expr, Literal, Resolved},
+    expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    value::VrlValueConvert,
     vm::OpCode,
     Context, Expression, TypeDef, Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
-    inner: Vec<(Expr, Expr)>,
+    inner: BTreeMap<String, Expr>,
 }
 
 impl Object {
-    pub fn new(inner: Vec<(Expr, Expr)>) -> Self {
+    pub fn new(inner: BTreeMap<String, Expr>) -> Self {
         Self { inner }
     }
 }
 
 impl Deref for Object {
-    type Target = Vec<(Expr, Expr)>;
+    type Target = BTreeMap<String, Expr>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -31,10 +30,7 @@ impl Expression for Object {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
-            .map(|(key, expr)| {
-                expr.resolve(ctx)
-                    .and_then(|v| Ok((key.resolve(ctx)?.try_bytes_utf8_lossy()?.to_string(), v)))
-            })
+            .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(Value::Object)
     }
@@ -42,11 +38,7 @@ impl Expression for Object {
     fn as_value(&self) -> Option<Value> {
         self.inner
             .iter()
-            .map(|(key, expr)| {
-                expr.as_value().and_then(|v| {
-                    Some((key.as_value()?.try_bytes_utf8_lossy().ok()?.to_string(), v))
-                })
-            })
+            .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
             .collect::<Option<BTreeMap<_, _>>>()
             .map(Value::Object)
     }
@@ -55,38 +47,19 @@ impl Expression for Object {
         let type_defs = self
             .inner
             .iter()
-            .map(|(k, expr)| {
-                Some((
-                    k.as_value()?.try_bytes_utf8_lossy().ok()?.to_string(),
-                    expr.type_def(state),
-                ))
-            })
-            .collect::<Option<BTreeMap<_, _>>>();
+            .map(|(k, expr)| (k.to_owned(), expr.type_def(state)))
+            .collect::<BTreeMap<_, _>>();
 
-        match type_defs {
-            None => {
-                // We can't get the full typedef of the object as the keys aren't fully deterimined,
-                // but we can at least still get the fallibility from the value expressions.
-                let fallible = self
-                    .inner
-                    .iter()
-                    .any(|(_, expr)| expr.type_def(state).is_fallible());
+        // If any of the stored expressions is fallible, the entire object is
+        // fallible.
+        let fallible = type_defs.values().any(TypeDef::is_fallible);
 
-                TypeDef::object(BTreeMap::default()).with_fallibility(fallible)
-            }
-            Some(type_defs) => {
-                // If any of the stored expressions is fallible, the entire object is
-                // fallible.
-                let fallible = type_defs.values().any(TypeDef::is_fallible);
+        let collection = type_defs
+            .into_iter()
+            .map(|(field, type_def)| (field.into(), type_def.into()))
+            .collect::<BTreeMap<_, _>>();
 
-                let collection = type_defs
-                    .into_iter()
-                    .map(|(field, type_def)| (field.into(), type_def.into()))
-                    .collect::<BTreeMap<_, _>>();
-
-                TypeDef::object(collection).with_fallibility(fallible)
-            }
-        }
+        TypeDef::object(collection).with_fallibility(fallible)
     }
 
     fn compile_to_vm(
@@ -97,8 +70,10 @@ impl Expression for Object {
         let (local, external) = state;
 
         for (key, value) in &self.inner {
-            // Write the key
-            key.compile_to_vm(vm, (local, external))?;
+            // Write the key as a constant
+            let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
+            vm.write_opcode(OpCode::Constant);
+            vm.write_primitive(keyidx);
 
             // Write the value
             value.compile_to_vm(vm, (local, external))?;
@@ -129,11 +104,6 @@ impl fmt::Display for Object {
 
 impl From<BTreeMap<String, Expr>> for Object {
     fn from(inner: BTreeMap<String, Expr>) -> Self {
-        let inner = inner
-            .into_iter()
-            .map(|(key, value)| (Literal::from(key).into(), value))
-            .collect::<Vec<_>>();
-
         Self { inner }
     }
 }

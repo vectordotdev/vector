@@ -463,11 +463,13 @@ Array: Array = {
 #[inline]
 Object: Object = {
     "{" NonterminalNewline* "}" => Object(BTreeMap::default()),
-    "{" NonterminalNewline* <CommaMultiline<(<Sp<String>> ":" <ArithmeticExpr>)>> "}" => {
+    "{" NonterminalNewline* <CommaMultiline<(<Sp<ObjectKey>> ":" <ArithmeticExpr>)>> "}" => {
         let object =<>.into_iter().collect::<BTreeMap<_, _>>();
         Object(object)
     },
 };
+
+ObjectKey: String = "string literal" => <>.unescape();
 
 // -----------------------------------------------------------------------------
 // literals

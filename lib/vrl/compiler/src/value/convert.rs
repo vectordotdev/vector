@@ -166,15 +166,7 @@ impl TryFrom<Expr> for Value {
             }) => Ok(Value::Object(
                 object
                     .iter()
-                    .map(|(key, value)| {
-                        Ok((
-                            Value::try_from(key.clone())?
-                                .try_bytes_utf8_lossy()
-                                .map_err(|_| key.clone())?
-                                .to_string(),
-                            value.clone().try_into()?,
-                        ))
-                    })
+                    .map(|(key, value)| Ok((key.clone(), value.clone().try_into()?)))
                     .collect::<Result<_, Self::Error>>()?,
             )),
             Expr::Container(Container {
