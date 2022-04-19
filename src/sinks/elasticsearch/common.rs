@@ -162,17 +162,19 @@ pub async fn sign_request(
 ) -> crate::Result<()> {
     let signable_request = SignableRequest::from(&*request);
     let credentials = credentials_provider.provide_credentials().await?;
-    let signing_params = SigningParams::builder()
+    let mut signing_params_builder = SigningParams::builder()
         .access_key(credentials.access_key_id())
         .secret_key(credentials.secret_access_key())
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
         .service_name("es")
         .time(SystemTime::now())
-        .settings(SigningSettings::default())
-        .build()?;
+        .settings(SigningSettings::default());
+
+    signing_params_builder.set_security_token(credentials.session_token());
 
     let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params)?.into_parts();
+        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
+            .into_parts();
     signing_instructions.apply_to_request(request);
 
     Ok(())

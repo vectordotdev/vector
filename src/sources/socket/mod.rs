@@ -221,7 +221,7 @@ mod test {
         thread,
     };
 
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
@@ -533,12 +533,27 @@ mod test {
         // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
         // it down, exercising the logic we have to ensure timely shutdown even under load:
         let message = random_string(512);
-        let message_bytes = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone());
 
-        let sink_cx = SinkContext::new_test();
-        let encoder = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::from_address(addr.to_string());
-        let (sink, _healthcheck) = sink_config.build(sink_cx, encoder).unwrap();
+        let cx = SinkContext::new_test();
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = codecs::encoding::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
+                Ok(())
+            }
+        }
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
+            bytes: message_bytes,
+        };
+        let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat(())
