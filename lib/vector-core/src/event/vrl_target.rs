@@ -145,68 +145,7 @@ impl vrl_lib::Target for VrlTarget {
                 .get(path)
                 .map(|val| val.cloned())
                 .map_err(|err| err.to_string()),
-            VrlTarget::Metric(metric) => {
-                if path.is_root() {
-                    let mut map = BTreeMap::<String, vrl_lib::Value>::new();
-                    map.insert("name".to_string(), metric.series.name.name.clone().into());
-                    if let Some(ref namespace) = metric.series.name.namespace {
-                        map.insert("namespace".to_string(), namespace.clone().into());
-                    }
-                    if let Some(timestamp) = metric.data.timestamp {
-                        map.insert("timestamp".to_string(), timestamp.into());
-                    }
-                    map.insert("kind".to_string(), metric.data.kind.into());
-                    if let Some(tags) = metric.tags() {
-                        map.insert(
-                            "tags".to_string(),
-                            tags.iter()
-                                .map(|(tag, value)| (tag.clone(), value.clone().into()))
-                                .collect::<BTreeMap<_, _>>()
-                                .into(),
-                        );
-                    }
-                    map.insert("type".to_string(), metric.data.value.clone().into());
-
-                    return Ok(Some(map.into()));
-                }
-
-                for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-                    match paths.as_slice() {
-                        ["name"] => return Ok(Some(metric.name().to_string().into())),
-                        ["namespace"] => match &metric.series.name.namespace {
-                            Some(namespace) => return Ok(Some(namespace.clone().into())),
-                            None => continue,
-                        },
-                        ["timestamp"] => match metric.data.timestamp {
-                            Some(timestamp) => return Ok(Some(timestamp.into())),
-                            None => continue,
-                        },
-                        ["kind"] => return Ok(Some(metric.data.kind.into())),
-                        ["tags"] => {
-                            return Ok(metric.tags().map(|map| {
-                                map.iter()
-                                    .map(|(k, v)| (k.clone(), v.clone().into()))
-                                    .collect::<vrl_lib::Value>()
-                            }))
-                        }
-                        ["tags", field] => match metric.tag_value(field) {
-                            Some(value) => return Ok(Some(value.into())),
-                            None => continue,
-                        },
-                        ["type"] => return Ok(Some(metric.data.value.clone().into())),
-                        _ => {
-                            return Err(MetricPathError::InvalidPath {
-                                path: &path.to_string(),
-                                expected: VALID_METRIC_PATHS_GET,
-                            }
-                            .to_string())
-                        }
-                    }
-                }
-                // We only reach this point if we have requested a tag that doesn't exist or an empty
-                // field.
-                Ok(None)
-            }
+            VrlTarget::Metric(metric) => target_get_metric(path, metric),
         }
     }
 
@@ -356,68 +295,7 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
 
             VrlImmutableTarget::Trace(log) => Ok(log.lookup(path).cloned()),
 
-            VrlImmutableTarget::Metric(metric) => {
-                if path.is_root() {
-                    let mut map = BTreeMap::<String, vrl_lib::Value>::new();
-                    map.insert("name".to_string(), metric.series.name.name.clone().into());
-                    if let Some(ref namespace) = metric.series.name.namespace {
-                        map.insert("namespace".to_string(), namespace.clone().into());
-                    }
-                    if let Some(timestamp) = metric.data.timestamp {
-                        map.insert("timestamp".to_string(), timestamp.into());
-                    }
-                    map.insert("kind".to_string(), metric.data.kind.into());
-                    if let Some(tags) = metric.tags() {
-                        map.insert(
-                            "tags".to_string(),
-                            tags.iter()
-                                .map(|(tag, value)| (tag.clone(), value.clone().into()))
-                                .collect::<BTreeMap<_, _>>()
-                                .into(),
-                        );
-                    }
-                    map.insert("type".to_string(), metric.data.value.clone().into());
-
-                    return Ok(Some(map.into()));
-                }
-
-                for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-                    match paths.as_slice() {
-                        ["name"] => return Ok(Some(metric.name().to_string().into())),
-                        ["namespace"] => match &metric.series.name.namespace {
-                            Some(namespace) => return Ok(Some(namespace.clone().into())),
-                            None => continue,
-                        },
-                        ["timestamp"] => match metric.data.timestamp {
-                            Some(timestamp) => return Ok(Some(timestamp.into())),
-                            None => continue,
-                        },
-                        ["kind"] => return Ok(Some(metric.data.kind.into())),
-                        ["tags"] => {
-                            return Ok(metric.tags().map(|map| {
-                                map.iter()
-                                    .map(|(k, v)| (k.clone(), v.clone().into()))
-                                    .collect::<vrl_lib::Value>()
-                            }))
-                        }
-                        ["tags", field] => match metric.tag_value(field) {
-                            Some(value) => return Ok(Some(value.into())),
-                            None => continue,
-                        },
-                        ["type"] => return Ok(Some(metric.data.value.clone().into())),
-                        _ => {
-                            return Err(MetricPathError::InvalidPath {
-                                path: &path.to_string(),
-                                expected: VALID_METRIC_PATHS_GET,
-                            }
-                            .to_string())
-                        }
-                    }
-                }
-                // We only reach this point if we have requested a tag that doesn't exist or an empty
-                // field.
-                Ok(None)
-            }
+            VrlImmutableTarget::Metric(metric) => target_get_metric(path, metric),
         }
     }
 
@@ -456,6 +334,81 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
         Err("cannot modify immutable target".to_string())
     }
+}
+
+/// Retrieves a value from a the provided metric using the path.
+/// Currently the root path and the following paths are supported:
+/// - name
+/// - namespace
+/// - timestamp
+/// - kind
+/// - tags
+/// - tags.<tagname>
+/// - type
+///
+/// Any other paths result in a `MetricPathError::InvalidPath` being returned.
+fn target_get_metric(path: &LookupBuf, metric: &Metric) -> Result<Option<Value>, String> {
+    if path.is_root() {
+        let mut map = BTreeMap::<String, vrl_lib::Value>::new();
+        map.insert("name".to_string(), metric.series.name.name.clone().into());
+        if let Some(ref namespace) = metric.series.name.namespace {
+            map.insert("namespace".to_string(), namespace.clone().into());
+        }
+        if let Some(timestamp) = metric.data.timestamp {
+            map.insert("timestamp".to_string(), timestamp.into());
+        }
+        map.insert("kind".to_string(), metric.data.kind.into());
+        if let Some(tags) = metric.tags() {
+            map.insert(
+                "tags".to_string(),
+                tags.iter()
+                    .map(|(tag, value)| (tag.clone(), value.clone().into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into(),
+            );
+        }
+        map.insert("type".to_string(), metric.data.value.clone().into());
+
+        return Ok(Some(map.into()));
+    }
+
+    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+        match paths.as_slice() {
+            ["name"] => return Ok(Some(metric.name().to_string().into())),
+            ["namespace"] => match &metric.series.name.namespace {
+                Some(namespace) => return Ok(Some(namespace.clone().into())),
+                None => continue,
+            },
+            ["timestamp"] => match metric.data.timestamp {
+                Some(timestamp) => return Ok(Some(timestamp.into())),
+                None => continue,
+            },
+            ["kind"] => return Ok(Some(metric.data.kind.into())),
+            ["tags"] => {
+                return Ok(metric.tags().map(|map| {
+                    map.iter()
+                        .map(|(k, v)| (k.clone(), v.clone().into()))
+                        .collect::<vrl_lib::Value>()
+                }))
+            }
+            ["tags", field] => match metric.tag_value(field) {
+                Some(value) => return Ok(Some(value.into())),
+                None => continue,
+            },
+            ["type"] => return Ok(Some(metric.data.value.clone().into())),
+            _ => {
+                return Err(MetricPathError::InvalidPath {
+                    path: &path.to_string(),
+                    expected: VALID_METRIC_PATHS_GET,
+                }
+                .to_string())
+            }
+        }
+    }
+
+    // We only reach this point if we have requested a tag that doesn't exist or an empty
+    // field.
+    Ok(None)
 }
 
 // Turn a `Value` back into `LogEvents`:
