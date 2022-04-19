@@ -8,7 +8,6 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use derivative::Derivative;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
