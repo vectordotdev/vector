@@ -3683,20 +3683,43 @@ dependencies = [
 [[package]]
 name = "inkwell"
 version = "0.1.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#4ddaa3b4e3c3593c3382769b1d81267e3a5681f9"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#36c3b106e61b1b45295a35f94023d93d9328c76f"
 dependencies = [
  "either",
- "inkwell_internals",
+ "inkwell_internals 0.5.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
  "libc",
  "llvm-sys",
  "once_cell",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
+]
+
+[[package]]
+name = "inkwell"
+version = "0.1.0"
+source = "git+https://github.com/pablosichert/inkwell?branch=orc2#e335e56c4f293a6e0ef22d062bce8483cf3ec6d0"
+dependencies = [
+ "either",
+ "inkwell_internals 0.5.0 (git+https://github.com/pablosichert/inkwell?branch=orc2)",
+ "libc",
+ "llvm-sys",
+ "once_cell",
+ "parking_lot 0.12.0",
 ]
 
 [[package]]
 name = "inkwell_internals"
 version = "0.5.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#4ddaa3b4e3c3593c3382769b1d81267e3a5681f9"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#36c3b106e61b1b45295a35f94023d93d9328c76f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "inkwell_internals"
+version = "0.5.0"
+source = "git+https://github.com/pablosichert/inkwell?branch=orc2#e335e56c4f293a6e0ef22d062bce8483cf3ec6d0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4230,10 +4253,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "llvm"
+version = "0.0.0"
+dependencies = [
+ "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
+ "llvm-sys",
+]
+
+[[package]]
 name = "llvm-sys"
-version = "130.0.0"
+version = "130.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a0de69eac0257a2f6c0da27b42e6a8dd21bae7b39c37caf87aee6021d79d61f"
+checksum = "95eb03b4f7ae21f48ef7c565a3e3aa22c50616aea64645fb1fd7f6f56b51c274"
 dependencies = [
  "cc",
  "lazy_static",
@@ -9080,12 +9111,14 @@ dependencies = [
  "bytes 1.1.0",
  "criterion",
  "indoc",
+ "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
  "lookup",
  "ordered-float 3.0.0",
  "serde_json",
  "value",
  "vector_common",
  "vrl-compiler",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",
@@ -9121,8 +9154,10 @@ dependencies = [
  "criterion",
  "dyn-clone",
  "indoc",
- "inkwell",
+ "inkwell 0.1.0 (git+https://github.com/pablosichert/inkwell?branch=orc2)",
  "lalrpop-util",
+ "libc",
+ "llvm-sys",
  "lookup",
  "ordered-float 3.0.0",
  "paste",

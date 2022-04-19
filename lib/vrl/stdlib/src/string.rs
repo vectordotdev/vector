@@ -63,6 +63,7 @@ struct StringFn {
     value: Box<dyn Expression>,
 }
 
+#[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_string(value: &mut Resolved, resolved: &mut Resolved) {
     let value = {

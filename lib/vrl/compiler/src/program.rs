@@ -36,6 +36,16 @@ impl Program {
         self.expressions.resolve(ctx)
     }
 
+    #[cfg(feature = "llvm")]
+    /// Emit LLVM IR for the program.
+    pub fn emit_llvm<'ctx>(
+        &self,
+        state: (&LocalEnv, &ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        self.expressions.emit_llvm(state, ctx)
+    }
+
     /// Compile the program down to the [`Vm`] runtime.
     pub fn compile_to_vm(
         &self,

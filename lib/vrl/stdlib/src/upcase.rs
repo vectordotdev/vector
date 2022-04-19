@@ -51,8 +51,10 @@ struct UpcaseFn {
     value: Box<dyn Expression>,
 }
 
+#[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_upcase(value: &mut Resolved, resolved: &mut Resolved) {
+    println!("vrl_fn_upcase");
     let value = {
         let mut moved = Ok(Value::Null);
         std::mem::swap(value, &mut moved);

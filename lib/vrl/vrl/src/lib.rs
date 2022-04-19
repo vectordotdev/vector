@@ -9,6 +9,8 @@
 pub mod prelude;
 mod runtime;
 
+#[cfg(feature = "llvm")]
+pub use compiler::llvm;
 pub use compiler::{
     function, state, value, vm::Vm, Context, Expression, Function, Program, ProgramInfo, Target,
     VrlRuntime,
@@ -21,7 +23,7 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub fn compile(
     source: &str,
     fns: &[Box<dyn Function>],
-) -> compiler::Result<(Program, state::LocalEnv)> {
+) -> compiler::Result<(Program, state::LocalEnv, DiagnosticList)> {
     let mut state = state::ExternalEnv::default();
 
     compile_with_state(source, fns, &mut state)

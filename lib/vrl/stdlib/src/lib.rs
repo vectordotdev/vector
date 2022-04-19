@@ -541,7 +541,7 @@ pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
 pub use upcase::{vrl_fn_upcase, Upcase};
 #[cfg(feature = "uuid_v4")]
-pub use uuid_v4::UuidV4;
+pub use uuid_v4::{uuid_v4, UuidV4};
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
