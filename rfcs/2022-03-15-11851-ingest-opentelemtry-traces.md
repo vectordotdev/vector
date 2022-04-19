@@ -84,7 +84,7 @@ N/A
 - Support `opentelemetry` source to `datadog_traces` sink forwarding by dealing with:
   - Traces normalization to a single format inside Vector
   - Conversion to/from this format in all traces sources/sinks
-- APM stats computation logic, with an implementation fully function for traces from both the `opentelemetry` and the
+- APM stats computation logic, with an implementation fully functional for traces from both the `opentelemetry` and the
   `datadog_agent` sources.
 
 ### Out of scope
