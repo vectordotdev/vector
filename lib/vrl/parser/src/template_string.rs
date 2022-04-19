@@ -38,6 +38,16 @@ impl TemplateString {
                 ))
             })
     }
+
+    /// If the template string is just a single literal string return that string
+    /// as we can just represent it in the ast as a single literal, otherwise return
+    /// None as we will need to rewrite it into an expression.
+    pub fn literal_string(&self) -> Option<String> {
+        match self.0.as_slice() {
+            [StringSegment::Literal(s)] => Some(s.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for TemplateString {

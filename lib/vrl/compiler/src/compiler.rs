@@ -1,5 +1,4 @@
-use std::convert::TryFrom;
-
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -115,25 +114,48 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
+        use ast::Literal::*;
         use literal::ErrorVariant::*;
 
-        if let ast::Literal::String(template) = node.inner() {
-            self.compile_expr(Node::new(node.span(), template.rewrite()), external)
-        } else {
-            let literal = Literal::try_from(node).unwrap_or_else(|err| {
-                let value = match &err.variant {
-                    #[allow(clippy::trivial_regex)]
-                    InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
-                    InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
-                    NanFloat => NotNan::new(0.0).unwrap().into(),
-                };
+        let (span, lit) = node.take();
 
-                self.errors.push(Box::new(err));
-                value
-            });
+        let literal = match lit {
+            String(template) => {
+                if let Some(v) = template.literal_string() {
+                    Ok(Literal::String(Bytes::from(v)))
+                } else {
+                    // Rewrite the template into an expression and compile that block.
+                    return self.compile_expr(Node::new(span, template.rewrite()), external);
+                }
+            }
+            RawString(v) => Ok(Literal::String(Bytes::from(v))),
+            Integer(v) => Ok(Literal::Integer(v)),
+            Float(v) => Ok(Literal::Float(v)),
+            Boolean(v) => Ok(Literal::Boolean(v)),
+            Regex(v) => regex::Regex::new(&v)
+                .map_err(|err| literal::Error::from((span, err)))
+                .map(|r| Literal::Regex(r.into())),
+            // TODO: support more formats (similar to Vector's `Convert` logic)
+            Timestamp(v) => v
+                .parse()
+                .map(Literal::Timestamp)
+                .map_err(|err| literal::Error::from((span, err))),
+            Null => Ok(Literal::Null),
+        };
 
-            literal.into()
-        }
+        let literal = literal.unwrap_or_else(|err| {
+            let value = match &err.variant {
+                #[allow(clippy::trivial_regex)]
+                InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
+                InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
+                NanFloat => NotNan::new(0.0).unwrap().into(),
+            };
+
+            self.errors.push(Box::new(err));
+            value
+        });
+
+        literal.into()
     }
 
     fn compile_container(
