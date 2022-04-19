@@ -12,7 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::{future, future::Shared, stream::BoxStream, FutureExt, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -25,6 +25,7 @@ use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
+    sync::{Mutex, MutexGuard},
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
@@ -39,6 +40,7 @@ use crate::{
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
+    sources::util::finalizer::OrderedFinalizer,
     SourceSender,
 };
 
@@ -231,7 +233,7 @@ impl JournaldSource {
         shutdown: ShutdownSignal,
         start_journalctl: StartJournalctlFn,
     ) -> Result<(), ()> {
-        let mut checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
+        let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 error!(
@@ -241,24 +243,31 @@ impl JournaldSource {
                 );
             })?;
 
-        let run = Box::pin(self.run(&mut checkpointer, start_journalctl));
-        future::select(run, shutdown).await;
+        let checkpointer = SharedCheckpointer::new(checkpointer);
+        let shutdown = shutdown.shared();
+        let finalizer = Finalizer::new(
+            self.acknowledgements,
+            checkpointer.clone(),
+            shutdown.clone(),
+        );
 
-        checkpointer.sync().await;
+        let run = Box::pin(self.run(checkpointer, finalizer, start_journalctl));
+        future::select(run, shutdown).await;
 
         Ok(())
     }
 
     async fn run(
         mut self,
-        checkpointer: &mut StatefulCheckpointer,
+        checkpointer: SharedCheckpointer,
+        finalizer: Finalizer,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
-            match start_journalctl(&checkpointer.cursor) {
+            match start_journalctl(&checkpointer.lock().await.cursor) {
                 Ok(RunningJournal(stream, stop)) => {
-                    let should_restart = self.run_stream(stream, checkpointer).await;
+                    let should_restart = self.run_stream(stream, &finalizer).await;
                     stop();
                     if !should_restart {
                         return;
@@ -280,11 +289,11 @@ impl JournaldSource {
     async fn run_stream<'a>(
         &'a mut self,
         mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-        checkpointer: &'a mut StatefulCheckpointer,
+        finalizer: &'a Finalizer,
     ) -> bool {
         let batch_size = self.batch_size;
         loop {
-            let mut batch = Batch::new(self, checkpointer);
+            let mut batch = Batch::new(self);
 
             if !batch.handle_next(stream.next().await) {
                 break true;
@@ -301,7 +310,7 @@ impl JournaldSource {
                     }
                 }
             }
-            if let Some(x) = batch.finish().await {
+            if let Some(x) = batch.finish(finalizer).await {
                 break x;
             }
         }
@@ -315,11 +324,11 @@ struct Batch<'a> {
     batch: Option<Arc<BatchNotifier>>,
     receiver: Option<BatchStatusReceiver>,
     source: &'a mut JournaldSource,
-    checkpointer: &'a mut StatefulCheckpointer,
+    cursor: Option<String>,
 }
 
 impl<'a> Batch<'a> {
-    fn new(source: &'a mut JournaldSource, checkpointer: &'a mut StatefulCheckpointer) -> Self {
+    fn new(source: &'a mut JournaldSource) -> Self {
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(source.acknowledgements);
         Self {
             events: Vec::new(),
@@ -328,7 +337,7 @@ impl<'a> Batch<'a> {
             batch,
             receiver,
             source,
-            checkpointer,
+            cursor: None,
         }
     }
 
@@ -350,7 +359,7 @@ impl<'a> Batch<'a> {
                 match decode_record(&bytes, self.source.remap_priority) {
                     Ok(mut record) => {
                         if let Some(tmp) = record.remove(&*CURSOR) {
-                            self.checkpointer.set(tmp);
+                            self.cursor = Some(tmp);
                         }
 
                         if !filter_matches(
@@ -375,7 +384,7 @@ impl<'a> Batch<'a> {
         }
     }
 
-    async fn finish(mut self) -> Option<bool> {
+    async fn finish(mut self, finalizer: &Finalizer) -> Option<bool> {
         drop(self.batch);
 
         if self.record_size > 0 {
@@ -393,9 +402,8 @@ impl<'a> Batch<'a> {
 
             match self.source.out.send_batch(self.events).await {
                 Ok(_) => {
-                    if let Some(receiver) = self.receiver {
-                        // Ignore the received status, we can't do anything with failures here.
-                        receiver.await;
+                    if let Some(cursor) = self.cursor {
+                        finalizer.finalize(cursor, self.receiver).await;
                     }
                 }
                 Err(error) => {
@@ -403,10 +411,6 @@ impl<'a> Batch<'a> {
                     // `out` channel is closed, don't restart journalctl.
                     self.exiting = Some(false);
                 }
-            }
-
-            if self.exiting != Some(false) {
-                self.checkpointer.sync().await;
             }
         }
         self.exiting
@@ -608,6 +612,40 @@ fn find_duplicate_match(a_matches: &Matches, b_matches: &Matches) -> Option<(Str
     None
 }
 
+enum Finalizer {
+    Sync(SharedCheckpointer),
+    Async(OrderedFinalizer<String>),
+}
+
+impl Finalizer {
+    fn new(
+        acknowledgements: bool,
+        checkpointer: SharedCheckpointer,
+        shutdown: Shared<ShutdownSignal>,
+    ) -> Self {
+        if acknowledgements {
+            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
+                let checkpointer = checkpointer.clone();
+                async move {
+                    checkpointer.lock().await.set(cursor).await;
+                }
+            }))
+        } else {
+            Self::Sync(checkpointer)
+        }
+    }
+
+    async fn finalize(&self, cursor: String, receiver: Option<BatchStatusReceiver>) {
+        match (self, receiver) {
+            (Self::Sync(checkpointer), None) => checkpointer.lock().await.set(cursor).await,
+            (Self::Async(finalizer), Some(receiver)) => finalizer.add(cursor, receiver),
+            _ => {
+                unreachable!("Cannot have async finalization without a receiver in journald source")
+            }
+        }
+    }
+}
+
 struct Checkpointer {
     file: File,
     filename: PathBuf,
@@ -664,20 +702,29 @@ impl StatefulCheckpointer {
         })
     }
 
-    fn set(&mut self, token: impl Into<String>) {
-        self.cursor = Some(token.into());
+    async fn set(&mut self, token: impl Into<String>) {
+        let token = token.into();
+        if let Err(error) = self.checkpointer.set(&token).await {
+            error!(
+                message = "Could not set journald checkpoint.",
+                %error,
+                filename = ?self.checkpointer.filename,
+            );
+        }
+        self.cursor = Some(token);
+    }
+}
+
+#[derive(Clone)]
+struct SharedCheckpointer(Arc<Mutex<StatefulCheckpointer>>);
+
+impl SharedCheckpointer {
+    fn new(c: StatefulCheckpointer) -> Self {
+        Self(Arc::new(Mutex::new(c)))
     }
 
-    async fn sync(&mut self) {
-        if let Some(token) = self.cursor.as_ref() {
-            if let Err(error) = self.checkpointer.set(token).await {
-                error!(
-                    message = "Could not set journald checkpoint.",
-                    %error,
-                    filename = ?self.checkpointer.filename,
-                );
-            }
-        }
+    async fn lock(&self) -> MutexGuard<'_, StatefulCheckpointer> {
+        self.0.lock().await
     }
 }
 
@@ -832,7 +879,7 @@ mod tests {
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
             out: tx,
-            acknowledgements: true,
+            acknowledgements: false,
         }
         .run_shutdown(
             shutdown,
@@ -994,14 +1041,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn waits_for_acknowledgements() {
+    async fn handles_acknowledgements() {
         let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
         let mut checkpoint_path = tempdir.path().to_path_buf();
         checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        let mut checkpointer = StatefulCheckpointer::new(checkpoint_path.clone())
+        let checkpointer = StatefulCheckpointer::new(checkpoint_path.clone())
             .await
             .expect("Creating checkpointer failed!");
 
@@ -1015,20 +1062,29 @@ mod tests {
             acknowledgements: true,
         };
         let RunningJournal(stream, _stop) = FakeJournal::new(&checkpointer.cursor);
-        let mut handle = tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer));
+        let checkpointer = SharedCheckpointer::new(checkpointer);
+        let (_trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown.shared());
 
-        // Drive the journal until it waits for the acknowledgement.
-        assert_eq!(handle.poll(), Poll::Pending);
-        assert!(!handle.is_woken());
+        // The source runs to completion without setting the checkpoint
+        source.run_stream(stream, &finalizer).await;
+
+        // Make sure the checkpointer cursor is empty
+        assert_eq!(checkpointer.lock().await.cursor, None);
+
         // Acknowledge all the received events.
         let mut count = 0;
         while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            // The checkpointer shouldn't set the cursor until the end of the batch.
+            assert_eq!(checkpointer.lock().await.cursor, None);
             event.metadata().update_status(EventStatus::Delivered);
             count += 1;
         }
         assert_eq!(count, 8);
-        // Make sure it is woken up again after receiving the acknowledgement.
-        assert!(handle.is_woken());
+
+        // Let the async finalizer update the cursor
+        tokio::task::yield_now().await;
+        assert_eq!(checkpointer.lock().await.cursor.as_deref(), Some("6"));
     }
 
     #[test]

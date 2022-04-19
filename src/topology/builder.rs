@@ -147,8 +147,7 @@ pub async fn build_pieces(
 
     // Build sources
     for (key, source) in config
-        .sources
-        .iter()
+        .sources()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
         debug!(component = %key, "Building new source.");
@@ -267,8 +266,7 @@ pub async fn build_pieces(
 
     // Build transforms
     for (key, transform) in config
-        .transforms
-        .iter()
+        .transforms()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
         debug!(component = %key, "Building new transform.");
@@ -327,8 +325,7 @@ pub async fn build_pieces(
 
     // Build sinks
     for (key, sink) in config
-        .sinks
-        .iter()
+        .sinks()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
         debug!(component = %key, "Building new sink");
