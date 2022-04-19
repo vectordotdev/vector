@@ -228,7 +228,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
     match value {
         Value::Bytes(bytes) => {
             let mut value = String::from_utf8_lossy(bytes).into_owned();
-            // ideally this Z should in quoted in the pattern, but DataDog supports this as a special case:
+            // Ideally this Z should be quoted in the pattern, but DataDog supports this as a special case:
             // yyyy-MM-dd'T'HH:mm:ss.SSSZ - e.g. 2016-09-02T15:02:29.648Z
             if value.ends_with('Z') && filter.original_format.ends_with('Z') {
                 value.remove(value.len() - 1); // drop Z
