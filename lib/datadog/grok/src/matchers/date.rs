@@ -26,7 +26,7 @@ pub fn convert_time_format(format: &str) -> std::result::Result<String, String> 
                 // fraction of second
                 'S' => {
                     if time_format.ends_with('.') {
-                        time_format.remove(time_format.len() - 1); // drop .
+                        time_format.pop(); // drop .
                         time_format.push_str("%.f");
                     } else {
                         time_format.push_str("%f");
@@ -231,7 +231,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
             // Ideally this Z should be quoted in the pattern, but DataDog supports this as a special case:
             // yyyy-MM-dd'T'HH:mm:ss.SSSZ - e.g. 2016-09-02T15:02:29.648Z
             if value.ends_with('Z') && filter.original_format.ends_with('Z') {
-                value.remove(value.len() - 1); // drop Z
+                value.pop(); // drop Z
                 value.push_str("+0000");
             }
             match &filter.regex_with_tz {
