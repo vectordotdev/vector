@@ -153,14 +153,6 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.pipelines.nginx.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
-
-[[transforms.processing.logs.pipelines.nginx.transforms]]
-type = "remap"
-source = '''
 if exists(.custom.date_access) {
   .timestamp = .custom.date_access
 }
@@ -1499,14 +1491,6 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
-
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
-type = "remap"
-source = '''
 if exists(.custom.date_access) {
   .timestamp = .custom.date_access
 }
@@ -2809,14 +2793,6 @@ del(.custom.data.user_agent)
 [[transforms.processing.logs.pipelines.auth0.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
-
-[[transforms.processing.logs.pipelines.auth0.transforms]]
-type = "remap"
-source = '''
 if .custom.usr.id == null {
   if (source = .custom.data.user_name; source != null) {
     .custom.usr.id = source
@@ -3293,14 +3269,6 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.pipelines.nodejs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
-
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
-type = "remap"
-source = '''
 if .custom.dd.env != null {
   if (tag, err = "env:" + to_string(.custom.dd.env); err == null) {
     .tags, err = push(.tags, tag)
@@ -3570,14 +3538,6 @@ custom, err = parse_groks(value: .custom.message,
 )
 if (err == null) {
   .custom, err = merge(.custom, custom, deep: true)
-}
-'''
-
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
 }
 '''
 
@@ -4008,14 +3968,6 @@ source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
   details.queryString = del(details.query)
   .custom.http.url_details = details
-}
-'''
-
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
 }
 '''
 
