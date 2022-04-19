@@ -30,6 +30,7 @@ vrl-compiler = { path = "../../vrl/compiler" }
 
 [dev-dependencies]
 vrl-compiler = { path = "../../vrl/compiler", features = ["test"] }
+value = {path = "../../value", features = ["json", "test"]}
 criterion = { version = "0.3.5" }
 
 [build-dependencies]

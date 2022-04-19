@@ -2163,6 +2163,7 @@ dependencies = [
  "thiserror",
  "tracing 0.1.34",
  "tracing-test",
+ "value",
  "vector_common",
  "vrl-compiler",
 ]
