@@ -8,7 +8,8 @@ use itertools::{
 };
 use std::collections::BTreeMap;
 use tracing::warn;
-use vrl_compiler::{Target, Value};
+use value::Value;
+use vrl_compiler::Target;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -113,7 +114,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
-    use vrl_compiler::Value;
+    use value::Value;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;

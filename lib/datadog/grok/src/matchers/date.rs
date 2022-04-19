@@ -5,7 +5,7 @@ use peeking_take_while::PeekableExt;
 use regex::Regex;
 use std::fmt::Formatter;
 use tracing::warn;
-use vrl_compiler::Value;
+use value::Value;
 
 /// converts Joda time format to strptime format
 pub fn convert_time_format(format: &str) -> std::result::Result<String, String> {
