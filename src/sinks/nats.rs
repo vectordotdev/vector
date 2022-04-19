@@ -230,10 +230,7 @@ mod integration_tests {
     use std::{thread, time::Duration};
 
     use super::*;
-    use crate::nats::{
-        NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthStrategy, NatsAuthToken,
-        NatsAuthUserPassword,
-    };
+    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use crate::tls::TlsOptions;
@@ -322,22 +319,17 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4223".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::UserPassword,
-                user_password: Some(NatsAuthUserPassword {
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
                     user: "natsuser".into(),
                     password: "natspass".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
-        let r = publish_and_check(conf).await;
-        assert!(
-            r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
-        );
+        publish_and_check(conf)
+            .await
+            .expect("publish_and_check failed");
     }
 
     #[tokio::test]
@@ -352,13 +344,11 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4224".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::UserPassword,
-                user_password: Some(NatsAuthUserPassword {
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
                     user: "natsuser".into(),
                     password: "wrongpass".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -382,12 +372,10 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4224".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::Token,
-                token: Some(NatsAuthToken {
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
                     value: "secret".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -411,12 +399,10 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4224".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::Token,
-                token: Some(NatsAuthToken {
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
                     value: "wrongsecret".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -440,13 +426,11 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4225".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                nkey: Some(NatsAuthNKey {
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
                     nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
                     seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -470,13 +454,11 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4225".to_owned(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                nkey: Some(NatsAuthNKey {
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
                     nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
                     seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -618,12 +600,10 @@ mod integration_tests {
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::CredentialsFile,
-                credentials_file: Some(NatsAuthCredentialsFile {
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
                     path: "tests/data/nats.creds".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -653,12 +633,10 @@ mod integration_tests {
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::CredentialsFile,
-                credentials_file: Some(NatsAuthCredentialsFile {
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
                     path: "tests/data/nats-bad.creds".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
