@@ -8,10 +8,11 @@ use smallvec::SmallVec;
 use socket2::SockRef;
 use vector_core::ByteSizeOf;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 
+use codecs::StreamDecodingError;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -20,7 +21,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
-use super::{AfterReadExt as _, StreamDecodingError};
+use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
@@ -110,7 +111,7 @@ where
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn handle_events(&self, _events: &mut [Event], _host: Bytes) {}
+    fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
@@ -194,7 +195,7 @@ where
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(&ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -203,7 +204,7 @@ where
                                 receive_buffer_bytes,
                                 source,
                                 tripwire,
-                                peer_addr.ip(),
+                                peer_addr,
                                 out,
                                 acknowledgements,
                                 request_limiter,
@@ -232,7 +233,7 @@ async fn handle_stream<T>(
     receive_buffer_bytes: Option<usize>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    peer_addr: IpAddr,
+    peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
@@ -243,7 +244,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(&TcpSocketTlsConnectionError { error });
+                emit!(TcpSocketTlsConnectionError { error });
                 return;
             }
         },
@@ -265,14 +266,13 @@ async fn handle_stream<T>(
     }
 
     let socket = socket.after_read(move |byte_size| {
-        emit!(&TcpBytesReceived {
+        emit!(TcpBytesReceived {
             byte_size,
             peer_addr
         });
     });
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
-    let host = Bytes::from(peer_addr.to_string());
 
     loop {
         let mut permit = tokio::select! {
@@ -315,7 +315,7 @@ async fn handle_stream<T>(
                         let mut events = frames.into_iter().flat_map(Into::into).collect::<Vec<Event>>();
                         let count = events.len();
 
-                        emit!(&SocketEventsReceived {
+                        emit!(SocketEventsReceived {
                             mode: SocketMode::Tcp,
                             byte_size: events.size_of(),
                             count,
@@ -334,7 +334,7 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        source.handle_events(&mut events, host.clone());
+                        source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {
@@ -357,7 +357,7 @@ async fn handle_stream<T>(
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
-                                        emit!(&TcpSendAckError{ error });
+                                        emit!(TcpSendAckError{ error });
                                         break;
                                     }
                                 }
@@ -366,7 +366,7 @@ async fn handle_stream<T>(
                                 }
                             }
                             Err(error) => {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                                 break;
                             }
                         }

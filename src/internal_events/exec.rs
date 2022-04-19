@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, io_error_code};
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_core::internal_event::InternalEvent;
@@ -13,16 +13,13 @@ pub struct ExecEventsReceived<'a> {
 }
 
 impl InternalEvent for ExecEventsReceived<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
             command = %self.command,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_events_total", self.count as u64,
             "command" => self.command.to_owned(),
@@ -36,10 +33,6 @@ impl InternalEvent for ExecEventsReceived<'_> {
             "events_in_total", self.count as u64,
             "command" => self.command.to_owned(),
         );
-        counter!(
-            "processed_bytes_total", self.byte_size as u64,
-            "command" => self.command.to_owned(),
-        );
     }
 }
 
@@ -50,29 +43,26 @@ pub struct ExecFailedError<'a> {
 }
 
 impl InternalEvent for ExecFailedError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Unable to exec.",
             command = %self.command,
             error = ?self.error,
             error_type = error_type::COMMAND_FAILED,
+            error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.to_string(),
             "error_type" => error_type::COMMAND_FAILED,
+            "error_code" => io_error_code(&self.error),
             "stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.to_string(),
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
@@ -87,7 +77,7 @@ pub struct ExecTimeoutError<'a> {
 }
 
 impl InternalEvent for ExecTimeoutError<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Timeout during exec.",
             command = %self.command,
@@ -96,13 +86,9 @@ impl InternalEvent for ExecTimeoutError<'_> {
             error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.to_string(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
         );
@@ -110,7 +96,6 @@ impl InternalEvent for ExecTimeoutError<'_> {
         counter!(
             "processing_errors_total", 1,
             "command" => self.command.to_owned(),
-            "error" => self.error.to_string(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
         );
@@ -134,26 +119,24 @@ impl ExecCommandExecuted<'_> {
 }
 
 impl InternalEvent for ExecCommandExecuted<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
+        let exit_status = self.exit_status_string();
         trace!(
             message = "Executed command.",
             command = %self.command,
-            exit_status = %self.exit_status_string(),
+            exit_status = %exit_status,
             elapsed_millis = %self.exec_duration.as_millis(),
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "command_executed_total", 1,
             "command" => self.command.to_owned(),
-            "exit_status" => self.exit_status_string(),
+            "exit_status" => exit_status.clone(),
         );
 
         histogram!(
             "command_execution_duration_seconds", self.exec_duration,
             "command" => self.command.to_owned(),
-            "exit_status" => self.exit_status_string(),
+            "exit_status" => exit_status,
         );
     }
 }

@@ -24,7 +24,7 @@ mod integration_tests {
         event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
     };
 
-    use crate::aws::aws_sdk::create_client;
+    use crate::aws::create_client;
     use crate::aws::{AwsAuthentication, RegionOrEndpoint};
     use crate::common::s3::S3ClientBuilder;
     use crate::{
@@ -335,7 +335,7 @@ mod integration_tests {
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         let mut batch = BatchConfig::default();
         batch.max_events = Some(batch_size);
-        batch.timeout_secs = Some(5);
+        batch.timeout_secs = Some(5.0);
 
         S3SinkConfig {
             bucket: bucket.to_string(),

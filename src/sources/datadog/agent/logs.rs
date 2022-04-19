@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
@@ -13,7 +14,7 @@ use crate::{
     internal_events::EventsReceived,
     sources::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-        util::{ErrorMessage, StreamDecodingError},
+        util::ErrorMessage,
     },
     SourceSender,
 };
@@ -129,7 +130,7 @@ pub(crate) fn decode_log_body(
         }
     }
 
-    emit!(&EventsReceived {
+    emit!(EventsReceived {
         byte_size: decoded.size_of(),
         count: decoded.len(),
     });

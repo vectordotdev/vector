@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -331,7 +331,8 @@ pub fn file_source(
     let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            checkpoints.update(entry.file_id, entry.offset)
+            let checkpoints = Arc::clone(&checkpoints);
+            async move { checkpoints.update(entry.file_id, entry.offset) }
         })
     });
 
@@ -346,7 +347,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(&FileBytesReceived {
+                emit!(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
@@ -406,7 +407,7 @@ pub fn file_source(
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(&FileOpen { count: 0 });
+            emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -466,7 +467,7 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> LogEvent {
-    emit!(&FileEventsReceived {
+    emit!(FileEventsReceived {
         count: 1,
         file: &file,
         byte_size: line.len(),

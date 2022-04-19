@@ -170,7 +170,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(&crate::internal_events::TemplateRenderingError {
+                emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,

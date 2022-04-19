@@ -72,7 +72,7 @@ impl FunctionTransform for RemoveFields {
             let field_string = field.to_string();
             let old_val = log.remove_prune(field_string.as_str(), self.drop_empty);
             if old_val.is_none() {
-                emit!(&RemoveFieldsFieldMissing {
+                emit!(RemoveFieldsFieldMissing {
                     field: &field_string
                 });
             }

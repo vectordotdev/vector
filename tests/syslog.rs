@@ -91,6 +91,7 @@ async fn test_unix_stream_syslog() {
         "in",
         SyslogConfig::from_mode(Mode::Unix {
             path: in_path.clone(),
+            socket_file_mode: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -164,6 +165,7 @@ async fn test_octet_counting_syslog() {
     let output_lines = CountReceiver::receive_lines(out_addr);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 

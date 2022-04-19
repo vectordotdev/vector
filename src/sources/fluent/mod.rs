@@ -1,13 +1,15 @@
 use std::io::{self, Read};
+use std::net::SocketAddr;
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -101,12 +103,12 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         for event in events {
             let log = event.as_mut_log();
 
             if !log.contains(log_schema().host_key()) {
-                log.insert(log_schema().host_key(), host.clone());
+                log.insert(log_schema().host_key(), host.ip().to_string());
             }
         }
     }
@@ -323,7 +325,7 @@ impl Decoder for FluentDecoder {
 
             let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
                 let base64_encoded_message = base64::encode(&src);
-                emit!(&FluentMessageDecodeError {
+                emit!(FluentMessageDecodeError {
                     error: &error,
                     base64_encoded_message
                 });
@@ -362,7 +364,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(&FluentMessageReceived { byte_size });
+            emit!(FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };

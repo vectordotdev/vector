@@ -85,6 +85,7 @@ class Event
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
+      logs_should_have('error')
       counters_must_include('component_errors_total', ['error_type', 'stage'])
     end
 
@@ -136,6 +137,12 @@ class Event
       @reports.append(report)
     end
 
+    def logs_should_have(level)
+      if @logs.find_index { |type, message, parameters| type == level }.nil?
+        @reports.append("This event MUST log with level #{level}.")
+      end
+    end
+
     def counters_must_include(name, required_tags)
       unless @counters.include? name
         @reports.append("This event MUST increment counter \"#{name}\".")
@@ -179,7 +186,7 @@ Find.find('.') do |path|
       end
     end
 
-    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match? /## skip check-events ##/i
+    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/')
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
@@ -201,12 +208,14 @@ Find.find('.') do |path|
         block.scan(/
                     (trace|debug|info|warn|error)! # The log type
                     \(\s*(?:message\s*=\s*)? # Skip any leading "message =" bit
-                    "([^({)][^("]+)" # The log message text
+                    (?:"([^({)][^("]+)"|([^,]+)) # The log message text
                     ([^;]*?) # Match the parameter list
                     \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
-                   /mx) do |type, message, parameters|
+                   /mx) do |type, raw_message, var_message, parameters|
           parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
                          .map { |assignment, simple| assignment or simple }
+
+          message = raw_message.nil? ? var_message : raw_message
 
           $all_events[event_name].add_log(type, message, parameters)
         end

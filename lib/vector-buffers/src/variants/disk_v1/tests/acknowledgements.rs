@@ -1,4 +1,3 @@
-use futures::{SinkExt, StreamExt};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
@@ -15,6 +14,7 @@ use crate::{
 
 #[tokio::test]
 async fn acking_single_event_advances_delete_offset() {
+    let _a = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -27,10 +27,8 @@ async fn acking_single_event_advances_delete_offset() {
             // expected amount, since the entry key should be increment by event count:
             let record = SizedRecord(360);
             assert_eq!(record.event_count(), 1);
-            writer
-                .send(record.clone())
-                .await
-                .expect("write should not fail");
+            writer.send(record.clone()).await;
+            writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
             // And now read it out which should give us a matching record, while our delete offset
@@ -82,6 +80,7 @@ async fn acking_single_event_advances_delete_offset() {
 
 #[tokio::test]
 async fn acking_multi_event_advances_delete_offset() {
+    let _a = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -94,10 +93,8 @@ async fn acking_multi_event_advances_delete_offset() {
             // expected amount, since the entry key should be increment by event count:
             let record = MultiEventRecord(14);
             assert_eq!(record.event_count(), 14);
-            writer
-                .send(record.clone())
-                .await
-                .expect("write should not fail");
+            writer.send(record).await;
+            writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
             // And now read it out which should give us a matching record, while our delete offset
@@ -160,10 +157,8 @@ async fn acking_multi_event_advances_delete_offset_incremental() {
             // expected amount, since the entry key should be increment by event count:
             let record = MultiEventRecord(14);
             assert_eq!(record.event_count(), 14);
-            writer
-                .send(record.clone())
-                .await
-                .expect("write should not fail");
+            writer.send(record).await;
+            writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
             // And now read it out which should give us a matching record, while our delete offset
@@ -269,8 +264,9 @@ async fn acking_when_undecodable_records_present() {
 
                 for input in inputs {
                     expected_writer_offset += input.event_count();
-                    writer.send(input).await.expect("write should not fail");
+                    writer.send(input).await;
                 }
+                writer.flush();
 
                 assert_reader_writer_v1_positions!(reader, writer, 0, expected_writer_offset);
 

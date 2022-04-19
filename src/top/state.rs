@@ -31,6 +31,7 @@ pub enum EventType {
     ProcessedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
+    ErrorsTotals(Vec<IdentifiedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
     ConnectionUpdated(ConnectionStatus),
@@ -197,6 +198,13 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                         if let Some(r) = state.components.get_mut(&key) {
                             r.processed_bytes_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
+                        }
+                    }
+                }
+                EventType::ErrorsTotals(rows) => {
+                    for (key, v) in rows {
+                        if let Some(r) = state.components.get_mut(&key) {
+                            r.errors = v;
                         }
                     }
                 }

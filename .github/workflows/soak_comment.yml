@@ -106,7 +106,7 @@ jobs:
           path: /tmp/${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-analysis
 
       - name: Post Results To PR
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v2
         with:
           issue-number: ${{ steps.pr-number.outputs.content }}
           edit-mode: replace

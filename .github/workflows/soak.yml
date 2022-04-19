@@ -92,6 +92,7 @@ jobs:
           export COEFFICIENT_OF_VARIATION="0.3"
           export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
+
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
@@ -129,7 +130,6 @@ jobs:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
               target: target,     // run each experiment
-              replica: [1, 2, 3], // run three replicas of each experiment/variant
             }
 
             // export this variable to be available to other github steps
@@ -159,7 +159,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        uses: docker/metadata-action@f2a13332ac1ce8c0a71aeac48a150dbb1838ab67
         with:
           flavor: |
             latest=false
@@ -179,7 +179,7 @@ jobs:
           outputs: type=docker,dest=/tmp/baseline-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: baseline-image
           path: /tmp/baseline-image.tar
@@ -204,7 +204,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        uses: docker/metadata-action@f2a13332ac1ce8c0a71aeac48a150dbb1838ab67
         with:
           flavor: |
             latest=false
@@ -224,13 +224,13 @@ jobs:
           outputs: type=docker,dest=/tmp/comparison-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: comparison-image
           path: /tmp/comparison-image.tar
 
   soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline - replica ${{ matrix.replica }}
+    name: Soak (${{ matrix.target }}) - baseline
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
@@ -242,7 +242,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download baseline image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: baseline-image
           path: /tmp
@@ -262,23 +262,23 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
+                                  --replicas 4 \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-baseline
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-baseline:
     name: Erratic detection - baseline
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -298,7 +298,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -316,7 +316,7 @@ jobs:
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison - replica ${{ matrix.replica }}
+    name: Soak (${{ matrix.target }}) - comparison
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
@@ -328,7 +328,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download comparison image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: comparison-image
           path: /tmp
@@ -348,23 +348,23 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
+                                  --replicas 4 \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_${{ matrix.replica }}-comparison
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
   detect-erratic-comparison:
     name: Erratic detection - comparison
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-comparison
@@ -384,7 +384,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -403,7 +403,7 @@ jobs:
 
   analyze-results:
     name: Soak analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -424,7 +424,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -441,8 +441,9 @@ jobs:
                                          --warmup-seconds 30 \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
+                                         --mean-drift-percentage 7 \
                                          --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: soak-analysis
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
@@ -450,14 +451,14 @@ jobs:
       - name: Save PR number for subsequent workflow
         run: |
           echo ${{ github.event.number }} > /tmp/pr.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: pr-number
           path: /tmp/pr.txt
 
   detect-regressions:
     name: Regression analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -478,7 +479,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -491,11 +492,12 @@ jobs:
           ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
+                                         --mean-drift-percentage 7 \
                                          --p-value 0.1
 
   plot-analysis:
     name: Plot analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
       - soak-baseline
@@ -516,7 +518,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -531,14 +533,8 @@ jobs:
                                     --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/ \
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
 
-      - name: Plot up analysis
-        run: |
-          mkdir -p ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
-          ./soaks/bin/plot_up --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                              --output-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/plots/
-
       - name: Upload plots
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-captures-plots
           path: "${{ github.run_id }}-${{ github.run_attempt }}-captures/plots"

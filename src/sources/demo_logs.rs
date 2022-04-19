@@ -2,6 +2,10 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
@@ -12,15 +16,11 @@ use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -76,7 +76,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&DemoLogsEventProcessed);
+        emit!(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -137,7 +137,7 @@ async fn demo_logs_source(
     interval: f64,
     count: usize,
     format: OutputFormat,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
@@ -153,7 +153,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: 0,
             protocol: "none",
         });
@@ -165,7 +165,7 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count,
                         byte_size: events.size_of()
                     });
@@ -180,7 +180,7 @@ async fn demo_logs_source(
                         event
                     });
                     out.send_batch(events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {

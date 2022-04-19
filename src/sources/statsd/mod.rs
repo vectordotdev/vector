@@ -11,11 +11,7 @@ use vector_core::ByteSizeOf;
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{
-        self,
-        decoding::{self, Deserializer, Framer},
-        NewlineDelimitedDecoder,
-    },
+    codecs::Decoder,
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
@@ -28,6 +24,10 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     udp, SourceSender,
+};
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
 };
 
 pub mod parser;
@@ -128,7 +128,7 @@ impl SourceConfig for StatsdConfig {
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
+            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
         }
     }
 
@@ -159,7 +159,7 @@ pub(crate) struct StatsdDeserializer;
 
 impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             protocol: "udp",
             byte_size: bytes.len(),
         });
@@ -169,14 +169,14 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                emit!(&EventsReceived {
+                emit!(EventsReceived {
                     count: 1,
                     byte_size: event.size_of(),
                 });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecordError {
+                emit!(StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -192,7 +192,7 @@ async fn statsd_udp(
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -207,7 +207,7 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = codecs::Decoder::new(
+    let codec = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
         Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
@@ -217,11 +217,11 @@ async fn statsd_udp(
             Ok(((events, _byte_size), _sock)) => {
                 let count = events.len();
                 if let Err(error) = out.send_batch(events).await {
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                 }
             }
             Err(error) => {
-                emit!(&StatsdSocketError::read(error));
+                emit!(StatsdSocketError::read(error));
             }
         }
     }
@@ -235,11 +235,11 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )
@@ -258,14 +258,15 @@ mod test {
         io::AsyncWriteExt,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::config::ComponentKey;
+    use vector_core::{config::ComponentKey, event::EventContainer};
 
     use super::*;
     use crate::test_util::{
+        collect_limited,
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
-    use crate::{event::into_event_stream, series, test_util::metrics::AbsoluteMetricState};
+    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -333,7 +334,6 @@ mod test {
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
         let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let rx = rx.flat_map(into_event_stream);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -374,7 +374,11 @@ mod test {
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
         // cumulative values for incremental metrics, etc.  This will represent the final/cumulative
         // values for each metric sent by the source into the pipeline.
-        let state = rx.collect::<AbsoluteMetricState>().await;
+        let state = collect_limited(rx)
+            .await
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
         assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);

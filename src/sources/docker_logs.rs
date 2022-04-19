@@ -5,7 +5,7 @@ use std::{
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
     errors::Error as DockerError,
-    service::{ContainerInspectResponse, SystemEventsResponse},
+    service::{ContainerInspectResponse, EventMessage},
     system::EventsOptions,
     Docker,
 };
@@ -239,7 +239,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -290,7 +290,7 @@ impl DockerLogsSourceCore {
 struct DockerLogsSource {
     esb: EventStreamBuilder,
     /// event stream from docker
-    events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
+    events: Pin<Box<dyn Stream<Item = Result<EventMessage, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo coming from event stream futures
@@ -449,9 +449,9 @@ impl DockerLogsSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(&DockerLogsContainerEventReceived { container_id: &id, action: &action });
+                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
-                            let id = ContainerId::new(id);
+                            let id = ContainerId::new(id.to_owned());
 
                             // Update container status
                             match action.as_str() {
@@ -482,7 +482,7 @@ impl DockerLogsSource {
                             };
                         }
                         Some(Err(error)) => {
-                            emit!(&DockerLogsCommunicationError {
+                            emit!(DockerLogsCommunicationError {
                                 error,
                                 container_id: None,
                             });
@@ -542,12 +542,12 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(&DockerLogsTimestampParseError {
+                    Err(error) => emit!(DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(&DockerLogsContainerMetadataFetchError {
+                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
                     error,
                     container_id: id.as_str()
                 }),
@@ -579,7 +579,7 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        emit!(&DockerLogsContainerWatch {
+        emit!(DockerLogsContainerWatch {
             container_id: info.id.as_str()
         });
 
@@ -604,14 +604,14 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(&DockerLogsLoggingDriverUnsupportedError {
+                                emit!(DockerLogsLoggingDriverUnsupportedError {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
                                 Err(ErrorPersistence::Permanent)
                             }
                             _ => {
-                                emit!(&DockerLogsCommunicationError {
+                                emit!(DockerLogsCommunicationError {
                                     error,
                                     container_id: Some(info.id.as_str())
                                 });
@@ -648,12 +648,12 @@ impl EventStreamBuilder {
                 .await
                 .map_err(|error| {
                     let (count, _) = stream.size_hint();
-                    emit!(&StreamClosedError { error, count });
+                    emit!(StreamClosedError { error, count });
                 })
         };
 
         // End of stream
-        emit!(&DockerLogsContainerUnwatch {
+        emit!(DockerLogsContainerUnwatch {
             container_id: info.id.as_str()
         });
 
@@ -806,7 +806,7 @@ impl ContainerLogInfo {
             LogOutput::StdIn { message: _ } => return None,
         };
 
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: bytes_message.len(),
             protocol: "http"
         });
@@ -846,7 +846,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(&DockerLogsTimestampParseError {
+                emit!(DockerLogsTimestampParseError {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -967,7 +967,7 @@ impl ContainerLogInfo {
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
-        emit!(&DockerLogsEventsReceived {
+        emit!(DockerLogsEventsReceived {
             byte_size: log_event.size_of(),
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str

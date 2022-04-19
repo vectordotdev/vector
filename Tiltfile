@@ -18,11 +18,10 @@ helm_resource(
     image_deps=['timberio/vector'],
     image_keys=[('image.repository', 'image.tag')],
     flags=[
-        '--devel',
         '--set', 'role=Agent',
-        # '--set', 'env[0].name=VECTOR_LOG',
-        # '--set', 'env[0].value=trace'
+        '--set', 'env[0].name=VECTOR_LOG',
+        '--set', 'env[0].value=trace'
         ]
     )
 
-k8s_resource(workload='vector', port_forwards=8686)
+k8s_resource(workload='vector', port_forwards=9090)

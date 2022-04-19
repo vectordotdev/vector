@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -10,15 +8,12 @@ pub struct StdinEventsReceived {
 }
 
 impl InternalEvent for StdinEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
@@ -26,6 +21,5 @@ impl InternalEvent for StdinEventsReceived {
         );
         // deprecated
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

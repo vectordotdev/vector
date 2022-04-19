@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -5,13 +6,14 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -106,7 +108,7 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         let now = Value::from(chrono::Utc::now());
         for event in events {
             let log = event.as_mut_log();
@@ -123,7 +125,7 @@ impl TcpSource for LogstashSource {
                     .unwrap_or_else(|| now.clone());
                 log.insert(log_schema().timestamp_key(), timestamp);
             }
-            log.try_insert(log_schema().host_key(), host.clone());
+            log.try_insert(log_schema().host_key(), host.ip().to_string());
         }
     }
 

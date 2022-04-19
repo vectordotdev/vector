@@ -2,13 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        Decoder,
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
@@ -24,6 +22,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
+    pub socket_file_mode: Option<u32>,
     pub max_length: Option<usize>,
     pub host_key: Option<String>,
     #[serde(default)]
@@ -36,6 +35,7 @@ impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
+            socket_file_mode: None,
             max_length: Some(crate::serde::default_max_length()),
             host_key: None,
             framing: None,
@@ -63,14 +63,16 @@ fn handle_events(events: &mut [Event], host_key: &str, received_from: Option<Byt
 
 pub(super) fn unix_datagram(
     path: PathBuf,
+    socket_file_mode: Option<u32>,
     max_length: usize,
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
+) -> crate::Result<Source> {
     build_unix_datagram_source(
         path,
+        socket_file_mode,
         max_length,
         decoder,
         move |events, received_from| handle_events(events, &host_key, received_from),
@@ -81,13 +83,15 @@ pub(super) fn unix_datagram(
 
 pub(super) fn unix_stream(
     path: PathBuf,
+    socket_file_mode: Option<u32>,
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
+) -> crate::Result<Source> {
     build_unix_stream_source(
         path,
+        socket_file_mode,
         decoder,
         move |events, received_from| handle_events(events, &host_key, received_from),
         shutdown,

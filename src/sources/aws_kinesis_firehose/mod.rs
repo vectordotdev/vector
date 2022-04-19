@@ -1,11 +1,12 @@
 use std::{fmt, net::SocketAddr};
 
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use warp::Filter;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    codecs::DecodingConfig,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
         SourceContext, SourceDescription,

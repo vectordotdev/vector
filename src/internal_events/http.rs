@@ -12,16 +12,13 @@ pub struct HttpBytesReceived<'a> {
 }
 
 impl InternalEvent for HttpBytesReceived<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
             http_path = %self.http_path,
             protocol = %self.protocol
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
             "http_path" => self.http_path.to_string(),
@@ -39,7 +36,7 @@ pub struct HttpEventsReceived<'a> {
 }
 
 impl InternalEvent for HttpEventsReceived<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Events received.",
             count = %self.count,
@@ -47,9 +44,6 @@ impl InternalEvent for HttpEventsReceived<'_> {
             http_path = %self.http_path,
             protocol = %self.protocol,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_events_total", self.count as u64,
             "http_path" => self.http_path.to_string(),
@@ -62,7 +56,6 @@ impl InternalEvent for HttpEventsReceived<'_> {
             "protocol" => self.protocol,
         );
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -85,7 +78,7 @@ impl<'a> HttpBadRequest<'a> {
 }
 
 impl<'a> InternalEvent for HttpBadRequest<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(
             message = "Received bad request.",
             error = %self.message,
@@ -95,32 +88,14 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             http_code = %self.code,
             internal_log_rate_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error_code" => self.error_code.clone(),
+            "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
         // deprecated
         counter!("http_bad_requests_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct HttpEventEncoded {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for HttpEventEncoded {
-    fn emit_logs(&self) {
-        trace!(message = "Encode event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -131,7 +106,7 @@ pub struct HttpDecompressError<'a> {
 }
 
 impl<'a> InternalEvent for HttpDecompressError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed decompressing payload.",
             error = %self.error,
@@ -141,9 +116,6 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             encoding = %self.encoding,
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_decompressing_payload",

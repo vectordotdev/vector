@@ -2,6 +2,7 @@ use std::{io::Read, sync::Arc};
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -15,14 +16,13 @@ use super::{
     Compression,
 };
 use crate::{
-    codecs,
+    codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
         StreamClosedError,
     },
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -32,7 +32,7 @@ pub async fn firehose(
     source_arn: String,
     request: FirehoseRequest,
     compression: Compression,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     acknowledgements: bool,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
@@ -42,7 +42,7 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: bytes.len(),
             protocol: "http",
         });
@@ -51,7 +51,7 @@ pub async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count: events.len(),
                         byte_size: events.size_of(),
                     });
@@ -80,7 +80,7 @@ pub async fn firehose(
 
                     let count = events.len();
                     if let Err(error) = out.send_batch(events).await {
-                        emit!(&StreamClosedError {
+                        emit!(StreamClosedError {
                             error: error.clone(),
                             count,
                         });
@@ -158,7 +158,7 @@ fn decode_record(
             match infer::get(&buf) {
                 Some(filetype) => match filetype.mime_type() {
                     "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(&AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
                             compression: Compression::Gzip,
                             error
                         });

@@ -10,11 +10,8 @@ pub struct BytesReceived {
 }
 
 impl InternalEvent for BytesReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
     }
 }
@@ -27,16 +24,13 @@ pub struct HttpClientBytesReceived<'a> {
 }
 
 impl InternalEvent for HttpClientBytesReceived<'_> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
             protocol = %self.protocol,
             endpoint = %self.endpoint,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_owned(),
@@ -53,16 +47,13 @@ pub struct EndpointBytesSent<'a> {
 }
 
 impl<'a> InternalEvent for EndpointBytesSent<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes sent.",
             byte_size = %self.byte_size,
             protocol = %self.protocol,
             endpoint = %self.endpoint
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_string(),
@@ -71,50 +62,21 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
-#[cfg(feature = "rusoto")]
-pub struct AwsBytesSent {
-    pub byte_size: usize,
-    pub region: rusoto_core::Region,
-}
-
-#[cfg(feature = "rusoto")]
-impl InternalEvent for AwsBytesSent {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Bytes sent.",
-            protocol = "https",
-            byte_size = %self.byte_size,
-            region = ?self.region,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
-            "protocol" => "https",
-            "region" => self.region.name().to_owned(),
-        );
-    }
-}
-
 #[cfg(feature = "aws-core")]
-pub struct AwsSdkBytesSent {
+pub struct AwsBytesSent {
     pub byte_size: usize,
     pub region: Option<aws_types::region::Region>,
 }
 
 #[cfg(feature = "aws-core")]
-impl InternalEvent for AwsSdkBytesSent {
-    fn emit_logs(&self) {
+impl InternalEvent for AwsBytesSent {
+    fn emit(self) {
         trace!(
             message = "Bytes sent.",
             protocol = "https",
             byte_size = %self.byte_size,
             region = ?self.region,
         );
-    }
-
-    fn emit_metrics(&self) {
         let region = self
             .region
             .as_ref()
@@ -137,7 +99,7 @@ pub struct StreamClosedError {
 }
 
 impl InternalEvent for StreamClosedError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Failed to forward event(s), downstream is closed.",
             error_code = STREAM_CLOSED,
@@ -145,9 +107,6 @@ impl InternalEvent for StreamClosedError {
             stage = error_stage::SENDING,
             count = %self.count,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
             "error_code" => STREAM_CLOSED,

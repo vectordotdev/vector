@@ -20,10 +20,8 @@ use super::{
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Derivative, Deserialize)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize)]
 pub struct LogEvent {
-    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
     #[serde(flatten)]
     fields: Arc<Value>,
 
@@ -44,6 +42,7 @@ impl LogEvent {
 impl Default for LogEvent {
     fn default() -> Self {
         Self {
+            // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Arc::new(Value::Object(BTreeMap::new())),
             metadata: EventMetadata::default(),
         }

@@ -64,6 +64,7 @@ jobs:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
+          - test: 'datadog-traces'
           - test: 'dnstap'
           - test: 'docker-logs'
           - test: 'elasticsearch'

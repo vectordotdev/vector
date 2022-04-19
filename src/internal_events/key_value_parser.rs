@@ -9,7 +9,7 @@ pub struct KeyValueParserError {
 }
 
 impl InternalEvent for KeyValueParserError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Event failed to parse as key/value.",
             key = %self.key,
@@ -17,16 +17,12 @@ impl InternalEvent for KeyValueParserError {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
+        );
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-            "key" => self.key.clone(),
+            "key" => self.key,
         );
         // deprecated
         counter!(

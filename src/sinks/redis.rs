@@ -1,6 +1,5 @@
 use std::{
     convert::TryFrom,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -88,7 +87,7 @@ pub struct RedisDefaultBatchSettings;
 impl SinkBatchSettings for RedisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -239,7 +238,7 @@ fn encode_event(
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingError {
+            emit!(TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,
@@ -348,12 +347,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(&RedisEventsSent { count, byte_size });
+                        emit!(RedisEventsSent { count, byte_size });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventError::new(error)),
+                Err(error) => emit!(RedisSendEventError::new(error)),
             };
             result
         })

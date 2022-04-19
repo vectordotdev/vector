@@ -142,7 +142,7 @@ impl Function for Remove {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -160,7 +160,7 @@ impl Function for Remove {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let path = args.required("path");
-        let compact = args.optional("compact").unwrap_or(value!(false));
+        let compact = args.optional("compact").unwrap_or_else(|| value!(false));
 
         remove(path, compact, value)
     }
@@ -182,7 +182,7 @@ impl Expression for RemoveFn {
         remove(path, compact, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
         let mut td = TypeDef::from(Kind::empty()).fallible();

@@ -1,7 +1,9 @@
+use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
+use regex::Regex;
 use snafu::Snafu;
 use vector_common::encode_logfmt;
 use vector_core::{
@@ -16,18 +18,19 @@ use vector_core::{
 use super::{
     config::{Encoding, LokiConfig, OutOfOrderAction},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
-    service::{LokiRequest, LokiService},
+    service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
     config::{log_schema, SinkContext},
     http::HttpClient,
     internal_events::{
-        LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
-        LokiOutOfOrderEventRewritten, TemplateRenderingError,
+        LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
+        TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::{EncodingConfig, EncodingConfiguration},
+        service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
     },
     template::Template,
@@ -50,7 +53,7 @@ impl Partitioner for KeyPartitioner {
         self.0.as_ref().and_then(|t| {
             t.render_string(item)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: false,
@@ -131,9 +134,6 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        emit!(&LokiEventsProcessed {
-            byte_size: payload.len(),
-        });
         let compression = self.compression();
 
         LokiRequest {
@@ -158,19 +158,32 @@ pub(super) struct EventEncoder {
 
 impl EventEncoder {
     fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
-        self.labels
-            .iter()
-            .filter_map(|(key_template, value_template)| {
-                if let (Ok(key), Ok(value)) = (
-                    key_template.render_string(event),
-                    value_template.render_string(event),
-                ) {
-                    Some((key, value))
+        let mut vec: Vec<(String, String)> = Vec::new();
+
+        for (key_template, value_template) in self.labels.iter() {
+            if let (Ok(key), Ok(value)) = (
+                key_template.render_string(event),
+                value_template.render_string(event),
+            ) {
+                if let Some(opening_prefix) = key.strip_suffix('*') {
+                    let output: Result<serde_json::map::Map<String, serde_json::Value>, _> =
+                        serde_json::from_str(value.as_str());
+
+                    if let Ok(output) = output {
+                        // key_* -> key_one, key_two, key_three
+                        for (k, v) in output {
+                            vec.push((
+                                slugify_text(format!("{}{}", opening_prefix, k)),
+                                Value::from(v).to_string_lossy(),
+                            ))
+                        }
+                    }
                 } else {
-                    None
+                    vec.push((key, value));
                 }
-            })
-            .collect()
+            }
+        }
+        vec
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -223,7 +236,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(&LokiEventUnlabeled);
+            emit!(LokiEventUnlabeled);
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
@@ -311,20 +324,40 @@ impl RecordFilter {
     }
 }
 
-#[derive(Clone)]
 pub struct LokiSink {
     acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
     out_of_order_action: OutOfOrderAction,
-    service: LokiService,
+    service: Svc<LokiService, LokiRetryLogic>,
 }
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         let compression = config.compression;
+
+        // if Vector is configured to allow events with out of order timestamps, then then we can
+        // safely enable concurrency settings.
+        //
+        // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
+        // timestamps across requests. We used to support concurrency across partitions (Loki
+        // streams) but this was lost in #9506. Rather than try to re-add it, since Loki no longer
+        // requires in-order processing for version >= 2.4, instead we just keep the static limit
+        // of 1 for now.
+        let request_limits = match config.out_of_order_action {
+            OutOfOrderAction::Accept => config.request.unwrap_with(&Default::default()),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                let mut settings = config.request.unwrap_with(&Default::default());
+                settings.concurrency = Some(1);
+                settings
+            }
+        };
+
+        let service = tower::ServiceBuilder::new()
+            .settings(request_limits, LokiRetryLogic)
+            .service(LokiService::new(client, config.endpoint, config.auth)?);
 
         Ok(Self {
             acker: cx.acker(),
@@ -341,17 +374,22 @@ impl LokiSink {
             },
             batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
-            service: LokiService::new(client, config.endpoint, config.auth)?,
+            service,
         })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = tower::ServiceBuilder::new()
-            .concurrency_limit(1)
-            .service(self.service);
-
         let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
+
+        // out_of_order_action's that require a complete ordering are limited to building 1 request
+        // at a time
+        let request_builder_concurrency = match self.out_of_order_action {
+            OutOfOrderAction::Accept => NonZeroUsize::new(50).expect("static"),
+            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
+                NonZeroUsize::new(1).expect("static")
+            }
+        };
 
         let sink = input
             .map(|event| encoder.encode_event(event))
@@ -371,15 +409,15 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(&LokiOutOfOrderEventRewritten { count });
+                        emit!(LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(&LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
                     None
                 }
             })
-            .request_builder(NonZeroUsize::new(1), self.request_builder)
+            .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -389,7 +427,7 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(service, self.acker);
+            .into_driver(self.service, self.acker);
 
         sink.run().await
     }
@@ -402,12 +440,22 @@ impl StreamSink<Event> for LokiSink {
     }
 }
 
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+
+fn slugify_text(input: String) -> String {
+    let result = RE.replace_all(&input, "_");
+    result.to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        convert::TryFrom,
+    };
 
     use futures::stream::StreamExt;
-    use vector_core::event::Event;
+    use vector_core::event::{Event, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -452,6 +500,14 @@ mod tests {
             Template::try_from("{{ name }}").unwrap(),
             Template::try_from("{{ value }}").unwrap(),
         );
+        labels.insert(
+            Template::try_from("test_key_*").unwrap(),
+            Template::try_from("{{ dict }}").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("going_to_fail_*").unwrap(),
+            Template::try_from("{{ value }}").unwrap(),
+        );
         let encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
             encoding: EncodingConfig::from(Encoding::Json),
@@ -464,12 +520,21 @@ mod tests {
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");
         log.insert("value", "bar");
+
+        let mut test_dict = BTreeMap::default();
+        test_dict.insert("one".to_string(), Value::from("foo"));
+        test_dict.insert("two".to_string(), Value::from("baz"));
+        log.insert("dict", Value::from(test_dict));
+
         let record = encoder.encode_event(event);
         assert!(record.event.event.contains(log_schema().timestamp_key()));
-        assert_eq!(record.labels.len(), 2);
+        assert_eq!(record.labels.len(), 4);
+
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
         assert_eq!(labels["static"], "value".to_string());
         assert_eq!(labels["foo"], "bar".to_string());
+        assert_eq!(labels["test_key_one"], "foo".to_string());
+        assert_eq!(labels["test_key_two"], "baz".to_string());
     }
 
     #[test]

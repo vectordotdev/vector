@@ -40,7 +40,9 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
+    utilization::wrap,
     SourceSender,
 };
 
@@ -145,12 +147,23 @@ pub async fn build_pieces(
 
     // Build sources
     for (key, source) in config
-        .sources
-        .iter()
+        .sources()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
+        debug!(component = %key, "Building new source.");
+
         let typetag = source.inner.source_type();
         let source_outputs = source.inner.outputs();
+
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_id = %key.id(),
+            component_type = %source.inner.source_type(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
+        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
 
         let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
@@ -162,13 +175,15 @@ pub async fn build_pieces(
 
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
+                debug!("Source pump starting.");
                 while let Some(array) = rx.next().await {
                     fanout.send(array).await;
                 }
+                debug!("Source pump finished.");
                 Ok(TaskOutput::Source)
             };
 
-            pumps.push(pump);
+            pumps.push(pump.instrument(span.clone()));
             controls.insert(
                 OutputId {
                     component: key.clone(),
@@ -187,7 +202,7 @@ pub async fn build_pieces(
         let pump = async move {
             let mut handles = Vec::new();
             for pump in pumps {
-                handles.push(tokio::spawn(pump));
+                handles.push(spawn_named(pump, task_name.as_ref()));
             }
             for handle in handles {
                 handle.await.expect("join error")?;
@@ -251,10 +266,11 @@ pub async fn build_pieces(
 
     // Build transforms
     for (key, transform) in config
-        .transforms
-        .iter()
+        .transforms()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        debug!(component = %key, "Building new transform.");
+
         let mut schema_definitions = HashMap::new();
         let merged_definition = if config.schema.enabled {
             schema::merged_definition(&transform.inputs, config, &mut definition_cache)
@@ -309,10 +325,11 @@ pub async fn build_pieces(
 
     // Build sinks
     for (key, sink) in config
-        .sinks
-        .iter()
+        .sinks()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
+        debug!(component = %key, "Building new sink");
+
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
@@ -344,7 +361,7 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream()))), acker),
             }
         };
 
@@ -378,13 +395,13 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = crate::utilization::wrap(rx);
+            let mut rx = wrap(rx);
 
             sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
-                        emit!(&EventsReceived {
+                        emit!(EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
                         })
@@ -575,7 +592,7 @@ impl Runner {
             self.last_report = stopped;
         }
 
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: events.len(),
             byte_size: events.size_of(),
         });
@@ -596,6 +613,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer.start_wait();
@@ -614,6 +632,7 @@ impl Runner {
             .input_rx
             .take()
             .expect("can't run runner twice")
+            .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut in_flight = FuturesOrdered::new();
@@ -676,12 +695,12 @@ fn build_task_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    let input_rx = crate::utilization::wrap(input_rx);
+    let input_rx = crate::utilization::wrap(input_rx.into_stream());
 
     let filtered = input_rx
         .filter(move |events| ready(filter_events_type(events, input_type)))
         .inspect(|events| {
-            emit!(&EventsReceived {
+            emit!(EventsReceived {
                 count: events.len(),
                 byte_size: events.size_of(),
             })
@@ -689,7 +708,7 @@ fn build_task_transform(
     let stream = t
         .transform(Box::pin(filtered))
         .inspect(|events: &EventArray| {
-            emit!(&EventsSent {
+            emit!(EventsSent {
                 count: events.len(),
                 byte_size: events.size_of(),
                 output: None,

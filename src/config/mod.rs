@@ -13,16 +13,16 @@ use serde::{Deserialize, Serialize};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
 
-use crate::{conditions, event::Metric};
+use crate::{conditions, event::Metric, serde::OneOrMany};
 
 pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
 pub mod component;
-#[cfg(feature = "datadog-pipelines")]
-pub mod datadog;
 mod diff;
+#[cfg(feature = "enterprise")]
+pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
@@ -97,13 +97,13 @@ pub struct Config {
     pub api: api::Options,
     pub schema: schema::Options,
     pub version: Option<String>,
-    #[cfg(feature = "datadog-pipelines")]
-    pub datadog: Option<datadog::Options>,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<ComponentKey, SourceOuter>,
-    pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
-    pub transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
+    sources: IndexMap<ComponentKey, SourceOuter>,
+    sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
+    transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
@@ -114,10 +114,41 @@ impl Config {
         Default::default()
     }
 
+    pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
+        self.sources.iter()
+    }
+
+    pub fn source(&self, id: &ComponentKey) -> Option<&SourceOuter> {
+        self.sources.get(id)
+    }
+
+    pub fn transforms(&self) -> impl Iterator<Item = (&ComponentKey, &TransformOuter<OutputId>)> {
+        self.transforms.iter()
+    }
+
+    pub fn transform(&self, id: &ComponentKey) -> Option<&TransformOuter<OutputId>> {
+        self.transforms.get(id)
+    }
+
+    pub fn sinks(&self) -> impl Iterator<Item = (&ComponentKey, &SinkOuter<OutputId>)> {
+        self.sinks.iter()
+    }
+
+    pub fn sink(&self, id: &ComponentKey) -> Option<&SinkOuter<OutputId>> {
+        self.sinks.get(id)
+    }
+
+    pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
+        self.transforms
+            .get(id)
+            .map(|t| t.inputs.as_slice())
+            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
+    }
+
     /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
+    pub fn expand_input(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
         self.expansions
             .get(identifier)
             .cloned()
@@ -353,6 +384,7 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -367,18 +399,45 @@ impl TestDefinition<String> {
 
         let outputs = outputs
             .into_iter()
-            .filter_map(|old| {
-                if let Some(output_id) = output_map.get(&old.extract_from) {
-                    Some(TestOutput {
-                        extract_from: output_id.clone(),
-                        conditions: old.conditions,
+            .map(|old| {
+                let TestOutput {
+                    extract_from,
+                    conditions,
+                } = old;
+
+                let extract_from = extract_from
+                    .into_vec()
+                    .into_iter()
+                    .flat_map(|from| {
+                        if let Some(expanded) = expansions.get(&from) {
+                            expanded.to_vec()
+                        } else {
+                            vec![from]
+                        }
                     })
-                } else {
-                    errors.push(format!(
-                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                        name, old.extract_from
-                    ));
+                    .collect::<Vec<_>>();
+
+                (extract_from, conditions)
+            })
+            .filter_map(|(extract_from, conditions)| {
+                let mut outputs = Vec::new();
+                for from in extract_from {
+                    if let Some(output_id) = output_map.get(&from) {
+                        outputs.push(output_id.clone());
+                    } else {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                            name, from
+                        ));
+                    }
+                }
+                if outputs.is_empty() {
                     None
+                } else {
+                    Some(TestOutput {
+                        extract_from: outputs.into(),
+                        conditions,
+                    })
                 }
             })
             .collect();
@@ -425,7 +484,14 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: old.extract_from.to_string(),
+                extract_from: match old.extract_from {
+                    OneOrMany::One(value) => value.to_string().into(),
+                    OneOrMany::Many(values) => values
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                        .into(),
+                },
                 conditions: old.conditions,
             })
             .collect();
@@ -469,7 +535,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
-    pub extract_from: T,
+    pub extract_from: OneOrMany<T>,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -733,7 +799,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     fn order_independent_sha256_hashes() {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"
