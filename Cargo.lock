@@ -4750,25 +4750,25 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.18.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "603b57313fd7ff9ddf81b833923ee872264bec6426bff89b3c8c90c0de2267cb"
+checksum = "462738fc9a08f084626b863b1758b9f9f5ae3fab9e54269d124cb72ca2f7fba4"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
  "blocking",
  "crossbeam-channel",
  "fastrand",
- "itoa 0.4.8",
+ "itoa 1.0.1",
  "json",
  "lazy_static",
  "libc",
  "log",
  "memchr",
- "nkeys 0.1.0",
+ "nkeys",
  "nuid",
  "once_cell",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "regex",
  "rustls 0.19.1",
  "rustls-native-certs 0.5.0",
@@ -4908,20 +4908,6 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1a98f0a974ff737974b57ba1c71d2e0fe7ec18e5a828d4b8e02683171349dfa"
-dependencies = [
- "byteorder",
- "data-encoding",
- "ed25519-dalek",
- "log",
- "rand 0.7.3",
- "signatory 0.21.0",
-]
-
-[[package]]
-name = "nkeys"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e66a7cd1358277b2a6f77078e70aea7315ff2f20db969cc61153103ec162594"
@@ -4932,7 +4918,7 @@ dependencies = [
  "getrandom 0.2.3",
  "log",
  "rand 0.8.5",
- "signatory 0.23.2",
+ "signatory",
 ]
 
 [[package]]
@@ -7255,18 +7241,6 @@ dependencies = [
 
 [[package]]
 name = "signatory"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eaebd4be561a7d8148803baa108092f85090189c4b8c3ffb81602b15b5c1771"
-dependencies = [
- "getrandom 0.1.16",
- "signature",
- "subtle-encoding",
- "zeroize",
-]
-
-[[package]]
-name = "signatory"
 version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfecc059e81632eef1dd9b79e22fc28b8fe69b30d3357512a77a0ad8ee3c782"
@@ -7630,15 +7604,6 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
-
-[[package]]
-name = "subtle-encoding"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcb1ed7b8330c5eed5441052651dd7a12c75e2ed88f2ec024ae1fa3a5e59945"
-dependencies = [
- "zeroize",
-]
 
 [[package]]
 name = "syn"
@@ -8998,7 +8963,7 @@ dependencies = [
  "mongodb",
  "nats",
  "nix",
- "nkeys 0.2.0",
+ "nkeys",
  "nom 7.1.1",
  "notify",
  "num-format",
