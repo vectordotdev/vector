@@ -5,15 +5,25 @@ use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     schema::{
         ArrayValidation, InstanceType, ObjectValidation, RootSchema, Schema, SchemaObject,
-        SingleOrVec,
+        SingleOrVec, SubschemaValidation,
     },
 };
+use serde_json::{Map, Value};
 
-use crate::{ArrayShape, Configurable, MapShape, Metadata, NumberShape, StringShape};
+use crate::{ArrayShape, Configurable, Metadata, NumberShape, StringShape};
 
-// TODO: realistically, we should use the availability of the description for a type that
-// implements `Configurable` as the basis of whether or not it can be referencable, since without
-// that, there's no sane way to promote it to a referencable definition
+/// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
+///
+/// As many configuration types are reused often, such as nearly all sinks allowing configuration of batching
+/// behavior via `BatchConfig`, we utilize JSONSchema's ability to define a named schema and then
+/// reference it via a short identifier whenever we want to apply that schema to a particular field.
+/// This promotes a more concise schema and allows effectively exposing the discrete configuration
+/// types such that they can be surfaced by tools using the schema.
+///
+/// Since we don't utilize the typical flow of generating schemas via `schemars`, we're forced to
+/// manually determine when we should register a schema as a referencable schema within the schema
+/// generator. As well, we need to handle applying metadata to these schemas such that we preserve
+/// the intended behavior.
 pub fn finalize_schema<'de, T>(
     gen: &mut SchemaGenerator,
     schema: &mut SchemaObject,
@@ -21,63 +31,79 @@ pub fn finalize_schema<'de, T>(
 ) where
     T: Configurable<'de>,
 {
-    // Figure out if we're dealing with a referencable type or not. A referencable schema
-    // can be pointed to and reused over the lifetime of the generation process, so this influences
-    // whether or not we even do anything here or not.
-    match T::referencable_name() {
-        // This type can be referenced, but we don't know if it's actually been defined already or
-        // not.  If it has, we alter the caller's schema object to use a reference.
-        Some(ref_name) => match gen.definitions().get(ref_name) {
-            Some(Schema::Bool(_)) => panic!("all-or-nothing schema definitions are not supported"),
-            Some(Schema::Object(ref_schema)) => {
-                // We've already finalized a schema for `T` before, so alter the caller's mutable
-                // reference to point to it.
-                let ref_path = format!("{}{}", gen.settings().definitions_path, ref_name);
-                std::mem::replace(schema, SchemaObject::new_ref(ref_path));
-            }
-            None => {
-                // `T` is referencable, but has not been defined yet, so apply the metadata and then
-                // define it in the generator.  After that, we alter the caller's schema object to
-                // use  a reference.
-                apply_metadata(schema, metadata);
-                gen.definitions_mut()
-                    .insert(ref_name.to_string(), Schema::Object(schema.clone()));
-                let ref_path = format!("{}{}", gen.settings().definitions_path, ref_name);
-                std::mem::replace(schema, SchemaObject::new_ref(ref_path));
-            }
-        },
-        None => {
-            // The type is not referencable, so we just apply the metadata directly and call it a
-            // day.
-            apply_metadata(schema, metadata);
+    // If the type that this schema represents is referencable, check to see if it's been defined
+    // before, and if not, then go ahead and define it.
+    if let Some(ref_name) = T::referencable_name() {
+        if !gen.definitions().contains_key(ref_name) {
+            // We specifically apply the metadata of `T` itself, and not the `metadata` we've been
+            // given, as we do not want to apply field-level metadata e.g. field-specific default
+            // values. We do, however, apply the given `metadata` to the schema reference itself.
+            apply_metadata(schema, T::metadata());
+            gen.definitions_mut()
+                .insert(ref_name.to_string(), Schema::Object(schema.clone()));
         }
+
+        // Replace the mutable reference to the original schema with an actual "reference" schema
+        // that points the caller towards the stored definition for the given schema, which is
+        // represented in the JSONSchema output by the usage of `"$ref": "<ref_name>"`.
+        let ref_path = format!("{}{}", gen.settings().definitions_path, ref_name);
+        *schema = SchemaObject::new_ref(ref_path);
     }
+
+    apply_metadata(schema, metadata);
 }
 
-fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de, T>)
+/// Applies metadata to the given schema.
+///
+/// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
+/// patterns, etc), as well as actual arbitrary key/value data.
+pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de, T>)
 where
     T: Configurable<'de>,
 {
+    // Figure out if we're applying metadata to a schema reference or the actual schema itself.
+    // Some things only makes sense to add to the reference (like a default value to use), while
+    // some things only make sense to add to the schema itself (like custom metadata, validation,
+    // etc), and some things make sense being added to both. (like the description)
+    let is_schema_ref = schema.reference.is_some();
+
     // Set the description of this schema.
-    let schema_desc = match metadata.description {
-        Some(desc) => desc,
-        None => {
-            panic!("no description provided for `{}`; all `Configurable` types must define a description or be provided one when used within another `Configurable` type", std::any::type_name::<T>());
-        }
-    };
+    let schema_description = metadata.description().map(|s| s.to_string());
+    if schema_description.is_none() && !metadata.transparent() {
+        panic!("no description provided for `{}`; all `Configurable` types must define a description or be provided one when used within another `Configurable` type", std::any::type_name::<T>());
+    }
 
     // Set the default value for this schema, if any.
     let schema_default = metadata
-        .default
+        .default_value()
         .map(|v| serde_json::to_value(v).expect("default value should never fail to serialize"));
 
     let schema_metadata = schemars::schema::Metadata {
-        description: Some(schema_desc.to_string()),
+        description: schema_description,
         default: schema_default,
         ..Default::default()
     };
 
+    // Set any custom attributes as extensions on the schema.
+    let mut custom_map = Map::new();
+    for (key, value) in metadata.custom_attributes() {
+        custom_map.insert(key.to_string(), Value::String(value.to_string()));
+    }
+
+    if !custom_map.is_empty() && !is_schema_ref {
+        schema
+            .extensions
+            .insert("_metadata".to_string(), Value::Object(custom_map));
+    }
+
     schema.metadata = Some(Box::new(schema_metadata));
+}
+
+pub fn generate_null_schema(gen: &mut SchemaGenerator) -> SchemaObject {
+    SchemaObject {
+        instance_type: Some(InstanceType::Null.into()),
+        ..Default::default()
+    }
 }
 
 pub fn generate_bool_schema(gen: &mut SchemaGenerator) -> SchemaObject {
@@ -103,13 +129,16 @@ pub fn generate_number_schema(gen: &mut SchemaGenerator, shape: NumberShape) -> 
     }
 }
 
-pub fn generate_array_schema<'de, T>(gen: &mut SchemaGenerator, shape: ArrayShape) -> SchemaObject
+pub fn generate_array_schema<'de, T>(
+    gen: &mut SchemaGenerator,
+    shape: ArrayShape,
+    metadata: Metadata<'de, T>,
+) -> SchemaObject
 where
     T: Configurable<'de>,
 {
-    // We generate the schema for T itself, and then apply any of T's metadata to the given schema.
-    // TODO: fix me and use real metadata
-    let element_schema = T::generate_schema(gen, Metadata::default());
+    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
+    let element_schema = T::generate_schema(gen, metadata);
 
     SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -123,13 +152,15 @@ where
     }
 }
 
-pub fn generate_map_schema<'de, V>(gen: &mut SchemaGenerator, shape: MapShape) -> SchemaObject
+pub fn generate_map_schema<'de, V>(
+    gen: &mut SchemaGenerator,
+    metadata: Metadata<'de, V>,
+) -> SchemaObject
 where
     V: Configurable<'de>,
 {
-    // We generate the schema for V itself, and then apply any of V's metadata to the given schema.
-    // TODO: fix me and use real metadata
-    let element_schema = V::generate_schema(gen, Metadata::default());
+    // We generate the schema for `V` itself, and then apply any of `V`'s metadata to the given schema.
+    let element_schema = V::generate_schema(gen, metadata);
 
     SchemaObject {
         instance_type: Some(InstanceType::Object.into()),
@@ -163,13 +194,15 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<'de, T>(gen: &mut SchemaGenerator) -> SchemaObject
+pub fn generate_optional_schema<'de, T>(
+    gen: &mut SchemaGenerator,
+    metadata: Metadata<'de, T>,
+) -> SchemaObject
 where
     T: Configurable<'de>,
 {
-    // We generate the schema for T itself, and then apply any of T's metadata to the given schema.
-    // TODO: fix me and use real metadata
-    let mut schema = T::generate_schema(gen, Metadata::default());
+    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
+    let mut schema = T::generate_schema(gen, metadata);
 
     // We do a little dance here to add an additional instance type of "null" to the schema to
     // signal it can be "X or null", achieving the functional behavior of "this is optional".
@@ -189,11 +222,29 @@ where
     schema
 }
 
-pub fn generate_composite_schema<'de, T>(gen: &mut SchemaGenerator) -> SchemaObject
-where
-    T: Configurable<'de>,
-{
-    SchemaObject::default()
+pub fn generate_composite_schema(
+    gen: &mut SchemaGenerator,
+    subschemas: &[SchemaObject],
+) -> SchemaObject {
+    let subschemas = subschemas
+        .iter()
+        .map(|s| Schema::Object(s.clone()))
+        .collect::<Vec<_>>();
+
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            one_of: Some(subschemas),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
+pub fn generate_const_string_schema(value: String) -> SchemaObject {
+    SchemaObject {
+        const_value: Some(Value::String(value)),
+        ..Default::default()
+    }
 }
 
 pub fn generate_root_schema<'de, T>() -> RootSchema

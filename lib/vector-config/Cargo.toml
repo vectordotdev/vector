@@ -10,3 +10,4 @@ indexmap = { version = "1.2", default-features = false }
 schemars = { version = "0.8.8", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0.79", default-features = false }
+vector-config-macros = { path = "../vector-config-macros" }

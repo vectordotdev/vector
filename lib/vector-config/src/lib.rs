@@ -1,55 +1,42 @@
+// PRIMARY CONFIG SCHEMA TODO LIST
+//
+// TODO: serde supports defining a default at the struct level to fill in fields when no value is
+// present during serialization, but it also supports defaults on a per-field basis, which override
+// any defaults that would be applied by virtue of the struct-level default
+//
+// thus, mark a struct optional if it has a struct-level default _or_ if all fields are optional:
+// either literal `Option<T>` fields or if they all have defaults
+//
+// TODO: what happens if we try to stick in a field that has a struct with a lifetime attached to
+// it? how does the name of that get generated in terms of what ends up in the schema?
+//
+// TODO: we don't support `#[serde(flatten)]` either for collecting unknown fields or for flattening a
+// field into its parent struct
+//
+// TODO: we don't handle renamed fields i.e. `#[serde(rename_all = "...")]`
+
 #![allow(unused_variables)]
 
-use std::{
-    collections::{BTreeSet, HashMap},
-    marker::PhantomData,
-};
+use core::fmt;
+use std::marker::PhantomData;
 
-use indexmap::IndexMap;
-use schema::{finalize_schema, generate_struct_schema};
 use schemars::{
     gen::SchemaGenerator,
     schema::{NumberValidation, SchemaObject, StringValidation},
 };
 use serde::{Deserialize, Serialize};
+use vector_config_macros::Configurable;
 
-mod schema;
+pub mod schema;
+
 mod stdlib;
+
+pub use vector_config_macros::configurable_component;
 
 const NUM_MANTISSA_BITS: u32 = 53;
 const NUM_MAX_BOUND_UNSIGNED: u64 = 2u64.pow(NUM_MANTISSA_BITS);
 const NUM_MIN_BOUND_SIGNED: i64 = -2i64.pow(NUM_MANTISSA_BITS);
 const NUM_MAX_BOUND_SIGNED: i64 = 2i64.pow(NUM_MANTISSA_BITS);
-
-/// The shape of the field.
-///
-/// This maps similiar to the concept of JSON's data types, where types are generalized and have
-/// generalized representations. This allows us to provide general-but-relevant mappings to core
-/// types, such as integers and strings and so on, while providing escape hatches for customized
-/// types that may be encoded and decoded via "normal" types but otherwise have specific rules or
-/// requirements.
-///
-/// Additionally, the shape of a field can encode some basic properties about the field to which it
-/// is attached. For example, numbers can be bounded on or the lower or upper end, while strings
-/// could define a minimum length, or even an allowed pattern via regular expressions.
-///
-/// In this way, they describe a more complete shape of the field than simply the data type alone.
-#[derive(Clone)]
-pub enum Shape {
-    Boolean,
-    String(StringShape),
-    Number(NumberShape),
-    Array(ArrayShape),
-    Map(MapShape),
-    Optional(Box<Shape>),
-    Composite(Vec<Shape>),
-}
-
-impl Shape {
-    pub fn is_optional(&self) -> bool {
-        matches!(self, Self::Optional(..))
-    }
-}
 
 #[derive(Clone, Default)]
 pub struct StringShape {
@@ -147,72 +134,145 @@ impl From<NumberShape> for NumberValidation {
 
 #[derive(Clone)]
 pub struct ArrayShape {
-    element_shape: Box<Shape>,
     minimum_length: Option<u32>,
     maximum_length: Option<u32>,
 }
 
 #[derive(Clone)]
-pub struct MapShape {
-    required_fields: HashMap<&'static str, Shape>,
-    allowed_unknown_field_shape: Option<Box<Shape>>,
-}
-#[derive(Clone)]
 pub struct Metadata<'de, T: Configurable<'de>> {
     description: Option<&'static str>,
-    default: Option<T>,
-    attributes: Vec<(String, String)>,
+    default_value: Option<T>,
+    custom_attributes: Vec<(&'static str, &'static str)>,
+    deprecated: bool,
+    transparent: bool,
     _de: PhantomData<&'de ()>,
 }
 
 impl<'de, T: Configurable<'de>> Metadata<'de, T> {
-    pub fn new(
-        description: Option<&'static str>,
-        default: Option<T>,
-        attributes: Vec<(String, String)>,
-    ) -> Self {
-        Self {
-            description,
-            default,
-            attributes,
-            _de: PhantomData,
-        }
-    }
-
-    pub fn description(desc: &'static str) -> Self {
+    pub fn with_description(desc: &'static str) -> Self {
         Self {
             description: Some(desc),
             ..Default::default()
         }
     }
 
-    pub fn map_default<F, U>(self, f: F) -> Metadata<'de, U>
+    pub fn description(&self) -> Option<&'static str> {
+        self.description.clone()
+    }
+
+    pub fn set_description(&mut self, desc: &'static str) {
+        self.description = Some(desc);
+    }
+
+    pub fn clear_description(&mut self) {
+        self.description = None;
+    }
+
+    pub fn with_default_value(default: T) -> Self {
+        Self {
+            default_value: Some(default),
+            ..Default::default()
+        }
+    }
+
+    pub fn default_value(&self) -> Option<T> {
+        self.default_value.clone()
+    }
+
+    pub fn set_default_value(&mut self, default_value: T) {
+        self.default_value = Some(default_value);
+    }
+
+    pub fn clear_default_value(&mut self) {
+        self.default_value = None;
+    }
+
+    pub fn map_default_value<F, U>(self, f: F) -> Metadata<'de, U>
     where
         F: FnOnce(T) -> U,
         U: Configurable<'de>,
     {
         Metadata {
             description: self.description,
-            default: self.default.map(f),
-            attributes: self.attributes,
+            default_value: self.default_value.map(f),
+            custom_attributes: self.custom_attributes,
+            deprecated: self.deprecated,
+            transparent: self.transparent,
             _de: PhantomData,
         }
     }
 
-    pub fn merge(self, other: Metadata<'de, T>) -> Self {
-        // TODO: actually merge the attributes
-        let merged_attributes = Vec::new();
+    pub fn deprecated(&self) -> bool {
+        self.deprecated
+    }
+
+    pub fn set_deprecated(&mut self) {
+        self.deprecated = true;
+    }
+
+    pub fn clear_deprecated(&mut self) {
+        self.deprecated = false;
+    }
+
+    pub fn transparent(&self) -> bool {
+        self.transparent
+    }
+
+    pub fn set_transparent(&mut self) {
+        self.transparent = true;
+    }
+
+    pub fn clear_transparent(&mut self) {
+        self.transparent = false;
+    }
+
+    pub fn custom_attributes(&self) -> &[(&'static str, &'static str)] {
+        &self.custom_attributes
+    }
+
+    pub fn add_custom_attribute(&mut self, key: &'static str, value: &'static str) {
+        self.custom_attributes.push((key, value));
+    }
+
+    pub fn clear_custom_attribute(&mut self) {
+        self.custom_attributes.clear();
+    }
+
+    pub fn merge(mut self, other: Metadata<'de, T>) -> Self {
+        self.custom_attributes.extend(other.custom_attributes);
 
         Self {
             description: other.description.or(self.description),
-            default: other.default.or(self.default),
-            attributes: merged_attributes,
+            default_value: other.default_value.or(self.default_value),
+            custom_attributes: self.custom_attributes,
+            deprecated: other.deprecated,
+            transparent: other.transparent,
             _de: PhantomData,
         }
     }
 
-    pub fn into_parts(self) -> (Option<&'static str>, Option<T>, Vec<(String, String)>) {
-        (self.description, self.default, self.attributes)
+    pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
+        Metadata {
+            description: self.description,
+            default_value: None,
+            custom_attributes: self.custom_attributes,
+            deprecated: self.deprecated,
+            transparent: self.transparent,
+            _de: PhantomData,
+        }
+    }
+}
+
+impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
+    pub fn flatten_default(self) -> Metadata<'de, T> {
+        Metadata {
+            description: self.description,
+            default_value: self.default_value.flatten(),
+            custom_attributes: self.custom_attributes,
+            deprecated: self.deprecated,
+            transparent: self.transparent,
+            _de: PhantomData,
+        }
     }
 }
 
@@ -220,10 +280,29 @@ impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
     fn default() -> Self {
         Self {
             description: None,
-            default: None,
-            attributes: Vec::new(),
+            default_value: None,
+            custom_attributes: Vec::new(),
+            deprecated: false,
+            transparent: false,
             _de: PhantomData,
         }
+    }
+}
+
+impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Metadata")
+            .field("description", &self.description)
+            .field(
+                "default",
+                if self.default_value.is_some() {
+                    &"<some>"
+                } else {
+                    &"<none>"
+                },
+            )
+            .field("attributes", &self.custom_attributes)
+            .finish()
     }
 }
 
@@ -248,267 +327,20 @@ where
         None
     }
 
-    /// Gets the shape for this value.
-    fn shape() -> Shape;
+    /// Whether or not this value is optional.
+    fn is_optional() -> bool {
+        false
+    }
 
     /// Gets the metadata for this value.
     fn metadata() -> Metadata<'de, Self> {
-        Metadata::default()
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+        metadata
     }
 
     /// Generates the schema for this value.
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject;
-}
-
-/// A period of time.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct SpecialDuration(u64);
-
-/// Controls the batching behavior of events.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct BatchConfig {
-    max_events: Option<u64>,
-    max_bytes: Option<u64>,
-    timeout: Option<SpecialDuration>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct SimpleSinkConfig {
-    endpoint: String,
-    batch: BatchConfig,
-    tags: HashMap<String, String>,
-}
-
-impl<'de> Configurable<'de> for SpecialDuration {
-    fn shape() -> Shape {
-        Shape::Number(NumberShape::unsigned(u64::MAX))
-    }
-
-    fn metadata() -> Metadata<'de, Self> {
-        Metadata::description("A period of time.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let merged_metadata = Self::metadata().merge(overrides);
-
-        // We generate the schema for the inner unnamed field, and then apply the metadata to it.
-        let inner_metadata = <u64 as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|default| default.0));
-
-        let mut inner_schema =
-            <u64 as Configurable<'de>>::generate_schema(gen, inner_metadata.clone());
-        finalize_schema(gen, &mut inner_schema, inner_metadata);
-
-        inner_schema
-    }
-}
-
-impl<'de> Configurable<'de> for BatchConfig {
-    fn shape() -> Shape {
-        Shape::Map(MapShape {
-            required_fields: HashMap::new(),
-            allowed_unknown_field_shape: None,
-        })
-    }
-
-    fn metadata() -> Metadata<'de, Self> {
-        Metadata::description("Controls the batching behavior of events.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let mut properties = IndexMap::new();
-        let mut required = BTreeSet::new();
-
-        let merged_metadata = Self::metadata().merge(overrides);
-
-        // Schema for `max_events`:
-        let max_events_metadata = <Option<u64> as Configurable<'de>>::metadata()
-            .merge(
-                merged_metadata
-                    .clone()
-                    .map_default(|batch| batch.max_events),
-            )
-            .merge(Metadata::description(
-                "the maximum number of events per batch",
-            ));
-        let max_events_is_optional = <Option<u64> as Configurable<'de>>::shape().is_optional();
-        let mut max_events_schema =
-            <Option<u64> as Configurable<'de>>::generate_schema(gen, max_events_metadata.clone());
-        finalize_schema(gen, &mut max_events_schema, max_events_metadata);
-
-        if let Some(_) = properties.insert("max_events".to_string(), max_events_schema) {
-            panic!(
-                "schema properties already contained entry for `max_events`, this should not occur"
-            );
-        }
-
-        if !max_events_is_optional {
-            if !required.insert("max_events".to_string()) {
-                panic!("schema properties already contained entry for `max_events`, this should not occur");
-            }
-        }
-
-        // Schema for `max_bytes`:
-        let max_bytes_metadata = <Option<u64> as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|batch| batch.max_bytes))
-            .merge(Metadata::description(
-                "the maximum number of bytes per batch",
-            ));
-        let max_bytes_is_optional = <Option<u64> as Configurable<'de>>::shape().is_optional();
-        let mut max_bytes_schema =
-            <Option<u64> as Configurable<'de>>::generate_schema(gen, max_bytes_metadata.clone());
-        finalize_schema(gen, &mut max_bytes_schema, max_bytes_metadata);
-
-        if let Some(_) = properties.insert("max_bytes".to_string(), max_bytes_schema) {
-            panic!(
-                "schema properties already contained entry for `max_bytes`, this should not occur"
-            );
-        }
-
-        if !max_bytes_is_optional {
-            if !required.insert("max_bytes".to_string()) {
-                panic!("schema properties already contained entry for `max_bytes`, this should not occur");
-            }
-        }
-
-        // Schema for `timeout`
-        let timeout_metadata = <Option<SpecialDuration> as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|batch| batch.timeout))
-            .merge(Metadata::description(
-                "the timeout before a batch is automatically flushed",
-            ));
-        let timeout_is_optional =
-            <Option<SpecialDuration> as Configurable<'de>>::shape().is_optional();
-        let mut timeout_schema = <Option<SpecialDuration> as Configurable<'de>>::generate_schema(
-            gen,
-            timeout_metadata.clone(),
-        );
-        finalize_schema(gen, &mut timeout_schema, timeout_metadata);
-
-        if let Some(_) = properties.insert("timeout".to_string(), timeout_schema) {
-            panic!(
-                "schema properties already contained entry for `timeout`, this should not occur"
-            );
-        }
-
-        if !timeout_is_optional {
-            if !required.insert("timeout".to_string()) {
-                panic!("schema properties already contained entry for `timeout`, this should not occur");
-            }
-        }
-
-        // Schema for `BatchConfig`:
-        let additional_properties = None;
-        let mut schema = generate_struct_schema(gen, properties, required, additional_properties);
-        finalize_schema(gen, &mut schema, merged_metadata);
-
-        schema
-    }
-}
-
-impl<'de> Configurable<'de> for SimpleSinkConfig {
-    fn shape() -> Shape {
-        Shape::Map(MapShape {
-            required_fields: HashMap::new(),
-            allowed_unknown_field_shape: None,
-        })
-    }
-
-    fn metadata() -> Metadata<'de, Self> {
-        Metadata::description("A sink for sending events to the `simple` service.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let mut properties = IndexMap::new();
-        let mut required = BTreeSet::new();
-
-        let merged_metadata = Self::metadata().merge(overrides);
-
-        // Schema for `endpoint`:
-        let endpoint_metadata = <String as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|sink| sink.endpoint))
-            .merge(Metadata::description("the endpoint to send events to"));
-        let endpoint_is_optional = <String as Configurable<'de>>::shape().is_optional();
-        let mut endpoint_schema =
-            <String as Configurable<'de>>::generate_schema(gen, endpoint_metadata.clone());
-        finalize_schema(gen, &mut endpoint_schema, endpoint_metadata);
-
-        if let Some(_) = properties.insert("endpoint".to_string(), endpoint_schema) {
-            panic!(
-                "schema properties already contained entry for `endpoint`, this should not occur"
-            );
-        }
-
-        if !endpoint_is_optional {
-            if !required.insert("endpoint".to_string()) {
-                panic!("schema properties already contained entry for `endpoint`, this should not occur");
-            }
-        }
-
-        // Schema for `batch`:
-        let batch_metadata = <BatchConfig as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|sink| sink.batch));
-        let batch_is_optional = <BatchConfig as Configurable<'de>>::shape().is_optional();
-        let mut batch_schema =
-            <BatchConfig as Configurable<'de>>::generate_schema(gen, batch_metadata.clone());
-        finalize_schema(gen, &mut batch_schema, batch_metadata);
-
-        if let Some(_) = properties.insert("batch".to_string(), batch_schema) {
-            panic!("schema properties already contained entry for `batch`, this should not occur");
-        }
-
-        if !batch_is_optional {
-            if !required.insert("batch".to_string()) {
-                panic!(
-                    "schema properties already contained entry for `batch`, this should not occur"
-                );
-            }
-        }
-
-        // Schema for `tags`:
-        let tags_metadata = <HashMap<String, String> as Configurable<'de>>::metadata()
-            .merge(merged_metadata.clone().map_default(|batch| batch.tags))
-            .merge(Metadata::description(
-                "the tags to additionally add to each event",
-            ));
-        let tags_is_optional =
-            <HashMap<String, String> as Configurable<'de>>::shape().is_optional();
-        let mut tags_schema = <HashMap<String, String> as Configurable<'de>>::generate_schema(
-            gen,
-            tags_metadata.clone(),
-        );
-        finalize_schema(gen, &mut tags_schema, tags_metadata);
-
-        if let Some(_) = properties.insert("tags".to_string(), tags_schema) {
-            panic!("schema properties already contained entry for `tags`, this should not occur");
-        }
-
-        if !tags_is_optional {
-            if !required.insert("tags".to_string()) {
-                panic!(
-                    "schema properties already contained entry for `tags`, this should not occur"
-                );
-            }
-        }
-
-        // Schema for `SimpleSinkConfig`:
-        let additional_properties = None;
-        let mut schema = generate_struct_schema(gen, properties, required, additional_properties);
-        finalize_schema(gen, &mut schema, merged_metadata);
-
-        schema
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{schema::generate_root_schema, SimpleSinkConfig};
-
-    #[test]
-    fn foo() {
-        let schema = generate_root_schema::<SimpleSinkConfig>();
-        let as_json =
-            serde_json::to_string_pretty(&schema).expect("schema should not fail to serialize");
-        println!("{}", as_json);
-    }
 }

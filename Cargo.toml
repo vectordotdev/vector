@@ -73,6 +73,7 @@ members = [
   "lib/vector-buffers",
   "lib/vector-common",
   "lib/vector-config",
+  "lib/vector-config-macros",
   "lib/vector-core",
   "lib/dnsmsg-parser",
   "lib/fakedata",

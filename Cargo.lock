@@ -6649,7 +6649,7 @@ checksum = "41ae4dce13e8614c46ac3c38ef1c0d668b101df6ac39817aebdaa26642ddae9b"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
- "serde_derive_internals",
+ "serde_derive_internals 0.25.0",
  "syn 1.0.84",
 ]
 
@@ -6813,6 +6813,17 @@ name = "serde_derive_internals"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dbab34ca63057a1f15280bdf3c39f2b1eb1b54c17e98360e511637aef7418c6"
+dependencies = [
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "syn 1.0.84",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
 dependencies = [
  "proc-macro2 1.0.32",
  "quote 1.0.10",
@@ -8825,6 +8836,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector-config-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.32",
+ "quote 1.0.10",
+ "serde_derive_internals 0.26.0",
+ "syn 1.0.84",
+]
+
+[[package]]
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
@@ -8910,6 +8931,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "vector-config-macros",
 ]
 
 [[package]]
