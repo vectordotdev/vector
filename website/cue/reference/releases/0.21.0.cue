@@ -79,6 +79,10 @@ releases: "0.21.0": {
 		  outstanding bugs with Vector ceasing to process container logs. It also adds support for Kubernetes
 		  authentication token rotation.
 
+		We made additional performance improvements this release increasing the average throughput by up to 50% for
+		common topologies (see our [soak test
+		framework](https://github.com/vectordotdev/vector/tree/master/soaks/tests)).
+
 		Also, check out our [new guide](/guides/level-up/vector-tap-guide) on using `vector tap` for observing events
 		running through Vector instances
 		"""
