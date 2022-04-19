@@ -36,6 +36,7 @@ enum BuildError {
  */
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
     encoding: EncodingConfig<Encoding>,
     #[serde(default = "default_name", alias = "name")]
@@ -43,7 +44,6 @@ pub struct NatsSinkConfig {
     subject: String,
     url: String,
     tls: Option<TlsConfig>,
-    #[serde(flatten)]
     auth: Option<NatsAuthConfig>,
 }
 
