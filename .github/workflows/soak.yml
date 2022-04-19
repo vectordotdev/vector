@@ -141,7 +141,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    runs-on: [linux, soak, soak-builder]
+    runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -177,6 +177,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/baseline-image.tar
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Avoid having the local cache grow forever unbounded.
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
@@ -186,7 +196,7 @@ jobs:
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    runs-on: [linux, soak, soak-builder]
+    runs-on: [self-hosted, linux, x64, soak_builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -222,6 +232,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=docker,dest=/tmp/comparison-image.tar
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Avoid having the local cache grow forever unbounded.
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Upload image as artifact
         uses: actions/upload-artifact@v3
