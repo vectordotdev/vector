@@ -12,7 +12,7 @@ use std::{
     convert::TryFrom,
 };
 use tracing::error;
-use vrl_compiler::Value;
+use value::Value;
 
 static GROK_PATTERN_RE: Lazy<onig::Regex> =
     Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());

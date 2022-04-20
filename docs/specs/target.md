@@ -172,8 +172,8 @@ targets as there is little added benefit.
 
 [agent_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/agent/
 [aggregator_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/aggregator/
-[default_agent_configuration]: https://github.com/vectordotdev/vector/blob/target-specification/config/agent/vector.yaml
-[default_aggregator_configuration]: https://vector.dev/docs/reference/configuration/default/aggregator.yaml
+[default_agent_configuration]: https://github.com/vectordotdev/vector/blob/master/config/agent/vector.yaml
+[default_aggregator_configuration]: https://github.com/vectordotdev/vector/blob/master/config/aggregator/vector.yaml
 [hardening]: https://vector.dev/docs/setup/going-to-prod/hardening/
 [high_availability]: https://vector.dev/docs/setup/going-to-prod/high-availability/
 [reduce_decisions]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md#be-opinionated--reduce-decisions

@@ -196,28 +196,25 @@ impl TransformConfig for PipelinesConfig {
 impl GenerateConfig for PipelinesConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc::indoc! {r#"
-            [logs]
-            order = ["foo", "bar"]
-
-            [logs.pipelines.foo]
+            [[logs]]
             name = "foo pipeline"
 
-            [logs.pipelines.foo.filter]
+            [logs.filter]
             type = "datadog_search"
             source = "source:s3"
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
 
-            [logs.pipelines.bar]
+            [[logs]]
             name = "bar pipeline"
 
-            [[logs.pipelines.bar.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
         "#})
@@ -243,10 +240,10 @@ mod tests {
     fn parsing() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
-        assert_eq!(config.logs.pipelines().len(), 2);
-        let foo = config.logs.pipelines().get("foo").unwrap();
+        assert_eq!(config.logs.as_ref().len(), 2);
+        let foo = config.logs.as_ref().first().unwrap();
         assert_eq!(foo.transforms().len(), 2);
-        let bar = config.logs.pipelines().get("bar").unwrap();
+        let bar = config.logs.as_ref().get(1).unwrap();
         assert_eq!(bar.transforms().len(), 1);
     }
 
@@ -284,33 +281,33 @@ mod tests {
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
             vec![
-                "foo.logs.foo.filter",
-                "foo.logs.foo.0",
-                "foo.logs.foo.1",
-                "foo.logs.bar.0",
+                "foo.logs.0.filter",
+                "foo.logs.0.0",
+                "foo.logs.0.1",
+                "foo.logs.1.0",
                 "foo.type_router",
             ],
         );
         assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
         assert_eq!(
-            routes["foo.logs.foo.filter"],
+            routes["foo.logs.0.filter"],
             vec!["foo.type_router.logs".to_string()]
         );
         assert_eq!(
-            routes["foo.logs.foo.0"],
-            vec!["foo.logs.foo.filter.success".to_string()]
+            routes["foo.logs.0.0"],
+            vec!["foo.logs.0.filter.success".to_string()]
         );
-        assert_eq!(routes["foo.logs.foo.1"], vec!["foo.logs.foo.0".to_string()]);
+        assert_eq!(routes["foo.logs.0.1"], vec!["foo.logs.0.0".to_string()]);
         assert_eq!(
-            routes["foo.logs.bar.0"],
+            routes["foo.logs.1.0"],
             vec![
-                "foo.logs.foo.1".to_string(),
-                "foo.logs.foo.filter._unmatched".to_string(),
+                "foo.logs.0.1".to_string(),
+                "foo.logs.0.filter._unmatched".to_string(),
             ],
         );
         assert_eq!(
             expansions["foo"],
-            vec!["foo.type_router._unmatched", "foo.logs.bar.0"]
+            vec!["foo.type_router._unmatched", "foo.logs.1.0"]
         );
     }
 }

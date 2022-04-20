@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.21.0"
+version = "0.22.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -129,8 +129,8 @@ tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 console-subscriber = { version = "0.1.4", optional = true }
 
 # Tracing
-tracing = { version = "0.1.33", default-features = false }
-tracing-core = { version = "0.1.25", default-features = false }
+tracing = { version = "0.1.34", default-features = false }
+tracing-core = { version = "0.1.26", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
@@ -140,18 +140,18 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.9.0", optional = true }
-aws-types = { version = "0.9.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-s3 = { version = "0.9.0", optional = true }
-aws-sdk-sqs = { version = "0.9.0", optional = true }
-aws-sdk-cloudwatch = { version = "0.9.0", optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true }
-aws-sdk-elasticsearch = {version = "0.9.0", optional = true }
-aws-sdk-firehose = { version = "0.9.0", optional = true }
-aws-sdk-kinesis = { version = "0.9.0", optional = true }
-aws-sigv4 = { version = "0.9.0", optional = true }
-aws-smithy-client = { version = "0.39.0", optional = true }
-aws-smithy-http = { version = "0.39.0", optional = true }
+aws-config = { version = "0.10.1", optional = true }
+aws-types = { version = "0.10.1", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-s3 = { version = "0.10.1", optional = true }
+aws-sdk-sqs = { version = "0.10.1", optional = true }
+aws-sdk-cloudwatch = { version = "0.10.1", optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.10.1", optional = true }
+aws-sdk-elasticsearch = {version = "0.10.1", optional = true }
+aws-sdk-firehose = { version = "0.10.1", optional = true }
+aws-sdk-kinesis = { version = "0.10.1", optional = true }
+aws-sigv4 = { version = "0.10.1", optional = true }
+aws-smithy-client = { version = "0.40.2", optional = true }
+aws-smithy-http = { version = "0.40.2", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -170,7 +170,7 @@ serde_with = { version = "1.12.1", default-features = false, features = ["macros
 serde_yaml = { version = "0.8.23", default-features = false }
 
 # Messagepack
-rmp-serde = { version = "1.0.0", default-features = false, optional = true }
+rmp-serde = { version = "1.1.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
@@ -213,7 +213,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
-clap = { version = "3.1.8", features = ["derive", "env"] }
+clap = { version = "3.1.10", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -244,8 +244,8 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.5", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
-mongodb = { version = "2.1.0", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.18.1", default-features = false, optional = true }
+mongodb = { version = "2.2.0", default-features = false, features = ["tokio-runtime"], optional = true }
+nats = { version = "0.19.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
@@ -277,7 +277,7 @@ strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-toml = { version = "0.5.8", default-features = false }
+toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "compression"] }
 trust-dns-proto = { version = "0.21", features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
@@ -315,7 +315,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.123"
+libc = "0.2.124"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -326,7 +326,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.12"
+wiremock = "0.5.13"
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
