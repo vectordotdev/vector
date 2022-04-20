@@ -119,11 +119,12 @@ impl EventTypeConfig {
 
     pub(super) fn validate_nesting(&self, parents: &HashSet<&'static str>) -> Result<(), String> {
         for (pipeline_index, pipeline) in self.0.iter().enumerate() {
+            let pipeline_name = pipeline.name.as_str();
             for (transform_index, transform) in pipeline.transforms.iter().enumerate() {
                 if !transform.nestable(parents) {
                     return Err(format!(
-                        "the transform {} in pipeline {} cannot be nested in {:?}",
-                        transform_index, pipeline_index, parents
+                        "the transform {} in pipeline {:?} (at index {}) cannot be nested in {:?}",
+                        transform_index, pipeline_name, pipeline_index, parents
                     ));
                 }
             }
