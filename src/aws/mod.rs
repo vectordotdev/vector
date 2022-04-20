@@ -82,7 +82,8 @@ pub async fn create_client<T: ClientBuilder>(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsOptions>,
 ) -> crate::Result<T::Client> {
-    let mut config_builder = T::create_config_builder(auth.credentials_provider().await?);
+    let mut config_builder =
+        T::create_config_builder(auth.credentials_provider(region.clone()).await?);
 
     if let Some(endpoint_override) = endpoint {
         config_builder = T::with_endpoint_resolver(config_builder, endpoint_override);
