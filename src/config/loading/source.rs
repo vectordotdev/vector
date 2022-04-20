@@ -1,4 +1,4 @@
-use super::{ComponentHint, Format, Loader, Process};
+use super::{ComponentHint, Loader, Process};
 use serde_toml_merge::merge_into_table;
 use std::io::Read;
 use toml::{map::Map, value::Table};
@@ -16,11 +16,7 @@ impl SourceLoader {
 impl Process for SourceLoader {
     /// Prepares input by simply reading bytes to a string. Unlike other loaders, there's no
     /// interpolation of environment variables. This is on purpose to preserve the original config.
-    fn prepare<R: Read>(
-        &self,
-        mut input: R,
-        _: Format,
-    ) -> Result<(String, Vec<String>), Vec<String>> {
+    fn prepare<R: Read>(&self, mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
         let mut source_string = String::new();
         input
             .read_to_string(&mut source_string)
