@@ -23,7 +23,7 @@ pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, String> {
 #[cfg(test)]
 mod tests {
     use lookup::{LookupBuf, SegmentBuf};
-    use vrl_compiler::Value;
+    use value::Value;
 
     use super::*;
     use crate::ast::{Destination, Function, FunctionArgument};

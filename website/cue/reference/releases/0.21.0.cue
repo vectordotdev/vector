@@ -4,6 +4,12 @@ releases: "0.21.0": {
 	date:     "2022-04-11"
 	codename: ""
 
+	known_issues: [
+		"The `kubernetes_logs` source can panic when while processing Kubernetes watcher events. Will be fixed in `0.21.1`.",
+		"The `elasticsearch` sink fails to include the security token when signing requests for AWS authentication to OpenSearch. Will be fixed in `0.21.1`.",
+		"The `nats` source and sink authentication is not configured using snake_case keys. Will be fixed in `0.21.1`.",
+	]
+
 	whats_next: [
 		{
 			title: "An OpenTelemetry source"
@@ -78,6 +84,10 @@ releases: "0.21.0": {
 		  [`kube-rs`](https://github.com/kube-rs/kube-rs) library. We expect that this will resolve some long
 		  outstanding bugs with Vector ceasing to process container logs. It also adds support for Kubernetes
 		  authentication token rotation.
+
+		We made additional performance improvements this release increasing the average throughput by up to 50% for
+		common topologies (see our [soak test
+		framework](https://github.com/vectordotdev/vector/tree/master/soaks/tests)).
 
 		Also, check out our [new guide](/guides/level-up/vector-tap-guide) on using `vector tap` for observing events
 		running through Vector instances
