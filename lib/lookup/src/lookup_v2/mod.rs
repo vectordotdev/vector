@@ -32,14 +32,20 @@ impl Serialize for OwnedPath {
             let path = self
                 .segments
                 .iter()
-                .map(|segment| match segment {
+                .enumerate()
+                .map(|(i, segment)| match segment {
                     OwnedSegment::Field(field) => {
                         let needs_quotes = field
                             .chars()
                             .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+                        // Allocate enough to fit the field, a `.` and two `"` characters. This
+                        // should suffice for the majority of cases when no escape sequence is used.
+                        let mut string = String::with_capacity(field.as_bytes().len() + 3);
+                        if i != 0 {
+                            string.push('.');
+                        }
                         if needs_quotes {
-                            let mut string = String::with_capacity(field.as_bytes().len() + 3);
-                            string.push_str(r#".""#);
+                            string.push('"');
                             for c in field.chars() {
                                 if matches!(c, '"' | '\\') {
                                     string.push('\\');
@@ -49,14 +55,14 @@ impl Serialize for OwnedPath {
                             string.push('"');
                             string
                         } else {
-                            let mut string = String::with_capacity(field.as_bytes().len() + 1);
-                            string.push('.');
                             string.push_str(field);
                             string
                         }
                     }
                     OwnedSegment::Index(index) => format!("[{}]", index),
-                    OwnedSegment::Invalid => ".<invalid>".to_owned(),
+                    OwnedSegment::Invalid => {
+                        (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join("");
@@ -262,42 +268,36 @@ mod test {
     #[test]
     fn owned_path_serialize() {
         let test_cases = [
-            ("", ".<invalid>"),
-            (".", "."),
-            ("]", ".<invalid>"),
-            ("]foo", ".<invalid>"),
-            ("..", ".<invalid>"),
-            ("...", ".<invalid>"),
-            ("f", ".f"),
-            (".f", ".f"),
-            (".[", ".<invalid>"),
-            ("foo", ".foo"),
+            ("", "<invalid>"),
+            ("]", "<invalid>"),
+            ("]foo", "<invalid>"),
+            ("..", "<invalid>"),
+            ("...", "<invalid>"),
+            ("f", "f"),
+            ("foo", "foo"),
             (
                 r#"ec2.metadata."availability-zone""#,
-                r#".ec2.metadata."availability-zone""#,
+                r#"ec2.metadata."availability-zone""#,
             ),
-            (".foo", ".foo"),
-            (".@timestamp", ".@timestamp"),
-            ("foo[", ".foo.<invalid>"),
-            ("foo$", ".<invalid>"),
-            (r#""$peci@l chars""#, r#"."$peci@l chars""#),
-            (".foo.foo bar", ".foo.<invalid>"),
-            (r#".foo."foo bar".bar"#, r#".foo."foo bar".bar"#),
+            ("@timestamp", "@timestamp"),
+            ("foo[", "foo.<invalid>"),
+            ("foo$", "<invalid>"),
+            (r#""$peci@l chars""#, r#""$peci@l chars""#),
+            ("foo.foo bar", "foo.<invalid>"),
+            (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
             ("[1]", "[1]"),
             ("[42]", "[42]"),
-            (".[42]", ".<invalid>"),
+            ("foo.[42]", "foo.<invalid>"),
             ("[42].foo", "[42].foo"),
-            ("[-1]", ".<invalid>"),
-            ("[-42]", ".<invalid>"),
-            (".[-42]", ".<invalid>"),
-            ("[-42].foo", ".<invalid>"),
-            ("[-42]foo", ".<invalid>"),
-            (r#"."[42]. {}-_""#, r#"."[42]. {}-_""#),
-            (r#""a\"a""#, r#"."a\"a""#),
-            (r#"."a\"a""#, r#"."a\"a""#),
-            (r#".foo."a\"a"."b\\b".bar"#, r#".foo."a\"a"."b\\b".bar"#),
-            (".<invalid>", ".<invalid>"),
-            (r#"."🤖""#, r#"."🤖""#),
+            ("[-1]", "<invalid>"),
+            ("[-42]", "<invalid>"),
+            ("[-42].foo", "<invalid>"),
+            ("[-42]foo", "<invalid>"),
+            (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
+            (r#""a\"a""#, r#""a\"a""#),
+            (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
+            ("<invalid>", "<invalid>"),
+            (r#""🤖""#, r#""🤖""#),
         ];
 
         for (path, expected) in test_cases {
