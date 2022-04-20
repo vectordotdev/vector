@@ -68,10 +68,12 @@ components: sources: internal_metrics: {
 						description: """
 				The key name added to each event representing the current host. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+				Set to "" to suppress this key.
 				"""
 						required:    false
 						type: string: {
-							default: null
+							default: "host"
 						}
 					}
 					pid_key: {
@@ -79,10 +81,12 @@ components: sources: internal_metrics: {
 						common:   false
 						description: """
 					The key name added to each event representing the current process ID.
+
+					Set to "" to suppress this key.
 					"""
 						required: false
 						type: string: {
-							default: null
+							default: "pid"
 						}
 					}
 				}
