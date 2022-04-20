@@ -8726,6 +8726,7 @@ dependencies = [
  "aws-sigv4",
  "aws-smithy-client",
  "aws-smithy-http",
+ "aws-smithy-types",
  "aws-types",
  "azure_core",
  "azure_storage",

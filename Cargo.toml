@@ -150,6 +150,7 @@ aws-sdk-elasticsearch = {version = "0.10.1", optional = true }
 aws-sdk-firehose = { version = "0.10.1", optional = true }
 aws-sdk-kinesis = { version = "0.10.1", optional = true }
 aws-sigv4 = { version = "0.10.1", optional = true }
+aws-smithy-types = { version = "0.40.2", optional = true }
 aws-smithy-client = { version = "0.40.2", optional = true }
 aws-smithy-http = { version = "0.40.2", optional = true }
 
@@ -396,6 +397,7 @@ api-client = [
 aws-core = [
   "aws-config",
   "aws-types",
+  "aws-smithy-types",
   "aws-smithy-client",
   "aws-smithy-http"
 ]
