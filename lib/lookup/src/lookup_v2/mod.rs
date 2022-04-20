@@ -3,7 +3,6 @@ mod jit;
 use crate::lookup_v2::jit::{JitLookup, JitPath};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
-use std::fmt::Display;
 use std::iter::Cloned;
 use std::slice::Iter;
 
@@ -27,7 +26,38 @@ impl Serialize for OwnedPath {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        if self.segments.is_empty() {
+            serializer.serialize_str(".")
+        } else {
+            let path = self
+                .segments
+                .iter()
+                .map(|segment| match segment {
+                    OwnedSegment::Field(field) => {
+                        let needs_quotes = field
+                            .chars()
+                            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+                        if needs_quotes {
+                            let mut string = String::new();
+                            string.reserve(field.as_bytes().len());
+                            for c in field.chars() {
+                                if matches!(c, '"' | '\\') {
+                                    string.push('\\');
+                                }
+                                string.push(c);
+                            }
+                            format!(r#"."{}""#, string)
+                        } else {
+                            format!(".{}", field)
+                        }
+                    }
+                    OwnedSegment::Index(index) => format!("[{}]", index),
+                    OwnedSegment::Invalid => ".<invalid>".to_owned(),
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            serializer.serialize_str(&path)
+        }
     }
 }
 
@@ -64,18 +94,6 @@ impl OwnedPath {
 impl From<Vec<OwnedSegment>> for OwnedPath {
     fn from(segments: Vec<OwnedSegment>) -> Self {
         Self { segments }
-    }
-}
-
-impl Display for OwnedPath {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.segments.is_empty() {
-            write!(formatter, ".")
-        } else {
-            self.segments
-                .iter()
-                .try_for_each(|segment| segment.fmt(formatter))
-        }
     }
 }
 
@@ -198,33 +216,6 @@ impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     }
 }
 
-impl Display for OwnedSegment {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            OwnedSegment::Field(field) => {
-                let needs_quotes = field
-                    .chars()
-                    .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
-                if needs_quotes {
-                    let mut string = String::new();
-                    string.reserve(field.as_bytes().len());
-                    for c in field.chars() {
-                        if matches!(c, '"' | '\\') {
-                            string.push('\\');
-                        }
-                        string.push(c);
-                    }
-                    write!(formatter, r#"."{}""#, string)
-                } else {
-                    write!(formatter, ".{}", field)
-                }
-            }
-            OwnedSegment::Index(index) => write!(formatter, "[{}]", index),
-            OwnedSegment::Invalid => write!(formatter, ".<invalid>"),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
@@ -265,7 +256,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn owned_path_display() {
+    fn owned_path_serialize() {
         let test_cases = [
             ("", ".<invalid>"),
             (".", "."),
@@ -307,7 +298,9 @@ mod test {
 
         for (path, expected) in test_cases {
             let path = parse_path(path);
-            assert_eq!(format!("{}", path), expected);
+            let path = serde_json::to_string(&path).unwrap();
+            let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
+            assert_eq!(path, expected);
         }
     }
 }
