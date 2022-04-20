@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod secret;
 mod source;
 
 use std::{
@@ -14,8 +15,7 @@ use config_builder::ConfigBuilderLoader;
 use loader::process::Process;
 
 use super::{
-    builder::ConfigBuilder, format, secret, validation, vars, Config, ConfigPath, Format,
-    FormatHint,
+    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -23,6 +23,7 @@ use once_cell::sync::Lazy;
 
 pub use config_builder::*;
 pub use loader::*;
+pub use secret::*;
 pub use source::*;
 
 pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
@@ -135,7 +136,19 @@ pub async fn load_from_paths_with_provider(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    // Load secret backends first
+    let (mut secrets_backends_loader, secrets_warning) =
+        load_secret_backends_from_paths(config_paths)?;
+    // And then, if need, retrieve secret from configured backends
+    let (mut builder, load_warnings) = if secrets_backends_loader.has_secrets_to_retrieve() {
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
+        let resolved_secrets = secrets_backends_loader.retrieve().map_err(|e| vec![e])?;
+        load_builder_from_paths_with_secrets(config_paths, resolved_secrets)?
+    } else {
+        debug!(message = "No secret placeholder found, skipping secret resolution.");
+        load_builder_from_paths(config_paths)?
+    };
+
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -147,7 +160,11 @@ pub async fn load_from_paths_with_provider(
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
-    for warning in load_warnings.into_iter().chain(build_warnings) {
+    for warning in secrets_warning
+        .into_iter()
+        .chain(load_warnings)
+        .chain(build_warnings)
+    {
         warn!("{}", warning);
     }
 
@@ -202,11 +219,26 @@ pub fn load_builder_from_paths(
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
+/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
+pub fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    secrets: HashMap<String, String>,
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+    loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
+}
+
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(toml::value::Table, Vec<String>), Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
+}
+
+/// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
+fn load_secret_backends_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<(SecretBackendLoader, Vec<String>), Vec<String>> {
+    loader_from_paths(SecretBackendLoader::new(), config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
@@ -244,10 +276,7 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(
-    mut input: R,
-    format: Format,
-) -> Result<(String, Vec<String>), Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -259,17 +288,15 @@ pub fn prepare_input<R: std::io::Read>(
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    let (vars_interpolated, mut warnings) = vars::interpolate(&source_string, &vars);
-    let (secret_interpolated, secret_warnings) = secret::interpolate(&vars_interpolated, format);
-    warnings.extend(secret_warnings);
-    Ok((secret_interpolated, warnings))
+
+    Ok(vars::interpolate(&source_string, &vars))
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
-    let (with_vars, warnings) = prepare_input(input, format)?;
+    let (with_vars, warnings) = prepare_input(input)?;
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
