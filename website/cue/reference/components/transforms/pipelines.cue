@@ -36,42 +36,10 @@ components: transforms: pipelines: {
 
 	configuration: {
 		_pipeline_group: {
-			description: """
-				A list of pipeline's configurations. It's also possible to define this order in which the pipelines are
-				chained using the `order` options. If no order is specified, they will be chained by alphabetical order.
-				"""
-			required: true
-			warnings: []
-			type: object: options: {
-				order: {
-					common:      true
-					description: "A complete ordered list of how the pipelines will be chained."
-					required:    false
-					type: array: {
-						default: null
-						items: type: string: {
-							syntax: "literal"
-						}
-					}
-				}
-				pipelines: {
-					description: "A set of pipelines describing how the events will be transformed."
-					required:    true
-					type: object: options: {
-						"*": _pipeline_configuration
-					}
-				}
-			}
-		}
-
-		_pipeline_configuration: {
-			description: """
-				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
-				for the list of available transforms and their configuration.
-				"""
+			description: "A list of pipeline's configurations."
 			required:    true
 			warnings: []
-			type: object: options: {
+			type: array: items: type: object: options: {
 				name: {
 					description: "Name of the pipeline"
 					required:    false
@@ -133,39 +101,33 @@ components: transforms: pipelines: {
 				type = "pipelines"
 				inputs = ["pipelines_gate"]
 
-				[transforms.pipelines_processing.logs]
-				order = [
-				  "foo",
-				  "bar"
-				]
-
-				[transforms.pipelines_processing.logs.pipelines.foo]
+				[[transforms.pipelines_processing.logs]]
 				name = "foo"
 				filter.type = "vrl"
 				filter.source = '''
 					contains(.message, "hello") ?? false
 				'''
 
-				[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+				[[transforms.pipelines_processing.logs.transforms]]
 				type = "remap"
 				source = '''
 				.message = "[foo]" + .message
 				'''
 
-				[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+				[[transforms.pipelines_processing.logs.transforms]]
 				type = "remap"
 				source = ".went_through_foo = true"
 
-				[transforms.pipelines_processing.logs.pipelines.bar]
+				[[transforms.pipelines_processing.logs]]
 				name = "bar"
 
-				[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+				[[transforms.pipelines_processing.logs.transforms]]
 				type = "remap"
 				source = '''
 				.message = "[bar]" + .message
 				'''
 
-				[[transforms.pipelines_processing.logs.pipelines.bar.transforms]]
+				[[transforms.pipelines_processing.logs.transforms]]
 				type = "remap"
 				source = ".went_through_bar = true"
 				"""
