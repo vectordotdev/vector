@@ -71,20 +71,16 @@ impl SourceConfig for InternalMetricsConfig {
         let version = self.version.clone();
         let configuration_key = self.configuration_key.clone();
 
-        let host_key = self.tags.host_key.as_deref().and_then(|tag| {
-            if tag.is_empty() {
-                None
-            } else {
-                Some(tag.to_owned())
-            }
-        });
-        let pid_key = self.tags.pid_key.as_deref().and_then(|tag| {
-            if tag.is_empty() {
-                None
-            } else {
-                Some(tag.to_owned())
-            }
-        });
+        let host_key = self
+            .tags
+            .host_key
+            .as_deref()
+            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+        let pid_key = self
+            .tags
+            .pid_key
+            .as_deref()
+            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
         Ok(Box::pin(run(
             namespace,
             version,
