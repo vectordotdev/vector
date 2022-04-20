@@ -121,7 +121,7 @@ struct BroadcastLayer<S> {
 }
 
 impl<S> BroadcastLayer<S> {
-    fn new() -> Self {
+    const fn new() -> Self {
         BroadcastLayer {
             _subscriber: PhantomData,
         }
