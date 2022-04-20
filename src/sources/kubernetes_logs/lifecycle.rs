@@ -8,11 +8,17 @@ use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
     pin_mut, ready,
-    stream::FuturesUnordered,
+    stream::{FuturesUnordered, FuturesOrdered},
     FutureExt, StreamExt,
 };
 
 use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
+
+#[derive(Debug)]
+pub enum LifecycleOrder{
+    Ordered,
+    Unordered,
+}
 
 /// Lifecycle encapsulates logic for managing a lifecycle of multiple futures
 /// that are bounded together by a shared shutdown condition.
@@ -22,7 +28,9 @@ use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 /// completing their work.
 #[derive(Debug)]
 pub struct Lifecycle<'bound> {
-    futs: FuturesUnordered<BoxFuture<'bound, ()>>,
+    futs_ordered: FuturesOrdered<BoxFuture<'bound, ()>>,
+    futs_unordered: FuturesUnordered<BoxFuture<'bound, ()>>,
+    order: LifecycleOrder,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
 }
 
@@ -41,9 +49,11 @@ pub enum GlobalShutdownToken {
 
 impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
-    pub fn new() -> Self {
-        Self {
-            futs: FuturesUnordered::new(),
+    pub fn new(lc_order: LifecycleOrder) -> Self {
+        return Self {
+            futs_ordered: FuturesOrdered::new(),
+            futs_unordered: FuturesUnordered::new(),
+            order: lc_order,
             fut_shutdowns: Vec::new(),
         }
     }
@@ -65,23 +75,49 @@ impl<'bound> Lifecycle<'bound> {
 
     /// Run the managed futures and keep track of the shutdown process.
     pub async fn run(mut self, mut global_shutdown: ShutdownSignal) -> GlobalShutdownToken {
-        let first_task_fut = self.futs.next();
-        pin_mut!(first_task_fut);
+        let token;
+        match self.order {
+            LifecycleOrder::Ordered => {
+                let first_task_fut = self.futs_ordered.next();
 
-        let token = match select(first_task_fut, &mut global_shutdown).await {
-            Either::Left((None, _)) => {
-                trace!(message = "Lifecycle had no tasks upon run, we're done.");
-                GlobalShutdownToken::Unused(global_shutdown)
+                pin_mut!(first_task_fut);
+
+                token = match select(first_task_fut, &mut global_shutdown).await {
+                    Either::Left((None, _)) => {
+                        trace!(message = "Lifecycle had no tasks upon run, we're done.");
+                        GlobalShutdownToken::Unused(global_shutdown)
+                    }
+                    Either::Left((Some(()), _)) => {
+                        trace!(message = "Lifecycle had the first task completed.");
+                        GlobalShutdownToken::Unused(global_shutdown)
+                    }
+                    Either::Right((shutdown_signal_token, _)) => {
+                        trace!(message = "Lifecycle got a global shutdown request.");
+                        GlobalShutdownToken::Token(shutdown_signal_token)
+                    }
+                };
+            },
+            LifecycleOrder::Unordered => {
+                let first_task_fut = self.futs_unordered.next();
+
+                pin_mut!(first_task_fut);
+
+                token = match select(first_task_fut, &mut global_shutdown).await {
+                    Either::Left((None, _)) => {
+                        trace!(message = "Lifecycle had no tasks upon run, we're done.");
+                        GlobalShutdownToken::Unused(global_shutdown)
+                    }
+                    Either::Left((Some(()), _)) => {
+                        trace!(message = "Lifecycle had the first task completed.");
+                        GlobalShutdownToken::Unused(global_shutdown)
+                    }
+                    Either::Right((shutdown_signal_token, _)) => {
+                        trace!(message = "Lifecycle got a global shutdown request.");
+                        GlobalShutdownToken::Token(shutdown_signal_token)
+                    }
+                };
             }
-            Either::Left((Some(()), _)) => {
-                trace!(message = "Lifecycle had the first task completed.");
-                GlobalShutdownToken::Unused(global_shutdown)
-            }
-            Either::Right((shutdown_signal_token, _)) => {
-                trace!(message = "Lifecycle got a global shutdown request.");
-                GlobalShutdownToken::Token(shutdown_signal_token)
-            }
-        };
+        }
 
         // Send the shutdowns to all managed futures.
         for fut_shutdown in self.fut_shutdowns {
@@ -94,9 +130,19 @@ impl<'bound> Lifecycle<'bound> {
             }
         }
 
-        // Wait for all the futures to complete.
-        while let Some(()) = self.futs.next().await {
-            trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
+        match self.order {
+            LifecycleOrder::Ordered => {
+             // Wait for all the futures to complete.
+                while let Some(()) = self.futs_ordered.next().await {
+                    trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
+                }
+            },
+            LifecycleOrder::Unordered => {
+                // Wait for all the futures to complete.
+                while let Some(()) = self.futs_unordered.next().await {
+                    trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
+                }
+            }
         }
 
         // Return the global shutdown token so that caller can perform it's
@@ -118,7 +164,11 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        self.lifecycle.futs.push(future);
+        match self.lifecycle.order {
+            LifecycleOrder::Ordered => self.lifecycle.futs_ordered.push(future),
+            LifecycleOrder::Unordered => self.lifecycle.futs_unordered.push(future),
+        }
+        // self.lifecycle.futs.push(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }
