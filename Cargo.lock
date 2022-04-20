@@ -2158,7 +2158,6 @@ dependencies = [
  "ordered-float",
  "peeking_take_while 1.0.0",
  "regex",
- "serde",
  "serde_json",
  "strum_macros 0.24.0",
  "thiserror",
@@ -2447,7 +2446,6 @@ checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 name = "enrichment"
 version = "0.1.0"
 dependencies = [
- "anymap",
  "arc-swap",
  "chrono",
  "dyn-clone",
@@ -2807,12 +2805,6 @@ dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
-
-[[package]]
-name = "fuchsia-cprng"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 
 [[package]]
 name = "fuchsia-zircon"
@@ -3465,12 +3457,6 @@ name = "httpdate"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
-
-[[package]]
-name = "human_bytes"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88a0d4dc39ec942e44c1c306aa196da67f2bd6a30dc7b4a475465c13ccf28817"
 
 [[package]]
 name = "humantime"
@@ -6155,19 +6141,6 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
-dependencies = [
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "rdrand",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "rand"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a6b1679d49b24bbfe0c803429aa1874472f50d9b363131f0e89fc356b544d03"
@@ -6209,21 +6182,6 @@ dependencies = [
  "ppv-lite86",
  "rand_core 0.6.3",
 ]
-
-[[package]]
-name = "rand_core"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
-dependencies = [
- "rand_core 0.4.2",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c33a3c44ca05fa6f1807d8e6743f3824e8509beca625669633be0acbdf509dc"
 
 [[package]]
 name = "rand_core"
@@ -6342,15 +6300,6 @@ dependencies = [
  "pkg-config",
  "sasl2-sys",
  "zstd-sys",
-]
-
-[[package]]
-name = "rdrand"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
-dependencies = [
- "rand_core 0.3.1",
 ]
 
 [[package]]
@@ -7591,15 +7540,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "substring"
-version = "1.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42ee6433ecef213b2e72f587ef64a2f5943e7cd16fbd82dbe8bc07486c534c86"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7679,16 +7619,6 @@ name = "temp-dir"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af547b166dd1ea4b472165569fc456cfb6818116f854690b0ff205e636523dab"
-
-[[package]]
-name = "tempdir"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
-dependencies = [
- "rand 0.4.6",
- "remove_dir_all",
-]
 
 [[package]]
 name = "tempfile"
@@ -8357,7 +8287,6 @@ dependencies = [
 name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
- "ansi_term",
  "criterion",
  "dashmap 5.2.0",
  "mock_instant",
@@ -9079,7 +9008,6 @@ name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
  "lookup",
- "value",
  "vrl",
 ]
 
@@ -9102,7 +9030,6 @@ dependencies = [
  "fslock",
  "futures 0.3.21",
  "hdrhistogram",
- "human_bytes",
  "leveldb",
  "memmap2",
  "metrics 0.17.1",
@@ -9113,7 +9040,6 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.0",
  "pin-project 1.0.10",
- "pretty_assertions",
  "proptest",
  "quickcheck",
  "rand 0.8.5",
@@ -9122,7 +9048,6 @@ dependencies = [
  "serde_yaml",
  "snafu",
  "temp-dir",
- "tempdir",
  "tokio",
  "tokio-stream",
  "tokio-test",
@@ -9201,7 +9126,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "substring",
  "tokio",
  "tokio-stream",
  "tokio-test",
@@ -9242,10 +9166,8 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float",
- "thiserror",
  "vector_common",
  "vrl-compiler",
- "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",
@@ -9255,7 +9177,6 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "bytes 1.1.0",
  "clap 3.1.8",
  "exitcode",
  "indoc",
@@ -9288,9 +9209,7 @@ dependencies = [
  "paste",
  "regex",
  "serde",
- "serde_json",
  "thiserror",
- "tracing 0.1.34",
  "value",
  "vector_common",
  "vrl-core",
@@ -9399,7 +9318,6 @@ dependencies = [
  "tracing-subscriber 0.3.11",
  "vector_common",
  "vrl",
- "vrl-parser",
  "vrl-stdlib",
 ]
 

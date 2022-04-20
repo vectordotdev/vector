@@ -13,7 +13,7 @@ use nom::{
     IResult,
 };
 use std::convert::TryFrom;
-use vrl_compiler::Value;
+use value::Value;
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     let args = f.args.as_ref();
