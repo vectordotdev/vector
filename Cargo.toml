@@ -170,7 +170,7 @@ serde_with = { version = "1.12.1", default-features = false, features = ["macros
 serde_yaml = { version = "0.8.23", default-features = false }
 
 # Messagepack
-rmp-serde = { version = "1.0.0", default-features = false, optional = true }
+rmp-serde = { version = "1.1.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
