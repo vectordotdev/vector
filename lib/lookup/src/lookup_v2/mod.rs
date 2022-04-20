@@ -278,7 +278,6 @@ mod test {
             ("f", ".f"),
             (".f", ".f"),
             (".[", ".<invalid>"),
-            ("f.", ".f"), // TODO: Review, shouldn't this be invalid?
             ("foo", ".foo"),
             (
                 r#"ec2.metadata."availability-zone""#,
@@ -295,7 +294,6 @@ mod test {
             ("[42]", "[42]"),
             (".[42]", ".<invalid>"),
             ("[42].foo", "[42].foo"),
-            ("[42]foo", "[42].foo"), // TODO: Review, shouldn't this be invalid?
             ("[-1]", ".<invalid>"),
             ("[-42]", ".<invalid>"),
             (".[-42]", ".<invalid>"),
