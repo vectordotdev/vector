@@ -325,7 +325,12 @@ pub async fn try_attach(
     );
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
-    let datadog_metrics = DatadogMetricsConfig::enterprise(api_key, endpoint);
+    let datadog_metrics = DatadogMetricsConfig::enterprise(
+        api_key,
+        datadog.endpoint.clone(),
+        datadog.site.clone(),
+        datadog.region,
+    );
 
     config.sinks.insert(
         datadog_metrics_id,

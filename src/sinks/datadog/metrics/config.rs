@@ -148,10 +148,17 @@ impl SinkConfig for DatadogMetricsConfig {
 
 impl DatadogMetricsConfig {
     /// Creates a [`DatadogMetricsConfig`] with enterprise reporting settings.
-    pub fn enterprise<T: Into<String>>(api_key: T, endpoint: T) -> Self {
+    pub fn enterprise<T: Into<String>>(
+        api_key: T,
+        endpoint: Option<String>,
+        site: Option<String>,
+        region: Option<Region>,
+    ) -> Self {
         Self {
             default_api_key: api_key.into(),
-            endpoint: Some(endpoint.into()),
+            endpoint,
+            site,
+            region,
             ..Self::default()
         }
     }
