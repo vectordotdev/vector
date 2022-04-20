@@ -36,7 +36,6 @@ impl InternalEvent for FileBytesSent<'_> {
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "file",
-            "file" => self.file.clone().into_owned(),
         );
     }
 }
@@ -95,7 +94,6 @@ mod source {
             counter!(
                 "component_received_bytes_total", self.byte_size as u64,
                 "protocol" => "file",
-                "file" => self.file.to_owned()
             );
         }
     }
@@ -115,17 +113,11 @@ mod source {
                 byte_size = %self.byte_size,
                 file = %self.file
             );
+            counter!("events_in_total", self.count as u64,);
+            counter!("component_received_events_total", self.count as u64,);
             counter!(
-                "events_in_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_events_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "component_received_event_bytes_total", self.byte_size as u64,
-                "file" => self.file.to_owned(),
+                "component_received_event_bytes_total",
+                self.byte_size as u64,
             );
         }
     }
@@ -141,10 +133,7 @@ mod source {
                 message = "Currently ignoring file too small to fingerprint.",
                 file = %self.file.display(),
             );
-            counter!(
-                "checksum_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("checksum_errors_total", 1,);
         }
     }
 
@@ -169,13 +158,9 @@ mod source {
                 "error_code" => "reading_fingerprint",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
             // deprecated
-            counter!(
-                "fingerprint_read_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("fingerprint_read_errors_total", 1,);
         }
     }
 
@@ -200,16 +185,12 @@ mod source {
             );
             counter!(
                 "component_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
                 "error_code" => DELETION_FAILED,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
             // deprecated
-            counter!(
-                "file_delete_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("file_delete_errors_total", 1,);
         }
     }
 
@@ -224,10 +205,7 @@ mod source {
                 message = "File deleted.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_deleted_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_deleted_total", 1,);
         }
     }
 
@@ -242,10 +220,7 @@ mod source {
                 message = "Stopped watching file.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_unwatched_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_unwatched_total", 1,);
         }
     }
 
@@ -270,13 +245,9 @@ mod source {
                 "error_code" => "watching",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-                "file" => self.file.to_string_lossy().into_owned(),
             );
             // deprecated
-            counter!(
-                "file_watch_errors_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("file_watch_errors_total", 1,);
         }
     }
 
@@ -293,10 +264,7 @@ mod source {
                 file = %self.file.display(),
                 file_position = %self.file_position
             );
-            counter!(
-                "files_resumed_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_resumed_total", 1,);
         }
     }
 
@@ -311,10 +279,7 @@ mod source {
                 message = "Found new file to watch.",
                 file = %self.file.display(),
             );
-            counter!(
-                "files_added_total", 1,
-                "file" => self.file.to_string_lossy().into_owned(),
-            );
+            counter!("files_added_total", 1,);
         }
     }
 
