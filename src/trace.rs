@@ -1,27 +1,16 @@
 use std::{
-    marker::PhantomData,
     str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex, MutexGuard,
-    },
+    sync::{Mutex, MutexGuard},
 };
 
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
-use tokio::sync::{
-    broadcast::{self, Receiver, Sender},
-    oneshot,
-};
-use tokio_stream::wrappers::BroadcastStream;
-use tracing::{span::Span, Event, Subscriber};
+use tokio::sync::broadcast::{self, Receiver, Sender};
+use tracing::{span::Span, subscriber::Interest, Id, Metadata, Subscriber};
+use tracing_core::span;
 pub use tracing_futures::Instrument;
 use tracing_limit::RateLimitedLayer;
-use tracing_subscriber::{
-    layer::{Context, SubscriberExt},
-    util::SubscriberInitExt,
-    Layer,
-};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
 use crate::event::LogEvent;
@@ -30,14 +19,6 @@ use crate::event::LogEvent;
 /// before the topology has been initialized. It will be cleared (set to
 /// `None`) by the topology initialization routines.
 static BUFFER: OnceCell<Mutex<Option<Vec<LogEvent>>>> = OnceCell::new();
-
-/// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to
-/// the trace broadcast channel.
-static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
-
-/// SUBSCRIBERS contains a list of callers interested in internal log events who will be notified
-/// when early buffering is disabled, by receiving a copy of all buffered internal log events.
-static SUBSCRIBERS: OnceCell<Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>>> = OnceCell::new();
 
 /// SENDER holds the sender/receiver handle that will receive a copy of
 /// all the internal log events *after* the topology has been
@@ -57,9 +38,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let metrics_layer = metrics_layer_enabled()
         .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
 
-    let subscriber = tracing_subscriber::registry()
-        .with(metrics_layer)
-        .with(BroadcastLayer::new().with_filter(fmt_filter.clone()));
+    let subscriber = tracing_subscriber::registry().with(metrics_layer);
 
     #[cfg(feature = "tokio-console")]
     let subscriber = {
@@ -79,6 +58,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let rate_limited = RateLimitedLayer::new(formatter);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
+        let subscriber = BroadcastSubscriber { subscriber };
         let _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
@@ -91,16 +71,17 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let rate_limited = RateLimitedLayer::new(formatter);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
+        let subscriber = BroadcastSubscriber { subscriber };
         let _ = subscriber.try_init();
     }
 }
 
 #[cfg(test)]
-pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
-    get_early_buffer().replace(Vec::new())
+pub fn reset_early_buffer() {
+    *early_buffer() = Some(Vec::new());
 }
 
-fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
+fn early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
     BUFFER
         .get()
         .expect("Internal logs buffer not initialized")
@@ -108,69 +89,8 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
-fn try_buffer_event(event: LogEvent) -> Option<LogEvent> {
-    if SHOULD_BUFFER.load(Ordering::Acquire) {
-        if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(event);
-            return None;
-        }
-    }
-
-    Some(event)
-}
-
-fn consume_early_buffer() -> Vec<LogEvent> {
-    get_early_buffer()
-        .take()
-        .expect("early buffer was already consumed")
-}
-
-/// Creates a trace sender for sending internal log events.
-fn get_trace_sender() -> &'static broadcast::Sender<LogEvent> {
-    SENDER.get_or_init(|| broadcast::channel(99).0)
-}
-
-/// Creates a trace receiver that receives internal log events.
-fn get_trace_receiver() -> broadcast::Receiver<LogEvent> {
-    get_trace_sender().subscribe()
-}
-
-fn get_trace_subscriber_list() -> MutexGuard<'static, Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> {
-    SUBSCRIBERS
-        .get_or_init(|| Mutex::new(Some(Vec::new())))
-        .lock()
-        .expect("poisoned locks are dumb")
-}
-
-fn try_register_for_early_events() -> Option<oneshot::Receiver<Vec<LogEvent>>> {
-    if SHOULD_BUFFER.load(Ordering::Acquire) {
-        // We're still in early buffering mode. Attempt to subscribe by adding a oneshot sender
-        // to SUBSCRIBERS. If it's already been consumed, then we've gotten beaten out by a
-        // caller that is disabling early buffering, so we just go with the flow either way.
-        get_trace_subscriber_list().as_mut().map(|subscribers| {
-            let (tx, rx) = oneshot::channel();
-            subscribers.push(tx);
-            rx
-        })
-    } else {
-        // Early buffering is being or has been disabled, so we can no longer register.
-        None
-    }
-}
-
 pub fn stop_buffering() {
-    // First, consume any waiting subscribers. This causes new subscriptions to simply receive from
-    // the broadcast channel, and not bother trying to receive the early buffered events.
-    let subscribers = get_trace_subscriber_list().take();
-
-    // Now that we have any waiting subscribers, actually disable early buffering and consume any
-    // buffered log events. Once we have the buffered events, send them to each subscriber.
-    SHOULD_BUFFER.store(false, Ordering::Release);
-    let buffered_events = consume_early_buffer();
-    for subscriber_tx in subscribers.into_iter().flatten() {
-        // Ignore any errors sending since the caller may have dropped or something else.
-        let _ = subscriber_tx.send(buffered_events.clone());
-    }
+    *early_buffer() = None;
 }
 
 /// Gets the current [`Span`].
@@ -179,62 +99,92 @@ pub fn current_span() -> Span {
 }
 
 pub struct TraceSubscription {
-    buffered_events_rx: Option<oneshot::Receiver<Vec<LogEvent>>>,
-    trace_rx: Receiver<LogEvent>,
-}
-
-impl TraceSubscription {
-    pub async fn buffered_events(&mut self) -> Option<Vec<LogEvent>> {
-        // If we have a receiver for buffered events, and it returns them successfully, then pass
-        // them back.  We don't care if the sender drops in the meantime, so just swallow that error.
-        if let Some(rx) = self.buffered_events_rx.take() {
-            if let Ok(events) = rx.await {
-                return Some(events);
-            }
-        }
-
-        None
-    }
-
-    pub fn into_stream(self) -> BroadcastStream<LogEvent> {
-        BroadcastStream::new(self.trace_rx)
-    }
+    pub buffer: Vec<LogEvent>,
+    pub receiver: Receiver<LogEvent>,
 }
 
 pub fn subscribe() -> TraceSubscription {
-    let buffered_events_rx = try_register_for_early_events();
-    let trace_rx = get_trace_receiver();
+    let buffer = match early_buffer().as_mut() {
+        Some(buffer) => buffer.drain(..).collect(),
+        None => Vec::new(),
+    };
+    let receiver = SENDER.get_or_init(|| broadcast::channel(99).0).subscribe();
+    TraceSubscription { buffer, receiver }
+}
 
-    TraceSubscription {
-        buffered_events_rx,
-        trace_rx,
+struct BroadcastSubscriber<S> {
+    subscriber: S,
+}
+
+impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
+    #[inline]
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        self.subscriber.enabled(metadata)
     }
-}
 
-struct BroadcastLayer<S> {
-    _subscriber: PhantomData<S>,
-}
-
-impl<S> BroadcastLayer<S>
-where
-    S: Subscriber,
-{
-    fn new() -> Self {
-        BroadcastLayer {
-            _subscriber: PhantomData,
-        }
+    #[inline]
+    fn new_span(&self, span: &tracing::span::Attributes<'_>) -> Id {
+        self.subscriber.new_span(span)
     }
-}
 
-impl<S> Layer<S> for BroadcastLayer<S>
-where
-    S: Subscriber + 'static,
-{
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // Try buffering the event, and if we're not buffering anymore, just send it along via the
-        // trace sender.
-        if let Some(event) = try_buffer_event(event.into()) {
-            let _ = get_trace_sender().send(event.into());
+    #[inline]
+    fn record(&self, span: &Id, record: &tracing::span::Record<'_>) {
+        self.subscriber.record(span, record)
+    }
+
+    #[inline]
+    fn record_follows_from(&self, span: &Id, follows: &Id) {
+        self.subscriber.record_follows_from(span, follows)
+    }
+
+    #[inline]
+    fn event(&self, event: &tracing::Event<'_>) {
+        if let Some(buffer) = early_buffer().as_mut() {
+            buffer.push(event.into());
         }
+        if let Some(sender) = SENDER.get() {
+            let _ = sender.send(event.into()); // Ignore errors
+        }
+        self.subscriber.event(event)
+    }
+
+    #[inline]
+    fn enter(&self, span: &Id) {
+        self.subscriber.enter(span)
+    }
+
+    #[inline]
+    fn exit(&self, span: &Id) {
+        self.subscriber.exit(span)
+    }
+
+    #[inline]
+    fn current_span(&self) -> span::Current {
+        self.subscriber.current_span()
+    }
+
+    #[inline]
+    fn clone_span(&self, id: &Id) -> Id {
+        self.subscriber.clone_span(id)
+    }
+
+    #[inline]
+    fn try_close(&self, id: Id) -> bool {
+        self.subscriber.try_close(id)
+    }
+
+    #[inline]
+    fn register_callsite(&self, meta: &'static Metadata<'static>) -> Interest {
+        self.subscriber.register_callsite(meta)
+    }
+
+    #[inline]
+    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+        self.subscriber.max_level_hint()
+    }
+
+    #[inline]
+    unsafe fn downcast_raw(&self, id: std::any::TypeId) -> Option<*const ()> {
+        self.subscriber.downcast_raw(id)
     }
 }

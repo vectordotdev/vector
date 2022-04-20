@@ -9,8 +9,7 @@ use crate::{
     event::Event,
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    trace::{self, TraceSubscription},
-    SourceSender,
+    trace, SourceSender,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -36,15 +35,8 @@ impl SourceConfig for InternalLogsConfig {
             .unwrap_or_else(|| log_schema().host_key())
             .to_owned();
         let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
-        let subscription = trace::subscribe();
 
-        Ok(Box::pin(run(
-            host_key,
-            pid_key,
-            subscription,
-            cx.out,
-            cx.shutdown,
-        )))
+        Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -63,18 +55,20 @@ impl SourceConfig for InternalLogsConfig {
 async fn run(
     host_key: String,
     pid_key: String,
-    mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
+    let subscription = trace::subscribe();
+
     // chain the logs emitted before the source started first
-    let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+    let mut rx = stream::iter(subscription.buffer)
         .map(Ok)
-        .chain(subscription.into_stream())
+        .chain(tokio_stream::wrappers::BroadcastStream::new(
+            subscription.receiver,
+        ))
         .filter_map(|log| future::ready(log.ok()))
         .take_until(shutdown);
 
