@@ -224,14 +224,25 @@ type = "add_fields"
 [transforms.add_host.fields]
 host = "${HOSTNAME}" # or "$HOSTNAME"
 environment = "${ENV:-development}" # default value when not present
+tenant = "${TENANT:?tenant must be supplied}" # required environment variable
 ```
 
 #### Default values
 
-Default values can be supplied using `:-` syntax:
+Default values can be supplied using `:-` or `-` syntax:
 
 ```toml
-option = "${ENV_VAR:-default}"
+option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+option = "${ENV_VAR-default}" # default value only if variable is unset
+```
+
+#### Required variables
+
+Environment variables that are required can be specified using `:?` or `?` syntax:
+
+```toml
+option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 ```
 
 #### Escaping

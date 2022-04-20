@@ -3,8 +3,6 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use std::net::SocketAddr;
-
 use codecs::NewlineDelimitedDecoderConfig;
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +43,7 @@ impl SocketConfig {
         tcp_config.into()
     }
 
-    pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
+    pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
 }
@@ -126,6 +124,7 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
+                    config.port_key().clone(),
                     config.receive_buffer_bytes(),
                     decoder,
                     cx.shutdown,
@@ -222,7 +221,7 @@ mod test {
         thread,
     };
 
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
@@ -281,12 +280,16 @@ mod test {
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
-        send_lines(addr, vec!["test".to_owned()].into_iter())
+        let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
             .await
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[log_schema().host_key()],
+            addr.ip().to_string().into()
+        );
+        assert_eq!(event.as_log()["port"], addr.port().into());
 
         SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
@@ -530,12 +533,27 @@ mod test {
         // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
         // it down, exercising the logic we have to ensure timely shutdown even under load:
         let message = random_string(512);
-        let message_bytes = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone());
 
-        let sink_cx = SinkContext::new_test();
-        let encoder = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::from_address(addr.to_string());
-        let (sink, _healthcheck) = sink_config.build(sink_cx, encoder).unwrap();
+        let cx = SinkContext::new_test();
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = codecs::encoding::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
+                Ok(())
+            }
+        }
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
+            bytes: message_bytes,
+        };
+        let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat(())
@@ -707,6 +725,7 @@ mod test {
             events[0].as_log()[log_schema().host_key()],
             from.ip().to_string().into()
         );
+        assert_eq!(events[0].as_log()["port"], from.port().into());
     }
 
     #[tokio::test]

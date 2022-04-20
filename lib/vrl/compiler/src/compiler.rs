@@ -32,11 +32,20 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// An intenal function used by `compile_for_repl`.
+    ///
+    /// This should only be used for its intended purpose.
+    pub(super) fn new_with_local_state(fns: &'a [Box<dyn Function>], local: LocalEnv) -> Self {
+        let mut compiler = Self::new(fns);
+        compiler.local = local;
+        compiler
+    }
+
     pub(super) fn compile(
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<Program, Errors> {
+    ) -> Result<(Program, LocalEnv), Errors> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
@@ -47,11 +56,13 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        Ok(Program {
+        let program = Program {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-        })
+        };
+
+        Ok((program, self.local))
     }
 
     fn compile_root_exprs(

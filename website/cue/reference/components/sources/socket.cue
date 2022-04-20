@@ -67,12 +67,23 @@ components: sources: socket: {
 			category:    "Context"
 			common:      false
 			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
+				The key name added to each event representing the peer host. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
 			type: string: {
 				default: "host"
+			}
+		}
+		port_key: {
+			category: "Context"
+			common:   true
+			description: """
+				The key name added to each event representing the peer source port. If empty, this context is not added.
+				"""
+			required: false
+			type: string: {
+				default: null
 			}
 		}
 		max_length: {
@@ -145,9 +156,25 @@ components: sources: socket: {
 	output: logs: line: {
 		description: "A single socket event."
 		fields: {
-			host:      fields._local_host
+			host: {
+				description: "The peer host IP address."
+				required:    true
+				type: string: {
+					examples: ["129.21.31.122"]
+				}
+			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			port: {
+				description: "The peer source port."
+				required:    false
+				common:      true
+				type: uint: {
+					default: null
+					unit:    null
+					examples: [2838]
+				}
+			}
 		}
 	}
 

@@ -30,7 +30,7 @@ use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
-pub type Result = std::result::Result<Program, compiler::Errors>;
+pub type Result<T = Program> = std::result::Result<T, compiler::Errors>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
@@ -77,6 +77,15 @@ pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
     compile_with_state(ast, fns, &mut external)
 }
 
+pub fn compile_for_repl(
+    ast: parser::Program,
+    fns: &[Box<dyn Function>],
+    local: state::LocalEnv,
+    external: &mut ExternalEnv,
+) -> Result<(Program, state::LocalEnv)> {
+    compiler::Compiler::new_with_local_state(fns, local).compile(ast, external)
+}
+
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]
 /// object, allowing running multiple successive programs based on each others
 /// state.
@@ -89,7 +98,9 @@ pub fn compile_with_state(
     fns: &[Box<dyn Function>],
     state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns).compile(ast, state)
+    compiler::Compiler::new(fns)
+        .compile(ast, state)
+        .map(|(program, _)| program)
 }
 
 /// re-export of commonly used parser types.
