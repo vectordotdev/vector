@@ -13,8 +13,8 @@ impl TemplateString {
             .iter()
             .map(|node| -> Expr {
                 match node {
-                    StringSegment::Literal(s) => {
-                        Expr::Literal(Node::new(diagnostic::Span::default(), RawString(s.clone())))
+                    StringSegment::Literal(s, span) => {
+                        Expr::Literal(Node::new(*span, RawString(s.clone())))
                     }
                     StringSegment::Template(s, span) => {
                         Expr::Variable(Node::new(*span, Ident::new(s)))
@@ -44,7 +44,7 @@ impl TemplateString {
     /// None as we will need to rewrite it into an expression.
     pub fn literal_string(&self) -> Option<String> {
         match self.0.as_slice() {
-            [StringSegment::Literal(s)] => Some(s.clone()),
+            [StringSegment::Literal(s, _)] => Some(s.clone()),
             _ => None,
         }
     }
@@ -62,14 +62,14 @@ impl fmt::Display for TemplateString {
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Hash)]
 pub enum StringSegment {
-    Literal(String),
+    Literal(String, Span),
     Template(String, Span),
 }
 
 impl fmt::Display for StringSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StringSegment::Literal(s) => write!(f, "{}", s),
+            StringSegment::Literal(s, _) => write!(f, "{}", s),
             StringSegment::Template(s, _) => write!(f, "{}", s),
         }
     }

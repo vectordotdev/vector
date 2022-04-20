@@ -465,7 +465,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Template(
                             seg.trim().to_string(),
-                            Span::new(span.start() + pos - seg.len() - 1, span.start() + pos + 3),
+                            Span::new(span.start() + pos - seg.len() - 1, span.start() + pos + 2),
                         ));
                     }
                     template = false;
@@ -491,7 +491,10 @@ impl StringLiteral<&str> {
                     // Handle start of template.
                     if !current.is_empty() {
                         let seg = std::mem::take(&mut current);
-                        segments.push(StringSegment::Literal(unescape_string_literal(&seg)));
+                        segments.push(StringSegment::Literal(
+                            unescape_string_literal(&seg),
+                            Span::new(span.start() + pos - seg.len(), span.start() + pos),
+                        ));
                     }
                     template = true;
                     pos += 2;
@@ -504,7 +507,10 @@ impl StringLiteral<&str> {
         }
 
         if !template && !current.is_empty() {
-            segments.push(StringSegment::Literal(unescape_string_literal(&current)));
+            segments.push(StringSegment::Literal(
+                unescape_string_literal(&current),
+                Span::new(span.start() + pos - current.len(), span.end()),
+            ));
         }
 
         TemplateString(segments)
@@ -1326,7 +1332,7 @@ mod test {
                 (r#"                          ~~~~~~"#, L(S(r#"\"\""#))),
             ],
         );
-        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string())]), StringLiteral(r#"\"\""#).template(Span::default()));
+        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string(), Span::new(0, 4))]), StringLiteral(r#"\"\""#).template(Span::new(0, 4)));
     }
 
     #[test]
@@ -1336,8 +1342,8 @@ mod test {
                                   bar""#);
 
         match lexer.next() {
-            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string())]), s.template(Span::default())),
-            _ => panic!("Not a string literal"),
+            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string(), Span::new(1, 8))]), s.template(Span::new(1, 8))),
+           _ => panic!("Not a string literal"),
         }
     }
 
@@ -2008,9 +2014,9 @@ mod test {
         let string = StringLiteral("zork {{ zonk }} zoog");
         assert_eq!(
             TemplateString(vec![
-                StringSegment::Literal("zork ".to_string()),
-                StringSegment::Template("zonk".to_string(), Span::new(6, 16)),
-                StringSegment::Literal(" zoog".to_string()),
+                StringSegment::Literal("zork ".to_string(), Span::new(0, 5)),
+                StringSegment::Template("zonk".to_string(), Span::new(6, 15)),
+                StringSegment::Literal(" zoog".to_string(), Span::new(15, 20)),
             ]),
             string.template(Span::new(0, 20))
         );
