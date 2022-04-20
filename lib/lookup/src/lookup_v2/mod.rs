@@ -38,8 +38,8 @@ impl Serialize for OwnedPath {
                             .chars()
                             .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
                         if needs_quotes {
-                            let mut string = String::from(r#".""#);
-                            string.reserve(field.as_bytes().len() + 1);
+                            let mut string = String::with_capacity(field.as_bytes().len() + 3);
+                            string.push_str(r#".""#);
                             for c in field.chars() {
                                 if matches!(c, '"' | '\\') {
                                     string.push('\\');
