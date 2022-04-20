@@ -75,7 +75,6 @@ impl AwsAuthentication {
 async fn default_credentials_provider(region: Option<Region>) -> SharedCredentialsProvider {
     let mut credentials = DefaultCredentialsChain::builder();
 
-    dbg!(&region);
     if let Some(region) = region {
         credentials = credentials.region(region)
     }
