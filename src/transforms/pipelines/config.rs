@@ -149,7 +149,12 @@ impl EventTypeConfig {
             let pipeline_name = name.join(pipeline_index);
             let topology = pipeline_config
                 .expand(&pipeline_name, &next_inputs)?
-                .ok_or_else(|| format!("Unable to expand pipeline {}", pipeline_index))?;
+                .ok_or_else(|| {
+                    format!(
+                        "Unable to expand pipeline {:?} ({:?})",
+                        pipeline_config.name, pipeline_name
+                    )
+                })?;
             result.inner.extend(topology.inner.into_iter());
             result.outputs = topology.outputs;
             next_inputs = result.outputs();
