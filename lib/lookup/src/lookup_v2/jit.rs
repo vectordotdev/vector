@@ -48,7 +48,6 @@ enum JitState {
     Index { value: usize },
     Field { start: usize },
     Quote { start: usize },
-    RequiredQuote { start: usize },
     EscapedQuote,
     End,
 }
@@ -65,7 +64,6 @@ impl<'a> Iterator for JitLookup<'a> {
                         | JitState::IndexStart
                         | JitState::Index { .. }
                         | JitState::Quote { .. }
-                        | JitState::RequiredQuote { .. }
                         | JitState::EscapedQuote { .. } => Some(BorrowedSegment::Invalid),
 
                         JitState::Continue | JitState::Dot | JitState::End => None,
@@ -128,31 +126,11 @@ impl<'a> Iterator for JitLookup<'a> {
                                 self.chars = self.path.char_indices();
                                 (None, JitState::EscapedQuote)
                             }
-                            'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
-                                (None, JitState::Quote { start })
-                            }
-                            _ => (None, JitState::RequiredQuote { start }),
-                        },
-                        JitState::RequiredQuote { start } => match c {
-                            '\"' => (
-                                Some(Some(BorrowedSegment::QuotedField(Cow::Borrowed(
-                                    &self.path[start..index],
-                                )))),
-                                JitState::Continue,
-                            ),
-                            '\\' => {
-                                // Character escaping requires copying chars to a new String.
-                                // State is reverted back to the start of the quote to start over
-                                // with the copy method (which is slower)
-                                self.path = &self.path[start..];
-                                self.chars = self.path.char_indices();
-                                (None, JitState::EscapedQuote)
-                            }
-                            _ => (None, JitState::RequiredQuote { start }),
+                            _ => (None, JitState::Quote { start }),
                         },
                         JitState::EscapedQuote => match c {
                             '\"' => (
-                                (Some(Some(BorrowedSegment::QuotedField(
+                                (Some(Some(BorrowedSegment::Field(
                                     std::mem::take(&mut self.escape_buffer).into(),
                                 )))),
                                 JitState::Continue,
@@ -229,15 +207,11 @@ mod test {
             ("f.", vec![BorrowedSegment::Field(Cow::from("f"))]),
             ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
             (
-                "\"no_quotes_needed\"",
-                vec![BorrowedSegment::Field(Cow::from("no_quotes_needed"))],
-            ),
-            (
                 "ec2.metadata.\"availability-zone\"",
                 vec![
                     BorrowedSegment::Field(Cow::from("ec2")),
                     BorrowedSegment::Field(Cow::from("metadata")),
-                    BorrowedSegment::QuotedField(Cow::from("availability-zone")),
+                    BorrowedSegment::Field(Cow::from("availability-zone")),
                 ],
             ),
             (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
@@ -255,7 +229,7 @@ mod test {
             ("foo$", vec![BorrowedSegment::Invalid]),
             (
                 "\"$peci@l chars\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("$peci@l chars"))],
+                vec![BorrowedSegment::Field(Cow::from("$peci@l chars"))],
             ),
             (
                 ".foo.foo bar",
@@ -268,7 +242,7 @@ mod test {
                 ".foo.\"foo bar\".bar",
                 vec![
                     BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::QuotedField(Cow::from("foo bar")),
+                    BorrowedSegment::Field(Cow::from("foo bar")),
                     BorrowedSegment::Field(Cow::from("bar")),
                 ],
             ),
@@ -296,29 +270,26 @@ mod test {
             ("[-42]foo", vec![BorrowedSegment::Invalid]),
             (
                 ".\"[42]. {}-_\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("[42]. {}-_"))],
+                vec![BorrowedSegment::Field(Cow::from("[42]. {}-_"))],
             ),
             (
                 "\"a\\\"a\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("a\"a"))],
+                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
             ),
             (
                 ".\"a\\\"a\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("a\"a"))],
+                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
             ),
             (
                 ".foo.\"a\\\"a\".\"b\\\\b\".bar",
                 vec![
                     BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::QuotedField(Cow::from("a\"a")),
-                    BorrowedSegment::QuotedField(Cow::from("b\\b")),
+                    BorrowedSegment::Field(Cow::from("a\"a")),
+                    BorrowedSegment::Field(Cow::from("b\\b")),
                     BorrowedSegment::Field(Cow::from("bar")),
                 ],
             ),
-            (
-                r#"."🤖""#,
-                vec![BorrowedSegment::QuotedField(Cow::from("🤖"))],
-            ),
+            (r#"."🤖""#, vec![BorrowedSegment::Field(Cow::from("🤖"))]),
         ];
 
         for (path, expected) in test_cases {

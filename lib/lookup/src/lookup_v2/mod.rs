@@ -1,6 +1,8 @@
 mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::Display;
@@ -165,7 +167,6 @@ impl<'a> Path<'a> for &'a str {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
-    QuotedField(String),
     Field(String),
     Index(usize),
     Invalid,
@@ -192,7 +193,6 @@ impl OwnedSegment {
 impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     fn from(segment: &'b OwnedSegment) -> Self {
         match segment {
-            OwnedSegment::QuotedField(value) => BorrowedSegment::QuotedField(value.as_str().into()),
             OwnedSegment::Field(value) => BorrowedSegment::Field(value.as_str().into()),
             OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
             OwnedSegment::Invalid => BorrowedSegment::Invalid,
@@ -203,19 +203,24 @@ impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
 impl Display for OwnedSegment {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            OwnedSegment::QuotedField(field) => {
-                let mut string = String::from('"');
-                string.reserve(field.as_bytes().len());
-                for c in field.chars() {
-                    if matches!(c, '"' | '\\') {
-                        string.push('\\');
+            OwnedSegment::Field(field) => {
+                static UNESCAPED_PATTERN: Lazy<Regex> =
+                    Lazy::new(|| Regex::new(r"^[A-Za-z_0-9@]*$").unwrap());
+                if !UNESCAPED_PATTERN.is_match(field) {
+                    let mut string = String::from('"');
+                    string.reserve(field.as_bytes().len());
+                    for c in field.chars() {
+                        if matches!(c, '"' | '\\') {
+                            string.push('\\');
+                        }
+                        string.push(c);
                     }
-                    string.push(c);
+                    string.push('"');
+                    write!(formatter, ".{}", string)
+                } else {
+                    write!(formatter, ".{}", field)
                 }
-                string.push('"');
-                write!(formatter, ".{}", string)
             }
-            OwnedSegment::Field(field) => write!(formatter, ".{}", field),
             OwnedSegment::Index(index) => write!(formatter, "[{}]", index),
             OwnedSegment::Invalid => write!(formatter, ".<invalid>"),
         }
@@ -224,7 +229,6 @@ impl Display for OwnedSegment {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {
-    QuotedField(Cow<'a, str>),
     Field(Cow<'a, str>),
     Index(usize),
     Invalid,
@@ -251,7 +255,6 @@ impl BorrowedSegment<'_> {
 impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
     fn from(x: BorrowedSegment<'a>) -> Self {
         match x {
-            BorrowedSegment::QuotedField(value) => OwnedSegment::QuotedField((*value).to_owned()),
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
@@ -276,7 +279,6 @@ mod test {
             (".f", ".f"),
             (".[", ".<invalid>"),
             ("foo", ".foo"),
-            (r#""no_quotes_needed""#, ".no_quotes_needed"),
             (
                 r#"ec2.metadata."availability-zone""#,
                 r#".ec2.metadata."availability-zone""#,
