@@ -49,7 +49,8 @@ impl Serialize for OwnedPath {
                             string.push('"');
                             string
                         } else {
-                            let mut string = String::from('.');
+                            let mut string = String::with_capacity(field.as_bytes().len() + 1);
+                            string.push('.');
                             string.push_str(field);
                             string
                         }
