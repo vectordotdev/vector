@@ -16,6 +16,7 @@ use crate::{
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
+    sources::util::change_socket_permissions,
     sources::Source,
     SourceSender,
 };
@@ -26,16 +27,19 @@ use crate::{
 /// syslog source).
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
+    socket_file_mode: Option<u32>,
     max_length: usize,
     decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
-    Box::pin(async move {
-        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
-        info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
+) -> crate::Result<Source> {
+    let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+    info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 
+    change_socket_permissions(&listen_path, socket_file_mode)?;
+
+    Ok(Box::pin(async move {
         let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
 
         // Delete socket file.
@@ -47,7 +51,7 @@ pub fn build_unix_datagram_source(
         }
 
         result
-    })
+    }))
 }
 
 async fn listen(

@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -331,7 +331,8 @@ pub fn file_source(
     let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            checkpoints.update(entry.file_id, entry.offset)
+            let checkpoints = Arc::clone(&checkpoints);
+            async move { checkpoints.update(entry.file_id, entry.offset) }
         })
     });
 

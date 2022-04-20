@@ -11,41 +11,36 @@ pub enum NatsConfigError {
     TlsMissingKey,
     #[snafu(display("NATS TLS Config Error: missing cert"))]
     TlsMissingCert,
-    #[snafu(display("Missing configuration for auth strategy: {}", strategy))]
-    AuthStrategyMissingConfiguration { strategy: NatsAuthStrategy },
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-#[derivative(Default)]
-pub enum NatsAuthStrategy {
-    #[derivative(Default)]
-    UserPassword,
-    Token,
-    CredentialsFile,
-    NKey,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "strategy")]
+pub(crate) enum NatsAuthConfig {
+    UserPassword {
+        user_password: NatsAuthUserPassword,
+    },
+    Token {
+        token: NatsAuthToken,
+    },
+    CredentialsFile {
+        credentials_file: NatsAuthCredentialsFile,
+    },
+    Nkey {
+        nkey: NatsAuthNKey,
+    },
 }
 
-impl std::fmt::Display for NatsAuthStrategy {
+impl std::fmt::Display for NatsAuthConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use NatsAuthStrategy::*;
-        match self {
-            UserPassword => write!(f, "user_password"),
-            Token => write!(f, "token"),
-            CredentialsFile => write!(f, "credentials_file"),
-            NKey => write!(f, "nkey"),
-        }
+        use NatsAuthConfig::*;
+        let word = match self {
+            UserPassword { .. } => "user_password",
+            Token { .. } => "token",
+            CredentialsFile { .. } => "credentials_file",
+            Nkey { .. } => "nkey",
+        };
+        write!(f, "{}", word)
     }
-}
-
-#[derive(Default, Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub(crate) struct NatsAuthConfig {
-    pub(crate) strategy: NatsAuthStrategy,
-    pub(crate) user_password: Option<NatsAuthUserPassword>,
-    pub(crate) token: Option<NatsAuthToken>,
-    pub(crate) credentials_file: Option<NatsAuthCredentialsFile>,
-    pub(crate) nkey: Option<NatsAuthNKey>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -76,47 +71,24 @@ pub(crate) struct NatsAuthNKey {
 
 impl NatsAuthConfig {
     pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
-        match self.strategy {
-            NatsAuthStrategy::UserPassword => self
-                .user_password
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_user_pass(&config.user, &config.password))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
+        match self {
+            NatsAuthConfig::UserPassword { user_password } => Ok(
+                nats::asynk::Options::with_user_pass(&user_password.user, &user_password.password),
+            ),
+            NatsAuthConfig::CredentialsFile { credentials_file } => Ok(
+                nats::asynk::Options::with_credentials(&credentials_file.path),
+            ),
+            NatsAuthConfig::Nkey { nkey } => nkeys::KeyPair::from_seed(&nkey.seed)
+                .context(AuthConfigSnafu)
+                .map(|kp| {
+                    // The following unwrap is safe because the only way the sign method can fail is if
+                    // keypair does not contain a seed. We are constructing the keypair from a seed in
+                    // the preceding line.
+                    nats::asynk::Options::with_nkey(&nkey.nkey, move |nonce| {
+                        kp.sign(nonce).unwrap()
+                    })
                 }),
-            NatsAuthStrategy::CredentialsFile => self
-                .credentials_file
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_credentials(&config.path))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                }),
-            NatsAuthStrategy::NKey => self
-                .nkey
-                .as_ref()
-                .map(|config| {
-                    nkeys::KeyPair::from_seed(&config.seed)
-                        .context(AuthConfigSnafu)
-                        .map(|kp| {
-                            // The following unwrap is safe because the only way the sign method can fail is if
-                            // keypair does not contain a seed. We are constructing the keypair from a seed in
-                            // the preceding line.
-                            nats::asynk::Options::with_nkey(&config.nkey, move |nonce| {
-                                kp.sign(nonce).unwrap()
-                            })
-                        })
-                })
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                })
-                .and_then(std::convert::identity),
-            NatsAuthStrategy::Token => self
-                .token
-                .as_ref()
-                .map(|config| nats::asynk::Options::with_token(&config.value))
-                .ok_or(NatsConfigError::AuthStrategyMissingConfiguration {
-                    strategy: self.strategy,
-                }),
+            NatsAuthConfig::Token { token } => Ok(nats::asynk::Options::with_token(&token.value)),
         }
     }
 }
@@ -159,5 +131,150 @@ pub(crate) fn from_tls_auth_config(
             };
             Ok(nats_options)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_auth(s: &str) -> Result<nats::asynk::Options, crate::Error> {
+        toml::from_str(s)
+            .map_err(Into::into)
+            .and_then(|config: NatsAuthConfig| config.to_nats_options().map_err(Into::into))
+    }
+
+    #[test]
+    fn auth_user_password_ok() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.user = "username"
+            user_password.password = "password"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_user_password_missing_user() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.password = "password"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_user_password_missing_password() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            user_password.user = "username"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_user_password_missing_all() {
+        parse_auth(
+            r#"
+            strategy = "user_password"
+            token.value = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_token_ok() {
+        parse_auth(
+            r#"
+            strategy = "token"
+            token.value = "token"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_token_missing() {
+        parse_auth(
+            r#"
+            strategy = "token"
+            user_password.user = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_credentials_file_ok() {
+        parse_auth(
+            r#"
+            strategy = "credentials_file"
+            credentials_file.path = "/path/to/nowhere"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_credentials_file_missing() {
+        parse_auth(
+            r#"
+            strategy = "credentials_file"
+            token.value = "foobar"
+            "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_ok() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
+            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn auth_nkey_missing_nkey() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_missing_seed() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
+        "#,
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn auth_nkey_missing_both() {
+        parse_auth(
+            r#"
+            strategy = "nkey"
+            user_password.user = "foobar"
+            "#,
+        )
+        .unwrap_err();
     }
 }
