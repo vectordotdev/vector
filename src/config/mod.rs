@@ -1105,16 +1105,16 @@ mod pipelines_tests {
                   inputs = ["in"]
                   type = "pipelines"
 
-                  [transforms.processing.logs.pipelines.foo]
+                  [[transforms.processing.logs]]
                     name = "foo"
 
-                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                    [[transforms.processing.logs.transforms]]
                       type = "pipelines"
 
-                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                      [[transforms.processing.logs.transforms.logs]]
                         name = "bar"
 
-                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                          [[transforms.processing.logs.transforms.logs.transforms]]
                             type = "filter"
                             condition = ""
 
