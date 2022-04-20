@@ -132,11 +132,14 @@ impl<'a> Compiler<'a> {
 
         let literal = match lit {
             String(template) => {
-                if let Some(v) = template.literal_string() {
-                    Ok(Literal::String(Bytes::from(v)))
+                if let Some(v) = template.as_literal_string() {
+                    Ok(Literal::String(Bytes::from(v.to_string())))
                 } else {
                     // Rewrite the template into an expression and compile that block.
-                    return self.compile_expr(Node::new(span, template.rewrite()), external);
+                    return self.compile_expr(
+                        Node::new(span, template.rewrite_to_concatenated_strings()),
+                        external,
+                    );
                 }
             }
             RawString(v) => Ok(Literal::String(Bytes::from(v))),

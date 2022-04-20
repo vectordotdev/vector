@@ -448,7 +448,7 @@ pub struct RawStringLiteral<S>(pub S);
 impl StringLiteral<&str> {
     /// Takes the string and splits it into segments of literals and templates.
     /// A templated section is delimited by `{{..}}`. ``{{` can be escaped using
-    /// `/{{.../}}`.
+    /// `\{{...\}}`.
     pub fn template(&self, span: Span) -> TemplateString {
         let mut segments = Vec::new();
 
@@ -465,7 +465,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Template(
                             seg.trim().to_string(),
-                            Span::new(span.start() + pos - seg.len() - 1, span.start() + pos + 2),
+                            Span::new(pos - seg.len() - 1, pos + 3) + span.start(),
                         ));
                     }
                     template = false;
@@ -483,7 +483,7 @@ impl StringLiteral<&str> {
                     && chars.get(pos + 1) == Some(&'}')
                     && chars.get(pos + 2) == Some(&'}') =>
                 {
-                    // Handle close escape
+                    // Handle close escape `\}}`
                     current.push_str(r#"}}"#);
                     pos += 3;
                 }
@@ -493,7 +493,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Literal(
                             unescape_string_literal(&seg),
-                            Span::new(span.start() + pos - seg.len(), span.start() + pos),
+                            Span::new(pos - seg.len() + 1, pos + 1) + span.start(),
                         ));
                     }
                     template = true;
@@ -509,7 +509,7 @@ impl StringLiteral<&str> {
         if !template && !current.is_empty() {
             segments.push(StringSegment::Literal(
                 unescape_string_literal(&current),
-                Span::new(span.start() + pos - current.len(), span.end()),
+                Span::new(pos - current.len() + 1, pos + 1) + span.start(),
             ));
         }
 
@@ -1332,7 +1332,7 @@ mod test {
                 (r#"                          ~~~~~~"#, L(S(r#"\"\""#))),
             ],
         );
-        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string(), Span::new(0, 4))]), StringLiteral(r#"\"\""#).template(Span::new(0, 4)));
+        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string(), Span::new(1, 5))]), StringLiteral(r#"\"\""#).template(Span::new(0, 6)));
     }
 
     #[test]
@@ -1342,7 +1342,7 @@ mod test {
                                   bar""#);
 
         match lexer.next() {
-            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string(), Span::new(1, 8))]), s.template(Span::new(1, 8))),
+            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string(), Span::new(1, 44))]), s.template(Span::new(0, 44))),
            _ => panic!("Not a string literal"),
         }
     }
@@ -2014,11 +2014,11 @@ mod test {
         let string = StringLiteral("zork {{ zonk }} zoog");
         assert_eq!(
             TemplateString(vec![
-                StringSegment::Literal("zork ".to_string(), Span::new(0, 5)),
-                StringSegment::Template("zonk".to_string(), Span::new(6, 15)),
-                StringSegment::Literal(" zoog".to_string(), Span::new(15, 20)),
+                StringSegment::Literal("zork ".to_string(), Span::new(1, 6)),
+                StringSegment::Template("zonk".to_string(), Span::new(6, 16)),
+                StringSegment::Literal(" zoog".to_string(), Span::new(16, 21)),
             ]),
-            string.template(Span::new(0, 20))
+            string.template(Span::new(0, 22))
         );
     }
 }

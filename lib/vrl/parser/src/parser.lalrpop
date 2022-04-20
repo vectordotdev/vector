@@ -469,6 +469,7 @@ Object: Object = {
     },
 };
 
+#[inline]
 ObjectKey: String = "string literal" => <>.unescape();
 
 // -----------------------------------------------------------------------------
