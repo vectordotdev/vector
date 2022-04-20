@@ -1,8 +1,11 @@
 mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
+use std::fmt::Display;
 use std::iter::Cloned;
 use std::slice::Iter;
 
@@ -22,12 +25,11 @@ impl<'de> Deserialize<'de> for OwnedPath {
 }
 
 impl Serialize for OwnedPath {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        // TODO: Implement canonical way to serialize segments.
-        todo!()
+        serializer.serialize_str(&format!("{}", self))
     }
 }
 
@@ -64,6 +66,18 @@ impl OwnedPath {
 impl From<Vec<OwnedSegment>> for OwnedPath {
     fn from(segments: Vec<OwnedSegment>) -> Self {
         Self { segments }
+    }
+}
+
+impl Display for OwnedPath {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.segments.is_empty() {
+            write!(formatter, ".")
+        } else {
+            self.segments
+                .iter()
+                .try_for_each(|segment| segment.fmt(formatter))
+        }
     }
 }
 
@@ -186,6 +200,33 @@ impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     }
 }
 
+impl Display for OwnedSegment {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            OwnedSegment::Field(field) => {
+                static UNESCAPED_PATTERN: Lazy<Regex> =
+                    Lazy::new(|| Regex::new(r"^[A-Za-z_0-9@]*$").unwrap());
+                if !UNESCAPED_PATTERN.is_match(field) {
+                    let mut string = String::from('"');
+                    string.reserve(field.as_bytes().len());
+                    for c in field.chars() {
+                        if matches!(c, '"' | '\\') {
+                            string.push('\\');
+                        }
+                        string.push(c);
+                    }
+                    string.push('"');
+                    write!(formatter, ".{}", string)
+                } else {
+                    write!(formatter, ".{}", field)
+                }
+            }
+            OwnedSegment::Index(index) => write!(formatter, "[{}]", index),
+            OwnedSegment::Invalid => write!(formatter, ".<invalid>"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
@@ -217,6 +258,60 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn owned_path_display() {
+        let test_cases = [
+            ("", ".<invalid>"),
+            (".", "."),
+            ("]", ".<invalid>"),
+            ("]foo", ".<invalid>"),
+            ("..", ".<invalid>"),
+            ("...", ".<invalid>"),
+            ("f", ".f"),
+            (".f", ".f"),
+            (".[", ".<invalid>"),
+            ("f.", ".f"), // TODO: Review, shouldn't this be invalid?
+            ("foo", ".foo"),
+            (
+                r#"ec2.metadata."availability-zone""#,
+                r#".ec2.metadata."availability-zone""#,
+            ),
+            (".foo", ".foo"),
+            (".@timestamp", ".@timestamp"),
+            ("foo[", ".foo.<invalid>"),
+            ("foo$", ".<invalid>"),
+            (r#""$peci@l chars""#, r#"."$peci@l chars""#),
+            (".foo.foo bar", ".foo.<invalid>"),
+            (r#".foo."foo bar".bar"#, r#".foo."foo bar".bar"#),
+            ("[1]", "[1]"),
+            ("[42]", "[42]"),
+            (".[42]", ".<invalid>"),
+            ("[42].foo", "[42].foo"),
+            ("[42]foo", "[42].foo"), // TODO: Review, shouldn't this be invalid?
+            ("[-1]", ".<invalid>"),
+            ("[-42]", ".<invalid>"),
+            (".[-42]", ".<invalid>"),
+            ("[-42].foo", ".<invalid>"),
+            ("[-42]foo", ".<invalid>"),
+            (r#"."[42]. {}-_""#, r#"."[42]. {}-_""#),
+            (r#""a\"a""#, r#"."a\"a""#),
+            (r#"."a\"a""#, r#"."a\"a""#),
+            (r#".foo."a\"a"."b\\b".bar"#, r#".foo."a\"a"."b\\b".bar"#),
+            (".<invalid>", ".<invalid>"),
+            (r#"."🤖""#, r#"."🤖""#),
+        ];
+
+        for (path, expected) in test_cases {
+            let path = parse_path(path);
+            assert_eq!(format!("{}", path), expected);
         }
     }
 }
