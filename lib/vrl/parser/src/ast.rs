@@ -759,6 +759,7 @@ impl FromStr for Opcode {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Assignment {
     Single {
         target: Node<AssignmentTarget>,
