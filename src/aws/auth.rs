@@ -1,5 +1,7 @@
-use aws_config::{default_provider::credentials::default_provider, sts::AssumeRoleProviderBuilder};
-use aws_types::{credentials::SharedCredentialsProvider, Credentials};
+use aws_config::{
+    default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
+};
+use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for configuring authentication strategy for AWS.
@@ -28,7 +30,10 @@ pub enum AwsAuthentication {
 }
 
 impl AwsAuthentication {
-    pub async fn credentials_provider(&self) -> crate::Result<SharedCredentialsProvider> {
+    pub async fn credentials_provider(
+        &self,
+        region: Option<Region>,
+    ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::Static {
                 access_key_id,
@@ -41,12 +46,19 @@ impl AwsAuthentication {
             AwsAuthentication::File { .. } => {
                 Err("Overriding the credentials file is not supported.".into())
             }
-            AwsAuthentication::Role { assume_role } => Ok(SharedCredentialsProvider::new(
-                AssumeRoleProviderBuilder::new(assume_role)
-                    .build(default_credentials_provider().await),
-            )),
+            AwsAuthentication::Role { assume_role } => {
+                let mut credentials = AssumeRoleProviderBuilder::new(assume_role);
+
+                if let Some(ref region) = region {
+                    credentials = credentials.region(region.clone())
+                }
+
+                Ok(SharedCredentialsProvider::new(
+                    credentials.build(default_credentials_provider(region).await),
+                ))
+            }
             AwsAuthentication::Default {} => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider().await,
+                default_credentials_provider(region).await,
             )),
         }
     }
@@ -60,8 +72,14 @@ impl AwsAuthentication {
     }
 }
 
-async fn default_credentials_provider() -> SharedCredentialsProvider {
-    SharedCredentialsProvider::new(default_provider().await)
+async fn default_credentials_provider(region: Option<Region>) -> SharedCredentialsProvider {
+    let mut credentials = DefaultCredentialsChain::builder();
+
+    if let Some(region) = region {
+        credentials = credentials.region(region)
+    }
+
+    SharedCredentialsProvider::new(credentials.build().await)
 }
 
 #[cfg(test)]
