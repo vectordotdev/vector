@@ -74,7 +74,11 @@ pub enum Error {
     Runtime(String),
 }
 
-pub fn tests() -> Vec<Test> {
+pub fn tests(ignore: bool) -> Vec<Test> {
+    if ignore {
+        return vec![];
+    }
+
     let dir = fs::canonicalize("../../../scripts").unwrap();
 
     let output = Command::new("bash")

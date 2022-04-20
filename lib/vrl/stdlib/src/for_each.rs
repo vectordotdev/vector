@@ -100,8 +100,25 @@ impl Function for ForEach {
             },
         };
 
+        let object_or_array = closure::Input {
+            parameter_keyword: "value",
+            kind: Kind::object(Collection::any()).or_array(Collection::any()),
+            variables: vec![
+                closure::Variable {
+                    kind: Kind::bytes().or_integer(),
+                },
+                closure::Variable { kind: Kind::any() },
+            ],
+            output: closure::Output::Any,
+            example: Example {
+                title: "iterate array",
+                source: r#"for_each([1, 2]) -> |key_or_index, value| { .foo = to_int!(.foo) + (int(key_or_index) ?? 0) + int!(value) }"#,
+                result: Ok("null"),
+            },
+        };
+
         Some(closure::Definition {
-            inputs: vec![object, array],
+            inputs: vec![object, array, object_or_array],
         })
     }
 
@@ -124,205 +141,31 @@ impl Expression for ForEachFn {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
         };
 
-        match self.value.resolve(ctx)? {
-            Value::Object(object) => {
-                let mut iter = ObjectIterator::new(object, recursive);
+        let value = self.value.resolve(ctx)?;
+        let top_level_kind = value.kind();
 
-                while let Some((key, value)) = iter.iter_mut() {
-                    // We do not care about the result of the closure, as we
-                    // don't need to mutate any state, and the function itself
-                    // always returns `null`.
-                    let _ = self
-                        .closure
-                        .key_value(key.clone(), value.clone())
-                        .resolve(ctx)?;
+        let mut iter = value.into_iter(recursive);
+
+        for item in iter.by_ref() {
+            match item {
+                IterItem::KeyValue(key, value) if top_level_kind.is_object() => {
+                    self.closure.run_key_value(ctx, key, value)?
                 }
 
-                Ok(Value::Null)
-            }
-            Value::Array(array) => {
-                let mut iter = ArrayIterator::new(array, recursive);
-
-                while let Some((index, value)) = iter.iter_mut() {
-                    // We do not care about the result of the closure, as we
-                    // don't need to mutate any state, and the function itself
-                    // always returns `null`.
-                    let _ = self
-                        .closure
-                        .index_value(index, value.clone())
-                        .resolve(ctx)?;
+                IterItem::IndexValue(index, value) if top_level_kind.is_array() => {
+                    self.closure.run_index_value(ctx, index, value)?
                 }
 
-                Ok(Value::Null)
-            }
-            _ => unreachable!("expected object or array"),
+                _ => {}
+            };
         }
+
+        Ok(Value::Null)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        // FIXME(Jean): fallibility of the function needs to take into account
-        // the fallibility of the closure block. But we should check this at the
-        // compiler-level, so that function implementors don't need to care
-        // about that.
-        TypeDef::null().infallible()
-    }
-}
+    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let fallible = self.closure.type_def(ctx).is_fallible();
 
-// --------------------------------------
-
-#[derive(Debug)]
-struct ObjectIterator {
-    entries: Vec<ObjectEntry>,
-    index: usize,
-}
-
-#[derive(Debug)]
-struct ObjectEntry {
-    key: String,
-    value: ObjectValue,
-}
-
-#[derive(Debug)]
-enum ObjectValue {
-    Value(Value),
-    Object {
-        value: Value,
-        iter: Box<ObjectIterator>,
-    },
-}
-
-impl ObjectValue {
-    fn into_value(self) -> Value {
-        match self {
-            Self::Value(value) => value,
-            Self::Object { value, .. } => value,
-        }
-    }
-}
-
-impl ObjectIterator {
-    fn new(object: BTreeMap<String, Value>, recursive: bool) -> Self {
-        let entries = object
-            .into_iter()
-            .map(|(key, value)| ObjectEntry {
-                key,
-                value: match value {
-                    Value::Object(object) if recursive => ObjectValue::Object {
-                        value: object.clone().into(),
-                        iter: Box::new(ObjectIterator::new(object, true)),
-                    },
-                    value => ObjectValue::Value(value),
-                },
-            })
-            .collect::<Vec<_>>();
-
-        Self { entries, index: 0 }
-    }
-
-    fn iter_mut(&mut self) -> Option<(&mut String, &mut Value)> {
-        let entry = self.entries.get_mut(self.index)?;
-        let value = match &mut entry.value {
-            ObjectValue::Value(value) => value,
-            ObjectValue::Object { value, iter } => {
-                while let Some(item) = iter.iter_mut() {
-                    return Some(item);
-                }
-
-                value
-            }
-        };
-
-        self.index += 1;
-        Some((&mut entry.key, value))
-    }
-}
-
-impl From<ObjectIterator> for Value {
-    fn from(iter: ObjectIterator) -> Self {
-        iter.entries
-            .into_iter()
-            .map(|entry| (entry.key, entry.value.into_value()))
-            .collect::<BTreeMap<_, _>>()
-            .into()
-    }
-}
-
-// --------------------------------------
-
-#[derive(Debug)]
-struct ArrayIterator {
-    entries: Vec<ArrayEntry>,
-    index: usize,
-}
-
-#[derive(Debug)]
-struct ArrayEntry {
-    index: usize,
-    value: ArrayValue,
-}
-
-#[derive(Debug)]
-enum ArrayValue {
-    Value(Value),
-    Array {
-        value: Value,
-        iter: Box<ArrayIterator>,
-    },
-}
-
-impl ArrayValue {
-    fn into_value(self) -> Value {
-        match self {
-            Self::Value(value) => value,
-            Self::Array { value, .. } => value,
-        }
-    }
-}
-
-impl ArrayIterator {
-    fn new(array: Vec<Value>, recursive: bool) -> Self {
-        let entries = array
-            .into_iter()
-            .enumerate()
-            .map(|(index, value)| ArrayEntry {
-                index,
-                value: match value {
-                    Value::Array(array) if recursive => ArrayValue::Array {
-                        value: array.clone().into(),
-                        iter: Box::new(ArrayIterator::new(array, true)),
-                    },
-                    value => ArrayValue::Value(value),
-                },
-            })
-            .collect::<Vec<_>>();
-
-        Self { entries, index: 0 }
-    }
-
-    fn iter_mut(&mut self) -> Option<(usize, &mut Value)> {
-        let entry = self.entries.get_mut(self.index)?;
-        let value = match &mut entry.value {
-            ArrayValue::Value(value) => value,
-            ArrayValue::Array { value, iter } => {
-                while let Some(item) = iter.iter_mut() {
-                    return Some(item);
-                }
-
-                value
-            }
-        };
-
-        self.index += 1;
-        Some((entry.index, value))
-    }
-}
-
-impl From<ArrayIterator> for Value {
-    fn from(iter: ArrayIterator) -> Self {
-        iter.entries
-            .into_iter()
-            .map(|entry| (entry.value.into_value()))
-            .collect::<Vec<_>>()
-            .into()
+        TypeDef::null().with_fallibility(fallible)
     }
 }

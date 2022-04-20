@@ -46,7 +46,6 @@ roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
 utf8-width = { version = "0.1.6", optional = true }
-thiserror = { version = "1", default-features = false, optional = true }
 
 # Cryptography
 aes = { version = "0.8.1", optional = true }
@@ -68,7 +67,6 @@ vector_common = { path = "../../vector-common", default-features = false, featur
 default = [
     "append",
     "array",
-    "map",
     "assert",
     "assert_eq",
     "boolean",
@@ -123,6 +121,8 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -199,7 +199,6 @@ default = [
 
 append = []
 array = []
-map = ["thiserror"]
 assert = []
 assert_eq = ["vector_common/conversion"]
 boolean = []
@@ -256,6 +255,8 @@ is_timestamp = ["chrono"]
 join = []
 length = []
 log = ["tracing"]
+map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]

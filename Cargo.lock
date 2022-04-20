@@ -9350,7 +9350,6 @@ dependencies = [
  "sha3",
  "strip-ansi-escapes",
  "syslog_loose",
- "thiserror",
  "tracing 0.1.33",
  "uaparser",
  "url",

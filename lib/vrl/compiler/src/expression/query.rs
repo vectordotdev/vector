@@ -1,7 +1,10 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind};
+use value::{
+    kind::{remove, Collection},
+    Kind,
+};
 
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
@@ -119,7 +122,7 @@ impl Expression for Query {
                 //
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
-                    return TypeDef::object(BTreeMap::default()).infallible();
+                    return TypeDef::object(Collection::any()).infallible();
                 }
 
                 match state.1.target() {

@@ -9,4 +9,4 @@ pub use kind::{Collection, Field, Index, Kind};
 pub use self::arithmetic::VrlValueArithmetic;
 pub use self::convert::VrlValueConvert;
 
-pub use value::Value;
+pub use value::{value::IterItem, Value};

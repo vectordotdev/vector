@@ -186,9 +186,10 @@ impl<'a> Builder<'a> {
             // Check for invalid closure signature.
             (Some(definition), Some(variables), _) => {
                 let mut matched = None;
-                let mut found_type_def = None;
-                let mut input_expression = None;
-                for input in definition.inputs {
+                let mut err_found_type_def = None;
+                let mut err_input_expression = None;
+
+                'outer: for input in definition.inputs {
                     // Check type definition for linked parameter.
                     match list.arguments.get(input.parameter_keyword) {
                         // No argument provided for the given parameter keyword.
@@ -199,74 +200,20 @@ impl<'a> Builder<'a> {
                         None => continue,
                         Some(expr) => {
                             let type_def = expr.type_def((local, external));
+
                             // The type definition of the value does not match the expected closure
                             // type, continue to check if the closure eventually accepts this
                             // definition.
                             if !input.kind.is_superset(type_def.kind()) {
-                                found_type_def = Some(type_def.kind().clone());
-                                input_expression = Some(expr);
+                                err_found_type_def = Some(type_def.kind().clone());
+                                err_input_expression = Some(expr);
                                 continue;
                             }
 
                             matched = Some(input.clone());
+                            break 'outer;
                         }
                     };
-
-                    // Now that we know we have a matching parameter argument with a valid type
-                    // definition, we can move on to checking/defining the closure arguments.
-                    //
-                    // In doing so we:
-                    //
-                    // - check the arity of the closure arguments
-                    // - set the expected type definition of each argument
-
-                    if input.variables.len() != variables.len() {
-                        let closure_arguments_span = variables.first().map_or(call_span, |node| {
-                            (node.span().start(), variables.last().unwrap().span().end()).into()
-                        });
-
-                        return Err(Error::ClosureArityMismatch {
-                            ident_span,
-                            closure_arguments_span,
-                            expected: input.variables.len(),
-                            supplied: variables.len(),
-                        });
-                    }
-
-                    // Get the provided argument identifier in the same position as defined in the
-                    // input definition.
-                    //
-                    // That is, if the function closure definition expects:
-                    //
-                    //   [bytes, integer]
-                    //
-                    // Then, given for an actual implementation of:
-                    //
-                    //   foo() -> { |bar, baz| }
-                    //
-                    // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
-                    // integer.
-                    //
-                    // An implementation with an arity mismatch will return in a compile-time
-                    // error.
-                    for (index, input_var) in input.variables.into_iter().enumerate() {
-                        let call_ident = &variables[index];
-
-                        // 1. get call_var type def from compiler state
-                        // 2. compare against input_var.kind type def
-                        // 3. if they don't match, error
-
-                        // TODO:
-                        // - need to register call_var type def as variable
-                        // - how??
-
-                        let details = Details {
-                            type_def: input_var.kind.into(),
-                            value: None,
-                        };
-
-                        local.insert_variable(call_ident.to_owned().into_inner(), details);
-                    }
                 }
 
                 // None of the inputs matched the value type, this is a user error.
@@ -274,14 +221,74 @@ impl<'a> Builder<'a> {
                     None => {
                         return Err(Error::EnumerationTypeMismatch {
                             call_span,
-                            found_kind: found_type_def.unwrap_or_else(Kind::any),
-                            input_expression: input_expression
+                            found_kind: err_found_type_def.unwrap_or_else(Kind::any),
+                            input_expression: err_input_expression
                                 .unwrap_or(&expression::Expr::Noop(Noop {}))
                                 .clone(),
                         })
                     }
 
-                    Some(input) => Some((variables, input)),
+                    Some(input) => {
+                        // Now that we know we have a matching parameter argument with a valid type
+                        // definition, we can move on to checking/defining the closure arguments.
+                        //
+                        // In doing so we:
+                        //
+                        // - check the arity of the closure arguments
+                        // - set the expected type definition of each argument
+
+                        if input.variables.len() != variables.len() {
+                            let closure_arguments_span =
+                                variables.first().map_or(call_span, |node| {
+                                    (node.span().start(), variables.last().unwrap().span().end())
+                                        .into()
+                                });
+
+                            return Err(Error::ClosureArityMismatch {
+                                ident_span,
+                                closure_arguments_span,
+                                expected: input.variables.len(),
+                                supplied: variables.len(),
+                            });
+                        }
+
+                        // Get the provided argument identifier in the same position as defined in the
+                        // input definition.
+                        //
+                        // That is, if the function closure definition expects:
+                        //
+                        //   [bytes, integer]
+                        //
+                        // Then, given for an actual implementation of:
+                        //
+                        //   foo() -> { |bar, baz| }
+                        //
+                        // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
+                        // integer.
+                        //
+                        // An implementation with an arity mismatch will return in a compile-time
+                        // error.
+                        for (index, input_var) in input.variables.clone().into_iter().enumerate() {
+                            let call_ident = &variables[index];
+
+                            // 1. get call_var type def from compiler state
+                            // 2. compare against input_var.kind type def
+                            // 3. if they don't match, error
+
+                            // TODO:
+                            // - need to register call_var type def as variable
+                            // - how??
+
+                            let details = Details {
+                                type_def: input_var.kind.into(),
+                                value: None,
+                            };
+
+                            local.insert_variable(call_ident.to_owned().into_inner(), details);
+                        }
+
+                        Some((variables, input))
+                    }
                 }
             }
 
@@ -307,8 +314,12 @@ impl<'a> Builder<'a> {
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
     ) -> Result<FunctionCall, Error> {
+        let mut closure_fallible = false;
+
         if let Some((variables, input)) = self.closure.clone() {
             let block = closure_block.unwrap();
+            closure_fallible = block.type_def((local, external)).is_fallible();
+
             let (block_span, block) = block.take();
 
             // Check the type definition of the resulting block.This needs to match
@@ -370,6 +381,7 @@ impl<'a> Builder<'a> {
             abort_on_error: self.abort_on_error,
             expr,
             maybe_fallible_arguments: self.maybe_fallible_arguments,
+            closure_fallible,
             span: call_span,
             ident: self.function.identifier(),
             function_id: self.function_id,
@@ -383,6 +395,7 @@ pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
     maybe_fallible_arguments: bool,
+    closure_fallible: bool,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
@@ -457,6 +470,7 @@ impl FunctionCall {
             abort_on_error: false,
             expr,
             maybe_fallible_arguments: false,
+            closure_fallible: false,
             span: Span::default(),
             ident: "noop",
             arguments: Arc::new(Vec::new()),
@@ -567,6 +581,12 @@ impl Expression for FunctionCall {
         // For the third event, both functions fail.
         //
         if self.maybe_fallible_arguments {
+            type_def = type_def.with_fallibility(true);
+        }
+
+        // If the function has a closure attached, and that closure is fallible,
+        // then the function call itself becomes fallible.
+        if self.closure_fallible {
             type_def = type_def.with_fallibility(true);
         }
 

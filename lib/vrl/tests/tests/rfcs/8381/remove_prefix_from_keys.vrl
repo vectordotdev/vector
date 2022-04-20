@@ -1,4 +1,3 @@
-# SKIP
 # object: { "my_prefix_message": "barbaz" }
 # result: {           "message": "barbaz" }
 

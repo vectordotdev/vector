@@ -1,5 +1,8 @@
+use core::ExpressionError;
+
 use crate::expression::Block;
 use crate::parser::{Ident, Node};
+use crate::value::VrlValueConvert;
 use crate::{Context, Expression, Value};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,127 +16,165 @@ impl FunctionClosure {
         Self { variables, block }
     }
 
-    pub fn key_value(&self, key: String, value: Value) -> FunctionClosureKeyValue {
-        let key = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| (v.clone().into_inner(), key)));
-
-        FunctionClosureKeyValue {
-            key,
-            value: self.value(value),
-            block: &self.block,
-        }
-    }
-
-    pub fn index_value(&self, index: usize, value: Value) -> FunctionClosureIndexValue {
-        let index = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| (v.clone().into_inner(), index)));
-
-        FunctionClosureIndexValue {
-            index,
-            value: self.value(value),
-            block: &self.block,
-        }
-    }
-
-    fn value(&self, value: Value) -> Option<(Ident, Value)> {
-        self.variables
-            .get(1)
-            .and_then(|v| (!v.is_empty()).then(|| (v.clone().into_inner(), value)))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FunctionClosureKeyValue<'a> {
-    key: Option<(Ident, String)>,
-    value: Option<(Ident, Value)>,
-    block: &'a Block,
-}
-
-impl Expression for FunctionClosureKeyValue<'_> {
-    fn resolve(&self, ctx: &mut Context) -> core::Resolved {
-        let state = ctx.state_mut();
-
-        // Make sure we keep track of parent scopes using the same variable
-        // names as the closure. Once the closure ends, we restore the old state
-        // for these variables.
-        let old_key_value = self.key.as_ref().and_then(|(ident, key)| {
-            state
-                .swap_variable(ident.clone(), key.clone().into())
-                .map(move |v| (ident, v))
-        });
-
-        let old_value_value = self.value.as_ref().and_then(|(ident, value)| {
-            state
-                .swap_variable(ident.clone(), value.clone())
-                .map(move |v| (ident, v))
-        });
-
-        let value = self.block.resolve(ctx)?;
-
-        let state = ctx.state_mut();
-
-        if let Some((ident, value)) = old_key_value {
-            state.insert_variable(ident.clone(), value);
-        }
-
-        if let Some((ident, value)) = old_value_value {
-            state.insert_variable(ident.clone(), value);
-        }
-
-        Ok(value)
-    }
-
-    fn type_def(
+    pub fn run_key_value(
         &self,
-        state: (&crate::state::LocalEnv, &crate::state::ExternalEnv),
-    ) -> crate::TypeDef {
-        self.block.type_def(state)
+        ctx: &mut Context,
+        key: &mut String,
+        value: &mut Value,
+    ) -> Result<(), ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // values, instead of owning them.
+        let cloned_key = key.clone();
+        let cloned_value = value.clone();
+
+        let key_ident = self
+            .variables
+            .get(0)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let value_ident = self
+            .variables
+            .get(1)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let state = ctx.state_mut();
+        let old_key_data = key_ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), cloned_key.into())
+                .map(|value| (ident.clone(), value))
+        });
+        let old_value_data = value_ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), cloned_value)
+                .map(|value| (ident.clone(), value))
+        });
+
+        self.block.resolve(ctx)?;
+
+        if let Some((ident, value)) = old_key_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        if let Some((ident, value)) = old_value_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        Ok(())
+    }
+
+    pub fn run_index_value(
+        &self,
+        ctx: &mut Context,
+        index: usize,
+        value: &mut Value,
+    ) -> Result<(), ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // values, instead of owning them.
+        let cloned_value = value.clone();
+
+        let index_ident = self
+            .variables
+            .get(0)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let value_ident = self
+            .variables
+            .get(1)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let state = ctx.state_mut();
+        let old_index_data = index_ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), index.into())
+                .map(|value| (ident.clone(), value))
+        });
+        let old_value_data = value_ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), cloned_value)
+                .map(|value| (ident.clone(), value))
+        });
+
+        self.block.resolve(ctx)?;
+
+        if let Some((ident, value)) = old_index_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        if let Some((ident, value)) = old_value_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        Ok(())
+    }
+
+    pub fn map_key(&self, ctx: &mut Context, key: &mut String) -> Result<(), ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // values, instead of owning them.
+        let cloned_key = key.clone();
+
+        let ident = self
+            .variables
+            .get(0)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let state = ctx.state_mut();
+        let old_data = ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), cloned_key.into())
+                .map(|value| (ident.clone(), value))
+        });
+
+        *key = self
+            .block
+            .resolve(ctx)?
+            .try_bytes_utf8_lossy()?
+            .into_owned();
+
+        if let Some((ident, value)) = old_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        Ok(())
+    }
+
+    pub fn map_value(&self, ctx: &mut Context, value: &mut Value) -> Result<(), ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // values, instead of owning them.
+        let cloned_value = value.clone();
+
+        let ident = self
+            .variables
+            .get(0)
+            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+
+        let state = ctx.state_mut();
+        let old_data = ident.and_then(|ident| {
+            state
+                .swap_variable(ident.clone(), cloned_value)
+                .map(|value| (ident.clone(), value))
+        });
+
+        *value = self.block.resolve(ctx)?;
+
+        if let Some((ident, value)) = old_data {
+            let state = ctx.state_mut();
+            state.insert_variable(ident, value);
+        }
+
+        Ok(())
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct FunctionClosureIndexValue<'a> {
-    index: Option<(Ident, usize)>,
-    value: Option<(Ident, Value)>,
-    block: &'a Block,
-}
-
-impl Expression for FunctionClosureIndexValue<'_> {
-    fn resolve(&self, ctx: &mut Context) -> core::Resolved {
-        let state = ctx.state_mut();
-
-        // Make sure we keep track of parent scopes using the same variable
-        // names as the closure. Once the closure ends, we restore the old state
-        // for these variables.
-        let old_index_value = self.index.as_ref().and_then(|(ident, index)| {
-            state
-                .swap_variable(ident.clone(), (*index).into())
-                .map(move |v| (ident, v))
-        });
-
-        let old_value_value = self.value.as_ref().and_then(|(ident, value)| {
-            state
-                .swap_variable(ident.clone(), value.clone())
-                .map(move |v| (ident, v))
-        });
-
-        let value = self.block.resolve(ctx)?;
-
-        let state = ctx.state_mut();
-
-        if let Some((ident, value)) = old_index_value {
-            state.insert_variable(ident.clone(), value);
-        }
-
-        if let Some((ident, value)) = old_value_value {
-            state.insert_variable(ident.clone(), value);
-        }
-
-        Ok(value)
+impl Expression for FunctionClosure {
+    fn resolve(&self, _: &mut Context) -> core::Resolved {
+        // We cannot implement `resolve` for this type, because we have to pass
+        // in the values that need to be stored in the configured `variables`.
+        unimplemented!("must use special-case mehods such as `map_value`")
     }
 
     fn type_def(
