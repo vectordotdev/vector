@@ -42,7 +42,6 @@ struct NatsSourceConfig {
     subject: String,
     queue: Option<String>,
     tls: Option<TlsConfig>,
-    #[serde(flatten)]
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]

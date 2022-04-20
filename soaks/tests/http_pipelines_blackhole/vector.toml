@@ -35,51 +35,12 @@ if starts_with(strip_whitespace!(.message), "{") {
 type = "pipelines"
 inputs = ["preprocessing"]
 
-[transforms.processing.logs]
-order = [
-    "nginx",
-    "redis",
-    "consul",
-    "python",
-    "rabbitmq",
-    "zookeeper",
-    "elasticsearch",
-    "kafka",
-    "couchdb",
-    "docker",
-    "datadog_agent",
-    "ruby",
-    "vault",
-    "nginx_ingress_controller",
-    "mysql",
-    "kubernetes_cluster_autoscaler",
-    "aws_alb_ingress_controller",
-    "proxysql",
-    "azure",
-    "azure_web",
-    "azure_storage",
-    "azure_network",
-    "azure_compute",
-    "etcd",
-    "glog_pipeline",
-    "auth0",
-    "kube_scheduler_glog",
-    "aws_ecs-agent",
-    "nodejs",
-    "postgresql",
-    "cassandra",
-    "apache_httpd",
-    "azure_recovery_services",
-    "c",
-    "web_browser_logs"
-]
-
-[transforms.processing.logs.pipelines.nginx]
+[[transforms.processing.logs]]
 name = "nginx"
 filter.type = "datadog_search"
 filter.source = "source:nginx"
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -111,7 +72,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -122,7 +83,7 @@ if .custom.network.client.ip == null {
 del(.custom.client)
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.request,
@@ -141,7 +102,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -150,7 +111,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -158,7 +119,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date_access) {
@@ -166,7 +127,7 @@ if exists(.custom.date_access) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -180,7 +141,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
@@ -210,12 +171,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.redis]
+[[transforms.processing.logs]]
 name = "redis"
 filter.type = "datadog_search"
 filter.source = "source:redis"
 
-[[transforms.processing.logs.pipelines.redis.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -235,7 +196,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.redis.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date) {
@@ -243,7 +204,7 @@ if exists(.custom.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.redis.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@severity: \".\"") {
@@ -257,7 +218,7 @@ if match_datadog_query(., "@severity: \".\"") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.redis.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.redis.severity) ?? ""
@@ -287,12 +248,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.consul]
+[[transforms.processing.logs]]
 name = "consul"
 filter.type = "datadog_search"
 filter.source = "source:consul"
 
-[[transforms.processing.logs.pipelines.consul.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -320,7 +281,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.consul.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -328,7 +289,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.consul.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -358,12 +319,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.python]
+[[transforms.processing.logs]]
 name = "python"
 filter.type = "datadog_search"
 filter.source = "source:python"
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -385,7 +346,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -393,7 +354,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.levelname) ?? ""
@@ -423,7 +384,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.error.stack == null {
@@ -434,7 +395,7 @@ if .custom.error.stack == null {
 del(.custom.traceback)
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.name == null {
@@ -445,7 +406,7 @@ if .custom.logger.name == null {
 del(.custom.name)
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.thread_name == null {
@@ -456,7 +417,7 @@ if .custom.logger.thread_name == null {
 del(.custom.threadName)
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.error.stack,
@@ -472,7 +433,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.trace_id) {
@@ -480,7 +441,7 @@ if exists(.custom.dd.trace_id) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.env != null {
@@ -491,7 +452,7 @@ if .custom.dd.env != null {
 del(.custom.dd.env)
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.version != null {
@@ -502,7 +463,7 @@ if .custom.dd.version != null {
 del(.custom.dd.version)
 '''
 
-[[transforms.processing.logs.pipelines.python.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.service) {
@@ -510,12 +471,12 @@ if exists(.custom.dd.service) {
 }
 '''
 
-[transforms.processing.logs.pipelines.rabbitmq]
+[[transforms.processing.logs]]
 name = "rabbitmq"
 filter.type = "datadog_search"
 filter.source = "source:rabbitmq"
 
-[[transforms.processing.logs.pipelines.rabbitmq.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -537,7 +498,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.rabbitmq.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -545,7 +506,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.rabbitmq.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.status) ?? ""
@@ -575,7 +536,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.rabbitmq.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.message) {
@@ -583,12 +544,12 @@ if exists(.custom.message) {
 }
 '''
 
-[transforms.processing.logs.pipelines.zookeeper]
+[[transforms.processing.logs]]
 name = "zookeeper"
 filter.type = "datadog_search"
 filter.source = "source:zookeeper"
 
-[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -614,7 +575,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.error.stack,
@@ -630,7 +591,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -638,7 +599,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.status) ?? ""
@@ -668,7 +629,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.zookeeper.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -676,12 +637,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.elasticsearch]
+[[transforms.processing.logs]]
 name = "elasticsearch"
 filter.type = "datadog_search"
 filter.source = "source:elasticsearch"
 
-[[transforms.processing.logs.pipelines.elasticsearch.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -710,7 +671,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.elasticsearch.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -718,7 +679,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.elasticsearch.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -748,7 +709,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.elasticsearch.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.node_name == null {
@@ -758,12 +719,12 @@ if .custom.node_name == null {
 }
 '''
 
-[transforms.processing.logs.pipelines.kafka]
+[[transforms.processing.logs]]
 name = "kafka"
 filter.type = "datadog_search"
 filter.source = "source:kafka"
 
-[[transforms.processing.logs.pipelines.kafka.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -791,7 +752,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kafka.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.error.stack,
@@ -807,7 +768,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kafka.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -815,7 +776,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kafka.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.status) ?? ""
@@ -845,7 +806,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kafka.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -853,12 +814,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.couchdb]
+[[transforms.processing.logs]]
 name = "couchdb"
 filter.type = "datadog_search"
 filter.source = "source:couchdb"
 
-[[transforms.processing.logs.pipelines.couchdb.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -886,7 +847,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.couchdb.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date_access) {
@@ -894,7 +855,7 @@ if exists(.custom.date_access) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.couchdb.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -924,7 +885,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.couchdb.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -933,12 +894,12 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[transforms.processing.logs.pipelines.docker]
+[[transforms.processing.logs]]
 name = "docker"
 filter.type = "datadog_search"
 filter.source = "source:docker"
 
-[[transforms.processing.logs.pipelines.docker.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -976,7 +937,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.docker.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -984,7 +945,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.docker.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1014,12 +975,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.datadog_agent]
+[[transforms.processing.logs]]
 name = "datadog_agent"
 filter.type = "datadog_search"
 filter.source = "source:(agent OR datadog-agent OR datadog-agent-cluster-worker OR datadog-cluster-agent OR process-agent OR security-agent OR system-probe OR trace-agent)"
 
-[[transforms.processing.logs.pipelines.datadog_agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1039,7 +1000,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.datadog_agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -1047,7 +1008,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.datadog_agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1077,12 +1038,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.ruby]
+[[transforms.processing.logs]]
 name = "ruby"
 filter.type = "datadog_search"
 filter.source = "source:ruby"
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.name == null {
@@ -1093,7 +1054,7 @@ if .custom.logger.name == null {
 del(.custom.logger)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.thread_name == null {
@@ -1104,7 +1065,7 @@ if .custom.logger.thread_name == null {
 del(.custom.thread)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.error.stack == null {
@@ -1118,7 +1079,7 @@ del(.custom.exception)
 del(.custom.stack_trace)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1155,7 +1116,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date) {
@@ -1163,7 +1124,7 @@ if exists(.custom.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1193,7 +1154,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.error.stack,
@@ -1209,7 +1170,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.method == null {
@@ -1220,7 +1181,7 @@ if .custom.http.method == null {
 del(.custom.method)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.url_details.path == null {
@@ -1231,7 +1192,7 @@ if .custom.http.url_details.path == null {
 del(.custom.path)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.status_code == null {
@@ -1242,7 +1203,7 @@ if .custom.http.status_code == null {
 del(.custom.status)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.trace_id) {
@@ -1250,7 +1211,7 @@ if exists(.custom.dd.trace_id) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.env != null {
@@ -1261,7 +1222,7 @@ if .custom.dd.env != null {
 del(.custom.dd.env)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.version != null {
@@ -1272,7 +1233,7 @@ if .custom.dd.version != null {
 del(.custom.dd.version)
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.service) {
@@ -1280,7 +1241,7 @@ if exists(.custom.dd.service) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.ruby.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.duration*1000000; err == null) {
@@ -1288,12 +1249,12 @@ if (result, err = .custom.duration*1000000; err == null) {
 }
 '''
 
-[transforms.processing.logs.pipelines.vault]
+[[transforms.processing.logs]]
 name = "vault"
 filter.type = "datadog_search"
 filter.source = "source:vault"
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1313,7 +1274,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -1321,7 +1282,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1351,7 +1312,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.message) {
@@ -1359,7 +1320,7 @@ if exists(.custom.message) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -1371,7 +1332,7 @@ if .custom.usr.id == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.url_details.path == null {
@@ -1381,7 +1342,7 @@ if .custom.http.url_details.path == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.status_code == null {
@@ -1391,7 +1352,7 @@ if .custom.http.status_code == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -1401,7 +1362,7 @@ if .custom.network.client.ip == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.vault.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.method == null {
@@ -1411,12 +1372,12 @@ if .custom.http.method == null {
 }
 '''
 
-[transforms.processing.logs.pipelines.nginx_ingress_controller]
+[[transforms.processing.logs]]
 name = "nginx_ingress_controller"
 filter.type = "datadog_search"
 filter.source = "source:nginx-ingress-controller"
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1457,7 +1418,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -1468,7 +1429,7 @@ if .custom.network.client.ip == null {
 del(.custom.client)
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.request,
@@ -1487,7 +1448,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -1496,7 +1457,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -1504,7 +1465,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date_access) {
@@ -1512,7 +1473,7 @@ if exists(.custom.date_access) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -1526,7 +1487,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nginx_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
@@ -1556,12 +1517,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.mysql]
+[[transforms.processing.logs]]
 name = "mysql"
 filter.type = "datadog_search"
 filter.source = "source:mysql"
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1597,7 +1558,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.db.slow_statement,
@@ -1613,7 +1574,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.statement == null {
@@ -1624,7 +1585,7 @@ if .custom.db.statement == null {
 del(.custom.db.slow_statement)
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.Query_time * 1000000000; err == null) {
@@ -1632,7 +1593,7 @@ if (result, err = .custom.Query_time * 1000000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.mysql.query.timestamp * 1000; err == null) {
@@ -1640,7 +1601,7 @@ if (result, err = .custom.mysql.query.timestamp * 1000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.bytes_written == null {
@@ -1650,7 +1611,7 @@ if .custom.network.bytes_written == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.bytes_read == null {
@@ -1660,7 +1621,7 @@ if .custom.network.bytes_read == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.db.date) {
@@ -1668,7 +1629,7 @@ if exists(.custom.db.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.mysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.db.severity) ?? ""
@@ -1698,12 +1659,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler]
+[[transforms.processing.logs]]
 name = "kubernetes_cluster_autoscaler"
 filter.type = "datadog_search"
 filter.source = "source:cluster-autoscaler"
 
-[[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1719,7 +1680,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -1727,7 +1688,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1757,7 +1718,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kubernetes_cluster_autoscaler.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -1765,12 +1726,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.aws_alb_ingress_controller]
+[[transforms.processing.logs]]
 name = "aws_alb_ingress_controller"
 filter.type = "datadog_search"
 filter.source = "source:aws-alb-ingress-controller"
 
-[[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1786,7 +1747,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -1794,7 +1755,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -1824,7 +1785,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_alb_ingress_controller.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -1832,12 +1793,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.proxysql]
+[[transforms.processing.logs]]
 name = "proxysql"
 filter.type = "datadog_search"
 filter.source = "source:proxysql"
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -1864,7 +1825,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.duration,
@@ -1886,7 +1847,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.client_addr,
@@ -1902,7 +1863,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.proxy_addr,
@@ -1918,7 +1879,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.extra_info,
@@ -1934,7 +1895,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.instance == null {
@@ -1945,7 +1906,7 @@ if .custom.db.instance == null {
 del(.custom.schemaname)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.user == null {
@@ -1956,7 +1917,7 @@ if .custom.db.user == null {
 del(.custom.username)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.thread_id == null {
@@ -1967,7 +1928,7 @@ if .custom.logger.thread_id == null {
 del(.custom.thread_id)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.client,
@@ -1983,7 +1944,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.duration_us * 1000; err == null) {
@@ -1991,7 +1952,7 @@ if (result, err = .custom.duration_us * 1000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.statement == null {
@@ -2002,7 +1963,7 @@ if .custom.db.statement == null {
 del(.custom.query)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.rows_affected == null {
@@ -2013,7 +1974,7 @@ if .custom.db.rows_affected == null {
 del(.custom.rows_affected)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db.rows_sent == null {
@@ -2024,7 +1985,7 @@ if .custom.db.rows_sent == null {
 del(.custom.rows_sent)
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.server,
@@ -2040,7 +2001,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2070,7 +2031,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date) {
@@ -2082,7 +2043,7 @@ if exists(.custom.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.proxysql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.message) {
@@ -2090,12 +2051,12 @@ if exists(.custom.message) {
 }
 '''
 
-[transforms.processing.logs.pipelines.azure]
+[[transforms.processing.logs]]
 name = "azure"
 filter.type = "datadog_search"
 filter.source = "source:(azure OR azure.alertsmanagement OR azure.analysisservices OR azure.apiconfiguration OR azure.apimanagement OR azure.authorization OR azure.automation OR azure.batchai OR azure.batchazure.cache OR azure.blockchain OR azure.cache OR azure.cdn OR azure.classiccompute OR azure.classicstorage OR azure.cognitiveservices OR azure.containerinstance OR azure.containerregistry OR azure.containerservice OR azure.datafactory OR azure.datalakestore OR azure.dbformariadb OR azure.dbformysql OR azure.dbforpostgresql OR azure.devices OR azure.documentdb OR azure.enterpriseknowledgegraph OR azure.eventgrid OR azure.eventhub OR azure.hdinsight OR azure.insights OR azure.iotcentral OR azure.keyvault OR azure.kusto OR azure.logic OR azure.machinelearningservices OR azure.managedidentity OR azure.operationalinsights OR azure.operationsmanagement OR azure.peering OR azure.relay OR azure.resourcegroup OR azure.resources OR azure.search OR azure.security OR azure.servicebus OR azure.servicefabric OR azure.streamanalytics OR azure.subscription OR azure.synapse)"
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -2103,7 +2064,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2133,7 +2094,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -2144,7 +2105,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -2155,7 +2116,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -2166,7 +2127,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2177,7 +2138,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -2185,7 +2146,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2196,12 +2157,12 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[transforms.processing.logs.pipelines.azure_web]
+[[transforms.processing.logs]]
 name = "azure_web"
 filter.type = "datadog_search"
 filter.source = "source:azure.web"
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -2209,7 +2170,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2239,7 +2200,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -2250,7 +2211,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -2261,7 +2222,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -2272,7 +2233,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2283,7 +2244,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -2291,7 +2252,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_web.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2302,12 +2263,12 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[transforms.processing.logs.pipelines.azure_storage]
+[[transforms.processing.logs]]
 name = "azure_storage"
 filter.type = "datadog_search"
 filter.source = "source:azure.storage"
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -2315,7 +2276,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2345,7 +2306,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -2356,7 +2317,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -2367,7 +2328,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -2378,7 +2339,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2389,7 +2350,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -2397,7 +2358,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_storage.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2408,12 +2369,12 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[transforms.processing.logs.pipelines.azure_network]
+[[transforms.processing.logs]]
 name = "azure_network"
 filter.type = "datadog_search"
 filter.source = "source:azure.network"
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -2421,7 +2382,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2451,7 +2412,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.properties.eventProperties.title) {
@@ -2459,7 +2420,7 @@ if exists(.custom.properties.eventProperties.title) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -2470,7 +2431,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -2481,7 +2442,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -2492,7 +2453,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2503,7 +2464,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -2511,7 +2472,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_network.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2522,12 +2483,12 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[transforms.processing.logs.pipelines.azure_compute]
+[[transforms.processing.logs]]
 name = "azure_compute"
 filter.type = "datadog_search"
 filter.source = "source:azure.compute"
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -2535,7 +2496,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2565,7 +2526,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.properties.eventProperties.title) {
@@ -2573,7 +2534,7 @@ if exists(.custom.properties.eventProperties.title) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -2584,7 +2545,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -2595,7 +2556,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -2606,7 +2567,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2617,7 +2578,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -2625,7 +2586,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_compute.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2636,12 +2597,12 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[transforms.processing.logs.pipelines.etcd]
+[[transforms.processing.logs]]
 name = "etcd"
 filter.type = "datadog_search"
 filter.source = "source:etcd"
 
-[[transforms.processing.logs.pipelines.etcd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -2658,7 +2619,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.etcd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date) {
@@ -2666,7 +2627,7 @@ if exists(.custom.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.etcd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.message) {
@@ -2674,7 +2635,7 @@ if exists(.custom.message) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.etcd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2704,12 +2665,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.glog_pipeline]
+[[transforms.processing.logs]]
 name = "glog_pipeline"
 filter.type = "datadog_search"
 filter.source = "source:(admission-webhook OR api-server OR cert-manager-acmesolver OR cert-manager-cainjector OR cert-manager-controller OR cert-manager-webhook OR cluster-proportional-autoscaler-amd64 OR hyperkube OR ip-masq-agent OR k8s-prometheus-adapter-amd64 OR kube-apiserver OR kube-controller-manager OR kube-proxy OR kube-state-metrics OR metacontroller OR metrics-server-amd64 OR prometheus-operator OR vpa-admission-controller OR vpa-recommender OR vpa-updater)"
 
-[[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -2725,7 +2686,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -2733,7 +2694,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -2763,7 +2724,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.glog_pipeline.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -2771,12 +2732,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.auth0]
+[[transforms.processing.logs]]
 name = "auth0"
 filter.type = "datadog_search"
 filter.source = "source:auth0"
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.data.date) {
@@ -2784,7 +2745,7 @@ if exists(.custom.data.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -2795,7 +2756,7 @@ if .custom.network.client.ip == null {
 del(.custom.data.ip)
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.http.useragent == null {
@@ -2806,7 +2767,7 @@ if .custom.http.useragent == null {
 del(.custom.data.user_agent)
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -2814,7 +2775,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -2824,7 +2785,7 @@ if .custom.usr.id == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.name == null {
@@ -2835,7 +2796,7 @@ if .custom.usr.name == null {
 del(.custom.data.user_name)
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.email == null {
@@ -2846,7 +2807,7 @@ if .custom.usr.email == null {
 del(.custom.data.details.request.auth.user.email)
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 lookup = {
@@ -2955,7 +2916,7 @@ if (.custom.evt.name == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 lookup = {
@@ -3024,7 +2985,7 @@ if (lookup_value, err = get(lookup, [.custom.data.type]); lookup_value != null) 
 }
 '''
 
-[[transforms.processing.logs.pipelines.auth0.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.message) {
@@ -3036,12 +2997,12 @@ if exists(.custom.message) {
 }
 '''
 
-[transforms.processing.logs.pipelines.kube_scheduler_glog]
+[[transforms.processing.logs]]
 name = "kube_scheduler_glog"
 filter.type = "datadog_search"
 filter.source = "source:(kube_scheduler OR kube-scheduler)"
 
-[[transforms.processing.logs.pipelines.kube_scheduler_glog.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3057,7 +3018,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kube_scheduler_glog.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.timestamp) {
@@ -3065,7 +3026,7 @@ if exists(.custom.timestamp) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kube_scheduler_glog.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -3095,7 +3056,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.kube_scheduler_glog.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -3103,7 +3064,7 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.aws_ecs-agent]
+[[transforms.processing.logs]]
 name = "aws_ecs-agent"
 filter.type = "datadog_search"
 filter.source = "source:amazon-ecs-agent"
@@ -3168,12 +3129,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.nodejs]
+[[transforms.processing.logs]]
 name = "nodejs"
 filter.type = "datadog_search"
 filter.source = "source:nodejs"
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -3181,7 +3142,7 @@ if exists(.custom.msg) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3203,7 +3164,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -3211,7 +3172,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -3225,7 +3186,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@level:10") {
@@ -3243,7 +3204,7 @@ if match_datadog_query(., "@level:10") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? string(.custom.bunyan_level) ?? string(.custom.level) ?? ""
@@ -3273,7 +3234,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.trace_id) {
@@ -3281,7 +3242,7 @@ if exists(.custom.dd.trace_id) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -3290,7 +3251,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -3298,7 +3259,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.env != null {
@@ -3309,7 +3270,7 @@ if .custom.dd.env != null {
 del(.custom.dd.env)
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.version != null {
@@ -3320,7 +3281,7 @@ if .custom.dd.version != null {
 del(.custom.dd.version)
 '''
 
-[[transforms.processing.logs.pipelines.nodejs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.service) {
@@ -3328,12 +3289,12 @@ if exists(.custom.dd.service) {
 }
 '''
 
-[transforms.processing.logs.pipelines.postgresql]
+[[transforms.processing.logs]]
 name = "postgresql"
 filter.type = "datadog_search"
 filter.source = "source:postgresql"
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3365,7 +3326,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.db.statement,
@@ -3381,7 +3342,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.db.date) {
@@ -3389,7 +3350,7 @@ if exists(.custom.db.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.db.severity) ?? ""
@@ -3419,7 +3380,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.db == null {
@@ -3431,7 +3392,7 @@ if .custom.db == null {
 }
 '''
 
-[[transforms.processing.logs.pipelines.postgresql.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.duration * 1000000; err == null) {
@@ -3439,12 +3400,12 @@ if (result, err = .custom.duration * 1000000; err == null) {
 }
 '''
 
-[transforms.processing.logs.pipelines.cassandra]
+[[transforms.processing.logs]]
 name = "cassandra"
 filter.type = "datadog_search"
 filter.source = "source:cassandra"
 
-[[transforms.processing.logs.pipelines.cassandra.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3501,7 +3462,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.cassandra.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.db.date) {
@@ -3509,7 +3470,7 @@ if exists(.custom.db.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.cassandra.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.db.severity) ?? ""
@@ -3539,12 +3500,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.apache_httpd]
+[[transforms.processing.logs]]
 name = "apache_httpd"
 filter.type = "datadog_search"
 filter.source = "source:httpd"
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3573,7 +3534,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -3581,7 +3542,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -3590,7 +3551,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date_access) {
@@ -3598,7 +3559,7 @@ if exists(.custom.date_access) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -3612,7 +3573,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.apache_httpd.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? ""
@@ -3642,12 +3603,12 @@ if status == "" {
 }
 '''
 
-[transforms.processing.logs.pipelines.azure_recovery_services]
+[[transforms.processing.logs]]
 name = "azure_recovery_services"
 filter.type = "datadog_search"
 filter.source = "source:azure.recoveryservices"
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -3655,7 +3616,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? ""
@@ -3685,7 +3646,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.category == null {
@@ -3696,7 +3657,7 @@ if .custom.evt.category == null {
 del(.custom.category)
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.name == null {
@@ -3707,7 +3668,7 @@ if .custom.evt.name == null {
 del(.custom.operationName)
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.evt.outcome == null {
@@ -3718,7 +3679,7 @@ if .custom.evt.outcome == null {
 del(.custom.resultType)
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.network.client.ip == null {
@@ -3729,7 +3690,7 @@ if .custom.network.client.ip == null {
 del(.custom.callerIpAddress)
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (result, err = .custom.durationMs * 1000000; err == null) {
@@ -3737,7 +3698,7 @@ if (result, err = .custom.durationMs * 1000000; err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.usr.id == null {
@@ -3748,7 +3709,7 @@ if .custom.usr.id == null {
 del(.custom.identity.authorization.evidence.principalId)
 '''
 
-[[transforms.processing.logs.pipelines.azure_recovery_services.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.entity_name == null {
@@ -3759,12 +3720,12 @@ if .custom.entity_name == null {
 del(.custom.properties.Entity_Name)
 '''
 
-[transforms.processing.logs.pipelines.c]
+[[transforms.processing.logs]]
 name = "c"
 filter.type = "datadog_search"
 filter.source = "source:csharp"
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.name == null {
@@ -3775,7 +3736,7 @@ if .custom.logger.name == null {
 del(.custom.logger)
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.logger.thread_name == null {
@@ -3786,7 +3747,7 @@ if .custom.logger.thread_name == null {
 del(.custom.thread)
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.error.stack == null {
@@ -3800,7 +3761,7 @@ del(.custom.exception)
 del(.custom.stack_trace)
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.message,
@@ -3831,7 +3792,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.date) {
@@ -3843,7 +3804,7 @@ if exists(.custom.date) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.level) ?? string(.custom.Level) ?? string(.custom.@l) ?? ""
@@ -3873,7 +3834,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 custom, err = parse_groks(value: .custom.error.stack,
@@ -3889,7 +3850,7 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.trace_id) {
@@ -3905,7 +3866,7 @@ if exists(.custom.dd.trace_id) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.RenderedMessage) {
@@ -3919,7 +3880,7 @@ if exists(.custom.RenderedMessage) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.env != null {
@@ -3950,7 +3911,7 @@ del(.custom.properties.dd.env)
 del(.custom.Properties.dd_env)
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if .custom.dd.version != null {
@@ -3981,7 +3942,7 @@ del(.custom.properties.dd.version)
 del(.custom.Properties.dd_version)
 '''
 
-[[transforms.processing.logs.pipelines.c.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.dd.service) {
@@ -3997,12 +3958,12 @@ if exists(.custom.dd.service) {
 }
 '''
 
-[transforms.processing.logs.pipelines.web_browser_logs]
+[[transforms.processing.logs]]
 name = "web_browser_logs"
 filter.type = "datadog_search"
 filter.source = "source:browser"
 
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.http.url); err == null) {
@@ -4011,7 +3972,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
@@ -4019,7 +3980,7 @@ if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); e
 }
 '''
 
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.view.url); err == null) {
@@ -4028,7 +3989,7 @@ if (details, err = parse_url(.custom.view.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.web_browser_logs.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if (details, err = parse_url(.custom.view.referrer); err == null) {
