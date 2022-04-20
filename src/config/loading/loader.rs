@@ -91,7 +91,15 @@ pub(super) mod process {
                         if entry.is_file() {
                             files.push(entry);
                         } else if entry.is_dir() {
-                            folders.push(entry);
+                            // do not load directories when the directory starts with a '.'
+                            if !entry
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .map(|name| name.starts_with('.'))
+                                .unwrap_or(false)
+                            {
+                                folders.push(entry);
+                            }
                         }
                     }
                     Err(err) => {

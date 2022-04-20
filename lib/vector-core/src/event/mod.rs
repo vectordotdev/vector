@@ -25,6 +25,9 @@ pub use trace::TraceEvent;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
+#[cfg(feature = "vrl")]
+pub use vrl_target::VrlImmutableTarget;
+
 pub mod array;
 pub mod discriminant;
 pub mod error;
