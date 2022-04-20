@@ -1,4 +1,4 @@
-use serde_derive_internals::{attr::Container, Ctxt};
+use serde_derive_internals::Ctxt;
 use syn::{Attribute, DeriveInput, Meta, NestedMeta};
 
 use super::{
@@ -6,29 +6,23 @@ use super::{
     try_extract_doc_title_description, try_get_attribute_meta_list,
 };
 
-/// A collection of attributes relevant to `Configurable`, specific to structs and enums themselves.
-pub struct ContainerAttributes {
+/// A collection of attributes relevant to containers i.e. structs and enums.
+pub struct Container {
     pub title: Option<String>,
     pub description: Option<String>,
     pub deprecated: bool,
     pub metadata: Vec<(String, String)>,
-    pub serde: Container,
 }
 
-impl ContainerAttributes {
-    /// Creates a new `ContainerAttributes` and extracts all relevant attributes.
-    pub fn new(context: &Ctxt, input: &DeriveInput) -> Self {
-        // Start off by extract all `serde`-specific attributes for the given container.
-        let serde_container = Container::from_ast(context, input);
-
-        // Now, construct our `ContainerAttributes` and extra any `configurable`-specific attributes
-        // that we know about.
-        let mut container_attributes = ContainerAttributes {
+impl Container {
+    /// Creates a new `Container` based on the attributes present on the given container AST.
+    pub fn from_ast(context: &Ctxt, input: &DeriveInput) -> Self {
+        // Construct our `Container` and extra any valid `configurable`-specific attributes.
+        let mut container_attributes = Container {
             title: None,
             description: None,
             deprecated: false,
             metadata: Vec::new(),
-            serde: serde_container,
         };
         container_attributes.extract(context, &input.attrs);
 

@@ -6,7 +6,7 @@ mod field;
 mod validation;
 mod variant;
 
-pub use container::ContainerAttributes;
+pub use container::Container;
 pub use field::FieldAttributes;
 pub use variant::VariantAttributes;
 
