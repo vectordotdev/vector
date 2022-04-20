@@ -1,8 +1,6 @@
 mod jit;
 
 use crate::lookup_v2::jit::{JitLookup, JitPath};
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::fmt::Display;
@@ -204,10 +202,11 @@ impl Display for OwnedSegment {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             OwnedSegment::Field(field) => {
-                static UNESCAPED_PATTERN: Lazy<Regex> =
-                    Lazy::new(|| Regex::new(r"^[A-Za-z_0-9@]*$").unwrap());
-                if !UNESCAPED_PATTERN.is_match(field) {
-                    let mut string = String::from('"');
+                let needs_quotes = field
+                    .chars()
+                    .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+                if needs_quotes {
+                    let mut string = String::new();
                     string.reserve(field.as_bytes().len());
                     for c in field.chars() {
                         if matches!(c, '"' | '\\') {
@@ -215,8 +214,7 @@ impl Display for OwnedSegment {
                         }
                         string.push(c);
                     }
-                    string.push('"');
-                    write!(formatter, ".{}", string)
+                    write!(formatter, r#"."{}""#, string)
                 } else {
                     write!(formatter, ".{}", field)
                 }
