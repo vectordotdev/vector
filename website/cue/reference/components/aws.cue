@@ -158,6 +158,11 @@ components: _aws: {
 				4. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
 				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
 
+				Note that use of
+				[`credentials_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)
+				in AWS credentials files is not supported as the underlying AWS SDK currently [lacks
+				support](https://github.com/awslabs/aws-sdk-rust/issues/261).
+
 				If no credentials are found, Vector's health check fails and an error is [logged](\(urls.vector_monitoring)).
 				If your AWS credentials expire, Vector will automatically search for up-to-date
 				credentials in the places (and order) described above.

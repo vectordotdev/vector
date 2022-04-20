@@ -7,7 +7,7 @@ use vrl::{diagnostic::Formatter, Program, Runtime, Value, Vm, VrlRuntime};
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
-    event::{Event, VrlTarget},
+    event::{Event, VrlImmutableTarget},
     internal_events::VrlConditionExecutionError,
 };
 
@@ -99,7 +99,7 @@ impl Vrl {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlImmutableTarget::new(event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
@@ -178,7 +178,7 @@ impl VrlVm {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlImmutableTarget::new(event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
