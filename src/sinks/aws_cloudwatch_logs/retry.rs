@@ -33,88 +33,31 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            CloudwatchError::Put(sdk_err) => match sdk_err {
-                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                    PutLogEventsErrorKind::ServiceUnavailableException(_) => {
-                        error!(message = "Put logs service unavailable.", %error);
-                        true
-                    }
-                    _ => is_retriable_error(sdk_err),
-                },
-                SdkError::DispatchFailure(_err) => {
-                    error!(message = "Put logs HTTP dispatch.", %error);
-                    true
+        if let CloudwatchError::Put(err) = error {
+            if let SdkError::ServiceError { err, raw: _ } = err {
+                if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
+                    return true;
                 }
-
-                SdkError::ResponseError { err: _, raw } => {
-                    let status = raw.http().status();
-                    if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
-                        let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
-                        error!(message = "Put logs HTTP error.", status = %status, body = %truncated_body);
-                        true
-                    } else {
-                        false
-                    }
-                }
-                SdkError::ConstructionFailure(_) => false,
-                SdkError::TimeoutError(_) => true,
-            },
-            CloudwatchError::Describe(sdk_err) => match sdk_err {
-                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                    DescribeLogStreamsErrorKind::ServiceUnavailableException(_) => {
-                        error!(message = "Describe streams service unavailable.", %error);
-                        true
-                    }
-                    _ => is_retriable_error(sdk_err),
-                },
-                SdkError::TimeoutError(_) => true,
-                SdkError::DispatchFailure(_) => {
-                    error!(message = "Describe streams HTTP dispatch.", %error);
-                    true
-                }
-                SdkError::ResponseError { err: _, raw } => {
-                    let status = raw.http().status();
-                    if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
-                        let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
-                        error!(message = "Describe streams HTTP error.", status = %status, body = %truncated_body);
-                        true
-                    } else {
-                        false
-                    }
-                }
-                SdkError::ConstructionFailure(_) => false,
-            },
-            CloudwatchError::CreateStream(sdk_err) => match sdk_err {
-                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                    CreateLogStreamErrorKind::ServiceUnavailableException(_) => {
-                        error!(message = "Create stream service unavailable.", %error);
-                        true
-                    }
-                    _ => is_retriable_error(sdk_err),
-                },
-                SdkError::TimeoutError(_) => true,
-                SdkError::DispatchFailure(_) => {
-                    error!(message = "Create stream HTTP dispatch.", %error);
-                    true
-                }
-                SdkError::ResponseError { err: _, raw } => {
-                    let status = raw.http().status();
-                    if status.is_server_error() || status == http::StatusCode::TOO_MANY_REQUESTS {
-                        let body = raw.http().body().bytes().unwrap_or(&[]);
-                        let truncated_body = String::from_utf8_lossy(&body[..body.len().min(50)]);
-                        error!(message = "Create stream HTTP error.", status = %status, body = %truncated_body);
-                        true
-                    } else {
-                        false
-                    }
-                }
-                SdkError::ConstructionFailure(_) => false,
-            },
-            _ => false,
+            }
+            return is_retriable_error(err);
         }
+        if let CloudwatchError::Describe(err) = error {
+            if let SdkError::ServiceError { err, raw: _ } = err {
+                if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
+                    return true;
+                }
+            }
+            return is_retriable_error(err);
+        }
+        if let CloudwatchError::CreateStream(err) = error {
+            if let SdkError::ServiceError { err, raw: _ } = err {
+                if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
+                    return true;
+                }
+            }
+            return is_retriable_error(err);
+        }
+        false
     }
 }
 

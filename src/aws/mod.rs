@@ -18,8 +18,8 @@ static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
 
 pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
-        SdkError::TimeoutError(_) => true,
-        SdkError::DispatchFailure(_) => true,
+        SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
+        SdkError::ConstructionFailure(_) => false,
         SdkError::ResponseError { err: _, raw } | SdkError::ServiceError { err: _, raw } => {
             // This header is a direct indication that we should retry the request. Eventually it'd
             // be nice to actually schedule the retry after the given delay, but for now we just
@@ -52,7 +52,6 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
                 || status == http::StatusCode::TOO_MANY_REQUESTS
                 || (status.is_client_error() && re.is_match(response_body.as_ref()))
         }
-        _ => false,
     }
 }
 
