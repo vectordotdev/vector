@@ -409,6 +409,7 @@ mod tests {
         assert!(event.as_mut_log().contains("b"));
         assert!(event.as_mut_log().contains("b[1].x"));
         assert!(event.as_mut_log().contains("c[0].y"));
+        assert!(event.as_mut_log().contains("\"f.z\""));
         assert!(event.as_mut_log().contains("\"g.z\""));
 
         assert!(!event.as_mut_log().contains("a.b.d"));

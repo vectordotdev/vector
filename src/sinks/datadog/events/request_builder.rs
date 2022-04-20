@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use lookup::lookup_v2::OwnedSegment;
+use lookup::lookup_v2::{OwnedField, OwnedSegment};
 use std::{io, sync::Arc};
 
 use vector_core::{buffers::Ackable, ByteSizeOf};
@@ -110,7 +110,7 @@ fn encoder() -> EncodingConfigFixed<StandardJsonEncoding> {
                 "title",
             ]
             .iter()
-            .map(|field| vec![OwnedSegment::Field((*field).into())].into())
+            .map(|field| vec![OwnedSegment::Field(OwnedField::Regular(field.to_string()))].into())
             .collect(),
         ),
         // DataDog Event API requires unix timestamp.

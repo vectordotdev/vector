@@ -1,4 +1,4 @@
-use crate::lookup_v2::{BorrowedSegment, Path};
+use crate::lookup_v2::{BorrowedField, BorrowedSegment, Path};
 use std::borrow::Cow;
 use std::str::CharIndices;
 
@@ -70,9 +70,9 @@ impl<'a> Iterator for JitLookup<'a> {
 
                         JitState::Continue | JitState::Dot | JitState::End => None,
 
-                        JitState::Field { start } => {
-                            Some(BorrowedSegment::Field(Cow::Borrowed(&self.path[start..])))
-                        }
+                        JitState::Field { start } => Some(BorrowedSegment::Field(
+                            BorrowedField::Regular(Cow::Borrowed(&self.path[start..])),
+                        )),
                     };
                     self.state = JitState::End;
                     return result;
@@ -100,14 +100,14 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::Field { start })
                             }
                             '.' => (
-                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
-                                    &self.path[start..index],
+                                Some(Some(BorrowedSegment::Field(BorrowedField::Regular(
+                                    Cow::Borrowed(&self.path[start..index]),
                                 )))),
                                 JitState::Dot,
                             ),
                             '[' => (
-                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
-                                    &self.path[start..index],
+                                Some(Some(BorrowedSegment::Field(BorrowedField::Regular(
+                                    Cow::Borrowed(&self.path[start..index]),
                                 )))),
                                 JitState::IndexStart,
                             ),
@@ -115,8 +115,8 @@ impl<'a> Iterator for JitLookup<'a> {
                         },
                         JitState::Quote { start } => match c {
                             '\"' => (
-                                Some(Some(BorrowedSegment::Field(Cow::Borrowed(
-                                    &self.path[start..index],
+                                Some(Some(BorrowedSegment::Field(BorrowedField::Regular(
+                                    Cow::Borrowed(&self.path[start..index]),
                                 )))),
                                 JitState::Continue,
                             ),
@@ -135,8 +135,8 @@ impl<'a> Iterator for JitLookup<'a> {
                         },
                         JitState::RequiredQuote { start } => match c {
                             '\"' => (
-                                Some(Some(BorrowedSegment::QuotedField(Cow::Borrowed(
-                                    &self.path[start..index],
+                                Some(Some(BorrowedSegment::Field(BorrowedField::Quoted(
+                                    Cow::Borrowed(&self.path[start..index]),
                                 )))),
                                 JitState::Continue,
                             ),
@@ -152,9 +152,9 @@ impl<'a> Iterator for JitLookup<'a> {
                         },
                         JitState::EscapedQuote => match c {
                             '\"' => (
-                                (Some(Some(BorrowedSegment::QuotedField(
+                                (Some(Some(BorrowedSegment::Field(BorrowedField::Quoted(
                                     std::mem::take(&mut self.escape_buffer).into(),
-                                )))),
+                                ))))),
                                 JitState::Continue,
                             ),
                             '\\' => match self.chars.next() {
@@ -211,7 +211,7 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
+    use crate::lookup_v2::{BorrowedField, BorrowedSegment, JitPath, Path};
     use std::borrow::Cow;
 
     #[test]
@@ -223,53 +223,84 @@ mod test {
             ("]foo", vec![BorrowedSegment::Invalid]),
             ("..", vec![BorrowedSegment::Invalid]),
             ("...", vec![BorrowedSegment::Invalid]),
-            ("f", vec![BorrowedSegment::Field(Cow::from("f"))]),
-            (".f", vec![BorrowedSegment::Field(Cow::from("f"))]),
+            (
+                "f",
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "f",
+                )))],
+            ),
+            (
+                ".f",
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "f",
+                )))],
+            ),
             (".[", vec![BorrowedSegment::Invalid]),
-            ("f.", vec![BorrowedSegment::Field(Cow::from("f"))]),
-            ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
+            (
+                "f.",
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "f",
+                )))],
+            ),
+            (
+                "foo",
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "foo",
+                )))],
+            ),
             (
                 "\"no_quotes_needed\"",
-                vec![BorrowedSegment::Field(Cow::from("no_quotes_needed"))],
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "no_quotes_needed",
+                )))],
             ),
             (
                 "ec2.metadata.\"availability-zone\"",
                 vec![
-                    BorrowedSegment::Field(Cow::from("ec2")),
-                    BorrowedSegment::Field(Cow::from("metadata")),
-                    BorrowedSegment::QuotedField(Cow::from("availability-zone")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("ec2"))),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("metadata"))),
+                    BorrowedSegment::Field(BorrowedField::Quoted(Cow::from("availability-zone"))),
                 ],
             ),
-            (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
+            (
+                ".foo",
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "foo",
+                )))],
+            ),
             (
                 ".@timestamp",
-                vec![BorrowedSegment::Field(Cow::from("@timestamp"))],
+                vec![BorrowedSegment::Field(BorrowedField::Regular(Cow::from(
+                    "@timestamp",
+                )))],
             ),
             (
                 "foo[",
                 vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
                     BorrowedSegment::Invalid,
                 ],
             ),
             ("foo$", vec![BorrowedSegment::Invalid]),
             (
                 "\"$peci@l chars\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("$peci@l chars"))],
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "$peci@l chars",
+                )))],
             ),
             (
                 ".foo.foo bar",
                 vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
                     BorrowedSegment::Invalid,
                 ],
             ),
             (
                 ".foo.\"foo bar\".bar",
                 vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::QuotedField(Cow::from("foo bar")),
-                    BorrowedSegment::Field(Cow::from("bar")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
+                    BorrowedSegment::Field(BorrowedField::Quoted(Cow::from("foo bar"))),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("bar"))),
                 ],
             ),
             ("[1]", vec![BorrowedSegment::Index(1)]),
@@ -279,14 +310,14 @@ mod test {
                 "[42].foo",
                 vec![
                     BorrowedSegment::Index(42),
-                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
                 ],
             ),
             (
                 "[42]foo",
                 vec![
                     BorrowedSegment::Index(42),
-                    BorrowedSegment::Field(Cow::from("foo")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
                 ],
             ),
             ("[-1]", vec![BorrowedSegment::Invalid]),
@@ -296,28 +327,42 @@ mod test {
             ("[-42]foo", vec![BorrowedSegment::Invalid]),
             (
                 ".\"[42]. {}-_\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("[42]. {}-_"))],
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "[42]. {}-_",
+                )))],
             ),
             (
                 "\"a\\\"a\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("a\"a"))],
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "a\"a",
+                )))],
             ),
             (
                 ".\"a\\\"a\"",
-                vec![BorrowedSegment::QuotedField(Cow::from("a\"a"))],
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "a\"a",
+                )))],
             ),
             (
                 ".foo.\"a\\\"a\".\"b\\\\b\".bar",
                 vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::QuotedField(Cow::from("a\"a")),
-                    BorrowedSegment::QuotedField(Cow::from("b\\b")),
-                    BorrowedSegment::Field(Cow::from("bar")),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("foo"))),
+                    BorrowedSegment::Field(BorrowedField::Quoted(Cow::from("a\"a"))),
+                    BorrowedSegment::Field(BorrowedField::Quoted(Cow::from("b\\b"))),
+                    BorrowedSegment::Field(BorrowedField::Regular(Cow::from("bar"))),
                 ],
             ),
             (
                 r#"."🤖""#,
-                vec![BorrowedSegment::QuotedField(Cow::from("🤖"))],
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "🤖",
+                )))],
+            ),
+            (
+                r#""sandbox0-label0""#,
+                vec![BorrowedSegment::Field(BorrowedField::Quoted(Cow::from(
+                    "sandbox0-label0",
+                )))],
             ),
         ];
 

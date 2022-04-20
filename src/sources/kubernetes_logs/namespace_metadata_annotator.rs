@@ -59,7 +59,9 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     if let Some(labels) = &metadata.labels {
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone().segments;
-            path.push(OwnedSegment::Field(key.clone()));
+            println!("annotate_from_metadata key {:?}", key);
+            path.push(OwnedSegment::field(key));
+            println!("annotate_from_metadata path: {:?}", path);
             log.insert(&path, val.to_owned());
         }
     }
@@ -86,8 +88,8 @@ mod tests {
                     uid: Some("sandbox0-uid".to_owned()),
                     labels: Some(
                         vec![
-                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                            ("\"sandbox0-label0\"".to_owned(), "val0".to_owned()),
+                            ("\"sandbox0-label1\"".to_owned(), "val1".to_owned()),
                         ]
                         .into_iter()
                         .collect(),
@@ -110,8 +112,8 @@ mod tests {
                     uid: Some("sandbox0-uid".to_owned()),
                     labels: Some(
                         vec![
-                            ("sandbox0-label0".to_owned(), "val0".to_owned()),
-                            ("sandbox0-label1".to_owned(), "val1".to_owned()),
+                            ("\"sandbox0-label0\"".to_owned(), "val0".to_owned()),
+                            ("\"sandbox0-label1\"".to_owned(), "val1".to_owned()),
                         ]
                         .into_iter()
                         .collect(),
@@ -161,6 +163,8 @@ mod tests {
         for (fields_spec, metadata, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata);
+            println!("log: {:?}", log);
+            println!("expected: {:?}", expected);
             assert_event_data_eq!(log, expected);
         }
     }
