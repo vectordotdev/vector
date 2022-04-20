@@ -130,7 +130,7 @@ console-subscriber = { version = "0.1.4", optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
-tracing-core = { version = "0.1.25", default-features = false }
+tracing-core = { version = "0.1.26", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
@@ -326,7 +326,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
-wiremock = "0.5.12"
+wiremock = "0.5.13"
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
