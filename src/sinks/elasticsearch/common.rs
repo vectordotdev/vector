@@ -70,10 +70,7 @@ impl ElasticsearchCommon {
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let region = match &config.aws {
-            Some(region) => region.region(),
-            None => None,
-        };
+        let region = config.aws.as_ref().map(|config| config.region());
 
         let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
