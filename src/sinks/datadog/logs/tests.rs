@@ -151,7 +151,7 @@ async fn smoke() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv1, BatchStatus::Errored).await;
+    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -164,7 +164,7 @@ async fn handles_failure_v1() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv2, BatchStatus::Errored).await;
+    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
