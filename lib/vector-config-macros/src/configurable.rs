@@ -171,7 +171,7 @@ fn build_struct_generate_schema_fn(
             let field_name = field.field.ident.clone().expect("only structs with named fields can derive `Configurable`");
 			let field_as_configurable = get_field_type_as_configurable(field);
             let field_already_contained = format!("schema properties already contained entry for `{}`, this should not occur", field_name);
-            let field_key = field_name.to_string();
+            let field_key = field.serde.name().deserialize_name();
 
             let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
 			let field_metadata = generate_field_metadata(&field_metadata_ref, field);

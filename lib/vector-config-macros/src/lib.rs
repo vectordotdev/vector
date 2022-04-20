@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
 use syn::Error;
 
+mod ast;
 mod attrs;
 mod configurable;
 mod configurable_component;

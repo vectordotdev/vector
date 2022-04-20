@@ -30,7 +30,8 @@ impl FieldAttributes {
         index: usize,
     ) -> Self {
         // Start off by extract all `serde`-specific attributes for the given field.
-        let serde_field = Field::from_ast(context, index, field, None, container.serde.default());
+        let mut serde_field = Field::from_ast(context, index, field, None, container.serde.default());
+        serde_field.rename_by_rules(container.serde.rename_all_rules());
 
         Self::with_serde(context, field, serde_field, index)
     }

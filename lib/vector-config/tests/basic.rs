@@ -147,6 +147,7 @@ fn default_simple_sink_endpoint() -> String {
 #[derive(Clone)]
 #[configurable_component]
 #[configurable(metadata("status", "stable"))]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdvancedSinkConfig {
     /// The endpoint to send events to.
     #[serde(default = "default_advanced_sink_endpoint")]
