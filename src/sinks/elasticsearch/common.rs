@@ -77,7 +77,9 @@ impl ElasticsearchCommon {
 
         let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
-            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.credentials_provider().await?),
+            Some(ElasticsearchAuth::Aws(aws)) => {
+                Some(aws.credentials_provider(region.clone()).await?)
+            }
         };
 
         let compression = config.compression;
