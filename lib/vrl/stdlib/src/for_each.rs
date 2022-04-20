@@ -111,8 +111,8 @@ impl Function for ForEach {
             ],
             output: closure::Output::Any,
             example: Example {
-                title: "iterate array",
-                source: r#"for_each([1, 2]) -> |key_or_index, value| { .foo = to_int!(.foo) + (int(key_or_index) ?? 0) + int!(value) }"#,
+                title: "iterate object or array",
+                source: r#"for_each([1, 2]) -> |key_or_index, value| { .foo = to_int!(.foo) + key_or_index + int!(value) }"#,
                 result: Ok("null"),
             },
         };

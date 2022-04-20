@@ -1,14 +1,16 @@
 # SKIP
-# object: {}
-# result: "TODO"
+# object: { "message": "2020-10-02T23:22:12.223222Z info Hello world" }
+# result: { "timestamp": "2020-10-02T23:22:12.223222Z", "level": "info", "message": "Hello world" }
 
-patterns = []
+patterns = ["foo", "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 matched = false
 
 for_each(patterns) -> |_index, pattern| {
-  if !matched && (parsed, err = parse_grok(.message, pattern); err == null) {
-    matched = true
-    . |= parsed
+  if !matched {
+    if (parsed, err = parse_grok(.message, pattern); err == null) {
+      matched = true
+      . |= parsed
+    }
   }
 }
 

@@ -26,13 +26,13 @@ impl Function for MapValues {
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "map object keys",
-                source: r#"map_values({ "a": 1, "b": 2 }) -> |key| { value = int!(value) + 1 }"#,
+                title: "map object values",
+                source: r#"map_values({ "a": 1, "b": 2 }) -> |value| { value = int!(value) + 1 }"#,
                 result: Ok(r#"{ "a": 2, "b": 3 }"#),
             },
             Example {
-                title: "recursively map object keys",
-                source: r#"map_values({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }) -> |value| { value = int!(value) + 1 }"#,
+                title: "recursively map object values",
+                source: r#"map_values({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }, recursive: true) -> |value| { value = if is_integer(value) { int!(value) + 1 } else { value } }"#,
                 result: Ok(r#"{ "a": 2, "b": [{ "c": 3 }, { "d": 4 }], "e": { "f": 5 } }"#),
             },
         ]
@@ -62,9 +62,9 @@ impl Function for MapValues {
             variables: vec![closure::Variable { kind: Kind::any() }],
             output: closure::Output::Any,
             example: Example {
-                title: "map object keys",
-                source: r#"map({ "one" : 1, "two": 2 }) -> |key| { upcase(key) }"#,
-                result: Ok(r#"{ "ONE": 1, "TWO": 2 }"#),
+                title: "map object values",
+                source: r#"map_values({ "one" : "one", "two": "two" }) -> |value| { upcase!(value) }"#,
+                result: Ok(r#"{ "one": "ONE", "two": "TWO" }"#),
             },
         };
 

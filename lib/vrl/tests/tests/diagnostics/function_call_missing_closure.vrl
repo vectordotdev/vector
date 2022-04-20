@@ -3,10 +3,10 @@
 # error[E111]: missing closure
 #   ┌─ :2:1
 #   │
-# 2 │ map({})
-#   │ ^^^^^^^ this function expects a closure
+# 2 │ for_each({})
+#   │ ^^^^^^^^^^^^ this function expects a closure
 #   │
-#   = example: map({ "one" : 1, "two": 2 }) -> |key, value| { [key + "*2", value * 2] }
+#   = example: for_each({ "one" : 1, "two": 2 }) -> |key, value| { .foo = to_int!(.foo) + int!(value) }
 #   = see language documentation at https://vrl.dev
 
-map({})
+for_each({})

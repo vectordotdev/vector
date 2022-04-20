@@ -1,3 +1,3 @@
-# result: { "FOO_foo": "BAR" }
+# result: { "FOO_foo": "bar" }
 
-map(value: { "foo": "bar" }) -> |key, value| { [upcase(k) + "_" + k, upcase(v)] }
+map_keys(value: { "foo": "bar" }) -> |k| { upcase(k) + "_" + k }

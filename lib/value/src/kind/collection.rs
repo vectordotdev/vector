@@ -295,7 +295,7 @@ impl std::fmt::Display for Collection<Field> {
 
         f.write_str(" }")?;
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -323,7 +323,7 @@ impl std::fmt::Display for Collection<Index> {
 
         f.write_str("]")?;
 
-        return Ok(());
+        Ok(())
     }
 }
 

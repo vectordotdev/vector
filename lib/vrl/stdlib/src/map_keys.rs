@@ -27,12 +27,12 @@ impl Function for MapKeys {
         &[
             Example {
                 title: "map object keys",
-                source: r#"map_keys({ "a": 1, "b": 2 }) -> |key| { upase(key) }"#,
+                source: r#"map_keys({ "a": 1, "b": 2 }) -> |key| { upcase(key) }"#,
                 result: Ok(r#"{ "A": 1, "B": 2 }"#),
             },
             Example {
                 title: "recursively map object keys",
-                source: r#"map_keys({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }) -> |key| { upase(key) }"#,
+                source: r#"map_keys({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }, recursive: true) -> |key| { upcase(key) }"#,
                 result: Ok(r#"{ "A": 1, "B": [{ "C": 2 }, { "D": 3 }], "E": { "F": 4 } }"#),
             },
         ]
@@ -67,7 +67,7 @@ impl Function for MapKeys {
             },
             example: Example {
                 title: "map object keys",
-                source: r#"map({ "one" : 1, "two": 2 }) -> |key| { upcase(key) }"#,
+                source: r#"map_keys({ "one" : 1, "two": 2 }) -> |key| { upcase(key) }"#,
                 result: Ok(r#"{ "ONE": 1, "TWO": 2 }"#),
             },
         };
