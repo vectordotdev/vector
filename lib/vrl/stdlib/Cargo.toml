@@ -41,7 +41,7 @@ strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.16", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
-uuid = { version = "0.8", features = ["v4"], optional = true }
+uuid = { version = "1.0", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
