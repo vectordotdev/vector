@@ -132,16 +132,12 @@ fn main() {
             continue;
         }
 
-        let dots = if test.name.len() >= 60 {
-            0
-        } else {
-            60 - test.name.len()
-        };
-        print!(
-            "  {}{}",
-            test.name,
-            Colour::Fixed(240).paint(".".repeat(dots))
-        );
+        let mut name = test.name.clone();
+        name.truncate(58);
+
+        let dots = if name.len() >= 60 { 0 } else { 60 - name.len() };
+
+        print!("  {}{}", name, Colour::Fixed(240).paint(".".repeat(dots)));
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
