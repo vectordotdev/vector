@@ -33,31 +33,33 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let CloudwatchError::Put(err) = error {
-            if let SdkError::ServiceError { err, raw: _ } = err {
-                if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
-                    return true;
+        match error {
+            CloudwatchError::Put(err) => {
+                if let SdkError::ServiceError { err, raw: _ } = err {
+                    if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
+                        return true;
+                    }
                 }
+                is_retriable_error(err)
             }
-            return is_retriable_error(err);
-        }
-        if let CloudwatchError::Describe(err) = error {
-            if let SdkError::ServiceError { err, raw: _ } = err {
-                if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
-                    return true;
+            CloudwatchError::Describe(err) => {
+                if let SdkError::ServiceError { err, raw: _ } = err {
+                    if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
+                        return true;
+                    }
                 }
+                is_retriable_error(err)
             }
-            return is_retriable_error(err);
-        }
-        if let CloudwatchError::CreateStream(err) = error {
-            if let SdkError::ServiceError { err, raw: _ } = err {
-                if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
-                    return true;
+            CloudwatchError::CreateStream(err) => {
+                if let SdkError::ServiceError { err, raw: _ } = err {
+                    if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
+                        return true;
+                    }
                 }
+                is_retriable_error(err)
             }
-            return is_retriable_error(err);
+            _ => false,
         }
-        false
     }
 }
 
