@@ -1779,7 +1779,7 @@ dependencies = [
  "tonic 0.7.1",
  "tracing 0.1.34",
  "tracing-core 0.1.26",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4292,15 +4292,6 @@ checksum = "ffbee8634e0d45d258acb448e7eaab3fce7a0a467395d4d9f228e3c1f01fb2e4"
 
 [[package]]
 name = "matchers"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f099785f7595cc4b4553a174ce30dd7589ef93391ff414dbb67f62392b9e0ce1"
-dependencies = [
- "regex-automata",
-]
-
-[[package]]
-name = "matchers"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
@@ -4467,7 +4458,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.34",
  "tracing-core 0.1.26",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -8261,7 +8252,7 @@ checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
  "tracing 0.1.34",
  "tracing-core 0.1.26",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -8294,7 +8285,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.34",
  "tracing-core 0.1.26",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -8320,14 +8311,13 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.25"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
+checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
 dependencies = [
  "ansi_term",
- "chrono",
  "lazy_static",
- "matchers 0.0.1",
+ "matchers",
  "regex",
  "serde",
  "serde_json",
@@ -8341,42 +8331,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-subscriber"
-version = "0.3.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
-dependencies = [
- "ansi_term",
- "lazy_static",
- "matchers 0.1.0",
- "regex",
- "serde",
- "serde_json",
- "sharded-slab",
- "thread_local",
- "tracing 0.1.34",
- "tracing-core 0.1.26",
- "tracing-log",
- "tracing-serde",
-]
-
-[[package]]
 name = "tracing-test"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3b48778c2d401c6a7fcf38a0e3c55dc8e8e753cbd381044a8cdb6fd69a29f53"
+checksum = "3eb7bda2e93bbc9c5b247034acc6a4b3d04f033a3d4b8fc1cb87d4d1c7c7ebd7"
 dependencies = [
  "lazy_static",
  "tracing-core 0.1.26",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
  "tracing-test-macro",
 ]
 
 [[package]]
 name = "tracing-test-macro"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c49adbab879d2e0dd7f75edace5f0ac2156939ecb7e6a1e8fa14e53728328c48"
+checksum = "4801dca35e4e2cee957c469bd4a1c370fadb7894c0d50721a40eba3523e6e91c"
 dependencies = [
  "lazy_static",
  "quote 1.0.10",
@@ -8937,7 +8907,7 @@ dependencies = [
  "tracing-core 0.1.26",
  "tracing-futures 0.2.5",
  "tracing-limit",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -9031,7 +9001,7 @@ dependencies = [
  "tokio-util 0.7.0",
  "tracing 0.1.34",
  "tracing-fluent-assertions",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
  "vector_common",
 ]
 
@@ -9112,7 +9082,7 @@ dependencies = [
  "tracing 0.1.34",
  "tracing-core 0.1.26",
  "tracing-log",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
  "twox-hash",
  "typetag",
  "url",
@@ -9292,7 +9262,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tikv-jemallocator",
- "tracing-subscriber 0.3.11",
+ "tracing-subscriber",
  "vector_common",
  "vrl",
  "vrl-stdlib",
