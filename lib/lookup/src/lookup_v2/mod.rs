@@ -27,7 +27,7 @@ impl Serialize for OwnedPath {
         S: Serializer,
     {
         if self.segments.is_empty() {
-            serializer.serialize_str(".")
+            serializer.serialize_str("<invalid>")
         } else {
             let path = self
                 .segments
