@@ -38,17 +38,20 @@ impl Serialize for OwnedPath {
                             .chars()
                             .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
                         if needs_quotes {
-                            let mut string = String::new();
-                            string.reserve(field.as_bytes().len());
+                            let mut string = String::from(r#".""#);
+                            string.reserve(field.as_bytes().len() + 1);
                             for c in field.chars() {
                                 if matches!(c, '"' | '\\') {
                                     string.push('\\');
                                 }
                                 string.push(c);
                             }
-                            format!(r#"."{}""#, string)
+                            string.push('"');
+                            string
                         } else {
-                            format!(".{}", field)
+                            let mut string = String::from('.');
+                            string.push_str(field);
+                            string
                         }
                     }
                     OwnedSegment::Index(index) => format!("[{}]", index),
