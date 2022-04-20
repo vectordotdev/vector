@@ -42,7 +42,6 @@ impl<'a> VmArgument<'a> {
 pub struct VmArgumentList<'a> {
     args: &'static [Parameter],
     values: Vec<Option<VmArgument<'a>>>,
-    // closure: Option<&'a Vm>,
 }
 
 impl<'a> VmArgumentList<'a> {

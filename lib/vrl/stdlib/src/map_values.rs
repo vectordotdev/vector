@@ -60,7 +60,7 @@ impl Function for MapValues {
             parameter_keyword: "value",
             kind: Kind::object(Collection::any()).or_array(Collection::any()),
             variables: vec![closure::Variable { kind: Kind::any() }],
-            output: closure::Output::Any,
+            output: closure::Output::Kind(Kind::any()),
             example: Example {
                 title: "map object values",
                 source: r#"map_values({ "one" : "one", "two": "two" }) -> |value| { upcase!(value) }"#,

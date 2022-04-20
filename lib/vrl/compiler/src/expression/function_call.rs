@@ -1,7 +1,3 @@
-use crate::expression::assignment::Details;
-use crate::function::closure;
-use crate::function::Example;
-
 use std::{fmt, sync::Arc};
 
 use anymap::AnyMap;
@@ -9,8 +5,9 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
     expression,
+    expression::assignment::Details,
     expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
-    function::{ArgumentList, FunctionCompileContext, Parameter},
+    function::{closure, ArgumentList, Example, FunctionCompileContext, Parameter},
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -39,7 +36,7 @@ impl<'a> Builder<'a> {
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-        fns: &'a [Box<dyn Function>],
+        funcs: &'a [Box<dyn Function>],
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
         closure_span: Option<Span>,
@@ -48,14 +45,17 @@ impl<'a> Builder<'a> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = match fns
+        let (function_id, function) = match funcs
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
         {
             Some(function) => function,
             None => {
-                let idents = fns.iter().map(|func| func.identifier()).collect::<Vec<_>>();
+                let idents = funcs
+                    .iter()
+                    .map(|func| func.identifier())
+                    .collect::<Vec<_>>();
 
                 return Err(Error::Undefined {
                     ident_span,
@@ -194,16 +194,24 @@ impl<'a> Builder<'a> {
                     match list.arguments.get(input.parameter_keyword) {
                         // No argument provided for the given parameter keyword.
                         //
-                        // This means the closure can't act on the input definition, so we continue
-                        // on to the next. If no input definitions are valid, the closure is
-                        // invalid.
+                        // This means the closure can't act on the input
+                        // definition, so we continue on to the next. If no
+                        // input definitions are valid, the closure is invalid.
                         None => continue,
+
+                        // We've found the function argument over which the
+                        // closure is going to resolve. We need to ensure the
+                        // type of this argument is as expected by the closure.
                         Some(expr) => {
                             let type_def = expr.type_def((local, external));
 
-                            // The type definition of the value does not match the expected closure
-                            // type, continue to check if the closure eventually accepts this
-                            // definition.
+                            // The type definition of the value does not match
+                            // the expected closure type, continue to check if
+                            // the closure eventually accepts this definition.
+                            //
+                            // Keep track of the type information, so that we
+                            // can report these in a diagnostic error if no
+                            // other input definition matches.
                             if !input.kind.is_superset(type_def.kind()) {
                                 err_found_type_def = Some(type_def.kind().clone());
                                 err_input_expression = Some(expr);
@@ -219,7 +227,7 @@ impl<'a> Builder<'a> {
                 // None of the inputs matched the value type, this is a user error.
                 match matched {
                     None => {
-                        return Err(Error::EnumerationTypeMismatch {
+                        return Err(Error::ClosureParameterTypeMismatch {
                             call_span,
                             found_kind: err_found_type_def.unwrap_or_else(Kind::any),
                             input_expression: err_input_expression
@@ -265,9 +273,6 @@ impl<'a> Builder<'a> {
                         //
                         // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
                         // integer.
-                        //
-                        // An implementation with an arity mismatch will return in a compile-time
-                        // error.
                         for (index, input_var) in input.variables.clone().into_iter().enumerate() {
                             let call_ident = &variables[index];
 
@@ -309,13 +314,14 @@ impl<'a> Builder<'a> {
     }
 
     pub(crate) fn compile(
-        &mut self,
+        mut self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
 
+        // Check if we have a closure we need to compile.
         if let Some((variables, input)) = self.closure.clone() {
             let block = closure_block.unwrap();
             closure_fallible = block.type_def((local, external)).is_fallible();
@@ -586,6 +592,16 @@ impl Expression for FunctionCall {
 
         // If the function has a closure attached, and that closure is fallible,
         // then the function call itself becomes fallible.
+        //
+        // Given that `FunctionClosure` also implements `Expression`, and
+        // function implementations can access this closure, it is possible the
+        // function implementation already handles potential closure
+        // fallibility, but to be on the safe side, we ensure it is set properly
+        // here.
+        //
+        // Note that, since closures are tied to function calls, it is still
+        // possible to silence potential closure errors using the "abort on
+        // error" function-call feature (see below).
         if self.closure_fallible {
             type_def = type_def.with_fallibility(true);
         }
@@ -780,13 +796,13 @@ pub(crate) enum Error {
         expected: usize,
         supplied: usize,
     },
-    #[error("type mismatch in enumeration function call")]
-    EnumerationTypeMismatch {
+    #[error("type mismatch in closure parameter")]
+    ClosureParameterTypeMismatch {
         call_span: Span,
         found_kind: Kind,
         input_expression: expression::Expr,
     },
-    #[error("type mismatch in enumeration return type")]
+    #[error("type mismatch in closure return type")]
     ReturnTypeMismatch {
         block_span: Span,
         found_kind: Kind,
@@ -811,7 +827,7 @@ impl DiagnosticError for Error {
             UnexpectedClosure { .. } => 109,
             MissingClosure { .. } => 111,
             ClosureArityMismatch { .. } => 120,
-            EnumerationTypeMismatch { .. } => 121,
+            ClosureParameterTypeMismatch { .. } => 121,
             ReturnTypeMismatch { .. } => 122,
         }
     }
@@ -975,13 +991,13 @@ impl DiagnosticError for Error {
                 Label::primary(format!("this function requires a closure with {expected} argument(s)"), ident_span),
                 Label::context(format!("but {supplied} argument(s) are supplied"), closure_arguments_span)
             ],
-            EnumerationTypeMismatch {
+            ClosureParameterTypeMismatch {
                 call_span,
                 found_kind,
                 input_expression
             } => vec![
-                Label::primary("This input value does not have a known enumerable type.", call_span),
-                Label::context(format!("The expression {input_expression} has an inferred type of {found_kind} where an array or object was expected. If the type is known and is enumerable, try asserting the correct type with the array() or object() functions."), call_span)],
+                Label::primary("the closure tied to this function call expects a different input value", call_span),
+                Label::context(format!("expression {input_expression} has an inferred type of {found_kind} where an array or object was expected"), call_span)],
             ReturnTypeMismatch {
                 block_span,
                 found_kind,

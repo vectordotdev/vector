@@ -4,15 +4,13 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
+    expression::FunctionClosure,
+    function::closure,
     value::{Collection, Field, Index, IterItem, Kind},
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
-pub use compiler::expression::FunctionClosure;
-
 pub type Result<T> = std::result::Result<T, ExpressionError>;
-
-pub use compiler::function::closure;
 
 pub use std::collections::BTreeMap;
 pub use std::fmt;

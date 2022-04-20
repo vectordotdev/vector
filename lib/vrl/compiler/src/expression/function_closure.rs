@@ -49,7 +49,7 @@ impl FunctionClosure {
                 .map(|value| (ident.clone(), value))
         });
 
-        self.block.resolve(ctx)?;
+        self.resolve(ctx)?;
 
         if let Some((ident, value)) = old_key_data {
             let state = ctx.state_mut();
@@ -96,7 +96,7 @@ impl FunctionClosure {
                 .map(|value| (ident.clone(), value))
         });
 
-        self.block.resolve(ctx)?;
+        self.resolve(ctx)?;
 
         if let Some((ident, value)) = old_index_data {
             let state = ctx.state_mut();
@@ -128,11 +128,7 @@ impl FunctionClosure {
                 .map(|value| (ident.clone(), value))
         });
 
-        *key = self
-            .block
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .into_owned();
+        *key = self.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned();
 
         if let Some((ident, value)) = old_data {
             let state = ctx.state_mut();
@@ -159,7 +155,7 @@ impl FunctionClosure {
                 .map(|value| (ident.clone(), value))
         });
 
-        *value = self.block.resolve(ctx)?;
+        *value = self.resolve(ctx)?;
 
         if let Some((ident, value)) = old_data {
             let state = ctx.state_mut();
@@ -171,10 +167,10 @@ impl FunctionClosure {
 }
 
 impl Expression for FunctionClosure {
-    fn resolve(&self, _: &mut Context) -> core::Resolved {
-        // We cannot implement `resolve` for this type, because we have to pass
-        // in the values that need to be stored in the configured `variables`.
-        unimplemented!("must use special-case mehods such as `map_value`")
+    fn resolve(&self, ctx: &mut Context) -> core::Resolved {
+        // NOTE: It is the task of the caller to ensure the closure arguments
+        // are inserted into the context before resolving this closure.
+        self.block.resolve(ctx)
     }
 
     fn type_def(

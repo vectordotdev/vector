@@ -9,6 +9,7 @@ use super::Example;
 /// receive.
 #[derive(Debug)]
 pub struct Definition {
+    /// A list of input configurations valid for this closure definition.
     pub inputs: Vec<Input>,
 }
 
@@ -17,10 +18,10 @@ pub struct Definition {
 /// A closure can support different variable input shapes, depending on the
 /// type of a given parameter of the function.
 ///
-/// For example, the `map` function takes either an `Object` or an `Array`
-/// for the `value` parameter, and the closure it takes either accepts
-/// `|key, value|`, where "key" is always a string, or `|index, value|` where
-/// "index" is always a number, depending on the parameter input type.
+/// For example, the `for_each` function takes either an `Object` or an `Array`
+/// for the `value` parameter, and the closure it takes either accepts `|key,
+/// value|`, where "key" is always a string, or `|index, value|` where "index"
+/// is always a number, depending on the parameter input type.
 #[derive(Debug, Clone)]
 pub struct Input {
     /// The parameter keyword upon which this closure input variant depends on.
@@ -42,13 +43,14 @@ pub struct Input {
 /// One variable input for a closure.
 ///
 /// For example, in `{ |foo, bar| ... }`, `foo` and `bar` are each
-/// a `ClosureVariable`.
+/// a `Variable`.
 #[derive(Debug, Clone)]
 pub struct Variable {
     /// The value kind this variable will return when called.
     pub kind: Kind,
 }
 
+/// The output type required by the closure block.
 #[derive(Debug, Clone)]
 pub enum Output {
     Array {
@@ -61,12 +63,10 @@ pub enum Output {
         fields: BTreeMap<&'static str, Kind>,
     },
 
-    Scalar {
-        /// The expected scalar kind.
-        kind: Kind,
-    },
-
-    Any,
+    Kind(
+        /// The expected kind.
+        Kind,
+    ),
 }
 
 impl Output {
@@ -91,8 +91,7 @@ impl Output {
 
                 collection.into()
             }
-            Output::Scalar { kind } => kind,
-            Output::Any => Kind::any(),
+            Output::Kind(kind) => kind,
         }
     }
 }

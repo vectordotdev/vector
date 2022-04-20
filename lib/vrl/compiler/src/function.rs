@@ -90,8 +90,8 @@ pub trait Function: Send + Sync + fmt::Debug {
 
     /// An optional closure definition for the function.
     ///
-    /// This function returns `None` by default, indicating the function doesn't
-    /// accept a closure.
+    /// This returns `None` by default, indicating the function doesn't accept
+    /// a closure.
     fn closure(&self) -> Option<closure::Definition> {
         None
     }
@@ -222,6 +222,13 @@ impl Parameter {
 #[derive(Debug, Default, Clone)]
 pub struct ArgumentList {
     pub(crate) arguments: HashMap<&'static str, Expr>,
+
+    /// A closure argument differs from regular arguments, in that it isn't an
+    /// expression by itself, and it also isn't tied to a parameter string in
+    /// the function call.
+    ///
+    /// We do still want to store the closure in the argument list, to allow
+    /// function implementors access to the closure through `Function::compile`.
     closure: Option<FunctionClosure>,
 }
 

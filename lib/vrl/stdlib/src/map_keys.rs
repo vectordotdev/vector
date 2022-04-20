@@ -62,9 +62,7 @@ impl Function for MapKeys {
             variables: vec![closure::Variable {
                 kind: Kind::bytes(),
             }],
-            output: closure::Output::Scalar {
-                kind: Kind::bytes(),
-            },
+            output: closure::Output::Kind(Kind::bytes()),
             example: Example {
                 title: "map object keys",
                 source: r#"map_keys({ "one" : 1, "two": 2 }) -> |key| { upcase(key) }"#,

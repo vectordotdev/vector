@@ -1,6 +1,6 @@
 # result:
 #
-# error[E122]: type mismatch in enumeration return type
+# error[E122]: type mismatch in closure return type
 #   ┌─ :2:21
 #   │
 # 2 │ map_keys({}) -> |k| { null }

@@ -75,7 +75,7 @@ impl Function for ForEach {
                 },
                 closure::Variable { kind: Kind::any() },
             ],
-            output: closure::Output::Any,
+            output: closure::Output::Kind(Kind::any()),
             example: Example {
                 title: "iterate object",
                 source: r#"for_each({ "one" : 1, "two": 2 }) -> |key, value| { .foo = to_int!(.foo) + int!(value) }"#,
@@ -92,7 +92,7 @@ impl Function for ForEach {
                 },
                 closure::Variable { kind: Kind::any() },
             ],
-            output: closure::Output::Any,
+            output: closure::Output::Kind(Kind::any()),
             example: Example {
                 title: "iterate array",
                 source: r#"for_each([1, 2]) -> |index, value| { .foo = to_int!(.foo) + index + int!(value) }"#,
@@ -109,7 +109,7 @@ impl Function for ForEach {
                 },
                 closure::Variable { kind: Kind::any() },
             ],
-            output: closure::Output::Any,
+            output: closure::Output::Kind(Kind::any()),
             example: Example {
                 title: "iterate object or array",
                 source: r#"for_each([1, 2]) -> |key_or_index, value| { .foo = to_int!(.foo) + key_or_index + int!(value) }"#,

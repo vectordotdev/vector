@@ -1062,7 +1062,7 @@ pub struct FunctionClosure {
 
 impl fmt::Display for FunctionClosure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("{ |")?;
+        f.write_str("-> |")?;
 
         let mut iter = self.variables.iter().peekable();
         while let Some(var) = iter.next() {
@@ -1073,7 +1073,7 @@ impl fmt::Display for FunctionClosure {
             }
         }
 
-        f.write_str("|\n")?;
+        f.write_str("| {\n")?;
 
         let mut iter = self.block.0.iter().peekable();
         while let Some(expr) = iter.next() {

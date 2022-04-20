@@ -423,7 +423,7 @@ impl<'a> Compiler<'a> {
             closure_span,
             closure_variables,
         )
-        .and_then(|mut builder| {
+        .and_then(|builder| {
             let block = closure_block.map(|block| {
                 let span = block.span();
                 let block = self.compile_block(block, external);

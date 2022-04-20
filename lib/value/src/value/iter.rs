@@ -46,27 +46,33 @@ impl Value {
     }
 }
 
+/// An [`Iterator`] over a [`Value`].
 pub struct ValueIter<'a> {
     data: IterData,
     recursive: bool,
     index: usize,
     recursive_iter: Option<Box<Self>>,
-    must_recurse_on_next: bool,
+    must_prepare_recursion: bool,
     phantom: PhantomData<&'a mut ()>,
 }
 
-enum IterData {
-    Value(Value),
-    Object(Vec<(String, Value)>),
-    Array(Vec<Value>),
-}
-
+/// The [`Iterator::Item`] returned by the [`ValueIter`] iterator.
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 pub enum IterItem<'a> {
     Value(&'a mut Value),
     KeyValue(&'a mut String, &'a mut Value),
     IndexValue(usize, &'a mut Value),
+}
+
+/// The internal data representation used by the iterator.
+///
+/// Objects are stored as a `Vec<(String, Value)>`, to allow mutating the object
+/// keys during iteration.
+enum IterData {
+    Value(Value),
+    Object(Vec<(String, Value)>),
+    Array(Vec<Value>),
 }
 
 impl<'a> ValueIter<'a> {
@@ -77,7 +83,7 @@ impl<'a> ValueIter<'a> {
             recursive,
             index: 0,
             recursive_iter: None,
-            must_recurse_on_next: false,
+            must_prepare_recursion: false,
             phantom: PhantomData,
         }
     }
@@ -87,14 +93,16 @@ impl<'a> Iterator for ValueIter<'a> {
     type Item = IterItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // If we get here, it means on the last iteration, we've returned
-        // a collection value-type, and the caller asked to recurse into that
-        // collection.
+        // If this returns true, it means on the last iteration cycle, we've
+        // returned a collection value-type, and the caller asked to recurse
+        // into that collection.
         //
         // We're going to prepare recursion by embedding a new recursive
-        // iterator into `ValueIter`.
-        if self.must_recurse_on_next {
-            self.must_recurse_on_next = false;
+        // iterator into `ValueIter`. This preparation is delayed to this new
+        // cycle, to allow the caller to first mutate the collection we're going
+        // to recurse into.
+        if self.must_prepare_recursion {
+            self.must_prepare_recursion = false;
 
             // Get the relevant collection `Value` type we want to iterate over.
             let value = match &mut self.data {
@@ -104,15 +112,19 @@ impl<'a> Iterator for ValueIter<'a> {
             };
 
             // Create a new `IterData` type we're going to embed recursively
-            // into this iterator, to allow recursing over.
+            // into this iterator, to allow iterating over.
             let data = match value {
                 Value::Object(object) => {
                     Some(IterData::Object(object.clone().into_iter().collect()))
                 }
                 Value::Array(array) => Some(IterData::Array(array.clone())),
 
-                // It's possible we hit this branch, if the caller changed the
-                // value type before recursion. That is, given this:
+                // It's possible the [`Value`] we're trying to iterate over is
+                // a non-collection type. This happens if the caller changed the
+                // value type of the collection to a non-collection type in the
+                // last iteration cycle.
+                //
+                // That is, given this:
                 //
                 // ```
                 // { "foo": [true] }
@@ -124,9 +136,7 @@ impl<'a> Iterator for ValueIter<'a> {
                 _ => None,
             };
 
-            if let Some(data) = data {
-                self.recursive_iter = Some(Box::new(Self::new(data, self.recursive)));
-            }
+            self.recursive_iter = data.map(|data| Box::new(Self::new(data, self.recursive)));
         }
 
         // If we have a recursive iterator stored, it means we're asked to
@@ -164,25 +174,23 @@ impl<'a> Iterator for ValueIter<'a> {
             // to recursively iterate the value type, and the value itself is an
             // actual object.
             //
-            // If no recursion was requested, the object `Value` type is instead
-            // stored in `IterData::Value`.
+            // If no recursion was requested, the object `Value` type is stored
+            // in `IterData::Value` instead.
             IterData::Object(object) => match object.get_mut(self.index) {
                 Some((key, value)) => {
+                    if value.is_object() || value.is_array() {
+                        // We *only* want to recurse deeper into nested
+                        // collections, if requested by the caller.
+                        self.must_prepare_recursion = self.recursive;
+                    }
+
                     // SAFETY:
                     //
                     // - We borrow each item in the collection *exactly once*.
                     // - We take a `&mut self`, so we also only borrow the
                     //   collection itself exactly once.
-                    // - We check above that the index points to a valid slot in
-                    //   the collection.
                     let key_mut = unsafe { &mut *std::ptr::addr_of_mut!(*key) };
                     let value_mut = unsafe { &mut *std::ptr::addr_of_mut!(*value) };
-
-                    // We *only* want to recurse deeper into nested collections,
-                    // if requested by the caller.
-                    if value.is_object() || value.is_array() {
-                        self.must_recurse_on_next = self.recursive;
-                    }
 
                     IterItem::KeyValue(key_mut, value_mut)
                 }
@@ -194,20 +202,18 @@ impl<'a> Iterator for ValueIter<'a> {
             // collection types.
             IterData::Array(array) => match array.get_mut(self.index) {
                 Some(value) => {
+                    if value.is_object() || value.is_array() {
+                        // We *only* want to recurse deeper into nested
+                        // collections, if requested by the caller.
+                        self.must_prepare_recursion = self.recursive;
+                    }
+
                     // SAFETY:
                     //
                     // - We borrow each item in the collection *exactly once*.
                     // - We take a `&mut self`, so we also only borrow the
                     //   collection itself exactly once.
-                    // - We check above that the index points to a valid slot in
-                    //   the collection.
                     let value_mut = unsafe { &mut *std::ptr::addr_of_mut!(*value) };
-
-                    // We *only* want to recurse deeper into nested collections,
-                    // if requested by the caller.
-                    if value.is_object() || value.is_array() {
-                        self.must_recurse_on_next = self.recursive;
-                    }
 
                     IterItem::IndexValue(self.index, value_mut)
                 }
@@ -228,6 +234,7 @@ impl<'a> Iterator for ValueIter<'a> {
                 // - We take a `&mut self`, so we also only borrow the
                 //   collection itself exactly once.
                 let value_mut = unsafe { &mut *std::ptr::addr_of_mut!(*value) };
+
                 IterItem::Value(value_mut)
             }
 
