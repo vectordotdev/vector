@@ -151,7 +151,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
                 AwsAuthentication::test_auth()
-                    .credentials_provider()
+                    .credentials_provider(test_region_endpoint().region())
                     .await
                     .unwrap(),
             )

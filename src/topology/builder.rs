@@ -40,6 +40,7 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    source_sender::CHUNK_SIZE,
     spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::wrap,
@@ -49,7 +50,8 @@ use crate::{
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
     Lazy::new(enrichment::TableRegistry::default);
 
-pub(crate) const SOURCE_SENDER_BUFFER_SIZE: usize = 1000;
+pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
+    Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
@@ -165,7 +167,7 @@ pub async fn build_pieces(
         );
         let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
 
-        let mut builder = SourceSender::builder().with_buffer(SOURCE_SENDER_BUFFER_SIZE);
+        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
