@@ -63,30 +63,25 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category:    "Context"
-						common:      false
+						category: "Context"
+						common:   false
 						description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-				Set to "" to suppress this key.
-				"""
-						required:    false
+							If set, will add a tag using the provided key name with a value of the current the current host.
+							"""
+						required: false
 						type: string: {
-							default: "host"
+							default: null
 						}
 					}
 					pid_key: {
 						category: "Context"
 						common:   false
 						description: """
-					The key name added to each event representing the current process ID.
-
-					Set to "" to suppress this key.
-					"""
+							If set, will add a tag using the provided key name with a value of the current the current process ID.
+							"""
 						required: false
 						type: string: {
-							default: "pid"
+							default: null
 						}
 					}
 				}
@@ -99,12 +94,12 @@ components: sources: internal_metrics: {
 		_internal_metrics_tags: {
 			pid: {
 				description: "The process ID of the Vector instance."
-				required:    true
+				required:    false
 				examples: ["4232"]
 			}
 			host: {
 				description: "The hostname of the system Vector is running on."
-				required:    true
+				required:    false
 				examples: [_values.local_host]
 			}
 		}
