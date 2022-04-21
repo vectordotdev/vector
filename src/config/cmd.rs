@@ -83,12 +83,6 @@ fn merge_json(a: &mut Value, b: Value) {
                 merge_json(a.entry(k).or_insert(Value::Null), v);
             }
         }
-        (Value::Array(ref mut a), Value::Object(b)) => {
-            a.extend([Value::Object(b)]);
-        }
-        (Value::Array(ref mut a), Value::Array(b)) => {
-            a.extend(b);
-        }
         (a, b) => {
             *a = b;
         }
@@ -154,24 +148,21 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_array_concat() {
+    fn test_array_override() {
         let mut json = json!({
             "arr": [
                 "value1", "value2"
             ]
         });
 
-        let to_add = json!({
+        let to_override = json!({
             "arr": [
                 "value3", "value4"
             ]
         });
 
-        merge_json(&mut json, to_add);
+        merge_json(&mut json, to_override);
 
-        assert_eq!(
-            *json.get("arr").unwrap(),
-            json!(["value1", "value2", "value3", "value4"])
-        )
+        assert_eq!(*json.get("arr").unwrap(), json!(["value3", "value4"]))
     }
 }
