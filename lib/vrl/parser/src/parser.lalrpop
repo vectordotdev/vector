@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use crate::ast::*;
+use crate::template_string::TemplateString;
 use crate::lex::*;
 use diagnostic::span;
 use std::collections::BTreeMap;
@@ -16,7 +17,8 @@ extern {
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
         "path field" => Token::PathField(<&'input str>),
-        "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
+        "string literal" => Token::StringLiteral(<StringLiteralToken<&'input str>>),
+        "raw string literal" => Token::RawStringLiteral(<RawStringLiteralToken<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
         "regex literal" => Token::RegexLiteral(<&'input str>),
@@ -461,11 +463,14 @@ Array: Array = {
 #[inline]
 Object: Object = {
     "{" NonterminalNewline* "}" => Object(BTreeMap::default()),
-    "{" NonterminalNewline* <CommaMultiline<(<Sp<String>> ":" <ArithmeticExpr>)>> "}" => {
+    "{" NonterminalNewline* <CommaMultiline<(<Sp<ObjectKey>> ":" <ArithmeticExpr>)>> "}" => {
         let object =<>.into_iter().collect::<BTreeMap<_, _>>();
         Object(object)
     },
 };
+
+#[inline]
+ObjectKey: String = "string literal" => <>.unescape();
 
 // -----------------------------------------------------------------------------
 // literals
@@ -473,6 +478,7 @@ Object: Object = {
 
 pub Literal: Literal = {
     String => Literal::String(<>),
+    RawString => Literal::RawString(<>),
     Integer => Literal::Integer(<>),
     Float => Literal::Float(<>),
     Boolean => Literal::Boolean(<>),
@@ -481,7 +487,12 @@ pub Literal: Literal = {
     Timestamp => Literal::Timestamp(<>),
 };
 
-String: String = "string literal" => <>.unescape();
+String: TemplateString = Sp<"string literal"> => {
+    let Node { span, node } = <>;
+    node.template(span)
+};
+
+RawString: String = "raw string literal" => <>.unescape();
 Integer: i64 = "integer literal";
 Float: NotNan<f64> = "float literal";
 Boolean: bool = { "true" => true, "false" => false };

@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::Error;
+use crate::{template_string::TemplateString, Error};
 
 // -----------------------------------------------------------------------------
 // node
@@ -308,7 +308,8 @@ impl fmt::Debug for Ident {
 
 #[derive(Clone, PartialEq)]
 pub enum Literal {
-    String(String),
+    String(TemplateString),
+    RawString(String),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -323,6 +324,7 @@ impl fmt::Display for Literal {
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
+            RawString(v) => write!(f, r#"s'{}'"#, v),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
