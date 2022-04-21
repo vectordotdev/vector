@@ -87,7 +87,10 @@ impl<'a> Arbitrary<'a> for TemplateString {
             (0..size)
                 .map(|_| {
                     if bool::arbitrary(u)? {
-                        Ok(StringSegment::Literal(String::arbitrary(u)?))
+                        Ok(StringSegment::Literal(
+                            String::arbitrary(u)?,
+                            Span::default(),
+                        ))
                     } else {
                         Ok(StringSegment::Template(
                             Ident::arbitrary(u)?.0,

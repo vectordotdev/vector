@@ -19,7 +19,7 @@ fuzz_target!(|data: Vec<parser::Program>| {
 
                 // Run the VRL in the VM
                 let vm = runtime
-                    .compile(stdlib::all(), &program, Default::default())
+                    .compile(stdlib::all(), &program, &mut Default::default())
                     .unwrap();
                 let result_vm = runtime.run_vm(&vm, &mut target_vm, &timezone);
 
