@@ -260,6 +260,7 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
         },
