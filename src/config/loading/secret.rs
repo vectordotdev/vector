@@ -213,8 +213,10 @@ async fn query_backend(
     let mut stdin = child.stdin.take().ok_or("unable to acquire stdin")?;
 
     let query = serde_json::to_vec(&query)?;
-    stdin.write_all(&query).await?;
-    drop(stdin);
+
+    tokio::spawn(async move {
+        stdin.write_all(&query).await
+    });
 
     let output = child.wait_with_output().await?;
     let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
