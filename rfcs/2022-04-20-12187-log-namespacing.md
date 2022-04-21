@@ -32,6 +32,7 @@ is the "key_field" and "headers_key" in the kafka source.
 ### Types of Data
 
 #### Data
+
 This is the main content of a log. The log message itself. This will be parsed according to the set codec.
 The decoded data will be placed on the event with a "data" prefix. In cases where the source
 does not have any metadata that will also be on the event, this may be placed at the root.
@@ -41,6 +42,7 @@ that the root is a string. Historically this has been forbidden, but it is possi
 An example of this is the "socket" source, with the "bytes" codec.
 
 #### Metadata
+
 This is any additional data that is not considered the log message itself, but is important / part of the source protocol.
 A good example is the "key" for kafka events. Kafka is key/value based, but only the value is decoded by the chosen codec.
 The key is still very important information that will be used by the sink.
@@ -49,6 +51,7 @@ In general, if the data would be used by a sink when writing the data, it is con
 Otherwise, it iss "vector metadata" (stored on the event metadata).
 
 #### Vector Metadata
+
 This is anything that is not really part of the log, but describes something useful _about_ the log, such as where
 it came from, or when it was received. These will be stored in event metadata. Some improvements will be needed to
 event metadata to make this easier to use, as described below.
@@ -56,21 +59,25 @@ event metadata to make this easier to use, as described below.
 ### Codecs
 
 #### Bytes
+
 With the "Legacy" namespace, this codec decodes the input as-is, and places it under a "message" key (configurable with global log schema).
 With the "Vector" namespace, this will be placed under the "data" key. If there is no additional metadata stored
 on the event, then it will be placed on the root instead. The placement will be decided for each source independently.
 
 #### Json
+
 With the "Legacy" namespace, this codec decodes the input as-is, and places it under a "message" key (configurable with global log schema).
 With the "Vector" namespace, this will be placed under the "data" key. If there is no additional metadata stored
 on the event, then it will be placed on the root instead. The placement will be decided for each source independently.
 
 #### Syslog
+
 All data will be placed at the root. Since the structure is known, it's easy to prevent naming collisions here.
 Syslog has a "message" field which might be useful to apply an additional codec to, but this is currently not supported,
 and no support is being added here.
 
 #### Native / Native JSON
+
 The behavior for these do not change. Sources such as the "Vector" source will pass through the event as-is.
 
 ### Event Metadata
@@ -78,6 +85,7 @@ The behavior for these do not change. Sources such as the "Vector" source will p
 There is currently minimal support for event metadata. Several changes will need to be made.
 
 Changes needed immediately:
+
 - Support arbitrarily nested values
 - Functions that access metadata (`get_metadata_field`, `remove_metadata_field`, and `set_metadata_field`) should support full paths as keys, and return
   the `any` type instead of just `string. This is technically a breaking change.
@@ -86,6 +94,7 @@ With these changes, using metadata can still be a bit annoying since the returne
 value is set and read in the same VRL program.
 
 Future changes (out of scope for now):
+
 - Add a special path syntax to reference metadata instead of using functions.
 - Expand schema support to metadata
 - Expand semantic meaning to metadata
@@ -99,7 +108,9 @@ A proof of concept for the Datadog Agent Logs source is being worked on alongsid
 ### Examples
 
 #### Datadog Agent source / JSON codec / Vector namespace
+
 event
+
 ```json
 {
   "data": {
@@ -117,17 +128,22 @@ event
   "timestamp": "2066-08-09T04:24:42.1234Z" // This is parsed from a unix timestamp provided by the DD agent
 }
 ```
+
 metadata
+
 ```json
 {
   "source_type": "datadog_agent",
   "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
 ```
+
 -----
 
 #### Datadog Agent source / bytes codec / Vector namespace
+
 event
+
 ```json
 {
   "data": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
@@ -139,17 +155,22 @@ event
   "timestamp": "2066-08-09T04:24:42.1234Z"
 }
 ```
+
 metadata
+
 ```json
 {
   "source_type": "datadog_agent",
   "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
 ```
+
 -----
 
 #### Kafka source / json codec / Vector namespace
+
 event
+
 ```json
 {
   "data": {
@@ -167,7 +188,9 @@ event
   }
 }
 ```
+
 metadata
+
 ```json
 {
   "topic": "name of topic",
@@ -177,16 +200,19 @@ metadata
   "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
 ```
+
 -----
 
 #### Kubernetes Logs / Vector namespace
 
 event (a string as the root event element)
+
 ```text
 F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable
 ```
 
 metadata
+
 ```json
 {
   "file": "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log",
@@ -217,12 +243,14 @@ metadata
   "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
 ```
+
 -----
 
 
 #### Syslog / Vector namespace
 
 event (the "data" key was elided)
+
 ```json
 {
     "message": "Hello Vector",
@@ -240,6 +268,7 @@ event (the "data" key was elided)
 ```
 
 metadata
+
 ```json
 {
   "source_ip": "127.0.0.1",
@@ -248,11 +277,13 @@ metadata
   "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
 ```
+
 -----
 
 #### Socket source (mode=udp) / syslog codec / Vector namespace
 
 event (the "data" key was elided)
+
 ```json
 {
     "message": "Hello Vector",
@@ -266,6 +297,7 @@ event (the "data" key was elided)
 ```
 
 metadata
+
 ```json
 {
   "source_ip": "192.168.0.1",
@@ -274,11 +306,13 @@ metadata
   "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
 ```
+
 -----
 
 #### HTTP source / JSON codec / Vector namespace
 
 event
+
 ```json
 {
     "data": {
@@ -298,12 +332,14 @@ event
 ```
 
 metadata
+
 ```json
 {
   "source_type": "http",
   "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
 ```
+
 -----
 
 
@@ -311,6 +347,7 @@ metadata
 ## Outstanding Questions / Alternatives
 
 ### Minimize data on the event
+
 The split of which data belongs in the event vs event metadata can sometimes be ambiguous. An alternative is to store only the
 "data" in the event, and everything else ("metadata" and "vector metadata") in the event metadata.
 This will keep the event itself very clean and easy to access.
