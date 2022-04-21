@@ -1,3 +1,5 @@
+pub mod closure;
+
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
@@ -84,6 +86,14 @@ pub trait Function: Send + Sync + fmt::Debug {
         _ctx: &mut Context,
         _args: &mut VmArgumentList,
     ) -> Result<Value, ExpressionError>;
+
+    /// An optional closure definition for the function.
+    ///
+    /// This returns `None` by default, indicating the function doesn't accept
+    /// a closure.
+    fn closure(&self) -> Option<closure::Definition> {
+        None
+    }
 }
 
 // -----------------------------------------------------------------------------
