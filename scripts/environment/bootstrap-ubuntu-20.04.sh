@@ -37,7 +37,6 @@ apt install --yes \
     nodejs \
     npm \
     pkg-config \
-    protobuf-compiler \
     python3-pip \
     rename \
     rpm \
@@ -102,6 +101,17 @@ if ! [ -x "$(command -v docker)" ]; then
     # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
     usermod --append --groups docker ubuntu || true
 fi
+
+# Protoc. No guard because we want to override Ubuntu's old version in
+# case it is already installed by a dependency.
+PROTOC_VERSION=3.19.4
+PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
+curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
+     --output $TEMP/$PROTOC_ZIP
+unzip $TEMP/$PROTOC_ZIP bin/protoc
+# .cargo/bin is in $PATH ahead of anything else, so this will make it
+# override any system-installed protoc
+mv bin/protoc $HOME/.cargo/bin
 
 # Apt cleanup
 apt clean
