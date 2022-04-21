@@ -37,7 +37,6 @@ apt install --yes \
     nodejs \
     npm \
     pkg-config \
-    protobuf-compiler \
     python3-pip \
     rename \
     rpm \
