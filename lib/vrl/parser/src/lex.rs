@@ -465,7 +465,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Template(
                             seg.trim().to_string(),
-                            Span::new(pos - seg.len() - 1, pos + 3) + span.start(),
+                            Span::new(pos - seg.chars().count() - 1, pos + 3) + span.start(),
                         ));
                     }
                     template = false;
@@ -493,7 +493,7 @@ impl StringLiteral<&str> {
                         let seg = std::mem::take(&mut current);
                         segments.push(StringSegment::Literal(
                             unescape_string_literal(&seg),
-                            Span::new(pos - seg.len() + 1, pos + 1) + span.start(),
+                            Span::new(pos - seg.chars().count() + 1, pos + 1) + span.start(),
                         ));
                     }
                     template = true;
@@ -509,7 +509,7 @@ impl StringLiteral<&str> {
         if !template && !current.is_empty() {
             segments.push(StringSegment::Literal(
                 unescape_string_literal(&current),
-                Span::new(pos - current.len() + 1, pos + 1) + span.start(),
+                Span::new(pos - current.chars().count() + 1, pos + 1) + span.start(),
             ));
         }
 
