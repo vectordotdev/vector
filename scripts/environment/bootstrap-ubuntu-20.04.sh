@@ -113,5 +113,8 @@ unzip $TEMP/$PROTOC_ZIP bin/protoc
 # override any system-installed protoc
 mv bin/protoc $HOME/.cargo/bin
 
+# Force the proto-build crate to avoid building the vendored protoc.
+echo "export PROTO_NO_VENDOR=1" >> "$HOME/.bash_profile"
+
 # Apt cleanup
 apt clean
