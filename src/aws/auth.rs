@@ -32,7 +32,7 @@ pub enum AwsAuthentication {
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
-        region: Option<Region>,
+        region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::Static {
@@ -47,15 +47,11 @@ impl AwsAuthentication {
                 Err("Overriding the credentials file is not supported.".into())
             }
             AwsAuthentication::Role { assume_role } => {
-                let mut credentials = AssumeRoleProviderBuilder::new(assume_role);
+                let provider = AssumeRoleProviderBuilder::new(assume_role)
+                    .region(region.clone())
+                    .build(default_credentials_provider(region).await);
 
-                if let Some(ref region) = region {
-                    credentials = credentials.region(region.clone())
-                }
-
-                Ok(SharedCredentialsProvider::new(
-                    credentials.build(default_credentials_provider(region).await),
-                ))
+                Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default {} => Ok(SharedCredentialsProvider::new(
                 default_credentials_provider(region).await,
@@ -72,14 +68,13 @@ impl AwsAuthentication {
     }
 }
 
-async fn default_credentials_provider(region: Option<Region>) -> SharedCredentialsProvider {
-    let mut credentials = DefaultCredentialsChain::builder();
+async fn default_credentials_provider(region: Region) -> SharedCredentialsProvider {
+    let chain = DefaultCredentialsChain::builder()
+        .region(region)
+        .build()
+        .await;
 
-    if let Some(region) = region {
-        credentials = credentials.region(region)
-    }
-
-    SharedCredentialsProvider::new(credentials.build().await)
+    SharedCredentialsProvider::new(chain)
 }
 
 #[cfg(test)]
