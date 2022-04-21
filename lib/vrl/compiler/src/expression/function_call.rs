@@ -6,7 +6,10 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 use crate::{
     expression::assignment::Details,
     expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
-    function::{closure, ArgumentList, Example, FunctionCompileContext, Parameter},
+    function::{
+        closure::{self, VariableKind},
+        ArgumentList, Example, FunctionCompileContext, Parameter,
+    },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -276,13 +279,13 @@ impl<'a> Builder<'a> {
                                 // it means we should use that definition over
                                 // any definition inferred from the closure
                                 // target.
-                                Some(kind) => (kind.into(), None),
+                                VariableKind::Exact(kind) => (kind.into(), None),
 
                                 // If no hard-coded `Kind` is defined, and the
                                 // closure is used as an iterator, we'll
                                 // construct the required `Kind` from the inner
                                 // types of the collection.
-                                None if definition.is_iterator => {
+                                VariableKind::TargetInner => {
                                     let type_def = target.type_def((local, external));
                                     let kind = type_def.kind();
 
@@ -305,7 +308,9 @@ impl<'a> Builder<'a> {
 
                                 // If the closure is not used as an iterator, we
                                 // use the `Kind` of `target`.
-                                None => (target.type_def((local, external)), target.as_value()),
+                                VariableKind::Target => {
+                                    (target.type_def((local, external)), target.as_value())
+                                }
                             };
 
                             let details = Details { type_def, value };
