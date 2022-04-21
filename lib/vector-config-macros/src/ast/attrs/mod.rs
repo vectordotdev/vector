@@ -6,9 +6,9 @@ mod field;
 mod validation;
 mod variant;
 
-pub use container::Container;
-pub use field::FieldAttributes;
-pub use variant::VariantAttributes;
+pub(super) use container::Container;
+pub(super) use field::FieldAttributes;
+pub(super) use variant::VariantAttributes;
 
 fn try_get_attribute_meta_list(
     attribute: &Attribute,

@@ -140,6 +140,7 @@ pub struct ArrayShape {
 
 #[derive(Clone)]
 pub struct Metadata<'de, T: Configurable<'de>> {
+    title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
     custom_attributes: Vec<(&'static str, &'static str)>,
@@ -149,6 +150,25 @@ pub struct Metadata<'de, T: Configurable<'de>> {
 }
 
 impl<'de, T: Configurable<'de>> Metadata<'de, T> {
+    pub fn with_title(title: &'static str) -> Self {
+        Self {
+            title: Some(title),
+            ..Default::default()
+        }
+    }
+
+    pub fn title(&self) -> Option<&'static str> {
+        self.title.clone()
+    }
+
+    pub fn set_title(&mut self, title: &'static str) {
+        self.title = Some(title);
+    }
+
+    pub fn clear_title(&mut self) {
+        self.title = None;
+    }
+
     pub fn with_description(desc: &'static str) -> Self {
         Self {
             description: Some(desc),
@@ -193,6 +213,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         U: Configurable<'de>,
     {
         Metadata {
+            title: self.title,
             description: self.description,
             default_value: self.default_value.map(f),
             custom_attributes: self.custom_attributes,
@@ -242,6 +263,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.custom_attributes.extend(other.custom_attributes);
 
         Self {
+            title: other.title.or(self.title),
             description: other.description.or(self.description),
             default_value: other.default_value.or(self.default_value),
             custom_attributes: self.custom_attributes,
@@ -253,6 +275,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
 
     pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
         Metadata {
+            title: self.title,
             description: self.description,
             default_value: None,
             custom_attributes: self.custom_attributes,
@@ -266,6 +289,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
 impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
     pub fn flatten_default(self) -> Metadata<'de, T> {
         Metadata {
+            title: self.title,
             description: self.description,
             default_value: self.default_value.flatten(),
             custom_attributes: self.custom_attributes,
@@ -279,6 +303,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
 impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
     fn default() -> Self {
         Self {
+            title: None,
             description: None,
             default_value: None,
             custom_attributes: Vec::new(),
@@ -292,6 +317,7 @@ impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
 impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
+            .field("title", &self.title)
             .field("description", &self.description)
             .field(
                 "default",

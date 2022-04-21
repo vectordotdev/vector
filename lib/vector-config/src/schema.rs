@@ -240,6 +240,28 @@ pub fn generate_composite_schema(
     }
 }
 
+pub fn generate_tuple_schema(
+    gen: &mut SchemaGenerator,
+    subschemas: &[SchemaObject],
+) -> SchemaObject {
+    let subschemas = subschemas
+        .iter()
+        .map(|s| Schema::Object(s.clone()))
+        .collect::<Vec<_>>();
+
+    SchemaObject {
+        instance_type: Some(InstanceType::Array.into()),
+        array: Some(Box::new(ArrayValidation {
+            items: Some(SingleOrVec::Vec(subschemas)),
+            // Rust's tuples are closed -- fixed size -- so we set `additionalItems` such that any
+            // items past what we have in `items` will cause schema validation to fail.
+            additional_items: Some(Box::new(Schema::Bool(false))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
 pub fn generate_const_string_schema(value: String) -> SchemaObject {
     SchemaObject {
         const_value: Some(Value::String(value)),
@@ -251,8 +273,7 @@ pub fn generate_root_schema<'de, T>() -> RootSchema
 where
     T: Configurable<'de>,
 {
-    let schema_settings = SchemaSettings::draft2019_09();
-    let mut schema_gen = SchemaGenerator::new(schema_settings);
+    let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
     let schema = T::generate_schema(&mut schema_gen, Metadata::default());
     RootSchema {
