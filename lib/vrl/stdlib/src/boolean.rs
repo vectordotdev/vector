@@ -42,7 +42,7 @@ impl Function for Boolean {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -67,7 +67,7 @@ impl Expression for BooleanFn {
         boolean(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_boolean = !self.value.type_def(state).is_boolean();
 
         TypeDef::boolean().with_fallibility(non_boolean)

@@ -1,8 +1,4 @@
-use std::{
-    marker::PhantomData,
-    num::{NonZeroU64, NonZeroUsize},
-    time::Duration,
-};
+use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
@@ -34,17 +30,7 @@ pub enum BatchError {
 pub trait SinkBatchSettings {
     const MAX_EVENTS: Option<usize>;
     const MAX_BYTES: Option<usize>;
-
-    // Per Nathan, once Rust 1.57 hits, we can add a helper method, such as the following, that
-    // implementations can use to avoid the gross `unsafe` approach:
-    //
-    // const fn non_zero(val: u64) -> NonZeroU64 {
-    //     match NonZeroU64::new(val) {
-    //         Some(x) => x,
-    //         None => panic!("Value must be non-zero!")
-    //     }
-    // }
-    const TIMEOUT_SECS: NonZeroU64;
+    const TIMEOUT_SECS: f64;
 }
 
 /// Reasonable default batch settings for sinks with timeliness concerns, limited by event count.
@@ -54,7 +40,7 @@ pub struct RealtimeEventBasedDefaultBatchSettings;
 impl SinkBatchSettings for RealtimeEventBasedDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 /// Reasonable default batch settings for sinks with timeliness concerns, limited by byte size.
@@ -64,7 +50,7 @@ pub struct RealtimeSizeBasedDefaultBatchSettings;
 impl SinkBatchSettings for RealtimeSizeBasedDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 /// Reasonable default batch settings for sinks focused on shipping fewer-but-larger batches,
@@ -75,7 +61,7 @@ pub struct BulkSizeBasedDefaultBatchSettings;
 impl SinkBatchSettings for BulkSizeBasedDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(300) };
+    const TIMEOUT_SECS: f64 = 300.0;
 }
 
 /// "Default" batch settings when a sink handles batch settings entirely on its own.
@@ -89,7 +75,7 @@ pub struct NoDefaultsBatchSettings;
 impl SinkBatchSettings for NoDefaultsBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -102,7 +88,7 @@ pub struct Unmerged;
 pub struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
-    pub timeout_secs: Option<u64>,
+    pub timeout_secs: Option<f64>,
 
     #[serde(skip)]
     _d: PhantomData<D>,
@@ -115,7 +101,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
         let config = BatchConfig {
             max_bytes: self.max_bytes.or(D::MAX_BYTES),
             max_events: self.max_events.or(D::MAX_EVENTS),
-            timeout_secs: self.timeout_secs.or_else(|| Some(D::TIMEOUT_SECS.get())),
+            timeout_secs: self.timeout_secs.or(Some(D::TIMEOUT_SECS)),
             _d: PhantomData,
             _s: PhantomData,
         };
@@ -128,7 +114,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
             // you dont always set both of those fields, etc..
             (Some(0), _, _) => Err(BatchError::InvalidMaxBytes),
             (_, Some(0), _) => Err(BatchError::InvalidMaxEvents),
-            (_, _, Some(0)) => Err(BatchError::InvalidTimeout),
+            (_, _, Some(timeout)) if timeout <= 0.0 => Err(BatchError::InvalidTimeout),
 
             _ => Ok(config),
         }
@@ -192,7 +178,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
                 events: adjusted.max_events.unwrap_or(usize::MAX),
                 _type_marker: PhantomData,
             },
-            timeout: Duration::from_secs(timeout_secs),
+            timeout: Duration::from_secs_f64(timeout_secs),
         })
     }
 
@@ -220,7 +206,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
         let timeout_secs = self.timeout_secs.ok_or(BatchError::InvalidTimeout)?;
 
         Ok(BatcherSettings::new(
-            Duration::from_secs(timeout_secs),
+            Duration::from_secs_f64(timeout_secs),
             max_bytes,
             max_events,
         ))

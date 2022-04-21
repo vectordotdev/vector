@@ -11,11 +11,7 @@ components: sinks: datadog_events: {
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			batch: {
-				enabled:      false
-				common:       false
-				timeout_secs: 0
-			}
+			batch: enabled:       false
 			compression: enabled: false
 			encoding: enabled:    false
 			proxy: enabled:       true
@@ -65,6 +61,7 @@ components: sinks: datadog_events: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

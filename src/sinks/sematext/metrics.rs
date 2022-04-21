@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
+use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -44,7 +44,7 @@ pub(crate) struct SematextMetricsDefaultBatchSettings;
 impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

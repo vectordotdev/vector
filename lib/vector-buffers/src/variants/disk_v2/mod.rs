@@ -135,7 +135,13 @@
 //! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
 
-use std::{error::Error, marker::PhantomData, num::NonZeroU64, path::PathBuf, sync::Arc};
+use std::{
+    error::Error,
+    marker::PhantomData,
+    num::NonZeroU64,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
@@ -148,12 +154,15 @@ mod ledger;
 mod reader;
 mod record;
 mod ser;
+mod v1_migration;
 mod writer;
 
 #[cfg(test)]
 mod tests;
 
-use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
+use self::{
+    acknowledgements::create_disk_v2_acker, ledger::Ledger, v1_migration::try_disk_v1_migration,
+};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},
@@ -287,15 +296,50 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
-        usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
+        // Attempt to migrate a disk v1 buffer based on the same data directory and buffer ID if one
+        // exists. If one doesn't exist, then this method does nothing.
+        try_disk_v1_migration::<T>(self.data_dir.as_path(), self.id.as_str()).await?;
 
-        // Create the actual buffer subcomponents.
-        let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
-        let config = DiskBufferConfigBuilder::from_path(buffer_path)
-            .max_buffer_size(self.max_size.get())
-            .build()?;
-        let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
+        // Now that we've handled any necessary migrations, go ahead and build the buffer.
+        let (writer, reader, acker) = build_disk_v2_buffer(
+            usage_handle,
+            &self.data_dir,
+            self.id.as_str(),
+            self.max_size,
+        )
+        .await?;
 
         Ok((writer.into(), reader.into(), Some(acker)))
     }
+}
+
+async fn build_disk_v2_buffer<T>(
+    usage_handle: BufferUsageHandle,
+    data_dir: &Path,
+    id: &str,
+    max_size: NonZeroU64,
+) -> Result<
+    (
+        Writer<T, ProductionFilesystem>,
+        Reader<T, ProductionFilesystem>,
+        Acker,
+    ),
+    Box<dyn Error + Send + Sync>,
+>
+where
+    T: Bufferable + Clone,
+{
+    usage_handle.set_buffer_limits(Some(max_size.get()), None);
+
+    let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
+    let config = DiskBufferConfigBuilder::from_path(buffer_path)
+        .max_buffer_size(max_size.get())
+        .build()?;
+    Buffer::from_config(config, usage_handle)
+        .await
+        .map_err(Into::into)
+}
+
+pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
+    base_dir.join("buffer").join("v2").join(buffer_id)
 }

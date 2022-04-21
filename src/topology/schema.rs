@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 pub(super) use crate::schema::Definition;
 
-use crate::{config::OutputId, topology};
+use crate::config::{ComponentKey, Config, Output, OutputId};
 
 /// Create a new [`Definition`] by recursively merging all provided inputs into a given component.
 ///
@@ -29,7 +29,7 @@ use crate::{config::OutputId, topology};
 /// together to produce the new `Definition` returned by this method.
 pub(super) fn merged_definition(
     inputs: &[OutputId],
-    config: &topology::Config,
+    config: &dyn ComponentContainer,
     cache: &mut HashMap<Vec<OutputId>, Definition>,
 ) -> Definition {
     // Try to get the definition from the cache.
@@ -46,11 +46,11 @@ pub(super) fn merged_definition(
         // "empty" schema.
         //
         // We merge this schema into the top-level schema.
-        if let Some(source) = config.sources.get(key) {
+        if let Some(outputs) = config.source_outputs(key) {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
-            let maybe_source_definition = source.inner.outputs().iter().find_map(|output| {
+            let maybe_source_definition = outputs.iter().find_map(|output| {
                 if output.port == input.port {
                     // For sources, a `None` schema definition is equal to an "empty" definition.
                     Some(
@@ -77,15 +77,15 @@ pub(super) fn merged_definition(
         // If the input is a transform, it _might_ define its own output schema, or it might not
         // change anything in the schema from its inputs, in which case we need to recursively get
         // the schemas of the transform inputs.
-        } else if let Some(transform) = config.transforms.get(key) {
-            let merged_definition = merged_definition(&transform.inputs, config, cache);
+        } else if let Some(inputs) = config.transform_inputs(key) {
+            let merged_definition = merged_definition(inputs, config, cache);
 
             // After getting the transform matching to the given input, we need to further narrow
             // the actual output of the transform feeding into this input, and then get the
             // definition belonging to that output.
-            let maybe_transform_definition = transform
-                .inner
-                .outputs(&merged_definition)
+            let maybe_transform_definition = config
+                .transform_outputs(key, &merged_definition)
+                .expect("already found inputs")
                 .iter()
                 .find_map(|output| {
                     if output.port == input.port {
@@ -113,68 +113,47 @@ pub(super) fn merged_definition(
     definition
 }
 
+pub(super) trait ComponentContainer {
+    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>>;
+
+    fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]>;
+
+    fn transform_outputs(
+        &self,
+        key: &ComponentKey,
+        merged_definition: &Definition,
+    ) -> Option<Vec<Output>>;
+}
+
+impl ComponentContainer for Config {
+    fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+        self.source(key).map(|source| source.inner.outputs())
+    }
+
+    fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
+        self.transform(key)
+            .map(|transform| transform.inputs.as_slice())
+    }
+
+    fn transform_outputs(
+        &self,
+        key: &ComponentKey,
+        merged_definition: &Definition,
+    ) -> Option<Vec<Output>> {
+        self.transform(key)
+            .map(|source| source.inner.outputs(merged_definition))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use serde::{Deserialize, Serialize};
     use value::Kind;
-    use vector_core::{
-        config::{DataType, Input, Output},
-        source::Source,
-        transform::{Transform, TransformConfig, TransformContext},
-    };
-
-    use crate::config::{SourceConfig, SourceContext, SourceOuter, TransformOuter};
+    use vector_core::config::{DataType, Output};
 
     use super::*;
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct MockComponent {
-        #[serde(skip)]
-        outputs: Vec<Output>,
-    }
-
-    #[async_trait::async_trait]
-    #[typetag::serde(name = "mock_source")]
-    impl SourceConfig for MockComponent {
-        async fn build(&self, _: SourceContext) -> crate::Result<Source> {
-            unimplemented!()
-        }
-
-        fn outputs(&self) -> Vec<Output> {
-            self.outputs.clone()
-        }
-
-        fn source_type(&self) -> &'static str {
-            unimplemented!()
-        }
-
-        fn can_acknowledge(&self) -> bool {
-            false
-        }
-    }
-
-    #[async_trait::async_trait]
-    #[typetag::serde(name = "mock_transform")]
-    impl TransformConfig for MockComponent {
-        async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-            unimplemented!()
-        }
-
-        fn outputs(&self, _: &Definition) -> Vec<Output> {
-            self.outputs.clone()
-        }
-
-        fn transform_type(&self) -> &'static str {
-            unimplemented!()
-        }
-
-        fn input(&self) -> Input {
-            unimplemented!()
-        }
-    }
 
     #[test]
     fn test_merged_definition() {
@@ -185,15 +164,25 @@ mod tests {
             want: Definition,
         }
 
-        for (
-            title,
-            TestCase {
-                inputs,
-                sources,
-                transforms,
-                want,
-            },
-        ) in HashMap::from([
+        impl ComponentContainer for TestCase {
+            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+                self.sources.get(key.id()).cloned()
+            }
+
+            fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
+                Some(&[])
+            }
+
+            fn transform_outputs(
+                &self,
+                key: &ComponentKey,
+                _merged_definition: &Definition,
+            ) -> Option<Vec<Output>> {
+                self.transforms.get(key.id()).cloned()
+            }
+        }
+
+        for (title, case) in HashMap::from([
             (
                 "no inputs",
                 TestCase {
@@ -267,26 +256,18 @@ mod tests {
                 },
             ),
         ]) {
-            let mut config = topology::Config::default();
-            config.sources = sources
-                .into_iter()
-                .map(|(key, outputs)| (key.into(), SourceOuter::new(MockComponent { outputs })))
-                .collect::<IndexMap<_, _>>();
-            config.transforms = transforms
-                .into_iter()
-                .map(|(key, outputs)| (key.into(), TransformOuter::new(MockComponent { outputs })))
-                .collect::<IndexMap<_, _>>();
-
-            let inputs = inputs
-                .into_iter()
+            let inputs = case
+                .inputs
+                .iter()
+                .cloned()
                 .map(|(key, port)| OutputId {
                     component: key.into(),
                     port,
                 })
                 .collect::<Vec<_>>();
 
-            let got = merged_definition(&inputs, &config, &mut HashMap::default());
-            assert_eq!(got, want, "{}", title);
+            let got = merged_definition(&inputs, &case, &mut HashMap::default());
+            assert_eq!(got, case.want, "{}", title);
         }
     }
 }

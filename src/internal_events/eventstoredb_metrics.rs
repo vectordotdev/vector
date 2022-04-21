@@ -31,13 +31,12 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
         error!(
             message = "HTTP request processing error.",
             error = ?self.error,
-            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
+            error_type = error_type::REQUEST_FAILED,
         );
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::RECEIVING,
-            "error" => self.error.to_string(),
             "error_type" => error_type::REQUEST_FAILED,
         );
         // deprecated
@@ -55,8 +54,8 @@ impl InternalEvent for EventStoreDbStatsParsingError {
         error!(
             message = "JSON parsing error.",
             error = ?self.error,
-            error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
         );
         counter!(
             "component_errors_total", 1,

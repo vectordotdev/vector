@@ -7,7 +7,7 @@ use vrl::{diagnostic::Formatter, Program, Runtime, Value, Vm, VrlRuntime};
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
-    event::{Event, VrlTarget},
+    event::{Event, VrlImmutableTarget},
     internal_events::VrlConditionExecutionError,
 };
 
@@ -50,7 +50,7 @@ impl ConditionConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::Compiler::new();
+        let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(enrichment_tables.clone());
 
         let program = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
@@ -63,7 +63,7 @@ impl ConditionConfig for VrlConfig {
 
         match self.runtime {
             VrlRuntime::Vm => {
-                let vm = Arc::new(Runtime::default().compile(functions, &program, state)?);
+                let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
                 Ok(Condition::VrlVm(VrlVm {
                     source: self.source.clone(),
                     vm,
@@ -99,7 +99,7 @@ impl Vrl {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlImmutableTarget::new(event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
@@ -178,7 +178,7 @@ impl VrlVm {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlImmutableTarget::new(event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
