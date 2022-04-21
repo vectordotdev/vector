@@ -289,6 +289,7 @@ mod test {
                     BorrowedSegment::Field(Cow::from("bar")),
                 ],
             ),
+            (r#"."🤖""#, vec![BorrowedSegment::Field(Cow::from("🤖"))]),
         ];
 
         for (path, expected) in test_cases {
