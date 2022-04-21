@@ -235,6 +235,32 @@ impl<T: Ord> Collection<T> {
             _ => {}
         };
     }
+
+    /// Return the reduced `Kind` of the items within the collection.
+    pub fn reduced_kind(&self) -> Kind {
+        let strategy = merge::Strategy {
+            depth: merge::Depth::Deep,
+            indices: merge::Indices::Keep,
+        };
+
+        self.known
+            .values()
+            .cloned()
+            .reduce(|mut lhs, rhs| {
+                lhs.merge(rhs, strategy);
+                lhs
+            })
+            .map_or_else(Kind::any, |kind| {
+                self.unknown
+                    .as_ref()
+                    .map(|unknown| {
+                        let mut kind = kind.clone();
+                        kind.merge(unknown.to_kind().into_owned(), strategy);
+                        kind
+                    })
+                    .unwrap_or(kind)
+            })
+    }
 }
 
 impl Collection<Field> {
@@ -841,6 +867,61 @@ mod tests {
             ),
         ]) {
             assert_eq!(this.to_string(), want.to_string(), "{}", title);
+        }
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_reduced_kind() {
+        struct TestCase {
+            this: Collection<&'static str>,
+            want: Kind,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: Kind::any(),
+                },
+            ),
+            (
+                "known bytes",
+                TestCase {
+                    this: BTreeMap::from([("foo", Kind::bytes())]).into(),
+                    want: Kind::bytes(),
+                },
+            ),
+            (
+                "multiple known",
+                TestCase {
+                    this: BTreeMap::from([("foo", Kind::bytes()), ("bar", Kind::boolean())]).into(),
+                    want: Kind::bytes().or_boolean(),
+                },
+            ),
+            (
+                "known bytes, unknown any",
+                TestCase {
+                    this: Collection::from_parts(
+                        BTreeMap::from([("foo", Kind::bytes())]),
+                        Kind::any(),
+                    ),
+                    want: Kind::any(),
+                },
+            ),
+            (
+                "known bytes, unknown timestamp",
+                TestCase {
+                    this: Collection::from_parts(
+                        BTreeMap::from([("foo", Kind::bytes())]),
+                        Kind::timestamp(),
+                    ),
+                    want: Kind::bytes().or_timestamp(),
+                },
+            ),
+        ]) {
+            assert_eq!(this.reduced_kind(), want, "{}", title);
         }
     }
 }
