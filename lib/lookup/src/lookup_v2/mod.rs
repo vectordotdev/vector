@@ -22,12 +22,52 @@ impl<'de> Deserialize<'de> for OwnedPath {
 }
 
 impl Serialize for OwnedPath {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        // TODO: Implement canonical way to serialize segments.
-        todo!()
+        if self.segments.is_empty() {
+            serializer.serialize_str("<invalid>")
+        } else {
+            let path = self
+                .segments
+                .iter()
+                .enumerate()
+                .map(|(i, segment)| match segment {
+                    OwnedSegment::Field(field) => {
+                        let needs_quotes = field
+                            .chars()
+                            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+                        // Allocate enough to fit the field, a `.` and two `"` characters. This
+                        // should suffice for the majority of cases when no escape sequence is used.
+                        let mut string = String::with_capacity(field.as_bytes().len() + 3);
+                        if i != 0 {
+                            string.push('.');
+                        }
+                        if needs_quotes {
+                            string.push('"');
+                            for c in field.chars() {
+                                if matches!(c, '"' | '\\') {
+                                    string.push('\\');
+                                }
+                                string.push(c);
+                            }
+                            string.push('"');
+                            string
+                        } else {
+                            string.push_str(field);
+                            string
+                        }
+                    }
+                    OwnedSegment::Index(index) => format!("[{}]", index),
+                    OwnedSegment::Invalid => {
+                        (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            serializer.serialize_str(&path)
+        }
     }
 }
 
@@ -217,6 +257,54 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn owned_path_serialize() {
+        let test_cases = [
+            ("", "<invalid>"),
+            ("]", "<invalid>"),
+            ("]foo", "<invalid>"),
+            ("..", "<invalid>"),
+            ("...", "<invalid>"),
+            ("f", "f"),
+            ("foo", "foo"),
+            (
+                r#"ec2.metadata."availability-zone""#,
+                r#"ec2.metadata."availability-zone""#,
+            ),
+            ("@timestamp", "@timestamp"),
+            ("foo[", "foo.<invalid>"),
+            ("foo$", "<invalid>"),
+            (r#""$peci@l chars""#, r#""$peci@l chars""#),
+            ("foo.foo bar", "foo.<invalid>"),
+            (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
+            ("[1]", "[1]"),
+            ("[42]", "[42]"),
+            ("foo.[42]", "foo.<invalid>"),
+            ("[42].foo", "[42].foo"),
+            ("[-1]", "<invalid>"),
+            ("[-42]", "<invalid>"),
+            ("[-42].foo", "<invalid>"),
+            ("[-42]foo", "<invalid>"),
+            (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
+            (r#""a\"a""#, r#""a\"a""#),
+            (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
+            ("<invalid>", "<invalid>"),
+            (r#""🤖""#, r#""🤖""#),
+        ];
+
+        for (path, expected) in test_cases {
+            let path = parse_path(path);
+            let path = serde_json::to_string(&path).unwrap();
+            let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
+            assert_eq!(path, expected);
         }
     }
 }

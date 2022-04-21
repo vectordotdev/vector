@@ -11,6 +11,7 @@ use crate::{
         FunctionCall, Group, Ident, IfStatement, Node, Op, Opcode, Predicate, Query, QueryTarget,
         RootExpr,
     },
+    template_string::{StringSegment, TemplateString},
     Literal, Program,
 };
 use arbitrary::{Arbitrary, Unstructured};
@@ -79,11 +80,34 @@ impl<'a> Arbitrary<'a> for Ident {
     }
 }
 
+impl<'a> Arbitrary<'a> for TemplateString {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let size = usize::arbitrary(u)? % 10;
+        Ok(TemplateString(
+            (0..size)
+                .map(|_| {
+                    if bool::arbitrary(u)? {
+                        Ok(StringSegment::Literal(
+                            String::arbitrary(u)?,
+                            Span::default(),
+                        ))
+                    } else {
+                        Ok(StringSegment::Template(
+                            Ident::arbitrary(u)?.0,
+                            Span::default(),
+                        ))
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    }
+}
+
 impl<'a> Arbitrary<'a> for Literal {
     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
         let choice = usize::arbitrary(u)? % 100;
         Ok(match choice {
-            0..=5 => Literal::String(String::arbitrary(u)?),
+            0..=5 => Literal::String(TemplateString::arbitrary(u)?),
             6..=10 => Literal::Boolean(bool::arbitrary(u)?),
             // TODO Limit the size of integers and keep them positive so both VRLs can handle it.
             _ => Literal::Integer((i64::arbitrary(u)? % 100).abs()),

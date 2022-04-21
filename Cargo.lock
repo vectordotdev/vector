@@ -3263,7 +3263,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix",
+ "nix 0.23.1",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -3345,7 +3345,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix",
+ "nix 0.23.1",
  "widestring 0.4.3",
  "winapi 0.3.9",
 ]
@@ -4886,6 +4886,18 @@ checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
 dependencies = [
  "bitflags",
  "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f6d99b651ff9697d6710f9613a07c5b4e0d655040faf56b3b471af108d55597"
+dependencies = [
+ "bitflags",
  "cfg-if 1.0.0",
  "libc",
  "memoffset",
@@ -6707,7 +6719,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix",
+ "nix 0.23.1",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -8792,7 +8804,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nats",
- "nix",
+ "nix 0.24.0",
  "nkeys",
  "nom 7.1.1",
  "notify",

@@ -159,7 +159,7 @@ impl CloudWatchMetricsSinkConfig {
     async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchClient> {
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            Some(Region::new("us-east-1"))
+            Region::new("us-east-1")
         } else {
             self.region.region()
         };
@@ -364,7 +364,7 @@ mod tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("local".to_owned()),
+            region: RegionOrEndpoint::with_region("local".to_owned()),
             ..Default::default()
         }
     }
@@ -510,7 +510,7 @@ mod integration_tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
+            region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
             ..Default::default()
         }
     }
