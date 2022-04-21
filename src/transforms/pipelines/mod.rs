@@ -7,55 +7,102 @@
 //! type = "pipelines"
 //! inputs = ["syslog"]
 //!
-//! [transforms.my_pipelines.logs]
-//! order = ["foo", "bar"]
-//!
-//! [transforms.my_pipelines.logs.pipelines.foo]
+//! [[transforms.my_pipelines.logs]]
 //! name = "foo pipeline"
 //!
-//! [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.logs.pipelines.bar]
+//! [[transforms.my_pipelines.logs]]
 //! name = "bar pipeline"
+//! filter.type = "vrl"
+//! filter.source = """some condition here"""
 //!
-//! [transforms.my_pipelines.logs.pipelines.bar.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.metrics]
-//! order = ["hello", "world"]
-//!
-//! [transforms.my_pipelines.metrics.pipelines.hello]
+//! [[transforms.my_pipelines.metrics]]
 //! name = "hello pipeline"
+//! filter.type = "vrl"
+//! filter.source = """some condition here"""
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.metrics.pipelines.world]
+//! [[transforms.my_pipelines.metrics]]
 //! name = "world pipeline"
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.world.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
+//!
+//! [sinks.output]
+//! inputs = ["my_pipelines"]
+//! # any sink configuration
 //! ```
 //!
-//! The pipelines transform will first expand into 2 parallel transforms for `logs` and
-//! `metrics`. A `Noop` transform will be also added to aggregate `logs` and `metrics`
-//! into a single transform and to be able to use the transform name (`my_pipelines`) as an input.
+//! The pipelines transform will expand individually each pipeline and adjust all the inputs accordingly.
+//! Once transpiled, the topology will have the same shape than the following configuration.
 //!
-//! Then the `logs` group of pipelines will be expanded into a `EventFilter` followed by
-//! a series `PipelineConfig` via the `EventRouter` transform. At the end, a `Noop` alias is added
-//! to be able to refer `logs` as `my_pipelines.logs`.
-//! Same thing for the `metrics` group of pipelines.
+//! ```toml
+//! [transforms.my_pipelines_type_router]
+//! inputs = ["syslog"]
 //!
-//! Each pipeline will then be expanded into a list of its transforms and at the end of each
-//! expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
-//! (`my_pipelines.logs.transforms.foo`).
+//! [transforms.my_pipelines_logs_0_transform_0]
+//! inputs = ["my_pipelines_type_router.logs"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_logs_0_transform_1]
+//! inputs = ["my_pipelines_logs_0_transform_0"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_logs_1_filter]
+//! inputs = ["my_pipelines_logs_0_transform_1"]
+//! type = "filter"
+//! condition.type = "vrl"
+//! condition.source = """some condition here"""
+//!
+//! [transforms.my_pipelines_logs_1_transform_0]
+//! inputs = ["my_pipelines_logs_1_filter.success"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_0_filter]
+//! inputs = ["my_pipelines_type_router.metrics"]
+//! type = "filter"
+//! condition.type = "vrl"
+//! condition.source = """some condition here"""
+//!
+//! [transforms.my_pipelines_metrics_0_transform_0]
+//! inputs = ["my_pipelines_metrics_0_filter.success"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_0_transform_1]
+//! inputs = ["my_pipelines_metrics_0_transform_0"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_1_transform_0]
+//! inputs = [
+//!     # the events filtered from the previous transform are forwarded
+//!     "my_pipelines_metrics_0_filter._dropped",
+//!     "my_pipelines_metrics_0_transform_1",
+//! ]
+//! # any transform configuration
+//!
+//! [sinks.output]
+//! inputs = [
+//!     "my_pipelines_type_router._dropped",
+//!     # the events from the last logs pipeline are forwarded here
+//!     "my_pipelines_logs_1_filter._dropped",
+//!     "my_pipelines_logs_1_transform_0",
+//!     "my_pipelines_metrics_1_transform_0",
+//! ]
+//! # any sink configuration
+//! ```
 mod config;
 
 use crate::{
