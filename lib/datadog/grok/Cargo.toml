@@ -21,7 +21,7 @@ serde_json = { version = "1.0.79", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 thiserror = { version = "1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
-tracing-test = { version = "0.1", default-features = false }
+tracing-test = { version = "0.2", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }

@@ -3,7 +3,7 @@ set -e -o verbose
 
 brew update
 
-brew install ruby@2.7 coreutils cue-lang/tap/cue
+brew install ruby@2.7 coreutils cue-lang/tap/cue protobuf
 
 gem install bundler
 
