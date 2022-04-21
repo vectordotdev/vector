@@ -1,7 +1,11 @@
-use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigPath};
+use super::{load_builder_from_paths, load_source_from_paths, process_paths};
+
 use crate::cli::handle_config_errors;
+use crate::config;
+
 use clap::Parser;
 use serde_json::Value;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(rename_all = "kebab-case")]
@@ -13,6 +17,62 @@ pub struct Opts {
     /// Include default values where missing from config
     #[clap(short, long)]
     include_defaults: bool,
+
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// File format is detected from the file name.
+    /// If zero files are specified the default config path
+    /// `/etc/vector/vector.toml` will be targeted.
+    #[clap(
+        name = "config",
+        short,
+        long,
+        env = "VECTOR_CONFIG",
+        use_value_delimiter(true)
+    )]
+    paths: Vec<PathBuf>,
+
+    /// Vector config files in TOML format.
+    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    paths_toml: Vec<PathBuf>,
+
+    /// Vector config files in JSON format.
+    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    paths_json: Vec<PathBuf>,
+
+    /// Vector config files in YAML format.
+    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    paths_yaml: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[clap(
+        name = "config-dir",
+        short = 'C',
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_value_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
+}
+
+impl Opts {
+    fn paths_with_formats(&self) -> Vec<config::ConfigPath> {
+        config::merge_path_lists(vec![
+            (&self.paths, None),
+            (&self.paths_toml, Some(config::Format::Toml)),
+            (&self.paths_json, Some(config::Format::Json)),
+            (&self.paths_yaml, Some(config::Format::Yaml)),
+        ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
+    }
 }
 
 /// Helper to merge JSON. Handles objects and array concatenation.
@@ -39,10 +99,11 @@ fn merge_json(a: &mut Value, b: Value) {
 /// The purpose of this func is to combine user configuration after processing all paths,
 /// Pipelines expansions, etc. The JSON result of this serialization can itself be used as a config,
 /// which also makes it useful for version control or treating as a singular unit of configuration.
-pub fn cmd(opts: &Opts, config_paths: &[ConfigPath]) -> exitcode::ExitCode {
+pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    let paths = opts.paths_with_formats();
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
-    let (paths, builder) = match process_paths(config_paths) {
+    let (paths, builder) = match process_paths(&paths) {
         Some(paths) => match load_builder_from_paths(&paths) {
             Ok((builder, _)) => (paths, builder),
             Err(errs) => return handle_config_errors(errs),
