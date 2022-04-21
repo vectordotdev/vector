@@ -30,7 +30,7 @@ inventory::submit! {
 impl_generate_config_from_default!(InternalLogsConfig);
 
 impl InternalLogsConfig {
-    /// Return an internal metrics config with enterprise reporting defaults.
+    /// Return an internal logs config with enterprise reporting defaults.
     pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
             version: Some(version.into()),
