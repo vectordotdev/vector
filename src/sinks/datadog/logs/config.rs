@@ -91,9 +91,17 @@ impl GenerateConfig for DatadogLogsConfig {
 impl DatadogLogsConfig {
     /// Creates a default [`DatadogLogsConfig`] with the given API key.
     #[cfg(feature = "enterprise")]
-    pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
+    pub fn enterprise<T: Into<String>>(
+        api_key: T,
+        endpoint: Option<String>,
+        site: Option<String>,
+        region: Option<Region>,
+    ) -> Self {
         Self {
             default_api_key: api_key.into(),
+            endpoint,
+            site,
+            region,
             ..Self::default()
         }
     }
