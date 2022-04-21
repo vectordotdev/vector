@@ -776,6 +776,7 @@ async fn parses_sink_full_es_aws() {
         type = "elasticsearch"
         inputs = ["in"]
         endpoint = "https://es.us-east-1.amazonaws.com"
+        aws.region = "us-east-1"
 
         [sinks.out.auth]
         strategy = "aws"
