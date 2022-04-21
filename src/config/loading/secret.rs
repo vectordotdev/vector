@@ -9,9 +9,9 @@ use tokio::{io::AsyncWriteExt, process::Command, time::Duration};
 use toml::value::Table;
 use typetag::serde;
 
-use super::{format, prepare_input, Format};
+use super::{loader, prepare_input};
 use crate::config::{
-    loading::{ComponentHint, Process},
+    loading::{deserialize_table, ComponentHint, Process},
     ComponentKey,
 };
 
@@ -23,92 +23,106 @@ pub trait SecretBackend: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn retrieve(&mut self, secret_keys: Vec<String>) -> crate::Result<HashMap<String, String>>;
 }
 
+#[derive(Deserialize, Serialize, Debug, Default)]
 pub struct SecretBackendLoader {
-    backends: SecretBackends,
+    backends: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub(crate) secret_keys: HashMap<String, Vec<String>>,
+}
+
+impl SecretBackendLoader {
+    pub(crate) fn new() -> Self {
+        Self {
+            backends: IndexMap::new(),
+            secret_keys: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn retrieve(&mut self) -> Result<HashMap<String, String>, String> {
+        let secrets = self.secret_keys.iter().flat_map(|(backend_name, keys)| {
+            match self.backends.get_mut(&ComponentKey::from(backend_name.clone())) {
+                None => {
+                    vec![Err(format!("Backend \"{}\" is required for secret retrieval but was not found in config.", backend_name))]
+                },
+                Some(backend) => {
+                    debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
+                    match backend.retrieve(keys.to_vec()) {
+                        Err(e) => {
+                            vec![Err(format!("Error while retrieving secret from backend \"{}\": {}", backend_name, e))]
+                        },
+                        Ok(s) => {
+                            s.into_iter().map(|(k, v)| {
+                                trace!(message = "Successfully retrieved a secret.", backend = ?backend_name, secret_key = ?k);
+                                Ok((format!("{}.{}", backend_name, k), v))
+                            }).collect::<Vec<Result<(String, String), String>>>()
+                        }
+                    }
+                },
+            }
+        }).collect::<Result<HashMap<String,String>,String>>()?;
+        Ok(secrets)
+    }
+
+    pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
+        !self.secret_keys.is_empty()
+    }
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(
-        &self,
-        input: R,
-        format: Format,
-    ) -> Result<(String, Vec<String>), Vec<String>> {
-        prepare_input(input, format)
+    fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
+        let (config_string, warnings) = prepare_input(input)?;
+        // Collect secret placeholders just after env var processing
+        collect_secret_keys(&config_string, &mut self.secret_keys);
+        Ok((config_string, warnings))
     }
 
     fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        if table.contains_key("secret") {
+            let additional = deserialize_table::<SecretBackends>(table)?;
+            self.backends.extend(additional.secret);
+        }
         Ok(())
     }
 }
 
+impl loader::Loader<SecretBackendLoader> for SecretBackendLoader {
+    /// Returns the resulting `SecretBackendLoader`.
+    fn take(self) -> SecretBackendLoader {
+        self
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Default)]
-struct SecretBackends {
+pub(crate) struct SecretBackends {
     #[serde(default)]
-    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub(crate) secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
-pub fn interpolate(input: &str, format: Format) -> (String, Vec<String>) {
-    let keys = collect_secret_keys(input);
-    if keys.is_empty() {
-        debug!("No secret placeholder found, skipping secret resolution.");
-        return (input.to_owned(), Vec::new());
-    }
-    let backends = format::deserialize::<SecretBackends>(input, format);
-    match backends {
-        Err(e) => (input.to_owned(), e),
-        Ok(backends) => {
-            let (secrets, warnings) = retrieve_secrets(keys, backends);
-            (do_replace(input, secrets), warnings)
-        }
-    }
-}
-
-fn retrieve_secrets(
-    keys: HashMap<String, Vec<String>>,
-    mut backends: SecretBackends,
-) -> (HashMap<String, String>, Vec<String>) {
-    let mut warnings = Vec::<String>::new();
-    let secrets = keys.into_iter().flat_map(|(backend_name, keys)| {
-        match backends.secret.get_mut(&ComponentKey::from(backend_name.clone())) {
-            None => {
-                warnings.push(format!("Backend \"{}\" is required for secret retrieval but was not found in config.", backend_name));
-                vec![]
-            },
-            Some(backend) => {
-                debug!("Retrieving secret for backend: {}", backend_name);
-                match backend.retrieve(keys) {
-                    Err(e) => {
-                        warnings.push(e.to_string());
-                        vec![]
-                    },
-                    Ok(s) => {
-                        s.into_iter().map(|(k, v)| {
-                            trace!("Successfully retrieved secret: {}.{}", backend_name, k);
-                            (format!("{}.{}", backend_name, k), v)
-                        }).collect::<Vec<(String, String)>>()
-                    }
-                }
-            },
-        }
-    }).collect::<HashMap<String,String>>();
-    (secrets, warnings)
-}
-
-fn do_replace(input: &str, secrets: HashMap<String, String>) -> String {
-    COLLECTOR
+pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
+    let mut errors = Vec::<String>::new();
+    let output = COLLECTOR
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
                 .and_then(|b| caps.get(2).map(|k| (b, k)))
                 .map(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
                 .flatten()
                 .cloned()
-                .unwrap_or_else(|| "foo".to_string())
+                .unwrap_or_else(|| {
+                    errors.push(format!(
+                        "Unable to find secret replacement for {}.",
+                        caps.get(0).unwrap().as_str()
+                    ));
+                    "".to_string()
+                })
         })
-        .into_owned()
+        .into_owned();
+    if errors.is_empty() {
+        Ok(output)
+    } else {
+        Err(errors)
+    }
 }
 
-fn collect_secret_keys(input: &str) -> HashMap<String, Vec<String>> {
-    let mut keys: HashMap<String, Vec<String>> = HashMap::new();
+fn collect_secret_keys(input: &str, keys: &mut HashMap<String, Vec<String>>) {
     COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
             if let Some(keys) = keys.get_mut(backend.as_str()) {
@@ -118,7 +132,6 @@ fn collect_secret_keys(input: &str) -> HashMap<String, Vec<String>> {
             }
         }
     });
-    keys
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -215,7 +228,7 @@ mod test {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, do_replace};
+    use super::{collect_secret_keys, interpolate};
 
     #[test]
     fn replacement() {
@@ -226,32 +239,49 @@ mod test {
         .into_iter()
         .collect();
 
-        assert_eq!("value", do_replace("SECRET[a.secret.key]", secrets.clone()));
         assert_eq!(
-            "xxxvalueyyy",
-            do_replace("xxxSECRET[a.secret.key]yyy", secrets.clone())
-        );
-        assert_eq!("a...value", do_replace("SECRET[a...key]", secrets.clone()));
-        assert_eq!(
-            "xxxSECRET[non_matching_syntax]yyy",
-            do_replace("xxxSECRET[non_matching_syntax]yyy", secrets.clone())
+            Ok("value".into()),
+            interpolate("SECRET[a.secret.key]", &secrets)
         );
         assert_eq!(
-            "xxxyyy",
-            do_replace("xxxSECRET[a.non.existing.key]yyy", secrets)
+            Ok("value value".into()),
+            interpolate("SECRET[a.secret.key] SECRET[a.secret.key]", &secrets)
+        );
+
+        assert_eq!(
+            Ok("xxxvalueyyy".into()),
+            interpolate("xxxSECRET[a.secret.key]yyy", &secrets)
+        );
+        assert_eq!(
+            Ok("a...value".into()),
+            interpolate("SECRET[a...key]", &secrets)
+        );
+        assert_eq!(
+            Ok("xxxSECRET[non_matching_syntax]yyy".into()),
+            interpolate("xxxSECRET[non_matching_syntax]yyy", &secrets)
+        );
+        assert_eq!(
+            Err(vec![
+                "Unable to find secret replacement for SECRET[a.non.existing.key].".into()
+            ]),
+            interpolate("xxxSECRET[a.non.existing.key]yyy", &secrets)
         );
     }
 
     #[test]
     fn collection() {
-        let keys = collect_secret_keys(indoc! {r#"
+        let mut keys = HashMap::<String, Vec<String>>::new();
+        collect_secret_keys(
+            indoc! {r#"
             SECRET[first_backend.secret_key]
             SECRET[first_backend.another_secret_key]
             SECRET[second_backend.secret_key]
             SECRET[second_backend.secret.key]
             SECRET[first_backend.a_third.secret_key]
             SECRET[non_matching_syntax]
-        "#});
+        "#},
+            &mut keys,
+        );
         assert_eq!(keys.len(), 2);
         assert!(keys.contains_key("first_backend"));
         assert!(keys.contains_key("second_backend"));

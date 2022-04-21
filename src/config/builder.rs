@@ -59,6 +59,7 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    secret: BTreeMap<&'a ComponentKey, &'a Box<dyn SecretBackend>>,
 }
 
 impl Clone for ConfigBuilder {
@@ -273,6 +274,11 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate test name found: {}", wt.name));
             }
         });
+        with.secret.keys().for_each(|k| {
+            if self.secret.contains_key(k) {
+                errors.push(format!("duplicate secret id found: {}", k));
+            }
+        });
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -282,6 +288,7 @@ impl ConfigBuilder {
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
+        self.secret.extend(with.secret);
 
         Ok(())
     }
@@ -303,6 +310,7 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
+            secret: self.secret.iter().collect(),
         })
         .expect("should serialize to JSON");
 
@@ -347,6 +355,7 @@ mod tests {
             "transforms",
             "tests",
             "provider",
+            "secret",
         ];
 
         let builder = ConfigBuilder::default();
@@ -361,6 +370,7 @@ mod tests {
             transforms: builder.transforms.iter().collect(),
             tests: &builder.tests,
             provider: &builder.provider,
+            secret: builder.secret.iter().collect(),
         });
 
         match value {
