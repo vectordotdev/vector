@@ -235,7 +235,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.to_hyphenated())
+                format!("{}-{}", seconds, uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
