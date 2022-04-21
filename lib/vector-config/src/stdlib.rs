@@ -12,7 +12,7 @@ use crate::{
 
 // Unit type.
 impl<'de> Configurable<'de> for () {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<'de, Self>) -> SchemaObject {
         panic!("unit fields are not supported and should never be used in `Configurable` types");
     }
 }
@@ -36,7 +36,7 @@ where
 
 impl<'de> Configurable<'de> for bool {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let mut schema = generate_bool_schema(gen);
+        let mut schema = generate_bool_schema();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -48,7 +48,7 @@ impl<'de> Configurable<'de> for String {
         // TODO: update shape based on provided metadata
         let shape = StringShape::default();
 
-        let mut schema = generate_string_schema(gen, shape);
+        let mut schema = generate_string_schema(shape);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -63,7 +63,7 @@ macro_rules! impl_configuable_unsigned {
 					// TODO: update shape based on provided metadata
 					let shape = NumberShape::unsigned(u64::from(<$ty>::MAX));
 
-					let mut schema = generate_number_schema(gen, shape);
+					let mut schema = generate_number_schema(shape);
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -80,7 +80,7 @@ macro_rules! impl_configuable_signed {
 					// TODO: update shape based on provided metadata
 					let shape = NumberShape::signed(i64::from(<$ty>::MIN), i64::from(<$ty>::MAX));
 
-					let mut schema = generate_number_schema(gen, shape);
+					let mut schema = generate_number_schema(shape);
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -97,7 +97,7 @@ impl<'de> Configurable<'de> for usize {
         // TODO: update shape based on provided metadata
         let shape = NumberShape::unsigned(u64::try_from(usize::MAX).unwrap_or(u64::MAX));
 
-        let mut schema = generate_number_schema(gen, shape);
+        let mut schema = generate_number_schema(shape);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -111,7 +111,7 @@ impl<'de> Configurable<'de> for f64 {
             maximum: f64::MAX,
         };
 
-        let mut schema = generate_number_schema(gen, shape);
+        let mut schema = generate_number_schema(shape);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -125,7 +125,7 @@ impl<'de> Configurable<'de> for f32 {
             maximum: f64::from(f32::MAX),
         };
 
-        let mut schema = generate_number_schema(gen, shape);
+        let mut schema = generate_number_schema(shape);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -194,7 +194,7 @@ impl<'de> Configurable<'de> for SocketAddr {
         // is well-known and can be easily codified.
         let shape = StringShape::default();
 
-        let mut schema = generate_string_schema(gen, shape);
+        let mut schema = generate_string_schema(shape);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }

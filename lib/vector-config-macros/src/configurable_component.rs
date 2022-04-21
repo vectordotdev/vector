@@ -38,8 +38,8 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     let component_type = match find_component_type(&args) {
         Ok(ct) => ct
             .map(|ct| ct.as_str().to_string())
-            .map(|s| quote! { #[configurable(type = #s)] })
-            .unwrap_or(proc_macro2::TokenStream::new()),
+            .map(|s| quote! { #[configurable(metadata(component_type = #s))] })
+            .unwrap_or_default(),
         Err(e) => return e.into_compile_error().into(),
     };
 

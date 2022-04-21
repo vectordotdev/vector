@@ -1,11 +1,10 @@
-use serde_derive_internals::{ast as serde_ast, attr as serde_attr, Ctxt, Derive};
-use syn::{DeriveInput, ExprPath, Generics, Ident, Meta, NestedMeta};
+use darling::{FromAttributes, error::Accumulator, FromMeta, util::path_to_string};
+use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
+use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
 
 use super::{
     util::{
-        duplicate_attribute, err_unexpected_literal, err_unexpected_meta_attribute,
-        get_back_to_back_lit_strs, get_default_exprpath, get_lit_str,
-        try_extract_doc_title_description, try_get_attribute_meta_list,
+        try_extract_doc_title_description, err_serde_failed, DarlingResultIterator, get_serde_default_value,
     },
     Data, Field, Style, Tagging, Variant,
 };
@@ -17,81 +16,77 @@ const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in styl
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";
 
 pub struct Container<'a> {
-    referencable_name: String,
+    original: &'a DeriveInput,
+    name: String,
     default_value: Option<ExprPath>,
     data: Data<'a>,
     attrs: Attributes,
-    original: &'a DeriveInput,
 }
 
 impl<'a> Container<'a> {
-    pub fn from_derive_input(context: &Ctxt, input: &'a DeriveInput) -> Option<Container<'a>> {
+    pub fn from_derive_input(input: &'a DeriveInput) -> darling::Result<Container<'a>> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
-        serde_ast::Container::from_ast(context, input, Derive::Deserialize)
-            // Once we have the `serde` side of things, we need to collect our own specific attributes for the container
-            // and map things to our own `Container`.
-            .and_then(|serde| {
-                let attrs = Attributes::from_ast(context, input);
+        let context = Ctxt::new();
+        let serde = match serde_ast::Container::from_ast(&context, input, Derive::Deserialize) {
+            Some(serde) => {
+                // This `serde_derive_internals` helper will panic if `check` isn't _always_ called, so we also have to
+                // call it on the success path.
+                let _ = context.check().expect("should not have errors if container was parsed successfully");
+                Ok(serde)
+            },
+            None => Err(err_serde_failed(context)),
+        }?;
+
+        
+        // Once we have the `serde` side of things, we need to collect our own specific attributes for the container
+        // and map things to our own `Container`.
+        Attributes::from_attributes(&input.attrs)
+            .and_then(|attrs| attrs.finalize(&input.attrs))
+            // We successfully parsed the derive input through both `serde` itself and our own attribute parsing, so
+            // build our data container based on whether or not we have a struct, enum, and do any neccessary
+            // validation, etc.
+            .and_then(|attrs| {
+                let mut accumulator = Accumulator::default();
+                let tagging: Tagging = serde.attrs.tag().into();
 
                 let data = match serde.data {
                     serde_ast::Data::Enum(variants) => {
-                        let variants = variants
-                            .into_iter()
-                            .map(|variant| {
-                                Variant::from_ast(context, variant, serde.attrs.tag().into())
-                            })
-                            .collect::<Vec<_>>();
+                        let variants = variants.iter()
+                            .map(|variant| Variant::from_ast(variant, tagging.clone()))
+                            .collect_darling_results()?;
 
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
                         // Not all enum variant styles are compatible with the various tagging types that `serde`
                         // supports, and additionally, we have some of our own constraints that we want to enforce.
-                        let mut had_error = false;
                         for variant in &variants {
                             // We don't support tuple variants.
                             if variant.style() == Style::Tuple {
-                                context.error_spanned_by(variant.original(), ERR_NO_ENUM_TUPLES);
-                                had_error = true;
+                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_TUPLES).with_span(variant));
                             }
 
                             // We don't support internal tag for newtype variants, because `serde` doesn't support it.
                             if variant.style() == Style::Newtype
                                 && matches!(variant.tagging(), Tagging::Internal { .. })
                             {
-                                context.error_spanned_by(
-                                    variant.original(),
-                                    ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG,
-                                );
-                                had_error = true;
+                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG).with_span(variant));
                             }
 
                             // All variants must have a description.  No derived/transparent mode.
                             if variant.description().is_none() {
-                                context.error_spanned_by(
-                                    variant.original(),
-                                    ERR_NO_ENUM_VARIANT_DESCRIPTION,
-                                );
-                                had_error = true;
+                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION).with_span(variant));
                             }
                         }
 
                         // If we're in untagged mode, there can be no duplicate variants.
-                        if Tagging::from(serde.attrs.tag()) == Tagging::None {
+                        if tagging == Tagging::None {
                             for (i, variant) in variants.iter().enumerate() {
                                 for (k, other_variant) in variants.iter().enumerate() {
                                     if variant == other_variant && i != k {
-                                        context.error_spanned_by(
-                                            variant.original(),
-                                            ERR_ENUM_UNTAGGED_DUPLICATES,
-                                        );
-                                        had_error = true;
+                                        accumulator.push(darling::Error::custom(ERR_ENUM_UNTAGGED_DUPLICATES).with_span(variant));
                                     }
                                 }
                             }
-                        }
-
-                        if had_error {
-                            return None;
                         }
 
                         Data::Enum(variants)
@@ -101,37 +96,32 @@ impl<'a> Container<'a> {
                         | serde_ast::Style::Tuple
                         | serde_ast::Style::Newtype => {
                             let fields = fields
-                                .into_iter()
-                                .map(|field| Field::from_ast(context, field))
-                                .collect();
+                                .iter()
+                                .map(Field::from_ast)
+                                .collect_darling_results()?;
 
                             Data::Struct(Style::Struct, fields)
                         }
                         serde_ast::Style::Unit => {
-                            context.error_spanned_by(input, ERR_NO_UNIT_STRUCTS);
-                            return None;
+                            return Err(darling::Error::custom(ERR_NO_UNIT_STRUCTS).with_span(input))
                         }
                     },
                 };
 
-                let default_value = match serde.attrs.default() {
-                    serde_attr::Default::None => None,
-                    serde_attr::Default::Default => Some(get_default_exprpath()),
-                    serde_attr::Default::Path(path) => Some(path.clone()),
-                };
+                let original = input;
+                let name = serde.attrs.name().deserialize_name();
+                let default_value = get_serde_default_value(serde.attrs.default());
 
-                Some(Container {
-                    referencable_name: serde.attrs.name().deserialize_name(),
+                let container = Container {
+                    original,
+                    name,
                     default_value,
                     data,
                     attrs,
-                    original: input,
-                })
-            })
-    }
+                };
 
-    pub fn original(&self) -> &DeriveInput {
-        self.original
+                accumulator.finish_with(container)
+            })
     }
 
     pub fn ident(&self) -> &Ident {
@@ -146,8 +136,8 @@ impl<'a> Container<'a> {
         &self.data
     }
 
-    pub fn referencable_name(&self) -> &str {
-        self.referencable_name.as_str()
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     pub fn title(&self) -> Option<&String> {
@@ -166,84 +156,84 @@ impl<'a> Container<'a> {
         self.attrs.deprecated
     }
 
-    pub fn metadata(&self) -> &[(String, String)] {
-        &self.attrs.metadata
+    pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
+        self.attrs.metadata.iter()
+            .map(|metadata| &metadata.pairs)
+            .flatten()
     }
 }
 
-/// A collection of attributes relevant to containers i.e. structs and enums.
-#[derive(Default)]
+#[derive(Debug, FromAttributes)]
+#[darling(attributes(configurable))]
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
+    #[darling(skip)]
     deprecated: bool,
-    metadata: Vec<(String, String)>,
+    #[darling(multiple)]
+    metadata: Vec<Metadata>
 }
 
 impl Attributes {
-    /// Creates a new `Container` based on the attributes present on the given container AST.
-    fn from_ast(context: &Ctxt, input: &DeriveInput) -> Self {
-        // Construct our `Container` and extra any valid `configurable`-specific attributes.
-        let mut attributes = Attributes::default();
-        attributes.extract(context, &input.attrs);
+    fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
+        // Parse any forwarded attributes that `darling` left us.
+        self.deprecated = forwarded_attrs.iter()
+            .any(|a| a.path.is_ident("deprecated"));
 
-        // Parse any helper-less attributes, such as `deprecated`, which are part of Rust itself.
-        attributes.deprecated = input.attrs.iter().any(|a| a.path.is_ident("deprecated"));
-
-        // We additionally attempt to extract a title/description from the doc attributes, if they exist. Whether we
-        // extract both a title and description, or just description, is documented in more detail in
+        // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
+        // Whether we extract both a title and description, or just description, is documented in more detail in
         // `try_extract_doc_title_description` itself.
-        let (doc_title, doc_description) = try_extract_doc_title_description(&input.attrs);
-        attributes.title = attributes.title.or(doc_title);
-        attributes.description = attributes.description.or(doc_description);
+        let (doc_title, doc_description) = try_extract_doc_title_description(forwarded_attrs);
+        self.title = self.title.or(doc_title);
+        self.description = self.description.or(doc_description);
 
-        attributes
+        Ok(self)
     }
+}
 
-    fn extract(&mut self, context: &Ctxt, attributes: &[syn::Attribute]) {
-        for meta_item in attributes
-            .iter()
-            .flat_map(|attribute| try_get_attribute_meta_list(attribute, context))
-            .flatten()
-        {
-            match &meta_item {
-                // Title set directly via the `configurable` helper.
-                NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("title") => {
-                    if let Ok(title) = get_lit_str(context, "title", &m.lit) {
-                        match self.title {
-                            Some(_) => duplicate_attribute(context, m),
-                            None => self.title = Some(title.value()),
-                        }
-                    }
-                }
+#[derive(Debug)]
+struct Metadata {
+    pairs: Vec<(String, String)>,
+}
 
-                // Title set directly via the `configurable` helper.
-                NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("description") => {
-                    if let Ok(description) = get_lit_str(context, "description", &m.lit) {
-                        match self.description {
-                            Some(_) => duplicate_attribute(context, m),
-                            None => self.description = Some(description.value()),
-                        }
-                    }
-                }
+impl FromMeta for Metadata {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        let mut errors = Accumulator::default();
 
-                // A custom metadata key/value pair.
-                NestedMeta::Meta(Meta::List(ml)) if ml.path.is_ident("metadata") => {
-                    if let Ok((key, value)) = get_back_to_back_lit_strs(context, "metadata", &ml) {
-                        self.metadata.push((key.value(), value.value()));
-                    }
-                }
-
-                // We've hit a meta item that we don't handle.
-                NestedMeta::Meta(meta) => {
-                    err_unexpected_meta_attribute(meta, context);
-                }
-
-                // We don't support literals in the `configurable` helper at all, so...
-                NestedMeta::Lit(lit) => {
-                    err_unexpected_literal(context, lit);
-                }
-            }
+        // Can't be empty.
+        if items.is_empty() {
+            errors.push(darling::Error::too_few_items(1));
         }
+
+        errors = errors.checkpoint()?;
+
+        // Can't be anything other than name/value pairs.
+        let pairs = items.iter()
+            .filter_map(|nmeta| match nmeta {
+                NestedMeta::Meta(meta) => match meta {
+                    syn::Meta::Path(_) => {
+                        errors.push(darling::Error::unexpected_type("path").with_span(nmeta));
+                        None
+                    },
+                    syn::Meta::List(_) => {
+                        errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
+                        None
+                    },
+                    syn::Meta::NameValue(nv) => match &nv.lit {
+                        syn::Lit::Str(s) => Some((path_to_string(&nv.path), s.value())),
+                        lit => {
+                            errors.push(darling::Error::unexpected_lit_type(lit));
+                            None
+                        }
+                    },
+                }
+                NestedMeta::Lit(_) => {
+                    errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
+                    None
+                },
+            })
+            .collect::<Vec<(String, String)>>();
+
+        errors.finish_with(Metadata { pairs })
     }
 }

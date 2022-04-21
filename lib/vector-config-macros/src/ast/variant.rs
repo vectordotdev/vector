@@ -1,53 +1,49 @@
-use serde_derive_internals::{ast as serde_ast, Ctxt};
-use syn::{Ident, Meta, NestedMeta};
+use darling::FromAttributes;
+use serde_derive_internals::ast as serde_ast;
+use syn::spanned::Spanned;
 
 use super::{
     util::{
-        duplicate_attribute, err_unexpected_literal, err_unexpected_meta_attribute, get_lit_str,
-        try_extract_doc_title_description, try_get_attribute_meta_list,
+        try_extract_doc_title_description, DarlingResultIterator,
     },
     Field, Style, Tagging,
 };
 
 pub struct Variant<'a> {
-    serde: serde_ast::Variant<'a>,
+    original: &'a syn::Variant,
+    name: String,
     attrs: Attributes,
     fields: Vec<Field<'a>>,
+    style: Style,
     tagging: Tagging,
 }
 
 impl<'a> Variant<'a> {
     pub fn from_ast(
-        context: &Ctxt,
-        mut serde: serde_ast::Variant<'a>,
+        serde: &serde_ast::Variant<'a>,
         tagging: Tagging,
-    ) -> Variant<'a> {
-        let attrs = Attributes::from_ast(context, &serde);
+    ) -> darling::Result<Variant<'a>> {
+        let original = serde.original;
+        let name = serde.attrs.name().deserialize_name();
+        let style = serde.style.into();
 
-        let fields = serde
-            .fields
-            .drain(..)
-            .map(|field| Field::from_ast(context, field))
-            .collect();
-
-        Variant {
-            serde,
-            attrs,
-            fields,
-            tagging,
-        }
-    }
-
-    pub fn original(&self) -> &syn::Variant {
-        self.serde.original
-    }
-
-    pub fn ident(&self) -> &Ident {
-        &self.serde.ident
+        Attributes::from_attributes(&original.attrs)
+            .and_then(|attrs| attrs.finalize(serde, &original.attrs))
+            .and_then(|attrs| serde.fields.iter()
+                .map(Field::from_ast)
+                .collect_darling_results()
+                .map(|fields| Variant {
+                    original,
+                    name,
+                    attrs,
+                    fields,
+                    style,
+                    tagging,
+                }))
     }
 
     pub fn style(&self) -> Style {
-        self.serde.style.into()
+        self.style
     }
 
     pub fn tagging(&self) -> &Tagging {
@@ -58,16 +54,16 @@ impl<'a> Variant<'a> {
         &self.fields
     }
 
-    pub fn name(&self) -> String {
-        self.serde.attrs.name().deserialize_name()
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
-    pub fn title(&self) -> Option<String> {
-        self.attrs.title.clone()
+    pub fn title(&self) -> Option<&String> {
+        self.attrs.title.as_ref()
     }
 
-    pub fn description(&self) -> Option<String> {
-        self.attrs.description.clone()
+    pub fn description(&self) -> Option<&String> {
+        self.attrs.description.as_ref()
     }
 
     pub fn deprecated(&self) -> bool {
@@ -79,79 +75,40 @@ impl<'a> Variant<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+impl<'a> Spanned for Variant<'a> {
+    fn span(&self) -> proc_macro2::Span {
+        self.original.span()
+    }
+}
+
+#[derive(Debug, FromAttributes)]
+#[darling(attributes(configurable))]
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
+    #[darling(skip)]
     deprecated: bool,
+    #[darling(skip)]
     visible: bool,
 }
 
 impl Attributes {
-    fn from_ast(context: &Ctxt, variant: &serde_ast::Variant<'_>) -> Self {
-        // Construct our `Attributes` and extract any `configurable`-specific attributes that we know about.
-        let mut attributes = Attributes::default();
-        attributes.extract(context, &variant.original.attrs);
+    fn finalize(mut self, variant: &serde_ast::Variant<'_>, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
+        // Derive any of the necessary fields from the `serde` side of things.
+        self.visible = !variant.attrs.skip_deserializing() || !variant.attrs.skip_serializing();
 
-        attributes.visible =
-            !variant.attrs.skip_deserializing() || !variant.attrs.skip_serializing();
-
-        // Parse any helper-less attributes, such as `deprecated`, which are part of Rust itself.
-        attributes.deprecated = variant
-            .original
-            .attrs
-            .iter()
+        // Parse any forwarded attributes that `darling` left us.
+        self.deprecated = forwarded_attrs.iter()
             .any(|a| a.path.is_ident("deprecated"));
 
-        // We additionally attempt to extract a title/description from the doc attributes, if they
-        // exist. Whether we extract both a title and description, or just description, is
-        // documented in more detail in `try_extract_doc_title_description` itself.
-        let (doc_title, doc_description) =
-            try_extract_doc_title_description(&variant.original.attrs);
-        attributes.title = attributes.title.or(doc_title);
-        attributes.description = attributes.description.or(doc_description);
+        // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
+        // Whether we extract both a title and description, or just description, is documented in more detail in
+        // `try_extract_doc_title_description` itself.
+        let (doc_title, doc_description) = try_extract_doc_title_description(forwarded_attrs);
+        self.title = self.title.or(doc_title);
+        self.description = self.description.or(doc_description);
 
-        attributes
-    }
-
-    fn extract(&mut self, context: &Ctxt, attributes: &[syn::Attribute]) {
-        for meta_item in attributes
-            .iter()
-            .flat_map(|attribute| try_get_attribute_meta_list(attribute, context))
-            .flatten()
-        {
-            match &meta_item {
-                // Title set directly via the `configurable` helper.
-                NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("title") => {
-                    if let Ok(title) = get_lit_str(context, "title", &m.lit) {
-                        match self.title {
-                            Some(_) => duplicate_attribute(context, m),
-                            None => self.title = Some(title.value()),
-                        }
-                    }
-                }
-
-                // Title set directly via the `configurable` helper.
-                NestedMeta::Meta(Meta::NameValue(m)) if m.path.is_ident("description") => {
-                    if let Ok(description) = get_lit_str(context, "description", &m.lit) {
-                        match self.description {
-                            Some(_) => duplicate_attribute(context, m),
-                            None => self.description = Some(description.value()),
-                        }
-                    }
-                }
-
-                // We've hit a meta item that we don't handle.
-                NestedMeta::Meta(meta) => {
-                    err_unexpected_meta_attribute(meta, context);
-                }
-
-                // We don't support literals in the `configurable` helper at all, so...
-                NestedMeta::Lit(lit) => {
-                    err_unexpected_literal(context, lit);
-                }
-            }
-        }
+        Ok(self)
     }
 }
 

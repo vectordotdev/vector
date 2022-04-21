@@ -1,21 +1,27 @@
-// PRIMARY CONFIG SCHEMA TODO LIST
+// High-level list of TODOS.
 //
-// TODO: serde supports defining a default at the struct level to fill in fields when no value is
-// present during serialization, but it also supports defaults on a per-field basis, which override
-// any defaults that would be applied by virtue of the struct-level default
+// TODO: `serde` supports defining a default at the struct level to fill in fields when no value is present during
+// serialization, but it also supports defaults on a per-field basis, which override any defaults that would be applied
+// by virtue of the struct-level default.
 //
-// thus, mark a struct optional if it has a struct-level default _or_ if all fields are optional:
-// either literal `Option<T>` fields or if they all have defaults
+// Thus, we should mark a struct optional if it has a struct-level default _or_ if all fields are optional: either
+// literal `Option<T>` fields or if they all have defaults.
 //
-// TODO: what happens if we try to stick in a field that has a struct with a lifetime attached to
-// it? how does the name of that get generated in terms of what ends up in the schema?
+// This could clean up some of the required properties where we have a field-level/struct-level default that we can
+// check by looking at the metadata for the type implementing `T`, maybe even such that the default impl of
+// `Configurable::is_optional` could just use that.
 //
-// TODO: we don't support `#[serde(flatten)]` either for collecting unknown fields or for flattening a
-// field into its parent struct
+// TODO: What happens if we try to stick in a field that has a struct with a lifetime attached to it? How does the name
+// of that get generated in terms of what ends up in the schema? Do we even have fields with lifetime bounds in any of
+// our configuration types in `vector`? :thinking:
 //
-// TODO: we don't handle renamed fields i.e. `#[serde(rename_all = "...")]`
+// TODO: We don't support `#[serde(flatten)]` either for collecting unknown fields or for flattening a field into its
+// parent struct. However, per #12341, we might actually not want to allow using `flatten` for collecting unknown
+// fields, at least, which would make implementing flatten support for merging structs a bit easier.
 
-#![allow(unused_variables)]
+// TODO: Remove this once we implement validation support on the derive macro side, because most things that are dead
+// are related to that.
+#![allow(dead_code)]
 
 use core::fmt;
 use std::marker::PhantomData;
@@ -35,7 +41,7 @@ pub use vector_config_macros::configurable_component;
 
 const NUM_MANTISSA_BITS: u32 = 53;
 const NUM_MAX_BOUND_UNSIGNED: u64 = 2u64.pow(NUM_MANTISSA_BITS);
-const NUM_MIN_BOUND_SIGNED: i64 = -2i64.pow(NUM_MANTISSA_BITS);
+const NUM_MIN_BOUND_SIGNED: i64 = -(2i64.pow(NUM_MANTISSA_BITS));
 const NUM_MAX_BOUND_SIGNED: i64 = 2i64.pow(NUM_MANTISSA_BITS);
 
 #[derive(Clone, Default)]
@@ -158,7 +164,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
     }
 
     pub fn title(&self) -> Option<&'static str> {
-        self.title.clone()
+        self.title
     }
 
     pub fn set_title(&mut self, title: &'static str) {
@@ -177,7 +183,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
     }
 
     pub fn description(&self) -> Option<&'static str> {
-        self.description.clone()
+        self.description
     }
 
     pub fn set_description(&mut self, desc: &'static str) {

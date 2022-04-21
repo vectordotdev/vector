@@ -1,33 +1,26 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use serde_derive_internals::Ctxt;
 use syn::{parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef};
 
 use crate::{
     ast::{Container, Data, Field, Style, Tagging, Variant},
-    errors_to_tokenstream,
 };
 
 pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Parse our input token stream as a derive input, and process the container, and the
     // container's children, that the macro is applied to.
     let input = parse_macro_input!(input as DeriveInput);
-    let context = Ctxt::new();
-    let container = match Container::from_derive_input(&context, &input) {
-        Some(container) => container,
-        None => {
+    let container = match Container::from_derive_input(&input) {
+        Ok(container) => container,
+        Err(e) => {
             // This should only occur when used on a union, as that's the only time `serde` will get
             // angry enough to not parse the derive AST at all, so we just return the context errors
             // we have, which will say as much, because also, if it gave us `None`, it should have
             // registered an error in the context as well.
-            return context.check().map_err(errors_to_tokenstream).unwrap_err();
+            return e.write_errors().into()
         }
     };
-
-    if let Err(errs) = context.check() {
-        return errors_to_tokenstream(errs);
-    }
 
     // We build the "impl" generics separately from the "type" generics, because the lifetime for
     // `Configurable` only matters to `impl`, not to the type that `Configurable` is being
@@ -54,12 +47,12 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // which are varied based on whether we have a struct or enum container.
     let metadata_fn = build_metadata_fn(&container);
     let generate_schema_fn = match container.data() {
-        Data::Struct(style, fields) => build_struct_generate_schema_fn(&container, style, &fields),
-        Data::Enum(variants) => build_enum_generate_schema_fn(&variants),
+        Data::Struct(style, fields) => build_struct_generate_schema_fn(&container, style, fields),
+        Data::Enum(variants) => build_enum_generate_schema_fn(variants),
     };
 
     let name = container.ident();
-    let ref_name = container.referencable_name();
+    let ref_name = container.name();
     let configurable_impl = quote! {
         const _: () = {
             #[automatically_derived]
@@ -95,10 +88,10 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
     let (clt, _) = get_configurable_lifetime();
 
     let mapped_variants = variants
-        .into_iter()
+        .iter()
         // Don't map this variant if it's marked to be skipped for both serialization and deserialization.
         .filter(|variant| variant.visible())
-        .map(|variant| generate_enum_variant_schema(variant));
+        .map(generate_enum_variant_schema);
 
     quote! {
         fn generate_schema(schema_gen: &mut ::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::schemars::schema::SchemaObject {
@@ -107,7 +100,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
             let schema_metadata = Self::metadata().merge(overrides);
             #(#mapped_variants)*
 
-            let mut schema = ::vector_config::schema::generate_composite_schema(schema_gen, &subschemas);
+            let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
             ::vector_config::schema::finalize_schema(schema_gen, &mut schema, schema_metadata);
 
             schema
@@ -204,7 +197,7 @@ fn build_named_struct_generate_schema_fn(
     let (clt, _) = get_configurable_lifetime();
 
     let mapped_fields = fields
-        .into_iter()
+        .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
         .filter(|field| field.visible())
         .map(|field| generate_named_struct_field(container, field));
@@ -225,7 +218,6 @@ fn build_named_struct_generate_schema_fn(
             // until we hit our first struct that needs it.
             let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
-                schema_gen,
                 properties,
                 required,
                 additional_properties,
@@ -241,7 +233,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
     let (clt, _) = get_configurable_lifetime();
 
     let mapped_fields = fields
-        .into_iter()
+        .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
         .filter(|field| field.visible())
         .map(generate_tuple_struct_field);
@@ -253,7 +245,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
             let metadata = Self::metadata().merge(overrides);
             #(#mapped_fields)*
 
-            let mut schema = ::vector_config::schema::generate_tuple_schema(schema_gen, &subschemas);
+            let mut schema = ::vector_config::schema::generate_tuple_schema(&subschemas);
             ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
 
             schema
@@ -266,7 +258,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
 
     // Map the fields normally, but we should end up with a single field at the end.
     let mut mapped_fields = fields
-        .into_iter()
+        .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
         .filter(|field| field.visible())
         .map(generate_struct_field)
@@ -297,7 +289,8 @@ fn generate_container_metadata(
     let maybe_title = get_metadata_description(meta_ident, container.title());
     let maybe_description = get_metadata_description(meta_ident, container.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, container.default_value());
-    let maybe_custom_attributes = container.metadata().iter().map(|(key, value)| {
+    let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
+    let maybe_custom_attributes = container.metadata().map(|(key, value)| {
         quote! {
             #meta_ident.add_custom_attribute(#key, #value);
         }
@@ -308,6 +301,7 @@ fn generate_container_metadata(
         #maybe_title
         #maybe_description
         #maybe_default_value
+        #maybe_deprecated
         #(#maybe_custom_attributes)*
     }
 }
@@ -318,6 +312,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, field.default_value());
+    let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
 
     quote! {
@@ -325,7 +320,24 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_title
         #maybe_description
         #maybe_default_value
+        #maybe_deprecated
         #maybe_transparent
+    }
+}
+
+fn generate_variant_metadata(meta_ident: &Ident, variant: &Variant<'_>) -> proc_macro2::TokenStream {
+    let variant_as_configurable = get_variant_type_as_configurable();
+
+    let maybe_title = get_metadata_title(meta_ident, variant.title());
+    let description = get_metadata_description(meta_ident, variant.description())
+        .expect("enum variants without a description should be rejected during AST parsing");
+    let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
+
+    quote! {
+        let mut #meta_ident = #variant_as_configurable::metadata();
+        #maybe_title
+        #description
+        #maybe_deprecated
     }
 }
 
@@ -333,6 +345,17 @@ fn get_field_type_as_configurable(field: &Field<'_>) -> proc_macro2::TokenStream
     let (clt, _) = get_configurable_lifetime();
     let field_ty = field.ty();
     quote! { <#field_ty as ::vector_config::Configurable<#clt>> }
+}
+
+
+fn get_variant_type_as_configurable() -> proc_macro2::TokenStream {
+    let (clt, _) = get_configurable_lifetime();
+
+    // We hardcode this to a unit tuple because we don't have access to the actual type of the variant's enum container,
+    // at least not without parsing it specifically as a type token from an amalgamated version of the enum ident... but
+    // it doesn't actually matter because enums don't support default values, which is the only spot in `Metadata<T>`
+    // where the `T` gets used, so we can carry all the other pertinent details with `()`... it's still a littlw wonky, though.
+    quote! { <() as ::vector_config::Configurable<#clt>> }
 }
 
 fn get_metadata_title(
@@ -368,6 +391,17 @@ fn get_metadata_default_value(
     })
 }
 
+fn get_metadata_deprecated(
+    meta_ident: &Ident,
+    deprecated: bool,
+) -> Option<proc_macro2::TokenStream> {
+    deprecated.then(|| {
+        quote! {
+            #meta_ident.set_deprecated();
+        }
+    })
+}
+
 fn get_metadata_transparent(
     meta_ident: &Ident,
     transparent: bool,
@@ -381,7 +415,7 @@ fn get_metadata_transparent(
 
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_name = field.ident().expect("field should be named");
-    let field_as_configurable = get_field_type_as_configurable(&field);
+    let field_as_configurable = get_field_type_as_configurable(field);
     let field_already_contained = format!(
         "schema properties already contained entry for `{}`, this should not occur",
         field_name
@@ -433,7 +467,6 @@ fn generate_enum_struct_named_variant_schema(
         #post_fields
 
         let mut subschema = ::vector_config::schema::generate_struct_schema(
-            schema_gen,
             properties,
             required,
             None
@@ -511,7 +544,6 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                     wrapper_required.insert(#variant_name.to_string());
 
                     let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        schema_gen,
                         wrapper_properties,
                         wrapper_required,
                         None
@@ -578,7 +610,6 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                     wrapper_required.insert(#tag.to_string());
 
                     let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        schema_gen,
                         wrapper_properties,
                         wrapper_required,
                         None
@@ -635,7 +666,6 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                     #maybe_variant_schema
 
                     let mut subschema = ::vector_config::schema::generate_struct_schema(
-                        schema_gen,
                         wrapper_properties,
                         wrapper_required,
                         None
@@ -685,12 +715,12 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
 }
 
 fn generate_enum_variant_apply_metadata(variant: &Variant<'_>) -> proc_macro2::TokenStream {
-    let variant_description = variant
-        .description()
-        .expect("enum variants without a description should be rejected during AST parsing");
+    let variant_metadata_ref = Ident::new("variant_metadata", Span::call_site());
+    let variant_metadata = generate_variant_metadata(&variant_metadata_ref, variant);
 
     quote! {
-        ::vector_config::schema::apply_metadata(&mut subschema, ::vector_config::Metadata::<'_, ()>::with_description(#variant_description));
+        #variant_metadata
+        ::vector_config::schema::apply_metadata(&mut subschema, #variant_metadata_ref);
     }
 }
 

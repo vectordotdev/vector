@@ -67,7 +67,11 @@ where
     // etc), and some things make sense being added to both. (like the description)
     let is_schema_ref = schema.reference.is_some();
 
-    // Set the description of this schema.
+    // Set the title/description of this schema.
+    //
+    // By default, we want to populate `description` because most things don't need a title: their property name or type
+    // name is the title... which is why we enforce description being present at the very least.
+    let schema_title = metadata.title().map(|s| s.to_string());
     let schema_description = metadata.description().map(|s| s.to_string());
     if schema_description.is_none() && !metadata.transparent() {
         panic!("no description provided for `{}`; all `Configurable` types must define a description or be provided one when used within another `Configurable` type", std::any::type_name::<T>());
@@ -79,8 +83,10 @@ where
         .map(|v| serde_json::to_value(v).expect("default value should never fail to serialize"));
 
     let schema_metadata = schemars::schema::Metadata {
+        title: schema_title,
         description: schema_description,
         default: schema_default,
+        deprecated: metadata.deprecated(),
         ..Default::default()
     };
 
@@ -99,21 +105,21 @@ where
     schema.metadata = Some(Box::new(schema_metadata));
 }
 
-pub fn generate_null_schema(gen: &mut SchemaGenerator) -> SchemaObject {
+pub fn generate_null_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Null.into()),
         ..Default::default()
     }
 }
 
-pub fn generate_bool_schema(gen: &mut SchemaGenerator) -> SchemaObject {
+pub fn generate_bool_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Boolean.into()),
         ..Default::default()
     }
 }
 
-pub fn generate_string_schema(gen: &mut SchemaGenerator, shape: StringShape) -> SchemaObject {
+pub fn generate_string_schema(shape: StringShape) -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::String.into()),
         string: Some(Box::new(shape.into())),
@@ -121,7 +127,7 @@ pub fn generate_string_schema(gen: &mut SchemaGenerator, shape: StringShape) -> 
     }
 }
 
-pub fn generate_number_schema(gen: &mut SchemaGenerator, shape: NumberShape) -> SchemaObject {
+pub fn generate_number_schema(shape: NumberShape) -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Number.into()),
         number: Some(Box::new(shape.into())),
@@ -173,7 +179,6 @@ where
 }
 
 pub fn generate_struct_schema(
-    gen: &mut SchemaGenerator,
     properties: IndexMap<String, SchemaObject>,
     required: BTreeSet<String>,
     additional_properties: Option<Box<Schema>>,
@@ -222,10 +227,7 @@ where
     schema
 }
 
-pub fn generate_composite_schema(
-    gen: &mut SchemaGenerator,
-    subschemas: &[SchemaObject],
-) -> SchemaObject {
+pub fn generate_composite_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
         .map(|s| Schema::Object(s.clone()))
@@ -240,10 +242,7 @@ pub fn generate_composite_schema(
     }
 }
 
-pub fn generate_tuple_schema(
-    gen: &mut SchemaGenerator,
-    subschemas: &[SchemaObject],
-) -> SchemaObject {
+pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
         .map(|s| Schema::Object(s.clone()))

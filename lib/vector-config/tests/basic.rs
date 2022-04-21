@@ -92,8 +92,8 @@ where
 
 /// A source for collecting events over TCP.
 #[derive(Clone)]
-#[configurable_component]
-#[configurable(metadata("status", "beta"))]
+#[configurable_component(source)]
+#[configurable(metadata(status = "beta"))]
 pub struct SimpleSourceConfig {
     /// The address to listen on for events.
     #[serde(default = "default_simple_source_listen_addr")]
@@ -109,8 +109,8 @@ fn default_simple_source_listen_addr() -> SocketListenAddr {
 
 /// A sink for sending events to the `simple` service.
 #[derive(Clone)]
-#[configurable_component]
-#[configurable(metadata("status", "beta"))]
+#[configurable_component(sink)]
+#[configurable(metadata(status = "beta"))]
 pub struct SimpleSinkConfig {
     /// The endpoint to send events to.
     #[serde(default = "default_simple_sink_endpoint")]
@@ -145,8 +145,8 @@ fn default_simple_sink_endpoint() -> String {
 
 /// A sink for sending events to the `advanced` service.
 #[derive(Clone)]
-#[configurable_component]
-#[configurable(metadata("status", "stable"))]
+#[configurable_component(sink)]
+#[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdvancedSinkConfig {
     /// The endpoint to send events to.
@@ -156,6 +156,7 @@ pub struct AdvancedSinkConfig {
     #[serde(default = "default_advanced_sink_batch")]
     batch: BatchConfig,
     #[configurable(derived)]
+    #[deprecated]
     #[serde(default = "default_advanced_sink_encoding")]
     encoding: Encoding,
     /// The tags to apply to each event.
