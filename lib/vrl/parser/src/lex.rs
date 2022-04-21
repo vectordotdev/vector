@@ -1338,14 +1338,21 @@ mod test {
     }
 
     #[test]
-    #[rustfmt::skip]
     fn multiline_string_literals() {
-        let mut lexer = lexer(r#""foo \
-                                  bar""#);
+        let mut lexer = lexer(
+            r#""foo \
+                bar""#,
+        );
 
         match lexer.next() {
-            Some(Ok((_, StringLiteral(s), _))) => assert_eq!(TemplateString(vec![StringSegment::Literal("foo bar".to_string(), Span::new(1, 44))]), s.template(Span::new(0, 44))),
-           _ => panic!("Not a string literal"),
+            Some(Ok((_, StringLiteral(s), _))) => assert_eq!(
+                TemplateString(vec![StringSegment::Literal(
+                    "foo bar".to_string(),
+                    Span::new(1, 26)
+                )]),
+                s.template(Span::new(0, 26))
+            ),
+            _ => panic!("Not a string literal"),
         }
     }
 

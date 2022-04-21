@@ -10,7 +10,6 @@ build = "build.rs" # LALRPOP preprocessing
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 lookup = { path = "../../lookup" }
 arbitrary = { version = "1", optional = true, features = ["derive"] }
-once_cell = { version = "1.10", default-features = false }
 
 lalrpop-util = "0.19"
 ordered-float = "2"
