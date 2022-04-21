@@ -26,9 +26,6 @@ fn merge_json(a: &mut Value, b: Value) {
         (Value::Array(ref mut a), Value::Object(b)) => {
             a.extend([Value::Object(b)]);
         }
-        (Value::Array(ref mut a), Value::Array(b)) => {
-            a.extend(b);
-        }
         (a, b) => {
             *a = b;
         }
