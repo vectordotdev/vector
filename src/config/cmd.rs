@@ -105,9 +105,6 @@ mod tests {
 
         merge_json(&mut json, to_override);
 
-        assert_eq!(
-            *json.get("arr").unwrap(),
-            json!(["value3", "value4"])
-        )
+        assert_eq!(*json.get("arr").unwrap(), json!(["value3", "value4"]))
     }
 }
