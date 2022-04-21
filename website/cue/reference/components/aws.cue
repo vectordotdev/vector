@@ -54,19 +54,17 @@ components: _aws: {
 		}
 
 		endpoint: {
-			common:        false
-			description:   "Custom endpoint for use with AWS-compatible services."
-			relevant_when: "region = null"
-			required:      false
+			common:      false
+			description: "Custom endpoint for use with AWS-compatible services."
+			required:    false
 			type: string: {
 				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
+				examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 		}
 		region: {
-			description:   "The [AWS region](\(urls.aws_regions)) of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region."
-			required:      true
-			relevant_when: "endpoint = null"
+			description: "The [AWS region](\(urls.aws_regions)) of the target service."
+			required:    true
 			type: string: {
 				examples: ["us-east-1"]
 			}

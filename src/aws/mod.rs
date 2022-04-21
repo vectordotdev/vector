@@ -76,7 +76,7 @@ pub trait ClientBuilder {
 
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
-    region: Option<Region>,
+    region: Region,
     endpoint: Option<Endpoint>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsOptions>,
@@ -88,9 +88,7 @@ pub async fn create_client<T: ClientBuilder>(
         config_builder = T::with_endpoint_resolver(config_builder, endpoint_override);
     }
 
-    if let Some(region) = region {
-        config_builder = T::with_region(config_builder, region);
-    }
+    config_builder = T::with_region(config_builder, region);
 
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 

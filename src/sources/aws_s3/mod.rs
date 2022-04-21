@@ -148,10 +148,7 @@ impl AwsS3Config {
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
     ) -> crate::Result<sqs::Ingestor> {
-        let region = self
-            .region
-            .region()
-            .ok_or(CreateSqsIngestorError::RegionMissing)?;
+        let region = self.region.region();
 
         let endpoint = self
             .region
@@ -160,7 +157,7 @@ impl AwsS3Config {
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            Some(region.clone()),
+            region.clone(),
             endpoint.clone(),
             proxy,
             &self.tls_options,
@@ -171,7 +168,7 @@ impl AwsS3Config {
             Some(ref sqs) => {
                 let sqs_client = create_client::<SqsClientBuilder>(
                     &self.auth,
-                    Some(region.clone()),
+                    region.clone(),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
@@ -205,8 +202,6 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Region is required"))]
-    RegionMissing,
     #[snafu(display("Endpoint is invalid"))]
     InvalidEndpoint,
 }
@@ -743,7 +738,7 @@ mod integration_tests {
     async fn s3_client() -> S3Client {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
+            region: "us-east-1".to_owned(),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
@@ -761,7 +756,7 @@ mod integration_tests {
     async fn sqs_client() -> SqsClient {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: Some("us-east-1".to_owned()),
+            region: "us-east-1".to_owned(),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();

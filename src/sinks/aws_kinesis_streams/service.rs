@@ -19,7 +19,7 @@ use aws_types::region::Region;
 pub struct KinesisService {
     pub client: KinesisClient,
     pub stream_name: String,
-    pub region: Option<Region>,
+    pub region: Region,
 }
 
 pub struct KinesisResponse {
