@@ -51,6 +51,10 @@ pub struct Cmd {
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    /// Ignore the Cue tests (to speed up run)
+    #[clap(long)]
+    ignore_cue: bool,
 }
 
 impl Cmd {
@@ -115,7 +119,7 @@ fn main() {
 
             tests.into_iter()
         })
-        .chain(docs::tests().into_iter())
+        .chain(docs::tests(cmd.ignore_cue).into_iter())
         .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
         .collect::<Vec<_>>();
 
