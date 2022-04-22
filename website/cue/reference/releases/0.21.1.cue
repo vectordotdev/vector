@@ -7,7 +7,7 @@ releases: "0.21.1": {
 	whats_next: []
 
 	description: """
-		This patch release contains a few fixes for regressions in in 0.21.0.
+		This patch release contains a few fixes for regressions in 0.21.0.
 
 		**Note:** Please see the release notes for [`v0.21.0`](/releases/0.21.0/) for additional changes if upgrading from
 		`v0.20.X`. In particular, the upgrade guide for breaking changes.
