@@ -60,9 +60,11 @@ remap: literals: string: {
 			description: """
 				Strings can be templated by enclosing a variable name with `{{..}}`. The
 				value of the variable is inserted into the string at this position at runtime.
-				The variable has to be a string. Only variables are supported, if you want to
-				insert a path from the event you must assign it to a variable first. To insert
-				a `{{` into the string it can be escaped with a `\\` escape: `\\{{..\\}}`.
+				Currently, the variable has to be a string. Only variables are supported, if
+				you want to insert a path from the event you must assign it to a variable
+				first. To insert a `{{` into the string it can be escaped with a `\\`
+				escape: `\\{{..\\}}`. We plan to expand this in future to allow paths and
+				format strings to enable non string variables.
 				"""
 		}
 		multiline_strings: {
