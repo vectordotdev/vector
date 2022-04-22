@@ -16,6 +16,12 @@ impl FunctionClosure {
         Self { variables, block }
     }
 
+    /// Run the closure to completion, given the provided key/value pair, and
+    /// the runtime context.
+    ///
+    /// The provided values are *NOT* mutated during the run, and no return
+    /// value is provided by this method. See `map_key` or `map_value` for
+    /// mutating alternatives.
     pub fn run_key_value(
         &self,
         ctx: &mut Context,
@@ -64,6 +70,12 @@ impl FunctionClosure {
         Ok(())
     }
 
+    /// Run the closure to completion, given the provided index/value pair, and
+    /// the runtime context.
+    ///
+    /// The provided values are *NOT* mutated during the run, and no return
+    /// value is provided by this method. See `map_key` or `map_value` for
+    /// mutating alternatives.
     pub fn run_index_value(
         &self,
         ctx: &mut Context,
@@ -111,6 +123,13 @@ impl FunctionClosure {
         Ok(())
     }
 
+    /// Run the closure to completion, given the provided key, and the runtime
+    /// context.
+    ///
+    /// The provided key is *MUTATED* by overwriting the key with the return
+    /// value of the closure after completion.
+    ///
+    /// See `run_key_value` and `run_index_value` for immutable alternatives.
     pub fn map_key(&self, ctx: &mut Context, key: &mut String) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
@@ -138,6 +157,13 @@ impl FunctionClosure {
         Ok(())
     }
 
+    /// Run the closure to completion, given the provided value, and the runtime
+    /// context.
+    ///
+    /// The provided value is *MUTATED* by overwriting the value with the return
+    /// value of the closure after completion.
+    ///
+    /// See `run_key_value` and `run_index_value` for immutable alternatives.
     pub fn map_value(&self, ctx: &mut Context, value: &mut Value) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
