@@ -13,6 +13,7 @@ use vector_core::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
+    aws::RegionOrEndpoint,
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -242,6 +243,7 @@ async fn insert_events_on_aws() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
         false,
@@ -258,6 +260,7 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
         },
