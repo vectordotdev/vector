@@ -178,9 +178,9 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 prost = { version = "0.10.1", default-features = false, features = ["std"] }
 
 # GCP
-goauth = { version = "0.11.1", default-features = false, optional = true }
+goauth = { version = "0.12.0", default-features = false, optional = true }
 gouth = { version = "0.2.1", default-features = false, optional = true }
-smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
+smpl_jwt = { version = "0.7.0", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.38", default-features = false, optional = true, features = ["chrono"] }
@@ -214,7 +214,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
-clap = { version = "3.1.10", features = ["derive", "env"] }
+clap = { version = "3.1.11", features = ["derive", "env"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -504,7 +504,6 @@ transforms-logs = [
   "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
-  "transforms-compound",
   "transforms-concat",
   "transforms-dedupe",
   "transforms-field_filter",
@@ -533,7 +532,6 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-add_tags",
   "transforms-aggregate",
-  "transforms-compound",
   "transforms-filter",
   "transforms-log_to_metric",
   "transforms-lua",
@@ -552,7 +550,6 @@ transforms-ansi_stripper = []
 transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["arc-swap"]
 transforms-coercer = []
-transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
@@ -783,7 +780,6 @@ vector-unit-test-tests = [
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "transforms-compound",
   "transforms-add_tags",
   "transforms-log_to_metric",
   "transforms-remove_fields",

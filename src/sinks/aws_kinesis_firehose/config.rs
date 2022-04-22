@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 
-use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_firehose::{
@@ -22,7 +22,9 @@ use crate::{
             sink::KinesisSink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
             retries::RetryLogic,
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
@@ -46,12 +48,13 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -161,9 +164,13 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
                 stream_name: self.stream_name.clone(),
             });
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.clone().encoding();
+        let encoder = Encoder::<()>::new(serializer);
+
         let request_builder = KinesisRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding.clone(),
+            encoder: (transformer, encoder),
         };
 
         let sink = KinesisSink {
