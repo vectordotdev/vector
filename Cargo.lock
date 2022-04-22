@@ -820,7 +820,7 @@ dependencies = [
  "percent-encoding",
  "regex",
  "ring",
- "time 0.3.7",
+ "time 0.3.9",
  "tracing 0.1.34",
 ]
 
@@ -936,7 +936,7 @@ dependencies = [
  "itoa 1.0.1",
  "num-integer",
  "ryu",
- "time 0.3.7",
+ "time 0.3.9",
 ]
 
 [[package]]
@@ -3019,9 +3019,9 @@ checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
 name = "goauth"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f3d68c8343245dc047982651b5afb8bd659c9959ed72efe5a73bf22684e5fd"
+checksum = "5a139506b3f65acaee2a2b4cb5bd51b26e0c6945d280955a9c25c026e1849537"
 dependencies = [
  "arc-swap",
  "futures 0.3.21",
@@ -3031,8 +3031,8 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "smpl_jwt",
- "time 0.3.7",
+ "smpl_jwt 0.7.0",
+ "time 0.3.9",
  "tokio",
 ]
 
@@ -4762,7 +4762,7 @@ dependencies = [
  "serde_json",
  "serde_nanos",
  "serde_repr",
- "time 0.3.7",
+ "time 0.3.9",
  "url",
  "webpki 0.21.4",
  "winapi 0.3.9",
@@ -7301,6 +7301,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "smpl_jwt"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f0293a6547a8463502e0f4d68dc35c79a6978e6c3f9e8b874c18bb7abae9b6"
+dependencies = [
+ "base64 0.13.0",
+ "log",
+ "openssl",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "simpl",
+ "time 0.3.9",
+]
+
+[[package]]
 name = "snafu"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7603,7 +7619,7 @@ dependencies = [
  "hostname",
  "libc",
  "log",
- "time 0.3.7",
+ "time 0.3.9",
 ]
 
 [[package]]
@@ -7774,9 +7790,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.7"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
+checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
 dependencies = [
  "itoa 1.0.1",
  "libc",
@@ -8897,7 +8913,7 @@ dependencies = [
  "serde_yaml",
  "sha2 0.10.2",
  "smallvec",
- "smpl_jwt",
+ "smpl_jwt 0.6.1",
  "snafu",
  "snap",
  "socket2",
