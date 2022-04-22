@@ -52,7 +52,7 @@ remap: literals: string: {
 				"\\0":       "Null"
 				"\\\"":      "Double quote"
 				"\\'":       "Single quote"
-				"\\{{":      "Double brace"
+				"\\{":       "Brace"
 			}
 		}
 		templates: {
