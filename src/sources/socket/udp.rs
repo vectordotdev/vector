@@ -99,7 +99,7 @@ pub fn udp(
             .expect("Failed to bind to udp listener socket");
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes + 1) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
