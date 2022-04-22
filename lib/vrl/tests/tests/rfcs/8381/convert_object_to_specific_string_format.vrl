@@ -1,0 +1,8 @@
+# SKIP
+# object: { "key1": "value1", "key2": "value2" }
+# result: "{key1=\"value1\", key2=\"value2\"}"
+
+strings = []
+for_each(.) -> |key, value| { strings = push(strings, key + "=" encode_json(value)) }
+
+"{" + join(strings, ",") + "}"

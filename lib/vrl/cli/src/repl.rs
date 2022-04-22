@@ -51,6 +51,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut external_state = state::ExternalEnv::default();
+    let mut local_state = state::LocalEnv::default();
     let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
@@ -109,12 +110,17 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                     &mut rt,
                     command,
                     &mut external_state,
+                    std::mem::take(&mut local_state),
                     timezone,
                     vrl_runtime,
                 );
 
                 let string = match result {
-                    Ok(v) => v.to_string(),
+                    Ok((v, local)) => {
+                        let _ = std::mem::replace(&mut local_state, local);
+
+                        v.to_string()
+                    }
                     Err(v) => v.to_string(),
                 };
 
@@ -140,22 +146,23 @@ fn resolve(
     object: Option<&mut impl Target>,
     runtime: &mut Runtime,
     program: &str,
-    state: &mut state::ExternalEnv,
+    external: &mut state::ExternalEnv,
+    local: state::LocalEnv,
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
-) -> Result<Value, String> {
+) -> Result<(Value, state::LocalEnv), String> {
     let mut empty = value!({});
     let object = match object {
         None => &mut empty as &mut dyn Target,
         Some(object) => object,
     };
 
-    let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
-        Ok(program) => program,
+    let (program, local) = match vrl::compile_for_repl(program, &stdlib::all(), external, local) {
+        Ok(result) => result,
         Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
     };
 
-    execute(runtime, program, object, timezone, vrl_runtime)
+    execute(runtime, program, object, timezone, vrl_runtime).map(|value| (value, local))
 }
 
 fn execute(
@@ -277,6 +284,7 @@ impl Validator for Repl {
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
+        let local_state = state::LocalEnv::default();
         let mut external_state = state::ExternalEnv::default();
         let mut rt = Runtime::new(state::Runtime::default());
         let target: Option<&mut Value> = None;
@@ -286,6 +294,7 @@ impl Validator for Repl {
             &mut rt,
             ctx.input(),
             &mut external_state,
+            local_state,
             &timezone,
             VrlRuntime::Ast,
         ) {

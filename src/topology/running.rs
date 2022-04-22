@@ -390,15 +390,15 @@ impl RunningTopology {
         let remove_sink = diff
             .sinks
             .removed_and_changed()
-            .map(|key| (key, self.config.sinks[key].resources(key)));
+            .map(|key| (key, self.config.sink(key).unwrap().resources(key)));
         let add_source = diff
             .sources
             .changed_and_added()
-            .map(|key| (key, new_config.sources[key].inner.resources()));
+            .map(|key| (key, new_config.source(key).unwrap().inner.resources()));
         let add_sink = diff
             .sinks
             .changed_and_added()
-            .map(|key| (key, new_config.sinks[key].resources(key)));
+            .map(|key| (key, new_config.sink(key).unwrap().resources(key)));
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
                 add_sink
@@ -420,7 +420,9 @@ impl RunningTopology {
             .sinks
             .to_change
             .iter()
-            .filter(|&key| self.config.sinks[key].buffer == new_config.sinks[key].buffer)
+            .filter(|&key| {
+                self.config.sink(key).unwrap().buffer == new_config.sink(key).unwrap().buffer
+            })
             .cloned()
             .collect::<HashSet<_>>();
 
@@ -639,11 +641,10 @@ impl RunningTopology {
     ) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
-        let sink_inputs = self.config.sinks.get(key).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(key).map(|t| &t.inputs);
-        let old_inputs = sink_inputs
-            .or(trans_inputs)
-            .unwrap()
+        let old_inputs = self
+            .config
+            .inputs_for_node(key)
+            .expect("node exists")
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
@@ -687,9 +688,7 @@ impl RunningTopology {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
 
-        let sink_inputs = self.config.sinks.get(key).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(key).map(|t| &t.inputs);
-        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+        let old_inputs = self.config.inputs_for_node(key).expect("node exists");
 
         for input in old_inputs {
             if let Some(output) = self.outputs.get_mut(input) {
@@ -716,8 +715,7 @@ impl RunningTopology {
     fn reattach_severed_inputs(&mut self, diff: &ConfigDiff) {
         let unchanged_transforms = self
             .config
-            .transforms
-            .iter()
+            .transforms()
             .filter(|(key, _)| !diff.transforms.contains(key));
         for (transform_key, transform) in unchanged_transforms {
             let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
@@ -732,8 +730,7 @@ impl RunningTopology {
 
         let unchanged_sinks = self
             .config
-            .sinks
-            .iter()
+            .sinks()
             .filter(|(key, _)| !diff.sinks.contains(key));
         for (sink_key, sink) in unchanged_sinks {
             let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());

@@ -361,7 +361,7 @@ configuration: {
 		environment_variables: {
 			title: "Environment variables"
 			body: """
-				Vector will interpolate environment variables within your configuration file
+				Vector interpolates environment variables within your configuration file
 				with the following syntax:
 
 				```toml title="vector.toml"
@@ -369,8 +369,9 @@ configuration: {
 				  type = "add_fields"
 
 				  [transforms.add_host.fields]
-				    host = "${HOSTNAME}"
+				    host = "${HOSTNAME}" # or "$HOSTNAME"
 				    environment = "${ENV:-development}" # default value when not present
+				    tenant = "${TENANT:?tenant must be supplied}" # required environment variable
 				```
 				"""
 
@@ -378,10 +379,22 @@ configuration: {
 				{
 					title: "Default values"
 					body: """
-						Default values can be supplied via the `:-` syntax:
+						Default values can be supplied using `:-` or `-` syntax:
 
 						```toml
-						option = "${ENV_VAR:-default}"
+						option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+						option = "${ENV_VAR-default}" # default value only if variable is unset
+						```
+						"""
+				},
+				{
+					title: "Required variables"
+					body: """
+						Environment variables that are required can be specified using `:?` or `?` syntax:
+
+						```toml
+						option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+						option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 						```
 						"""
 				},
@@ -389,7 +402,7 @@ configuration: {
 					title: "Escaping"
 					body: """
 						You can escape environment variable by preceding them with a `$` character. For
-						example `$${HOSTNAME}` will be treated _literally_ in the above environment
+						example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment
 						variable example.
 						"""
 				},
@@ -399,8 +412,8 @@ configuration: {
 			title: "Formats"
 			body:  """
 				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
-				ensure Vector fits into your workflow. A side benefit of supporting JSON is the
-				enablement of data templating languages like [Jsonnet](\(urls.jsonnet)) and
+				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
+				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
 				"""
 		}

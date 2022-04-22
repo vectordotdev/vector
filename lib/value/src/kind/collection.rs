@@ -276,6 +276,57 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
     }
 }
 
+impl std::fmt::Display for Collection<Field> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("object");
+        }
+
+        f.write_str("{ ")?;
+
+        let mut known = self.known.iter().peekable();
+        while let Some((key, kind)) = known.next() {
+            write!(f, "{key}: {kind}")?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str(" }")?;
+
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for Collection<Index> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("array");
+        }
+
+        f.write_str("[")?;
+
+        let mut known = self.known.iter().peekable();
+
+        // This expects the invariant to hold that an array without "unknown"
+        // fields cannot have known fields with non-incremental indices. That
+        // is, an array of 5 elements has to define index 0 to 4, otherwise
+        // "unknown" has to be defined.
+        while let Some((_, kind)) = known.next() {
+            kind.fmt(f)?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("]")?;
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -675,6 +726,121 @@ mod tests {
             this.anonymize();
 
             assert_eq!(this, want, "{}", title);
+        }
+    }
+
+    #[test]
+    fn test_display_field() {
+        struct TestCase {
+            this: Collection<Field>,
+            want: &'static str,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: "object",
+                },
+            ),
+            (
+                "unknown",
+                TestCase {
+                    this: Collection::from_unknown(Kind::null()),
+                    want: "object",
+                },
+            ),
+            (
+                "known single",
+                TestCase {
+                    this: BTreeMap::from([("foo".into(), Kind::null())]).into(),
+                    want: r#"{ foo: null }"#,
+                },
+            ),
+            (
+                "known multiple",
+                TestCase {
+                    this: BTreeMap::from([
+                        ("1".into(), Kind::null()),
+                        ("2".into(), Kind::boolean()),
+                    ])
+                    .into(),
+                    want: r#"{ "1": null, "2": boolean }"#,
+                },
+            ),
+            (
+                "known multiple, nested",
+                TestCase {
+                    this: BTreeMap::from([
+                        ("1".into(), Kind::null()),
+                        (
+                            "2".into(),
+                            Kind::object(BTreeMap::from([("3".into(), Kind::integer())])),
+                        ),
+                    ])
+                    .into(),
+                    want: r#"{ "1": null, "2": { "3": integer } }"#,
+                },
+            ),
+        ]) {
+            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+        }
+    }
+
+    #[test]
+    fn test_display_index() {
+        struct TestCase {
+            this: Collection<Index>,
+            want: &'static str,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: "array",
+                },
+            ),
+            (
+                "unknown",
+                TestCase {
+                    this: Collection::from_unknown(Kind::null()),
+                    want: "array",
+                },
+            ),
+            (
+                "known single",
+                TestCase {
+                    this: BTreeMap::from([(0.into(), Kind::null())]).into(),
+                    want: r#"[null]"#,
+                },
+            ),
+            (
+                "known multiple",
+                TestCase {
+                    this: BTreeMap::from([(0.into(), Kind::null()), (1.into(), Kind::boolean())])
+                        .into(),
+                    want: r#"[null, boolean]"#,
+                },
+            ),
+            (
+                "known multiple, nested",
+                TestCase {
+                    this: BTreeMap::from([
+                        (0.into(), Kind::null()),
+                        (
+                            1.into(),
+                            Kind::object(BTreeMap::from([("0".into(), Kind::integer())])),
+                        ),
+                    ])
+                    .into(),
+                    want: r#"[null, { "0": integer }]"#,
+                },
+            ),
+        ]) {
+            assert_eq!(this.to_string(), want.to_string(), "{}", title);
         }
     }
 }

@@ -286,12 +286,12 @@ impl Expression for ParseXmlFn {
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .fallible()
         .add_object(Collection::from_unknown(inner_kind()))
+        .fallible()
 }
 
 fn inner_kind() -> Kind {
-    Kind::object(BTreeMap::default())
+    Kind::object(Collection::any())
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -694,4 +694,45 @@ mod tests {
             tdef: type_def(),
         }
     ];
+
+    #[test]
+    fn test_kind() {
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::default();
+
+        let func = ParseXmlFn {
+            value: value!(true).into_expression(),
+            trim: None,
+            include_attr: None,
+            attr_prefix: None,
+            text_key: None,
+            always_use_text_key: None,
+            parse_bool: None,
+            parse_null: None,
+            parse_number: None,
+        };
+
+        let type_def = func.type_def((&local, &external));
+
+        assert!(type_def.is_fallible());
+        assert!(!type_def.is_exact());
+        assert!(type_def.contains_bytes());
+        assert!(type_def.contains_object());
+
+        let object1 = type_def.as_object().unwrap();
+
+        assert!(object1.known().is_empty());
+        assert!(object1.unknown().unwrap().as_exact().unwrap().is_object());
+
+        let object2 = object1
+            .unknown()
+            .unwrap()
+            .as_exact()
+            .unwrap()
+            .as_object()
+            .unwrap();
+
+        assert!(object2.known().is_empty());
+        assert!(object2.unknown().unwrap().is_any());
+    }
 }

@@ -13,6 +13,8 @@ use crate::Test;
 ///
 /// This mostly consists of functions that have a non-deterministic result.
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
+    "encrypt", // uses random_bytes for the IV
+    "random_bytes",
     "uuid_v4",
     "strip_ansi_escape_codes",
     "get_hostname",

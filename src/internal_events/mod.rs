@@ -37,7 +37,6 @@ mod console;
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 mod datadog_traces;
-#[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
@@ -187,7 +186,6 @@ pub(crate) use self::concat::*;
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
 pub(crate) use self::datadog_traces::*;
-#[cfg(any(feature = "codecs"))]
 pub(crate) use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;

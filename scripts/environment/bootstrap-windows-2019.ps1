@@ -14,6 +14,7 @@ if ($env:RELEASE_BUILDER -ne "true") {
 
 # Install some required dependencies / tools.
 choco install make
+choco install protoc
 
 # Set a specific override path for libclang.
 echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

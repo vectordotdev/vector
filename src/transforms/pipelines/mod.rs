@@ -7,59 +7,103 @@
 //! type = "pipelines"
 //! inputs = ["syslog"]
 //!
-//! [transforms.my_pipelines.logs]
-//! order = ["foo", "bar"]
-//!
-//! [transforms.my_pipelines.logs.pipelines.foo]
+//! [[transforms.my_pipelines.logs]]
 //! name = "foo pipeline"
 //!
-//! [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.logs.pipelines.bar]
+//! [[transforms.my_pipelines.logs]]
 //! name = "bar pipeline"
+//! filter.type = "vrl"
+//! filter.source = """some condition here"""
 //!
-//! [transforms.my_pipelines.logs.pipelines.bar.transforms]]
+//! [[transforms.my_pipelines.logs.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.metrics]
-//! order = ["hello", "world"]
-//!
-//! [transforms.my_pipelines.metrics.pipelines.hello]
+//! [[transforms.my_pipelines.metrics]]
 //! name = "hello pipeline"
+//! filter.type = "vrl"
+//! filter.source = """some condition here"""
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
 //!
-//! [transforms.my_pipelines.metrics.pipelines.world]
+//! [[transforms.my_pipelines.metrics]]
 //! name = "world pipeline"
 //!
-//! [[transforms.my_pipelines.metrics.pipelines.world.transforms]]
+//! [[transforms.my_pipelines.metrics.transforms]]
 //! # any transform configuration
+//!
+//! [sinks.output]
+//! inputs = ["my_pipelines"]
+//! # any sink configuration
 //! ```
 //!
-//! The pipelines transform will first expand into 2 parallel transforms for `logs` and
-//! `metrics`. A `Noop` transform will be also added to aggregate `logs` and `metrics`
-//! into a single transform and to be able to use the transform name (`my_pipelines`) as an input.
+//! The pipelines transform will expand individually each pipeline and adjust all the inputs accordingly.
+//! Once transpiled, the topology will have the same shape than the following configuration.
 //!
-//! Then the `logs` group of pipelines will be expanded into a `EventFilter` followed by
-//! a series `PipelineConfig` via the `EventRouter` transform. At the end, a `Noop` alias is added
-//! to be able to refer `logs` as `my_pipelines.logs`.
-//! Same thing for the `metrics` group of pipelines.
+//! ```toml
+//! [transforms.my_pipelines_type_router]
+//! inputs = ["syslog"]
 //!
-//! Each pipeline will then be expanded into a list of its transforms and at the end of each
-//! expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
-//! (`my_pipelines.logs.transforms.foo`).
+//! [transforms.my_pipelines_logs_0_transform_0]
+//! inputs = ["my_pipelines_type_router.logs"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_logs_0_transform_1]
+//! inputs = ["my_pipelines_logs_0_transform_0"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_logs_1_filter]
+//! inputs = ["my_pipelines_logs_0_transform_1"]
+//! type = "filter"
+//! condition.type = "vrl"
+//! condition.source = """some condition here"""
+//!
+//! [transforms.my_pipelines_logs_1_transform_0]
+//! inputs = ["my_pipelines_logs_1_filter.success"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_0_filter]
+//! inputs = ["my_pipelines_type_router.metrics"]
+//! type = "filter"
+//! condition.type = "vrl"
+//! condition.source = """some condition here"""
+//!
+//! [transforms.my_pipelines_metrics_0_transform_0]
+//! inputs = ["my_pipelines_metrics_0_filter.success"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_0_transform_1]
+//! inputs = ["my_pipelines_metrics_0_transform_0"]
+//! # any transform configuration
+//!
+//! [transforms.my_pipelines_metrics_1_transform_0]
+//! inputs = [
+//!     # the events filtered from the previous transform are forwarded
+//!     "my_pipelines_metrics_0_filter._dropped",
+//!     "my_pipelines_metrics_0_transform_1",
+//! ]
+//! # any transform configuration
+//!
+//! [sinks.output]
+//! inputs = [
+//!     "my_pipelines_type_router._dropped",
+//!     # the events from the last logs pipeline are forwarded here
+//!     "my_pipelines_logs_1_filter._dropped",
+//!     "my_pipelines_logs_1_transform_0",
+//!     "my_pipelines_metrics_1_transform_0",
+//! ]
+//! # any sink configuration
+//! ```
 mod config;
-// mod expander;
-// mod filter;
-// mod router;
 
 use crate::{
     conditions::is_log::IsLogConfig,
@@ -199,28 +243,25 @@ impl TransformConfig for PipelinesConfig {
 impl GenerateConfig for PipelinesConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc::indoc! {r#"
-            [logs]
-            order = ["foo", "bar"]
-
-            [logs.pipelines.foo]
+            [[logs]]
             name = "foo pipeline"
 
-            [logs.pipelines.foo.filter]
+            [logs.filter]
             type = "datadog_search"
             source = "source:s3"
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
 
-            [logs.pipelines.bar]
+            [[logs]]
             name = "bar pipeline"
 
-            [[logs.pipelines.bar.transforms]]
+            [[logs.transforms]]
             type = "filter"
             condition = ""
         "#})
@@ -246,10 +287,10 @@ mod tests {
     fn parsing() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
-        assert_eq!(config.logs.pipelines().len(), 2);
-        let foo = config.logs.pipelines().get("foo").unwrap();
+        assert_eq!(config.logs.as_ref().len(), 2);
+        let foo = config.logs.as_ref().first().unwrap();
         assert_eq!(foo.transforms().len(), 2);
-        let bar = config.logs.pipelines().get("bar").unwrap();
+        let bar = config.logs.as_ref().get(1).unwrap();
         assert_eq!(bar.transforms().len(), 1);
     }
 
@@ -287,33 +328,33 @@ mod tests {
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
             vec![
-                "foo.logs.foo.filter",
-                "foo.logs.foo.0",
-                "foo.logs.foo.1",
-                "foo.logs.bar.0",
+                "foo.logs.0.filter",
+                "foo.logs.0.0",
+                "foo.logs.0.1",
+                "foo.logs.1.0",
                 "foo.type_router",
             ],
         );
         assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
         assert_eq!(
-            routes["foo.logs.foo.filter"],
+            routes["foo.logs.0.filter"],
             vec!["foo.type_router.logs".to_string()]
         );
         assert_eq!(
-            routes["foo.logs.foo.0"],
-            vec!["foo.logs.foo.filter.success".to_string()]
+            routes["foo.logs.0.0"],
+            vec!["foo.logs.0.filter.success".to_string()]
         );
-        assert_eq!(routes["foo.logs.foo.1"], vec!["foo.logs.foo.0".to_string()]);
+        assert_eq!(routes["foo.logs.0.1"], vec!["foo.logs.0.0".to_string()]);
         assert_eq!(
-            routes["foo.logs.bar.0"],
+            routes["foo.logs.1.0"],
             vec![
-                "foo.logs.foo.1".to_string(),
-                "foo.logs.foo.filter._unmatched".to_string(),
+                "foo.logs.0.1".to_string(),
+                "foo.logs.0.filter._unmatched".to_string(),
             ],
         );
         assert_eq!(
             expansions["foo"],
-            vec!["foo.type_router._unmatched", "foo.logs.bar.0"]
+            vec!["foo.type_router._unmatched", "foo.logs.1.0"]
         );
     }
 }

@@ -103,35 +103,28 @@ impl PipelineConfig {
 //------------------------------------------------------------------------------
 
 /// This represent an ordered list of pipelines depending on the event type.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct EventTypeConfig {
-    #[serde(default)]
-    order: Option<Vec<String>>,
-    pipelines: IndexMap<String, PipelineConfig>,
-}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub(crate) struct EventTypeConfig(Vec<PipelineConfig>);
 
-#[cfg(test)]
-impl EventTypeConfig {
-    #[allow(dead_code)] // for some small subset of feature flags this code is dead
-    pub(crate) const fn order(&self) -> &Option<Vec<String>> {
-        &self.order
-    }
-
-    #[allow(dead_code)] // for some small subset of feature flags this code is dead
-    pub(crate) const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
-        &self.pipelines
+impl AsRef<Vec<PipelineConfig>> for EventTypeConfig {
+    fn as_ref(&self) -> &Vec<PipelineConfig> {
+        &self.0
     }
 }
 
 impl EventTypeConfig {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub(super) fn validate_nesting(&self, parents: &HashSet<&'static str>) -> Result<(), String> {
-        for (name, pipeline) in self.pipelines.iter() {
-            for (index, transform) in pipeline.transforms.iter().enumerate() {
+        for (pipeline_index, pipeline) in self.0.iter().enumerate() {
+            let pipeline_name = pipeline.name.as_str();
+            for (transform_index, transform) in pipeline.transforms.iter().enumerate() {
                 if !transform.nestable(parents) {
                     return Err(format!(
-                        "the transform {} in pipeline {:?} cannot be nested in {:?}",
-                        index, name, parents
+                        "the transform {} in pipeline {:?} (at index {}) cannot be nested in {:?}",
+                        transform_index, pipeline_name, pipeline_index, parents
                     ));
                 }
             }
@@ -141,22 +134,6 @@ impl EventTypeConfig {
 }
 
 impl EventTypeConfig {
-    pub(super) fn is_empty(&self) -> bool {
-        self.pipelines.is_empty()
-    }
-
-    fn names(&self) -> Vec<String> {
-        if let Some(ref names) = self.order {
-            // This assumes all the pipelines are present in the `order` field.
-            // If a pipeline is missing, it won't be used.
-            names.clone()
-        } else {
-            let mut names = self.pipelines.keys().cloned().collect::<Vec<String>>();
-            names.sort();
-            names
-        }
-    }
-
     /// Expand sub-pipelines configurations, preserving user defined order
     ///
     /// This function expands the sub-pipelines according to the order passed by
@@ -169,15 +146,16 @@ impl EventTypeConfig {
     ) -> crate::Result<Option<InnerTopology>> {
         let mut result = InnerTopology::default();
         let mut next_inputs = inputs.to_vec();
-        for pipe_name in self.names() {
-            let pipeline_name = name.join(&pipe_name);
-            let pipeline_config = self
-                .pipelines
-                .get_mut(&pipe_name)
-                .ok_or_else(|| format!("Unable to find pipeline with name {:?}", pipe_name))?;
+        for (pipeline_index, pipeline_config) in self.0.iter_mut().enumerate() {
+            let pipeline_name = name.join(pipeline_index);
             let topology = pipeline_config
                 .expand(&pipeline_name, &next_inputs)?
-                .ok_or_else(|| format!("Unable to expand pipeline named {:?}", pipe_name))?;
+                .ok_or_else(|| {
+                    format!(
+                        "Unable to expand pipeline {:?} ({:?})",
+                        pipeline_config.name, pipeline_name
+                    )
+                })?;
             result.inner.extend(topology.inner.into_iter());
             result.outputs = topology.outputs;
             next_inputs = result.outputs();

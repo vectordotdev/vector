@@ -91,7 +91,15 @@ pub(super) mod process {
                         if entry.is_file() {
                             files.push(entry);
                         } else if entry.is_dir() {
-                            folders.push(entry);
+                            // do not load directories when the directory starts with a '.'
+                            if !entry
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .map(|name| name.starts_with('.'))
+                                .unwrap_or(false)
+                            {
+                                folders.push(entry);
+                            }
                         }
                     }
                     Err(err) => {
@@ -221,7 +229,7 @@ where
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
-        if let Ok(Some((_, table, warnings))) = self.load_file(path, format) {
+        if let Some((_, table, warnings)) = self.load_file(path, format)? {
             self.merge(table, None)?;
             Ok(warnings)
         } else {

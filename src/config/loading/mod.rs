@@ -288,8 +288,7 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-
-    Ok(vars::interpolate(&source_string, &vars))
+    vars::interpolate(&source_string, &vars)
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
@@ -366,11 +365,9 @@ mod tests {
             .unwrap();
         let output = serde_json::to_string_pretty(&processing.inner).unwrap();
         let processing: PipelinesConfig = serde_json::from_str(&output).unwrap();
-        assert!(processing.logs().order().is_some());
-        assert!(processing.metrics().order().is_none());
-        assert!(processing.metrics().pipelines().is_empty());
-        let logs = processing.logs().pipelines();
-        let first = logs.get("first").unwrap();
+        assert!(processing.metrics().as_ref().is_empty());
+        let logs = processing.logs().as_ref();
+        let first = logs.first().unwrap();
         assert_eq!(first.transforms().len(), 2);
     }
 

@@ -51,7 +51,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(
             AwsAuthentication::test_auth()
-                .credentials_provider()
+                .credentials_provider(Some(Region::new("custom")))
                 .await
                 .unwrap(),
         )

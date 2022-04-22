@@ -54,19 +54,17 @@ components: _aws: {
 		}
 
 		endpoint: {
-			common:        false
-			description:   "Custom endpoint for use with AWS-compatible services."
-			relevant_when: "region = null"
-			required:      false
+			common:      false
+			description: "Custom endpoint for use with AWS-compatible services."
+			required:    false
 			type: string: {
 				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
+				examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 		}
 		region: {
-			description:   "The [AWS region](\(urls.aws_regions)) of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region."
-			required:      true
-			relevant_when: "endpoint = null"
+			description: "The [AWS region](\(urls.aws_regions)) of the target service."
+			required:    true
 			type: string: {
 				examples: ["us-east-1"]
 			}
@@ -157,6 +155,11 @@ components: _aws: {
 				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file (usually located at `~/.aws/config`).
 				4. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
 				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
+
+				Note that use of
+				[`credentials_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)
+				in AWS credentials files is not supported as the underlying AWS SDK currently [lacks
+				support](https://github.com/awslabs/aws-sdk-rust/issues/261).
 
 				If no credentials are found, Vector's health check fails and an error is [logged](\(urls.vector_monitoring)).
 				If your AWS credentials expire, Vector will automatically search for up-to-date

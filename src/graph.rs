@@ -84,11 +84,11 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut dot = String::from("digraph {\n");
 
-    for (id, _source) in &config.sources {
+    for (id, _source) in config.sources() {
         dot += &format!("  \"{}\" [shape=trapezium]\n", id);
     }
 
-    for (id, transform) in &config.transforms {
+    for (id, transform) in config.transforms() {
         dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
@@ -103,7 +103,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     }
 
-    for (id, sink) in &config.sinks {
+    for (id, sink) in config.sinks() {
         dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
