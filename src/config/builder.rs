@@ -59,7 +59,7 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-    secret: BTreeMap<&'a ComponentKey, &'a Box<dyn SecretBackend>>,
+    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
 impl Clone for ConfigBuilder {
@@ -310,7 +310,7 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
-            secret: self.secret.iter().collect(),
+            secret: self.secret.iter().map(|(k,v)| (k, v.as_ref())).collect(),
         })
         .expect("should serialize to JSON");
 
