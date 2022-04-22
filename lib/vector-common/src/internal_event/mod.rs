@@ -44,6 +44,4 @@ pub fn emit(event: impl InternalEvent) {
 }
 
 #[cfg(not(any(test, feature = "test")))]
-pub fn emit(event: impl InternalEvent) {
-    event.emit();
-}
+pub fn emit(event: impl InternalEvent) {}
