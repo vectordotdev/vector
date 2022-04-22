@@ -178,9 +178,9 @@ rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"],
 prost = { version = "0.9", default-features = false, features = ["std"] }
 
 # GCP
-goauth = { version = "0.11.1", default-features = false, optional = true }
+goauth = { version = "0.12.0", default-features = false, optional = true }
 gouth = { version = "0.2.1", default-features = false, optional = true }
-smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
+smpl_jwt = { version = "0.7.0", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.38", default-features = false, optional = true, features = ["chrono"] }
