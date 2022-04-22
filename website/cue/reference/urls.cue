@@ -503,7 +503,6 @@ urls: {
 	vector_code_of_conduct:                                   "\(vector_repo)/blob/master/CODE_OF_CONDUCT.md"
 	vector_community:                                         "/community/"
 	vector_components:                                        "/components/"
-	vector_compound_transform:                                "/docs/reference/configuration/transforms/compound/"
 	vector_configuration:                                     "/docs/reference/configuration/"
 	vector_configuration_global:                              "/docs/reference/configuration/global-options"
 	vector_data_model:                                        "/docs/about/under-the-hood/architecture/data-model/"
