@@ -740,7 +740,7 @@ mod test {
         let (tx, rx) = SourceSender::new_test();
         let address = next_addr();
         let mut config = UdpConfig::from_address(address);
-        config.max_length = 10;
+        config.max_length = 11;
         let address = init_udp_with_config(tx, config).await;
 
         send_lines_udp(
@@ -749,7 +749,6 @@ mod test {
                 "short line".to_string(),
                 "test with a long line".to_string(),
                 "a short un".to_string(),
-                "an extra line".to_string(),
             ],
         );
 
