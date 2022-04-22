@@ -107,11 +107,11 @@ fi
 PROTOC_VERSION=3.19.4
 PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
 curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
-     --output $TEMP/$PROTOC_ZIP
-unzip $TEMP/$PROTOC_ZIP bin/protoc
+     --output "$TEMP/$PROTOC_ZIP"
+unzip "$TEMP/$PROTOC_ZIP" bin/protoc
 # .cargo/bin is in $PATH ahead of anything else, so this will make it
 # override any system-installed protoc
-mv bin/protoc $HOME/.cargo/bin
+mv bin/protoc "$HOME/.cargo/bin"
 
 # Force the proto-build crate to avoid building the vendored protoc.
 echo "export PROTO_NO_VENDOR=1" >> "$HOME/.bash_profile"
