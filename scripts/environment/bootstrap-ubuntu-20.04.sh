@@ -79,12 +79,15 @@ fi
 
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
 # by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.
+# Also, force the proto-build crate to avoid building the vendored protoc.
 if [ -n "${CI-}" ] ; then
     echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
     # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
     echo "CARGO_BUILD_JOBS=$(($(nproc) /2))" >> "${GITHUB_ENV}"
+    echo PROTOC_NO_VENDOR=1 >> "${GITHUB_ENV}"
 else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
+    echo "export PROTOC_NO_VENDOR=1" >> "${HOME}/.bash_profile"
 fi
 
 # Docker.
@@ -112,9 +115,6 @@ unzip "$TEMP/$PROTOC_ZIP" bin/protoc
 # .cargo/bin is in $PATH ahead of anything else, so this will make it
 # override any system-installed protoc
 mv bin/protoc "$HOME/.cargo/bin"
-
-# Force the proto-build crate to avoid building the vendored protoc.
-echo "export PROTO_NO_VENDOR=1" >> "$HOME/.bash_profile"
 
 # Apt cleanup
 apt clean
