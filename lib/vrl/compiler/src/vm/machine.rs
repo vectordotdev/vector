@@ -504,6 +504,16 @@ impl Vm {
 
                     state.stack.push(Value::Object(object));
                 }
+                // OpCode::CallWithClosure => {
+                //     // Calls a function in the stdlib.
+                //     let function_id = state.next_primitive()?;
+                //     let closure_id = state.next_primitive()?;
+                //     let span_start = state.next_primitive()?;
+                //     let span_end = state.next_primitive()?;
+                //     let parameters = &self.fns[function_id].parameters();
+                //     let closure_vm = &self.closures[closure_id];
+                //     // key, value
+                // }
                 OpCode::Call => {
                     // Calls a function in the stdlib.
                     let function_id = state.next_primitive()?;
