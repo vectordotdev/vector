@@ -43,7 +43,7 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets, load_from_str,
     load_source_from_paths, merge_path_lists, process_paths, SecretBackend, CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};

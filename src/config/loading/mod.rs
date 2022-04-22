@@ -130,16 +130,17 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
     Ok(config)
 }
 
-/// Loads a configuration from paths. If a provider is present in the builder, the config is
-/// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
-pub async fn load_from_paths_with_provider(
+/// Loads a configuration from paths. Handle secret replacement and if a provider is present
+/// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
+/// provider instantiation is skipped.
+pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
     let (mut secrets_backends_loader, secrets_warning) =
         load_secret_backends_from_paths(config_paths)?;
-    // And then, if need, retrieve secret from configured backends
+    // And then, if needed, retrieve secrets from configured backends
     let (mut builder, load_warnings) = if secrets_backends_loader.has_secrets_to_retrieve() {
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let resolved_secrets = secrets_backends_loader

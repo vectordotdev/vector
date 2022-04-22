@@ -172,7 +172,7 @@ impl Application {
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
                 let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                    config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                         .await
                         .map_err(handle_config_errors)?;
 
@@ -315,7 +315,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
