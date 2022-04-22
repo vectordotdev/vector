@@ -6,7 +6,10 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 use crate::{
     expression::assignment::Details,
     expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
-    function::{closure, ArgumentList, Example, FunctionCompileContext, Parameter},
+    function::{
+        closure::{self, VariableKind},
+        ArgumentList, Example, FunctionCompileContext, Parameter,
+    },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -270,32 +273,30 @@ impl<'a> Builder<'a> {
                         // integer.
                         for (index, input_var) in input.variables.clone().into_iter().enumerate() {
                             let call_ident = &variables[index];
+                            let type_def = target.type_def((local, external));
 
                             let (type_def, value) = match input_var.kind {
-                                // If the input variable has a `Kind` defined,
-                                // it means we should use that definition over
-                                // any definition inferred from the closure
-                                // target.
-                                Some(kind) => (kind.into(), None),
+                                // The variable kind is expected to be exactly
+                                // the kind provided by the closure definition.
+                                VariableKind::Exact(kind) => (kind.into(), None),
 
-                                // If no hard-coded `Kind` is defined, and the
-                                // closure is used as an iterator, we'll
-                                // construct the required `Kind` from the inner
-                                // types of the collection.
-                                None if definition.is_iterator => {
-                                    let type_def = target.type_def((local, external));
-                                    let kind = type_def.kind();
+                                // The variable kind is expected to be equal to
+                                // the ind of the target of the closure.
+                                VariableKind::Target => {
+                                    (target.type_def((local, external)), target.as_value())
+                                }
 
-                                    let kind = if let Some(object) = kind.as_object() {
+                                // The variable kind is expected to be equal to
+                                // the recuded kind of all values within the
+                                // target collection type.
+                                //
+                                // This assumes the target is a collection type,
+                                // or else it'll return "any".
+                                VariableKind::TargetInnerValue => {
+                                    let kind = if let Some(object) = type_def.as_object() {
                                         object.reduced_kind()
-                                    } else if let Some(array) = kind.as_array() {
+                                    } else if let Some(array) = type_def.as_array() {
                                         array.reduced_kind()
-
-                                    // This branch should never trigger, as an
-                                    // iterator-closure that is fed
-                                    // a non-collection target is invalid. It's
-                                    // not "unreachable" though, so returning
-                                    // `any` here is a safe alternative.
                                     } else {
                                         Kind::any()
                                     };
@@ -303,9 +304,33 @@ impl<'a> Builder<'a> {
                                     (kind.into(), None)
                                 }
 
-                                // If the closure is not used as an iterator, we
-                                // use the `Kind` of `target`.
-                                None => (target.type_def((local, external)), target.as_value()),
+                                // The variable kind is expected to be equal to
+                                // the kind of all keys within the target
+                                // collection type.
+                                //
+                                // This means it's either a string for an
+                                // object, integer for an array, or
+                                // a combination of the two if the target isn't
+                                // known to be exactly one of the two.
+                                //
+                                // If the target can resolve to a non-collection
+                                // type, this again returns "any".
+                                VariableKind::TargetInnerKey => {
+                                    let mut kind = Kind::empty();
+
+                                    if !type_def.is_collection() {
+                                        kind = Kind::any()
+                                    } else {
+                                        if type_def.is_object() {
+                                            kind.add_bytes();
+                                        }
+                                        if type_def.is_array() {
+                                            kind.add_integer();
+                                        }
+                                    }
+
+                                    (kind.into(), None)
+                                }
                             };
 
                             let details = Details { type_def, value };
@@ -361,6 +386,7 @@ impl<'a> Builder<'a> {
                 });
             }
 
+            let variables = variables.into_iter().map(Node::into_inner).collect();
             let closure = FunctionClosure::new(variables, block);
             self.list.set_closure(closure);
         };

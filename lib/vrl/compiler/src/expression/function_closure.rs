@@ -1,19 +1,23 @@
 use core::ExpressionError;
 
 use crate::expression::Block;
-use crate::parser::{Ident, Node};
+use crate::parser::Ident;
+use crate::state::Runtime;
 use crate::value::VrlValueConvert;
 use crate::{Context, Expression, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionClosure {
-    variables: Vec<Node<Ident>>,
+    variables: Vec<Ident>,
     block: Block,
 }
 
 impl FunctionClosure {
-    pub(crate) fn new(variables: Vec<Node<Ident>>, block: Block) -> Self {
-        Self { variables, block }
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            block,
+        }
     }
 
     /// Run the closure to completion, given the provided key/value pair, and
@@ -33,39 +37,16 @@ impl FunctionClosure {
         let cloned_key = key.to_owned();
         let cloned_value = value.clone();
 
-        let key_ident = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+        let key_ident = self.ident(0);
+        let value_ident = self.ident(1);
 
-        let value_ident = self
-            .variables
-            .get(1)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
-
-        let state = ctx.state_mut();
-        let old_key_data = key_ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), cloned_key.into())
-                .map(|value| (ident.clone(), value))
-        });
-        let old_value_data = value_ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), cloned_value)
-                .map(|value| (ident.clone(), value))
-        });
+        let old_key = insert(ctx.state_mut(), key_ident, cloned_key.into());
+        let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
         self.resolve(ctx)?;
 
-        if let Some((ident, value)) = old_key_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
-
-        if let Some((ident, value)) = old_value_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
+        cleanup(ctx.state_mut(), key_ident, old_key);
+        cleanup(ctx.state_mut(), value_ident, old_value);
 
         Ok(())
     }
@@ -86,39 +67,16 @@ impl FunctionClosure {
         // values, instead of owning them.
         let cloned_value = value.clone();
 
-        let index_ident = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
+        let index_ident = self.ident(0);
+        let value_ident = self.ident(1);
 
-        let value_ident = self
-            .variables
-            .get(1)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
-
-        let state = ctx.state_mut();
-        let old_index_data = index_ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), index.into())
-                .map(|value| (ident.clone(), value))
-        });
-        let old_value_data = value_ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), cloned_value)
-                .map(|value| (ident.clone(), value))
-        });
+        let old_index = insert(ctx.state_mut(), index_ident, index.into());
+        let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
         self.resolve(ctx)?;
 
-        if let Some((ident, value)) = old_index_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
-
-        if let Some((ident, value)) = old_value_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
+        cleanup(ctx.state_mut(), index_ident, old_index);
+        cleanup(ctx.state_mut(), value_ident, old_value);
 
         Ok(())
     }
@@ -134,25 +92,12 @@ impl FunctionClosure {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_key = key.clone();
-
-        let ident = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
-
-        let state = ctx.state_mut();
-        let old_data = ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), cloned_key.into())
-                .map(|value| (ident.clone(), value))
-        });
+        let ident = self.ident(0);
+        let old_key = insert(ctx.state_mut(), ident, cloned_key.into());
 
         *key = self.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned();
 
-        if let Some((ident, value)) = old_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
+        cleanup(ctx.state_mut(), ident, old_key);
 
         Ok(())
     }
@@ -168,27 +113,34 @@ impl FunctionClosure {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_value = value.clone();
-
-        let ident = self
-            .variables
-            .get(0)
-            .and_then(|v| (!v.is_empty()).then(|| v.as_ref()));
-
-        let state = ctx.state_mut();
-        let old_data = ident.and_then(|ident| {
-            state
-                .swap_variable(ident.clone(), cloned_value)
-                .map(|value| (ident.clone(), value))
-        });
+        let ident = self.ident(0);
+        let old_value = insert(ctx.state_mut(), ident, cloned_value);
 
         *value = self.resolve(ctx)?;
 
-        if let Some((ident, value)) = old_data {
-            let state = ctx.state_mut();
-            state.insert_variable(ident, value);
-        }
+        cleanup(ctx.state_mut(), ident, old_value);
 
         Ok(())
+    }
+
+    fn ident(&self, index: usize) -> Option<&Ident> {
+        self.variables
+            .get(index)
+            .and_then(|v| (!v.is_empty()).then(|| v))
+    }
+}
+
+fn insert(state: &mut Runtime, ident: Option<&Ident>, data: Value) -> Option<Value> {
+    ident.and_then(|ident| state.swap_variable(ident.clone(), data))
+}
+
+fn cleanup(state: &mut Runtime, ident: Option<&Ident>, data: Option<Value>) {
+    match (ident, data) {
+        (Some(ident), Some(value)) => {
+            state.insert_variable(ident.clone(), value);
+        }
+        (Some(ident), None) => state.remove_variable(ident),
+        _ => {}
     }
 }
 

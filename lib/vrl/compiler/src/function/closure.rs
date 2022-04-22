@@ -59,7 +59,31 @@ pub struct Variable {
     ///
     /// If set to `None`, the compiler is expected to provide this value at
     /// compile-time, or resort to `Kind::any()` if no information is known.
-    pub kind: Option<Kind>,
+    pub kind: VariableKind,
+}
+
+/// The [`Value`] kind expected to be returned by a [`Variable`].
+#[derive(Debug, Clone)]
+pub enum VariableKind {
+    /// An exact [`Kind`] means this variable is guaranteed to always contain
+    /// a value that resolves to this kind.
+    ///
+    /// For example, in `map_keys`, it is known that the first (and only)
+    /// variable the closure takes will be a `Kind::bytes()`.
+    Exact(Kind),
+
+    /// The variable [`Kind`] is inferred from the target of the closure.
+    Target,
+
+    /// The variable [`Kind`] is inferred from the inner kind of the target of
+    /// the closure. This requires the closure target to be a collection type.
+    TargetInnerValue,
+
+    /// The variable [`Kind`] is inferred from the key or index type of the
+    /// target. If the target is known to be exactly an object, this is always
+    /// a `Value::bytes()`, if it's known to be exactly an array, it is
+    /// a `Value::integer()`, otherwise it is one of the two.
+    TargetInnerKey,
 }
 
 /// The output type required by the closure block.
