@@ -749,6 +749,7 @@ mod test {
                 "short line".to_string(),
                 "test with a long line".to_string(),
                 "a short un".to_string(),
+                "an extra line".to_string(),
             ],
         );
 
