@@ -33,8 +33,8 @@ no-proxy = { version  = "0.3.1", default-features = false, features = ["serializ
 once_cell = { version = "1.10", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
-prost = { version = "0.10.1", default-features = false, features = ["std"] }
-prost-types = { version = "0.10.1", default-features = false }
+prost = { version = "0.9", default-features = false, features = ["std"] }
+prost-types = { version = "0.9", default-features = false }
 regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.136", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.79", default-features = false }
@@ -46,7 +46,7 @@ toml = { version = "0.5.9", default-features = false }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
-tracing-log = { version = "0.1.2", default-features = false }
+tracing-log = { version = "0.1.3", default-features = false }
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.2", default-features = false }
@@ -59,7 +59,7 @@ vector_common = { path = "../vector-common" }
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 
 [build-dependencies]
-prost-build = "0.10.1"
+prost-build = "0.9"
 
 [dev-dependencies]
 base64 = "0.13.0"
