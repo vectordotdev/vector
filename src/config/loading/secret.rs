@@ -14,13 +14,18 @@ use crate::config::{
     loading::{deserialize_table, ComponentHint, Process},
     ComponentKey,
 };
+use crate::signal;
 
 static COLLECTOR: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
 #[typetag::serde(tag = "type")]
 pub trait SecretBackend: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn retrieve(&mut self, secret_keys: Vec<String>) -> crate::Result<HashMap<String, String>>;
+    fn retrieve(
+        &mut self,
+        secret_keys: Vec<String>,
+        signal_rx: &mut signal::SignalRx,
+    ) -> crate::Result<HashMap<String, String>>;
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -37,7 +42,10 @@ impl SecretBackendLoader {
         }
     }
 
-    pub(crate) fn retrieve(&mut self) -> Result<HashMap<String, String>, String> {
+    pub(crate) fn retrieve(
+        &mut self,
+        signal_rx: &mut signal::SignalRx,
+    ) -> Result<HashMap<String, String>, String> {
         let secrets = self.secret_keys.iter().flat_map(|(backend_name, keys)| {
             match self.backends.get_mut(&ComponentKey::from(backend_name.clone())) {
                 None => {
@@ -45,7 +53,7 @@ impl SecretBackendLoader {
                 },
                 Some(backend) => {
                     debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
-                    match backend.retrieve(keys.to_vec()) {
+                    match backend.retrieve(keys.to_vec(), signal_rx) {
                         Err(e) => {
                             vec![Err(format!("Error while retrieving secret from backend \"{}\": {}", backend_name, e))]
                         },
@@ -166,10 +174,25 @@ struct ExecResponse {
 
 #[typetag::serde(name = "exec")]
 impl SecretBackend for ExecBackend {
-    fn retrieve(&mut self, secret_keys: Vec<String>) -> crate::Result<HashMap<String, String>> {
+    fn retrieve(
+        &mut self,
+        secret_keys: Vec<String>,
+        signal_rx: &mut signal::SignalRx,
+    ) -> crate::Result<HashMap<String, String>> {
         let mut output = executor::block_on(tokio::time::timeout(
             Duration::from_secs(self.timeout),
-            query_backend(&self.command, new_query(secret_keys.clone())),
+            async {
+                loop {
+                    tokio::select! {
+                        biased;
+                        Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+                            warn!("signal");
+                            break Err("Secret retrieval was interrupted.".into());
+                        }
+                        output = query_backend(&self.command, new_query(secret_keys.clone())) => break output,
+                    }
+                }
+            },
         ))??;
         let mut secrets = HashMap::new();
         for k in secret_keys.into_iter() {
@@ -214,9 +237,7 @@ async fn query_backend(
 
     let query = serde_json::to_vec(&query)?;
 
-    tokio::spawn(async move {
-        stdin.write_all(&query).await
-    });
+    tokio::spawn(async move { stdin.write_all(&query).await });
 
     let output = child.wait_with_output().await?;
     let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
