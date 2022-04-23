@@ -291,7 +291,7 @@ components: sources: kubernetes_logs: {
 		order: {
 			common: false
 			description: """
-				Specifies the order in which events are processed.
+				Specifies if the events are processed in order.
                                 """
 			required: false
 			type: bool: default: false

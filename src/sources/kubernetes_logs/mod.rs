@@ -139,7 +139,7 @@ pub struct Config {
     /// event from the watched stream.
     delay_deletion_ms: usize,
 
-    /// What's order the events from log files must be passed to the sinks
+    /// If event must be properly ordered when sending downstream
     /// By default all events is unordered
     ordered: bool,
 }
@@ -454,11 +454,7 @@ impl Source {
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_event_stream(&mut stream);
-        let mut lc: Lifecycle;
-        match ordered {
-            true => lc = Lifecycle::new(lifecycle::LifecycleOrder::Ordered),
-            false => lc = Lifecycle::new(lifecycle::LifecycleOrder::Unordered),
-        }
+        let mut lc = Lifecycle::new(ordered);
         {
             let (slot, shutdown) = lc.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)

@@ -14,12 +14,6 @@ use futures::{
 
 use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 
-#[derive(Debug)]
-pub enum LifecycleOrder{
-    Ordered,
-    Unordered,
-}
-
 /// Lifecycle encapsulates logic for managing a lifecycle of multiple futures
 /// that are bounded together by a shared shutdown condition.
 ///
@@ -30,8 +24,8 @@ pub enum LifecycleOrder{
 pub struct Lifecycle<'bound> {
     futs_ordered: FuturesOrdered<BoxFuture<'bound, ()>>,
     futs_unordered: FuturesUnordered<BoxFuture<'bound, ()>>,
-    order: LifecycleOrder,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
+    ordered: bool,
 }
 
 /// Holds a "global" shutdown signal or shutdown signal token.
@@ -49,12 +43,12 @@ pub enum GlobalShutdownToken {
 
 impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
-    pub fn new(lc_order: LifecycleOrder) -> Self {
+    pub fn new(ordered: bool) -> Self {
         return Self {
             futs_ordered: FuturesOrdered::new(),
             futs_unordered: FuturesUnordered::new(),
-            order: lc_order,
             fut_shutdowns: Vec::new(),
+            ordered,
         }
     }
 
@@ -76,8 +70,8 @@ impl<'bound> Lifecycle<'bound> {
     /// Run the managed futures and keep track of the shutdown process.
     pub async fn run(mut self, mut global_shutdown: ShutdownSignal) -> GlobalShutdownToken {
         let token;
-        match self.order {
-            LifecycleOrder::Ordered => {
+        match self.ordered {
+            true => {
                 let first_task_fut = self.futs_ordered.next();
 
                 pin_mut!(first_task_fut);
@@ -97,7 +91,7 @@ impl<'bound> Lifecycle<'bound> {
                     }
                 };
             },
-            LifecycleOrder::Unordered => {
+            false => {
                 let first_task_fut = self.futs_unordered.next();
 
                 pin_mut!(first_task_fut);
@@ -130,14 +124,14 @@ impl<'bound> Lifecycle<'bound> {
             }
         }
 
-        match self.order {
-            LifecycleOrder::Ordered => {
+        match self.ordered {
+            true => {
              // Wait for all the futures to complete.
                 while let Some(()) = self.futs_ordered.next().await {
                     trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
                 }
             },
-            LifecycleOrder::Unordered => {
+            false => {
                 // Wait for all the futures to complete.
                 while let Some(()) = self.futs_unordered.next().await {
                     trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
@@ -164,11 +158,10 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        match self.lifecycle.order {
-            LifecycleOrder::Ordered => self.lifecycle.futs_ordered.push(future),
-            LifecycleOrder::Unordered => self.lifecycle.futs_unordered.push(future),
+        match self.lifecycle.ordered {
+            true => self.lifecycle.futs_ordered.push(future),
+            false => self.lifecycle.futs_unordered.push(future),
         }
-        // self.lifecycle.futs.push(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }
