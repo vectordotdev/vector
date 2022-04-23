@@ -34,7 +34,7 @@ releases: "0.21.1": {
 			type: "fix"
 			scopes: ["kubernetes_logs source"]
 			description: """
-				The `kubernetes_logs` no longer panicks whenever an error is received from the Kubernetes API watch
+				The `kubernetes_logs` no longer panics whenever an error is received from the Kubernetes API watch
 				stream.
 				"""
 			pr_numbers: [12248]
@@ -79,7 +79,7 @@ releases: "0.21.1": {
 			type: "fix"
 			scopes: ["config"]
 			description: """
-				Vector no longer panicks when used with configuration options that take event paths such as `encoding.only_fields`.
+				Vector no longer panics when used with configuration options that take event paths such as `encoding.only_fields`.
 				"""
 			pr_numbers: [12306]
 		},
