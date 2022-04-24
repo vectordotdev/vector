@@ -23,6 +23,10 @@ impl LocalEnv {
     pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
         self.bindings.insert(ident, details);
     }
+
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<assignment::Details> {
+        self.bindings.remove(ident)
+    }
 }
 
 /// A lexical scope within the program.

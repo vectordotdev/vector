@@ -26,7 +26,7 @@ pub(crate) struct Builder<'a> {
     ident_span: Span,
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
-    closure: Option<(Vec<Node<Ident>>, closure::Input)>,
+    closure: Option<(Vec<Ident>, closure::Input)>,
     list: ArgumentList,
     function: &'a dyn Function,
 }
@@ -192,7 +192,7 @@ impl<'a> Builder<'a> {
                 let mut matched = None;
                 let mut err_found_type_def = None;
 
-                'outer: for input in definition.inputs {
+                for input in definition.inputs {
                     // Check type definition for linked parameter.
                     match list.arguments.get(input.parameter_keyword) {
                         // No argument provided for the given parameter keyword.
@@ -221,7 +221,7 @@ impl<'a> Builder<'a> {
                             }
 
                             matched = Some((input.clone(), expr));
-                            break 'outer;
+                            break;
                         }
                     };
                 }
@@ -338,7 +338,13 @@ impl<'a> Builder<'a> {
                             local.insert_variable(call_ident.to_owned().into_inner(), details);
                         }
 
-                        Some((variables.into_inner(), input))
+                        let variables = variables
+                            .into_inner()
+                            .into_iter()
+                            .map(Node::into_inner)
+                            .collect();
+
+                        Some((variables, input))
                     }
                 }
             }
@@ -364,12 +370,25 @@ impl<'a> Builder<'a> {
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
+        mut local_snapshot: LocalEnv,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
 
         // Check if we have a closure we need to compile.
         if let Some((variables, input)) = self.closure.clone() {
             let block = closure_block.expect("closure must contain block");
+
+            // At this point, we've compiled the block, so we can remove the
+            // closure variables from the compiler's local environment.
+            variables
+                .iter()
+                .for_each(|ident| match local_snapshot.remove_variable(ident) {
+                    Some(details) => local.insert_variable(ident.clone(), details),
+                    None => {
+                        local.remove_variable(ident);
+                    }
+                });
+
             closure_fallible = block.type_def((local, external)).is_fallible();
 
             let (block_span, block) = block.take();
@@ -386,7 +405,6 @@ impl<'a> Builder<'a> {
                 });
             }
 
-            let variables = variables.into_iter().map(Node::into_inner).collect();
             let closure = FunctionClosure::new(variables, block);
             self.list.set_closure(closure);
         };
@@ -1249,7 +1267,7 @@ mod tests {
             None,
         )
         .unwrap()
-        .compile(&mut local, &mut external, None)
+        .compile(&mut local, &mut external, None, LocalEnv::default())
         .unwrap()
     }
 
