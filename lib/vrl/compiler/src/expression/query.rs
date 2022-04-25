@@ -104,11 +104,18 @@ impl Expression for Query {
     }
 
     fn as_value(&self) -> Option<Value> {
-        match self.target {
-            Target::Internal(ref variable) => variable
-                .value()
-                .and_then(|v| v.get_by_path(self.path()))
-                .cloned(),
+        match &self.target {
+            Target::Internal(variable) => variable
+                .as_value()
+                .and_then(|v| v.get_by_path(self.path()).cloned()),
+            Target::External => {
+                // NOTE: This one *could* be made to work, if we pass in the
+                // compiler context into `as_value`. Since `ExternalEnv` stores
+                // `assignment::Details`, which in turn has an optional `Value`
+                // attached for constant values.
+                None
+            }
+            Target::Container(expr) => expr.as_value(),
             _ => None,
         }
     }

@@ -144,8 +144,8 @@ impl Expr {
     pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
         let literal = match self {
             Expr::Literal(literal) => Ok(literal.clone()),
-            Expr::Variable(var) if var.value().is_some() => {
-                match var.value().unwrap().clone().into() {
+            Expr::Variable(var) if var.as_value().is_some() => {
+                match var.as_value().unwrap().into() {
                     Expr::Literal(literal) => Ok(literal),
                     expr => Err(super::function::Error::UnexpectedExpression {
                         keyword,

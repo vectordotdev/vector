@@ -1,18 +1,19 @@
+# object: { "status_code_150": 150, "status_code_250": 250, "status_code_350": 350, "status_code_450": 450, "status_code_550": 550 }
 # result: ["1xx", "2xx", "3xx", "4xx", null]
 
-status_code = 150
+status_code = int!(.status_code_150)
 a1 = if status_code < 200 { "1xx" } else if status_code < 300 { "2xx" } else if status_code < 400 { "3xx" } else if status_code < 500 { "4xx" }
 
-status_code = 250
+status_code = int!(.status_code_250)
 a2 = if status_code < 200 { "1xx" } else if status_code < 300 { "2xx" } else if status_code < 400 { "3xx" } else if status_code < 500 { "4xx" }
 
-status_code = 350
+status_code = int!(.status_code_350)
 a3 = if status_code < 200 { "1xx" } else if status_code < 300 { "2xx" } else if status_code < 400 { "3xx" } else if status_code < 500 { "4xx" }
 
-status_code = 450
+status_code = int!(.status_code_450)
 a4 = if status_code < 200 { "1xx" } else if status_code < 300 { "2xx" } else if status_code < 400 { "3xx" } else if status_code < 500 { "4xx" }
 
-status_code = 550
+status_code = int!(.status_code_550)
 a5 = if status_code < 200 { "1xx" } else if status_code < 300 { "2xx" } else if status_code < 400 { "3xx" } else if status_code < 500 { "4xx" }
 
 [a1, a2, a3, a4, a5]

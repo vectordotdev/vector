@@ -224,8 +224,8 @@ impl ArgumentList {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
-                Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into() {
+                Expr::Variable(var) if var.as_value().is_some() => {
+                    match var.as_value().unwrap().into() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
