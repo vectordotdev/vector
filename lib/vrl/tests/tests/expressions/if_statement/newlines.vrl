@@ -1,34 +1,34 @@
 # result: [true, true, false, false, true, true]
 
-v1 = if true
+v1 = if true == true
 {
     true
 }
 
-v2 = if true
+v2 = if true == true
 { true }
 
-v3 = if false
+v3 = if false == true
 { true } else
 { false }
 
-v4 = if false
+v4 = if false == true
 { true } else
-if false
+if false == true
 { true } else
 { false }
 
-v5 = if false {
+v5 = if false == true {
     true
 } else
-if false {
+if false == true {
     false
 } else {
     true
 }
 
 v6 =
-    if true {
+    if true == true {
         true }
 
 [v1, v2, v3, v4, v5, v6]
