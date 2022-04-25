@@ -112,8 +112,8 @@ PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
 curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
      --output "$TEMP/$PROTOC_ZIP"
 unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
+chmod +x "$TEMP"/bin/protoc
 mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
-echo "PROTOC=/usr/bin/protoc" >> "$GITHUB_ENV"
 
 # Apt cleanup
 apt clean
