@@ -38,7 +38,7 @@ pub fn compile_for_repl(
     fns: &[Box<dyn Function>],
     external: &mut state::ExternalEnv,
     local: state::LocalEnv,
-) -> compiler::Result<(Program, state::LocalEnv)> {
+) -> compiler::Result<Program> {
     let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;
 
     compiler::compile_for_repl(ast, fns, local, external)

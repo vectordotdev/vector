@@ -105,7 +105,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                     _ => line,
                 };
 
-                let result = resolve(
+                let (local, result) = resolve(
                     objects.get_mut(index),
                     &mut rt,
                     command,
@@ -115,12 +115,10 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                     vrl_runtime,
                 );
 
-                let string = match result {
-                    Ok((v, local)) => {
-                        let _ = std::mem::replace(&mut local_state, local);
+                let _ = std::mem::replace(&mut local_state, local);
 
-                        v.to_string()
-                    }
+                let string = match result {
+                    Ok(v) => v.to_string(),
                     Err(v) => v.to_string(),
                 };
 
@@ -150,19 +148,27 @@ fn resolve(
     local: state::LocalEnv,
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
-) -> Result<(Value, state::LocalEnv), String> {
+) -> (state::LocalEnv, Result<Value, String>) {
     let mut empty = value!({});
     let object = match object {
         None => &mut empty as &mut dyn Target,
         Some(object) => object,
     };
 
-    let (program, local) = match vrl::compile_for_repl(program, &stdlib::all(), external, local) {
+    let program = match vrl::compile_for_repl(program, &stdlib::all(), external, local.clone()) {
         Ok(result) => result,
-        Err(diagnostics) => return Err(Formatter::new(program, diagnostics).colored().to_string()),
+        Err(diagnostics) => {
+            return (
+                local,
+                Err(Formatter::new(program, diagnostics).colored().to_string()),
+            )
+        }
     };
 
-    execute(runtime, program, object, timezone, vrl_runtime).map(|value| (value, local))
+    (
+        program.local_env().clone(),
+        execute(runtime, program, object, timezone, vrl_runtime),
+    )
 }
 
 fn execute(
@@ -289,7 +295,7 @@ impl Validator for Repl {
         let mut rt = Runtime::new(state::Runtime::default());
         let target: Option<&mut Value> = None;
 
-        let result = match resolve(
+        let (_, result) = resolve(
             target,
             &mut rt,
             ctx.input(),
@@ -297,7 +303,9 @@ impl Validator for Repl {
             local_state,
             &timezone,
             VrlRuntime::Ast,
-        ) {
+        );
+
+        let result = match result {
             Err(error) => {
                 // TODO: Ideally we'd used typed errors for this, but
                 // that requires some more work to the VRL compiler.
