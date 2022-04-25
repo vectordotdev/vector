@@ -1,4 +1,4 @@
-# RFC 12187 - 2022-04-20 - Log Namesapcing
+# RFC 12187 - 2022-04-20 - Log Namespacing
 
 Today, when deserializing data on an event the keys are arbitrary and can potentially collide with data on the root.
 Not only is the loss of data inconvenient, but it prevents us from fully utilizing the power of schemas.
