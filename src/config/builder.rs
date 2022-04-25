@@ -59,6 +59,7 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
@@ -310,10 +311,9 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
-            secret: self.secret.iter().map(|(k,v)| (k, v.as_ref())).collect(),
+            secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         })
         .expect("should serialize to JSON");
-
         let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
@@ -370,7 +370,11 @@ mod tests {
             transforms: builder.transforms.iter().collect(),
             tests: &builder.tests,
             provider: &builder.provider,
-            secret: builder.secret.iter().collect(),
+            secret: builder
+                .secret
+                .iter()
+                .map(|(k, v)| (k, v.as_ref()))
+                .collect(),
         });
 
         match value {

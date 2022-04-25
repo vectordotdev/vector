@@ -238,7 +238,7 @@ pub fn load_source_from_paths(
 }
 
 /// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
-fn load_secret_backends_from_paths(
+pub fn load_secret_backends_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(SecretBackendLoader, Vec<String>), Vec<String>> {
     loader_from_paths(SecretBackendLoader::new(), config_paths)

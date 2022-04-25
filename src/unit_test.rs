@@ -1,4 +1,5 @@
 use crate::config::{self, UnitTestResult};
+use crate::signal;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -56,7 +57,7 @@ impl Opts {
     }
 }
 
-pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
@@ -69,7 +70,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     {
         println!("Running tests");
     }
-    match config::build_unit_tests_main(&paths).await {
+    match config::build_unit_tests_main(&paths, signal_handler).await {
         Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]

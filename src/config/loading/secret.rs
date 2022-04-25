@@ -245,6 +245,25 @@ async fn query_backend(
     Ok(response)
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct TestBackend {
+    pub replacement: String,
+}
+
+#[typetag::serde(name = "test")]
+impl SecretBackend for TestBackend {
+    fn retrieve(
+        &mut self,
+        secret_keys: Vec<String>,
+        _: &mut signal::SignalRx,
+    ) -> crate::Result<HashMap<String, String>> {
+        Ok(secret_keys
+            .into_iter()
+            .map(|k| (k, self.replacement.clone()))
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
