@@ -260,6 +260,22 @@ impl DeserializerConfig {
         }
     }
 
+    /// Return an appropriate default framer for the given deserializer
+    pub fn default_stream_framing(&self) -> FramingConfig {
+        match self {
+            DeserializerConfig::Native => FramingConfig::LengthDelimited,
+            DeserializerConfig::Bytes
+            | DeserializerConfig::Json
+            | DeserializerConfig::NativeJson => FramingConfig::NewlineDelimited {
+                newline_delimited: Default::default(),
+            },
+            #[cfg(feature = "syslog")]
+            DeserializerConfig::Syslog => FramingConfig::NewlineDelimited {
+                newline_delimited: Default::default(),
+            },
+        }
+    }
+
     /// The data type of returned events
     pub fn output_type(&self) -> DataType {
         match self {
