@@ -34,7 +34,7 @@ use crate::{
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -57,7 +57,7 @@ pub struct SplunkConfig {
     token: Option<String>,
     /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     /// Splunk HEC indexer acknowledgement settings
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,

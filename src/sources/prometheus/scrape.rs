@@ -23,7 +23,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
     SourceSender,
 };
 
@@ -53,7 +53,7 @@ struct PrometheusScrapeConfig {
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
     query: Option<HashMap<String, Vec<String>>>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     auth: Option<Auth>,
 }
 
@@ -164,7 +164,7 @@ struct PrometheusCompatConfig {
     query: Option<HashMap<String, Vec<String>>>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     auth: Option<Auth>,
 }
 

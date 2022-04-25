@@ -25,7 +25,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -98,7 +98,7 @@ pub struct KinesisSinkConfig {
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
