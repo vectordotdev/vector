@@ -8,8 +8,13 @@ use crate::event::Event;
 pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: usize,
-    pub pod_name: Option<&'a str>,
-    pub pod_namespace: Option<&'a str>,
+    pub pod_info: Option<KubernetesLogsPodInfo>,
+}
+
+#[derive(Debug)]
+pub struct KubernetesLogsPodInfo {
+    pub name: String,
+    pub namespace: String,
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
@@ -20,13 +25,16 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
             byte_size = %self.byte_size,
             file = %self.file,
         );
-        match (self.pod_name, self.pod_name) {
-            (Some(name), Some(namespace)) => {
-                counter!("component_received_events_total", 1, "pod_name" => name.to_owned(), "pod_namespace" => namespace.to_owned());
-                counter!("component_received_event_bytes_total", self.byte_size as u64, "pod_name" => name.to_owned(), "pod_namespace" => namespace.to_owned());
-                counter!("events_in_total", 1, "pod_name" => name.to_owned(), "pod_namespace" => namespace.to_owned());
+        match self.pod_info {
+            Some(pod_info) => {
+                let pod_namespace = pod_info.namespace.to_owned();
+                let pod_name = pod_info.name.to_owned();
+
+                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
+                counter!("component_received_event_bytes_total", self.byte_size as u64, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
+                counter!("events_in_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
             }
-            (Some(_), None) | (None, Some(_)) | (None, None) => {
+            None => {
                 counter!("component_received_events_total", 1);
                 counter!(
                     "component_received_event_bytes_total",
