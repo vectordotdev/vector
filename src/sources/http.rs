@@ -192,7 +192,12 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(
+            self.decoding
+                .as_ref()
+                .map(|d| d.output_type())
+                .unwrap_or(DataType::Log),
+        )]
     }
 
     fn source_type(&self) -> &'static str {

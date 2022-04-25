@@ -24,6 +24,7 @@ use encoding::Encodable;
 pub mod encoding;
 
 mod internal_events;
+
 #[cfg(test)]
 pub mod test;
 pub mod topology;

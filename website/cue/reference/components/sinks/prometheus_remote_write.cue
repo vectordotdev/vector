@@ -140,6 +140,7 @@ components: sinks: prometheus_remote_write: {
 			set:          false
 			summary:      true
 		}
+		traces: false
 	}
 
 	telemetry: metrics: {

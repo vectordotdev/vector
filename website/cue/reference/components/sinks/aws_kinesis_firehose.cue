@@ -84,6 +84,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

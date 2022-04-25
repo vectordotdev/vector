@@ -1,0 +1,14 @@
+# SKIP
+# object: { "message": "barbaz" }
+# result: true
+
+patterns = [r'foo', r'bar']
+
+matched = false
+for_each(patterns) -> |pattern| {
+  if !matched && match(.message, pattern) {
+    matched = true
+  }
+}
+
+matched

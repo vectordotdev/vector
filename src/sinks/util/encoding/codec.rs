@@ -1,10 +1,14 @@
 use std::io;
 
+use codecs::{
+    encoding::{FramingConfig, SerializerConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
+};
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
-use super::Encoder;
+use super::{Encoder, EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -151,6 +155,44 @@ impl Encoder<Vec<Event>> for StandardEncodings {
         written += n;
 
         Ok(written)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct StandardEncodingsMigrator;
+
+impl EncodingConfigMigrator for StandardEncodingsMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            StandardEncodings::Text => RawMessageSerializerConfig::new().into(),
+            StandardEncodings::Json | StandardEncodings::Ndjson => {
+                JsonSerializerConfig::new().into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
+/// `SerializerConfig` based encoding system.
+pub struct StandardEncodingsWithFramingMigrator;
+
+impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            StandardEncodings::Text => (None, RawMessageSerializerConfig::new().into()),
+            StandardEncodings::Json => (None, JsonSerializerConfig::new().into()),
+            StandardEncodings::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
     }
 }
 

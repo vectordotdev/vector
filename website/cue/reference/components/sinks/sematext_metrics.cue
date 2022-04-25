@@ -68,6 +68,7 @@ components: sinks: sematext_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	telemetry: metrics: {

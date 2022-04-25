@@ -76,6 +76,7 @@ components: sinks: influxdb_metrics: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

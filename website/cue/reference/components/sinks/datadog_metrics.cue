@@ -83,6 +83,7 @@ components: sinks: datadog_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	telemetry: metrics: {

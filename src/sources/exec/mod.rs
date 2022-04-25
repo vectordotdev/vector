@@ -27,7 +27,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     async_read::VecAsyncReadExt,
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
         ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
@@ -222,7 +222,7 @@ impl SourceConfig for ExecConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

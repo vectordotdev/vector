@@ -62,5 +62,6 @@ components: transforms: add_tags: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 }

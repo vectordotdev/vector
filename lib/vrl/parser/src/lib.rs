@@ -11,6 +11,7 @@ mod arbitrary;
 mod arbitrary_depth;
 pub mod ast;
 mod lex;
+mod template_string;
 
 pub use ast::{Literal, Program};
 pub use diagnostic::Span;

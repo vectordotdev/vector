@@ -51,6 +51,10 @@ pub struct Cmd {
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    /// Ignore the Cue tests (to speed up run)
+    #[clap(long)]
+    ignore_cue: bool,
 }
 
 impl Cmd {
@@ -115,7 +119,7 @@ fn main() {
 
             tests.into_iter()
         })
-        .chain(docs::tests().into_iter())
+        .chain(docs::tests(cmd.ignore_cue).into_iter())
         .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
         .collect::<Vec<_>>();
 
@@ -132,16 +136,12 @@ fn main() {
             continue;
         }
 
-        let dots = if test.name.len() >= 60 {
-            0
-        } else {
-            60 - test.name.len()
-        };
-        print!(
-            "  {}{}",
-            test.name,
-            Colour::Fixed(240).paint(".".repeat(dots))
-        );
+        let mut name = test.name.clone();
+        name.truncate(58);
+
+        let dots = if name.len() >= 60 { 0 } else { 60 - name.len() };
+
+        print!("  {}{}", name, Colour::Fixed(240).paint(".".repeat(dots)));
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));

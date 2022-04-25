@@ -18,8 +18,8 @@ static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
 
 pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     match error {
-        SdkError::TimeoutError(_) => true,
-        SdkError::DispatchFailure(_) => true,
+        SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
+        SdkError::ConstructionFailure(_) => false,
         SdkError::ResponseError { err: _, raw } | SdkError::ServiceError { err: _, raw } => {
             // This header is a direct indication that we should retry the request. Eventually it'd
             // be nice to actually schedule the retry after the given delay, but for now we just
@@ -52,7 +52,6 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
                 || status == http::StatusCode::TOO_MANY_REQUESTS
                 || (status.is_client_error() && re.is_match(response_body.as_ref()))
         }
-        _ => false,
     }
 }
 
@@ -77,20 +76,19 @@ pub trait ClientBuilder {
 
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
-    region: Option<Region>,
+    region: Region,
     endpoint: Option<Endpoint>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsOptions>,
 ) -> crate::Result<T::Client> {
-    let mut config_builder = T::create_config_builder(auth.credentials_provider().await?);
+    let mut config_builder =
+        T::create_config_builder(auth.credentials_provider(region.clone()).await?);
 
     if let Some(endpoint_override) = endpoint {
         config_builder = T::with_endpoint_resolver(config_builder, endpoint_override);
     }
 
-    if let Some(region) = region {
-        config_builder = T::with_region(config_builder, region);
-    }
+    config_builder = T::with_region(config_builder, region);
 
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 

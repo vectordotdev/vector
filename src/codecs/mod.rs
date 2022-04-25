@@ -8,5 +8,5 @@ mod encoder;
 mod ready_frames;
 
 pub use decoder::{Decoder, DecodingConfig};
-pub use encoder::{Encoder, EncodingConfig};
+pub use encoder::Encoder;
 pub use ready_frames::ReadyFrames;

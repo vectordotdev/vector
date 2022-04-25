@@ -249,6 +249,7 @@ components: sinks: aws_s3: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

@@ -1,5 +1,4 @@
-use std::convert::TryFrom;
-
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -32,11 +31,20 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// An intenal function used by `compile_for_repl`.
+    ///
+    /// This should only be used for its intended purpose.
+    pub(super) fn new_with_local_state(fns: &'a [Box<dyn Function>], local: LocalEnv) -> Self {
+        let mut compiler = Self::new(fns);
+        compiler.local = local;
+        compiler
+    }
+
     pub(super) fn compile(
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<Program, Errors> {
+    ) -> Result<(Program, LocalEnv), Errors> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
@@ -47,11 +55,13 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        Ok(Program {
+        let program = Program {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-        })
+        };
+
+        Ok((program, self.local))
     }
 
     fn compile_root_exprs(
@@ -101,7 +111,7 @@ impl<'a> Compiler<'a> {
         use ast::Expr::*;
 
         match node.into_inner() {
-            Literal(node) => self.compile_literal(node).into(),
+            Literal(node) => self.compile_literal(node, external),
             Container(node) => self.compile_container(node, external).into(),
             IfStatement(node) => self.compile_if_statement(node, external).into(),
             Op(node) => self.compile_op(node, external).into(),
@@ -114,10 +124,40 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn compile_literal(&mut self, node: Node<ast::Literal>) -> Literal {
+    fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
+        use ast::Literal::*;
         use literal::ErrorVariant::*;
 
-        Literal::try_from(node).unwrap_or_else(|err| {
+        let (span, lit) = node.take();
+
+        let literal = match lit {
+            String(template) => {
+                if let Some(v) = template.as_literal_string() {
+                    Ok(Literal::String(Bytes::from(v.to_string())))
+                } else {
+                    // Rewrite the template into an expression and compile that block.
+                    return self.compile_expr(
+                        Node::new(span, template.rewrite_to_concatenated_strings()),
+                        external,
+                    );
+                }
+            }
+            RawString(v) => Ok(Literal::String(Bytes::from(v))),
+            Integer(v) => Ok(Literal::Integer(v)),
+            Float(v) => Ok(Literal::Float(v)),
+            Boolean(v) => Ok(Literal::Boolean(v)),
+            Regex(v) => regex::Regex::new(&v)
+                .map_err(|err| literal::Error::from((span, err)))
+                .map(|r| Literal::Regex(r.into())),
+            // TODO: support more formats (similar to Vector's `Convert` logic)
+            Timestamp(v) => v
+                .parse()
+                .map(Literal::Timestamp)
+                .map_err(|err| literal::Error::from((span, err))),
+            Null => Ok(Literal::Null),
+        };
+
+        let literal = literal.unwrap_or_else(|err| {
             let value = match &err.variant {
                 #[allow(clippy::trivial_regex)]
                 InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
@@ -127,7 +167,9 @@ impl<'a> Compiler<'a> {
 
             self.errors.push(Box::new(err));
             value
-        })
+        });
+
+        literal.into()
     }
 
     fn compile_container(
@@ -377,6 +419,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
+            ..
         } = node.into_inner();
 
         let arguments = arguments

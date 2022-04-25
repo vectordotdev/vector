@@ -49,10 +49,10 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub(self) struct SplunkConfig {
+pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
-    address: SocketAddr,
+    pub address: SocketAddr,
     /// Splunk HEC token. Deprecated - use `valid_tokens` instead
     token: Option<String>,
     /// A list of tokens to accept. Omit this to accept any token

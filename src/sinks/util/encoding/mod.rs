@@ -57,7 +57,6 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
-#[cfg(feature = "codecs")]
 mod adapter;
 mod codec;
 mod config;
@@ -66,19 +65,25 @@ mod with_default;
 
 use std::{fmt::Debug, io, sync::Arc};
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
 
-#[cfg(feature = "codecs")]
-pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator, Transformer};
-pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use adapter::{
+    EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
+    EncodingConfigWithFramingMigrator, Transformer,
+};
+use bytes::BytesMut;
+pub use codec::{
+    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
+    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
+};
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
@@ -107,6 +112,18 @@ where
 {
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
         (**self).encode_input(input, writer)
+    }
+}
+
+impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
+    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        self.0.transform(&mut event);
+        let mut bytes = BytesMut::new();
+        encoder
+            .encode(event, &mut bytes)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        writer.write(&bytes)
     }
 }
 

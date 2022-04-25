@@ -3,6 +3,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_core::{
+    config::DataType,
     event::{proto, Event, EventArray, EventContainer},
     schema,
 };
@@ -17,6 +18,11 @@ impl NativeDeserializerConfig {
     /// Build the `NativeDeserializer` from this configuration.
     pub fn build(&self) -> NativeDeserializer {
         NativeDeserializer::default()
+    }
+
+    /// The data type of returned events
+    pub fn output_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema produced by the deserializer.

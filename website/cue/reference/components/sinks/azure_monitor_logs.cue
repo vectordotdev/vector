@@ -104,6 +104,7 @@ components: sinks: azure_monitor_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {
