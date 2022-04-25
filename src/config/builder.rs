@@ -59,7 +59,6 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
@@ -393,7 +392,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            "e71a87b3e4c761176a9f90aa94387e26383113554a119b1cbaaa25d439f25464",
             ConfigBuilder::default().sha256_hash()
         );
     }
