@@ -1,19 +1,19 @@
+// We allow dead code because some of the things we're testing are meant to ensure that the macros do the right thing
+// for codegen i.e. not doing codegen for fields that `serde` is going to skip, etc.
+#![allow(dead_code)]
+
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
 };
 
-use schemars::{gen::SchemaGenerator, schema::SchemaObject};
-use serde::{de, Deserialize, Deserializer, Serialize};
-use vector_config::{
-    configurable_component,
-    schema::{finalize_schema, generate_root_schema},
-    Configurable, Metadata,
-};
+use serde::{de, Deserialize, Deserializer};
+use vector_config::{configurable_component, schema::generate_root_schema};
 
 /// A period of time.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct SpecialDuration(u64);
+#[derive(Clone)]
+#[configurable_component]
+pub struct SpecialDuration(#[configurable(transparent)] u64);
 
 /// Controls the batching behavior of events.
 #[derive(Clone)]
@@ -21,6 +21,7 @@ pub struct SpecialDuration(u64);
 #[serde(default)]
 pub struct BatchConfig {
     /// The maximum number of events in a batch before it is flushed.
+    #[configurable(validation(range(max = 100000)))]
     max_events: Option<u64>,
     /// The maximum number of bytes in a batch before it is flushed.
     max_bytes: Option<u64>,
@@ -122,6 +123,7 @@ pub struct SimpleSinkConfig {
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
     /// The tags to apply to each event.
+    #[configurable(validation(length(max = 32)))]
     tags: HashMap<String, String>,
     #[serde(skip)]
     meaningless_field: String,
@@ -152,6 +154,11 @@ pub struct AdvancedSinkConfig {
     /// The endpoint to send events to.
     #[serde(default = "default_advanced_sink_endpoint")]
     endpoint: String,
+    /// The agent version to simulate when sending events to the downstream service.
+    ///
+    /// Must match the pattern of "v\d+\.\d+\.\d+", which allows for values such as `v1.23.0` or `v0.1.3`, and so on.
+    #[configurable(validation(pattern = "foo"))]
+    agent_version: String,
     #[configurable(derived)]
     #[serde(default = "default_advanced_sink_batch")]
     batch: BatchConfig,
@@ -218,29 +225,6 @@ pub struct VectorConfig {
     sinks: Vec<SinkConfig>,
 }
 
-impl<'de> Configurable<'de> for SpecialDuration {
-    fn metadata() -> Metadata<'de, Self> {
-        Metadata::with_description("A period of time.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let merged_metadata = Self::metadata().merge(overrides);
-
-        // We generate the schema for the inner unnamed field, and then apply the metadata to it.
-        let inner_metadata = <u64 as Configurable<'de>>::metadata().merge(
-            merged_metadata
-                .clone()
-                .map_default_value(|default| default.0),
-        );
-
-        let mut inner_schema =
-            <u64 as Configurable<'de>>::generate_schema(gen, inner_metadata.clone());
-        finalize_schema(gen, &mut inner_schema, inner_metadata);
-
-        inner_schema
-    }
-}
-
 #[test]
 fn vector_config() {
     let root_schema = generate_root_schema::<VectorConfig>();
@@ -248,72 +232,4 @@ fn vector_config() {
         .expect("rendering root schema to JSON should not fail");
 
     println!("{}", json);
-}
-
-#[test]
-fn serde_enum_flexibility() {
-    #[derive(Serialize, Deserialize)]
-    struct MessagePackConfig {
-        mp: u32,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    struct ProtocolBuffersConfig {
-        pb: u32,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    //#[serde(tag = "t", content = "c")]
-    //#[serde(untagged)]
-    enum Encoding {
-        Text,
-        Woops,
-        Json { pretty: bool },
-        MessagePack(u64),
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Container {
-        encoding: Encoding,
-    }
-
-    let text_container = Container {
-        encoding: Encoding::Text,
-    };
-
-    let woops_container = Container {
-        encoding: Encoding::Woops,
-    };
-
-    let json_container = Container {
-        encoding: Encoding::Json { pretty: true },
-    };
-
-    let msgpack_container = Container {
-        encoding: Encoding::MessagePack(42),
-    };
-
-    let text_ser = serde_json::to_string_pretty(&text_container).unwrap();
-    println!("text ser: {}", text_ser);
-
-    let woops_ser = serde_json::to_string_pretty(&woops_container).unwrap();
-    println!("woops ser: {}", woops_ser);
-
-    let msgpack_ser = serde_json::to_string_pretty(&msgpack_container).unwrap();
-    println!("msgpack ser: {}", msgpack_ser);
-
-    let json_ser = serde_json::to_string_pretty(&json_container).unwrap();
-    println!("json ser: {}", json_ser);
-
-    let text_deser = serde_json::from_str::<'_, Container>(text_ser.as_str()).unwrap();
-    println!("text deser: {:?}", text_deser);
-
-    let woops_deser = serde_json::from_str::<'_, Container>(woops_ser.as_str()).unwrap();
-    println!("woops deser: {:?}", woops_deser);
-
-    let msgpack_deser = serde_json::from_str::<'_, Container>(msgpack_ser.as_str()).unwrap();
-    println!("msgpack deser: {:?}", msgpack_deser);
-
-    let json_deser = serde_json::from_str::<'_, Container>(json_ser.as_str()).unwrap();
-    println!("json deser: {:?}", json_deser);
 }

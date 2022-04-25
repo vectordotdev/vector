@@ -1,16 +1,18 @@
 use std::collections::BTreeSet;
 
 use indexmap::IndexMap;
+use num_traits::{Bounded, ToPrimitive};
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     schema::{
-        ArrayValidation, InstanceType, ObjectValidation, RootSchema, Schema, SchemaObject,
-        SingleOrVec, SubschemaValidation,
+        ArrayValidation, InstanceType, NumberValidation, ObjectValidation, RootSchema, Schema,
+        SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
 use serde_json::{Map, Value};
+use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
-use crate::{ArrayShape, Configurable, Metadata, NumberShape, StringShape};
+use crate::{Configurable, Metadata};
 
 /// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
 ///
@@ -61,6 +63,9 @@ pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de,
 where
     T: Configurable<'de>,
 {
+    // TODO: apply validations here depending on the instance type(s) in the schema, and figure out how to split, or if
+    // we need to split, whether we apply validations to the referencable type and/or the actual mutable schema ref
+
     // Figure out if we're applying metadata to a schema reference or the actual schema itself.
     // Some things only makes sense to add to the reference (like a default value to use), while
     // some things only make sense to add to the schema itself (like custom metadata, validation,
@@ -102,6 +107,11 @@ where
             .insert("_metadata".to_string(), Value::Object(custom_map));
     }
 
+    // Now apply any relevant validations.
+    for validation in metadata.validations() {
+        validation.apply(schema);
+    }
+
     schema.metadata = Some(Box::new(schema_metadata));
 }
 
@@ -119,25 +129,57 @@ pub fn generate_bool_schema() -> SchemaObject {
     }
 }
 
-pub fn generate_string_schema(shape: StringShape) -> SchemaObject {
+pub fn generate_string_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::String.into()),
-        string: Some(Box::new(shape.into())),
         ..Default::default()
     }
 }
 
-pub fn generate_number_schema(shape: NumberShape) -> SchemaObject {
+pub fn generate_number_schema<'de, N>() -> SchemaObject
+where
+    N: Configurable<'de> + Bounded + ToPrimitive,
+{
+    // Calculate the minimum/maximum for the given `N`, respecting the 2^53 limit we put on each of those values.
+    let (minimum, maximum) = {
+        let enforced_minimum = NUMERIC_ENFORCED_LOWER_BOUND;
+        let enforced_maximum = NUMERIC_ENFORCED_UPPER_BOUND;
+        let mechanical_minimum = N::min_value()
+            .to_f64()
+            .expect("`Configurable` does not support numbers larger than an f64 representation");
+        let mechanical_maximum = N::max_value()
+            .to_f64()
+            .expect("`Configurable` does not support numbers larger than an f64 representation");
+
+        let calculated_minimum = if mechanical_minimum < enforced_minimum {
+            enforced_minimum
+        } else {
+            mechanical_minimum
+        };
+
+        let calculated_maximum = if mechanical_maximum > enforced_maximum {
+            enforced_maximum
+        } else {
+            mechanical_maximum
+        };
+
+        (calculated_minimum, calculated_maximum)
+    };
+
+    // We always set the minimum/maximum bound to the mechanical limits
     SchemaObject {
         instance_type: Some(InstanceType::Number.into()),
-        number: Some(Box::new(shape.into())),
+        number: Some(Box::new(NumberValidation {
+            minimum: Some(minimum),
+            maximum: Some(maximum),
+            ..Default::default()
+        })),
         ..Default::default()
     }
 }
 
 pub fn generate_array_schema<'de, T>(
     gen: &mut SchemaGenerator,
-    shape: ArrayShape,
     metadata: Metadata<'de, T>,
 ) -> SchemaObject
 where
@@ -150,8 +192,6 @@ where
         instance_type: Some(InstanceType::Array.into()),
         array: Some(Box::new(ArrayValidation {
             items: Some(SingleOrVec::Single(Box::new(element_schema.into()))),
-            min_items: shape.minimum_length,
-            max_items: shape.maximum_length,
             ..Default::default()
         })),
         ..Default::default()
@@ -212,7 +252,20 @@ where
     // We do a little dance here to add an additional instance type of "null" to the schema to
     // signal it can be "X or null", achieving the functional behavior of "this is optional".
     match schema.instance_type.as_mut() {
-        None => panic!("undeclared instance types are not supported"),
+        // If this schema has no instance type, see if it's a reference schema.  If so, then we'd simply switch to
+        // generating a composite schema with this schema reference and a generic null schema.
+        None => match schema.is_ref() {
+            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referencable schema"),
+            true => {
+                let null = generate_null_schema();
+
+                // Drop the description from our generated schema if we're here, because it's going to exist on the
+                // outer field wrapping this schema, and it looks wonky to have it nested within the composite schema.
+                schema.metadata().description = None;
+
+                return generate_composite_schema(&[null, schema])
+            }
+        },
         Some(sov) => match sov {
             SingleOrVec::Single(ty) if **ty != InstanceType::Null => {
                 *sov = vec![**ty, InstanceType::Null].into()

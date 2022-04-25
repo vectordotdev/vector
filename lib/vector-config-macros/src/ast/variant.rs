@@ -1,11 +1,9 @@
-use darling::FromAttributes;
+use darling::{error::Accumulator, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
 
 use super::{
-    util::{
-        try_extract_doc_title_description, DarlingResultIterator,
-    },
+    util::{try_extract_doc_title_description, DarlingResultIterator},
     Field, Style, Tagging,
 };
 
@@ -27,19 +25,25 @@ impl<'a> Variant<'a> {
         let name = serde.attrs.name().deserialize_name();
         let style = serde.style.into();
 
-        Attributes::from_attributes(&original.attrs)
-            .and_then(|attrs| attrs.finalize(serde, &original.attrs))
-            .and_then(|attrs| serde.fields.iter()
-                .map(Field::from_ast)
-                .collect_darling_results()
-                .map(|fields| Variant {
-                    original,
-                    name,
-                    attrs,
-                    fields,
-                    style,
-                    tagging,
-                }))
+        let attrs = Attributes::from_attributes(&original.attrs)
+            .and_then(|attrs| attrs.finalize(serde, &original.attrs))?;
+
+        let mut accumulator = Accumulator::default();
+        let fields = serde
+            .fields
+            .iter()
+            .map(Field::from_ast)
+            .collect_darling_results(&mut accumulator);
+
+        let variant = Variant {
+            original,
+            name,
+            attrs,
+            fields,
+            style,
+            tagging,
+        };
+        accumulator.finish_with(variant)
     }
 
     pub fn style(&self) -> Style {
@@ -93,12 +97,17 @@ struct Attributes {
 }
 
 impl Attributes {
-    fn finalize(mut self, variant: &serde_ast::Variant<'_>, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
+    fn finalize(
+        mut self,
+        variant: &serde_ast::Variant<'_>,
+        forwarded_attrs: &[syn::Attribute],
+    ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !variant.attrs.skip_deserializing() || !variant.attrs.skip_serializing();
 
         // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs.iter()
+        self.deprecated = forwarded_attrs
+            .iter()
             .any(|a| a.path.is_ident("deprecated"));
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.

@@ -1,8 +1,6 @@
 use darling::error::Accumulator;
 use serde_derive_internals::{attr as serde_attr, Ctxt};
-use syn::{
-    Attribute, ExprPath, Lit, Meta, MetaNameValue,
-};
+use syn::{Attribute, ExprPath, Lit, Meta, MetaNameValue};
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
 
@@ -80,8 +78,7 @@ pub fn get_default_exprpath() -> ExprPath {
 }
 
 pub fn err_field_missing_description(field: &syn::Field) -> darling::Error {
-    darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION)
-        .with_span(field)
+    darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
 }
 
 pub fn get_serde_default_value(default: &serde_attr::Default) -> Option<ExprPath> {
@@ -93,28 +90,22 @@ pub fn get_serde_default_value(default: &serde_attr::Default) -> Option<ExprPath
 }
 
 pub fn err_serde_failed(context: Ctxt) -> darling::Error {
-    context.check()
+    context
+        .check()
         .map_err(|errs| darling::Error::multiple(errs.into_iter().map(Into::into).collect()))
         .expect_err("serde error context should not be empty")
 }
 
 pub trait DarlingResultIterator<I> {
-    fn collect_darling_results(self) -> Result<Vec<I>, darling::Error>;
+    fn collect_darling_results(self, accumulator: &mut Accumulator) -> Vec<I>;
 }
 
 impl<I, T> DarlingResultIterator<I> for T
 where
     T: Iterator<Item = Result<I, darling::Error>>,
 {
-    fn collect_darling_results(self) -> Result<Vec<I>, darling::Error> {
-        let (items, accumulator) = self.fold((Vec::new(), Accumulator::default()), |(mut items, mut accumulator), result| {
-            if let Some(item) = accumulator.handle(result) {
-                items.push(item);
-            }
-
-            (items, accumulator)
-        });
-
-        accumulator.finish_with(items)
+    fn collect_darling_results(self, accumulator: &mut Accumulator) -> Vec<I> {
+        self.filter_map(|result| accumulator.handle(result))
+            .collect()
     }
 }

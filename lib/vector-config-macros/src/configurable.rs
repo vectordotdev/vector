@@ -2,10 +2,9 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef};
+use vector_config_common::validation::Validation;
 
-use crate::{
-    ast::{Container, Data, Field, Style, Tagging, Variant},
-};
+use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
 
 pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Parse our input token stream as a derive input, and process the container, and the
@@ -18,7 +17,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             // angry enough to not parse the derive AST at all, so we just return the context errors
             // we have, which will say as much, because also, if it gave us `None`, it should have
             // registered an error in the context as well.
-            return e.write_errors().into()
+            return e.write_errors().into();
         }
     };
 
@@ -56,6 +55,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     let configurable_impl = quote! {
         const _: () = {
             #[automatically_derived]
+            #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable<#clt> for #name #ty_generics #where_clause {
                 fn referencable_name() -> Option<&'static str> {
                     Some(#ref_name)
@@ -314,6 +314,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_default_value = get_metadata_default_value(meta_ident, field.default_value());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
+    let maybe_validation = get_metadata_validation(meta_ident, field.validation());
 
     quote! {
         let mut #meta_ident = #field_as_configurable::metadata();
@@ -322,10 +323,14 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_default_value
         #maybe_deprecated
         #maybe_transparent
+        #maybe_validation
     }
 }
 
-fn generate_variant_metadata(meta_ident: &Ident, variant: &Variant<'_>) -> proc_macro2::TokenStream {
+fn generate_variant_metadata(
+    meta_ident: &Ident,
+    variant: &Variant<'_>,
+) -> proc_macro2::TokenStream {
     let variant_as_configurable = get_variant_type_as_configurable();
 
     let maybe_title = get_metadata_title(meta_ident, variant.title());
@@ -346,7 +351,6 @@ fn get_field_type_as_configurable(field: &Field<'_>) -> proc_macro2::TokenStream
     let field_ty = field.ty();
     quote! { <#field_ty as ::vector_config::Configurable<#clt>> }
 }
-
 
 fn get_variant_type_as_configurable() -> proc_macro2::TokenStream {
     let (clt, _) = get_configurable_lifetime();
@@ -411,6 +415,19 @@ fn get_metadata_transparent(
             #meta_ident.set_transparent();
         }
     })
+}
+
+fn get_metadata_validation(
+    meta_ident: &Ident,
+    validation: &[Validation],
+) -> proc_macro2::TokenStream {
+    let mapped_validation = validation
+        .iter()
+        .map(|v| quote! { #meta_ident.add_validation(#v); });
+
+    quote! {
+        #(#mapped_validation)*
+    }
 }
 
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {

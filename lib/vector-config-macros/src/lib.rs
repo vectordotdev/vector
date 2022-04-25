@@ -7,7 +7,7 @@ mod ast;
 mod configurable;
 mod configurable_component;
 
-/// Allows the given struct/enum to be used as a type within the Vector configuration. 
+/// Allows the given struct/enum to be used as a type within the Vector configuration.
 #[proc_macro_attribute]
 pub fn configurable_component(args: TokenStream, item: TokenStream) -> TokenStream {
     configurable_component::configurable_component_impl(args, item)

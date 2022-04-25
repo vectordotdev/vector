@@ -1,12 +1,10 @@
-use darling::{FromAttributes, util::Flag};
+use darling::{util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::{ExprPath, Ident};
+use vector_config_common::validation::Validation;
 
-use super::{
-    util::{
-        try_extract_doc_title_description, get_serde_default_value, err_field_missing_description,
-    },
-    validation::Validation,
+use super::util::{
+    err_field_missing_description, get_serde_default_value, try_extract_doc_title_description,
 };
 
 pub struct Field<'a> {
@@ -21,10 +19,15 @@ impl<'a> Field<'a> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name();
         let default_value = get_serde_default_value(serde.attrs.default());
-        
+
         Attributes::from_attributes(&original.attrs)
             .and_then(|attrs| attrs.finalize(serde, &original.attrs))
-            .map(|attrs| Field { original, name, default_value, attrs })
+            .map(|attrs| Field {
+                original,
+                name,
+                default_value,
+                attrs,
+            })
     }
 
     pub fn ident(&self) -> Option<&Ident> {
@@ -84,12 +87,17 @@ struct Attributes {
 }
 
 impl Attributes {
-    fn finalize(mut self, field: &serde_ast::Field<'_>, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
+    fn finalize(
+        mut self,
+        field: &serde_ast::Field<'_>,
+        forwarded_attrs: &[syn::Attribute],
+    ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
 
         // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs.iter()
+        self.deprecated = forwarded_attrs
+            .iter()
             .any(|a| a.path.is_ident("deprecated"));
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
@@ -113,7 +121,7 @@ impl Attributes {
             && !self.transparent.is_present()
             && self.visible
         {
-            return Err(err_field_missing_description(field.original))
+            return Err(err_field_missing_description(field.original));
         }
 
         Ok(self)

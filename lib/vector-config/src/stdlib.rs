@@ -7,7 +7,7 @@ use crate::{
         finalize_schema, generate_array_schema, generate_bool_schema, generate_map_schema,
         generate_number_schema, generate_optional_schema, generate_string_schema,
     },
-    ArrayShape, Configurable, Metadata, NumberShape, StringShape,
+    Configurable, Metadata,
 };
 
 // Unit type.
@@ -45,10 +45,7 @@ impl<'de> Configurable<'de> for bool {
 // Strings.
 impl<'de> Configurable<'de> for String {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // TODO: update shape based on provided metadata
-        let shape = StringShape::default();
-
-        let mut schema = generate_string_schema(shape);
+        let mut schema = generate_string_schema();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -60,10 +57,8 @@ macro_rules! impl_configuable_unsigned {
 		$(
 			impl<'de> Configurable<'de> for $ty {
 				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-					// TODO: update shape based on provided metadata
-					let shape = NumberShape::unsigned(u64::from(<$ty>::MAX));
-
-					let mut schema = generate_number_schema(shape);
+                    $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
+					let mut schema = generate_number_schema::<Self>();
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -77,10 +72,8 @@ macro_rules! impl_configuable_signed {
 		$(
 			impl<'de> Configurable<'de> for $ty {
 				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-					// TODO: update shape based on provided metadata
-					let shape = NumberShape::signed(i64::from(<$ty>::MIN), i64::from(<$ty>::MAX));
-
-					let mut schema = generate_number_schema(shape);
+                    $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
+					let mut schema = generate_number_schema::<Self>();
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -94,10 +87,8 @@ impl_configuable_signed!(i8, i16, i32, i64);
 
 impl<'de> Configurable<'de> for usize {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // TODO: update shape based on provided metadata
-        let shape = NumberShape::unsigned(u64::try_from(usize::MAX).unwrap_or(u64::MAX));
-
-        let mut schema = generate_number_schema(shape);
+        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
+        let mut schema = generate_number_schema::<Self>();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -105,13 +96,8 @@ impl<'de> Configurable<'de> for usize {
 
 impl<'de> Configurable<'de> for f64 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // TODO: update shape based on provided metadata
-        let shape = NumberShape::FloatingPoint {
-            minimum: f64::MIN,
-            maximum: f64::MAX,
-        };
-
-        let mut schema = generate_number_schema(shape);
+        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
+        let mut schema = generate_number_schema::<Self>();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -119,13 +105,8 @@ impl<'de> Configurable<'de> for f64 {
 
 impl<'de> Configurable<'de> for f32 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // TODO: update shape based on provided metadata
-        let shape = NumberShape::FloatingPoint {
-            minimum: f64::from(f32::MIN),
-            maximum: f64::from(f32::MAX),
-        };
-
-        let mut schema = generate_number_schema(shape);
+        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
+        let mut schema = generate_number_schema::<Self>();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -138,13 +119,7 @@ where
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
         let element_metadata = T::metadata();
-        // TODO: update shape based on provided metadata
-        let shape = ArrayShape {
-            minimum_length: None,
-            maximum_length: None,
-        };
-
-        let mut schema = generate_array_schema(gen, shape, element_metadata);
+        let mut schema = generate_array_schema(gen, element_metadata);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -192,9 +167,7 @@ impl<'de> Configurable<'de> for SocketAddr {
         // TODO: We don't need anything other than a string schema to (de)serialize a `SocketAddr`,
         // but we eventually should have validation since the format for the possible permutations
         // is well-known and can be easily codified.
-        let shape = StringShape::default();
-
-        let mut schema = generate_string_schema(shape);
+        let mut schema = generate_string_schema();
         finalize_schema(gen, &mut schema, overrides);
         schema
     }

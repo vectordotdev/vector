@@ -1,10 +1,11 @@
-use darling::{FromAttributes, error::Accumulator, FromMeta, util::path_to_string};
+use darling::{error::Accumulator, util::path_to_string, FromAttributes, FromMeta};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
 use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
 
 use super::{
     util::{
-        try_extract_doc_title_description, err_serde_failed, DarlingResultIterator, get_serde_default_value,
+        err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
+        DarlingResultIterator,
     },
     Data, Field, Style, Tagging, Variant,
 };
@@ -32,13 +33,14 @@ impl<'a> Container<'a> {
             Some(serde) => {
                 // This `serde_derive_internals` helper will panic if `check` isn't _always_ called, so we also have to
                 // call it on the success path.
-                let _ = context.check().expect("should not have errors if container was parsed successfully");
+                let _ = context
+                    .check()
+                    .expect("should not have errors if container was parsed successfully");
                 Ok(serde)
-            },
+            }
             None => Err(err_serde_failed(context)),
         }?;
 
-        
         // Once we have the `serde` side of things, we need to collect our own specific attributes for the container
         // and map things to our own `Container`.
         Attributes::from_attributes(&input.attrs)
@@ -52,9 +54,10 @@ impl<'a> Container<'a> {
 
                 let data = match serde.data {
                     serde_ast::Data::Enum(variants) => {
-                        let variants = variants.iter()
+                        let variants = variants
+                            .iter()
                             .map(|variant| Variant::from_ast(variant, tagging.clone()))
-                            .collect_darling_results()?;
+                            .collect_darling_results(&mut accumulator);
 
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
                         // Not all enum variant styles are compatible with the various tagging types that `serde`
@@ -62,19 +65,27 @@ impl<'a> Container<'a> {
                         for variant in &variants {
                             // We don't support tuple variants.
                             if variant.style() == Style::Tuple {
-                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_TUPLES).with_span(variant));
+                                accumulator.push(
+                                    darling::Error::custom(ERR_NO_ENUM_TUPLES).with_span(variant),
+                                );
                             }
 
                             // We don't support internal tag for newtype variants, because `serde` doesn't support it.
                             if variant.style() == Style::Newtype
                                 && matches!(variant.tagging(), Tagging::Internal { .. })
                             {
-                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG).with_span(variant));
+                                accumulator.push(
+                                    darling::Error::custom(ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG)
+                                        .with_span(variant),
+                                );
                             }
 
                             // All variants must have a description.  No derived/transparent mode.
                             if variant.description().is_none() {
-                                accumulator.push(darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION).with_span(variant));
+                                accumulator.push(
+                                    darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION)
+                                        .with_span(variant),
+                                );
                             }
                         }
 
@@ -83,7 +94,10 @@ impl<'a> Container<'a> {
                             for (i, variant) in variants.iter().enumerate() {
                                 for (k, other_variant) in variants.iter().enumerate() {
                                     if variant == other_variant && i != k {
-                                        accumulator.push(darling::Error::custom(ERR_ENUM_UNTAGGED_DUPLICATES).with_span(variant));
+                                        accumulator.push(
+                                            darling::Error::custom(ERR_ENUM_UNTAGGED_DUPLICATES)
+                                                .with_span(variant),
+                                        );
                                     }
                                 }
                             }
@@ -98,12 +112,17 @@ impl<'a> Container<'a> {
                             let fields = fields
                                 .iter()
                                 .map(Field::from_ast)
-                                .collect_darling_results()?;
+                                .collect_darling_results(&mut accumulator);
 
-                            Data::Struct(Style::Struct, fields)
+                            Data::Struct(style.into(), fields)
                         }
                         serde_ast::Style::Unit => {
-                            return Err(darling::Error::custom(ERR_NO_UNIT_STRUCTS).with_span(input))
+                            // This is a little ugly but we can't drop the accumulator without finishing it, otherwise
+                            // it will panic to let us know we didn't assert whether there were errors or not... so add
+                            // our error and just return a dummy value.
+                            accumulator
+                                .push(darling::Error::custom(ERR_NO_UNIT_STRUCTS).with_span(input));
+                            Data::Struct(Style::Unit, Vec::new())
                         }
                     },
                 };
@@ -157,7 +176,9 @@ impl<'a> Container<'a> {
     }
 
     pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
-        self.attrs.metadata.iter()
+        self.attrs
+            .metadata
+            .iter()
             .map(|metadata| &metadata.pairs)
             .flatten()
     }
@@ -171,13 +192,14 @@ struct Attributes {
     #[darling(skip)]
     deprecated: bool,
     #[darling(multiple)]
-    metadata: Vec<Metadata>
+    metadata: Vec<Metadata>,
 }
 
 impl Attributes {
     fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
         // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs.iter()
+        self.deprecated = forwarded_attrs
+            .iter()
             .any(|a| a.path.is_ident("deprecated"));
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
@@ -208,17 +230,18 @@ impl FromMeta for Metadata {
         errors = errors.checkpoint()?;
 
         // Can't be anything other than name/value pairs.
-        let pairs = items.iter()
+        let pairs = items
+            .iter()
             .filter_map(|nmeta| match nmeta {
                 NestedMeta::Meta(meta) => match meta {
                     syn::Meta::Path(_) => {
                         errors.push(darling::Error::unexpected_type("path").with_span(nmeta));
                         None
-                    },
+                    }
                     syn::Meta::List(_) => {
                         errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
                         None
-                    },
+                    }
                     syn::Meta::NameValue(nv) => match &nv.lit {
                         syn::Lit::Str(s) => Some((path_to_string(&nv.path), s.value())),
                         lit => {
@@ -226,11 +249,11 @@ impl FromMeta for Metadata {
                             None
                         }
                     },
-                }
+                },
                 NestedMeta::Lit(_) => {
                     errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
                     None
-                },
+                }
             })
             .collect::<Vec<(String, String)>>();
 
