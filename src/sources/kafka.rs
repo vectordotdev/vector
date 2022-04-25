@@ -25,8 +25,7 @@ use super::util::finalizer::OrderedFinalizer;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, Output, SourceConfig, SourceContext, SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
@@ -157,7 +156,7 @@ impl SourceConfig for KafkaSourceConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

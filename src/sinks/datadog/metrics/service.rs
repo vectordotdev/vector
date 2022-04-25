@@ -37,6 +37,12 @@ impl RetryLogic for DatadogMetricsRetryLogic {
         let status = response.status_code;
 
         match status {
+            // This retry logic will be expanded further, but specifically retrying unauthorized
+            // requests for now. I verified using `curl` that `403` is the respose code for this.
+            //
+            // https://github.com/vectordotdev/vector/issues/10870
+            // https://github.com/vectordotdev/vector/issues/12220
+            StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())

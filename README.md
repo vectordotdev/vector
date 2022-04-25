@@ -87,7 +87,7 @@ Vector**][docs.installation].
 ### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [calendar][urls.vector_calendar], [@vectordotdev][urls.vector_twitter]
-* [**Releases**][urls.vector_releases] - [latest][urls.vector_releases]
+* [**Releases**][urls.vector_releases]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releases][urls.vector_releases_policy], [Security][urls.vector_security_policy], [Versioning][urls.vector_versioning_policy]
 
@@ -219,7 +219,7 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
 [urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
-[urls.vector_releases]: https://vector.dev/releases/latest/
+[urls.vector_releases]: https://vector.dev/releases/
 [urls.vector_releases_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md
 [urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/vectordotdev/vector/security/policy

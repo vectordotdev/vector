@@ -46,6 +46,17 @@ impl SocketConfig {
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
+
+    fn output_type(&self) -> DataType {
+        match &self.mode {
+            Mode::Tcp(config) => config.decoding().output_type(),
+            Mode::Udp(config) => config.decoding().output_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(config) => config.decoding.output_type(),
+            #[cfg(unix)]
+            Mode::UnixStream(config) => config.decoding.output_type(),
+        }
+    }
 }
 
 impl From<tcp::TcpConfig> for SocketConfig {
@@ -186,7 +197,7 @@ impl SourceConfig for SocketConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

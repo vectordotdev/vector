@@ -1,7 +1,10 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind};
+use value::{
+    kind::{remove, Collection},
+    Kind,
+};
 
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
@@ -119,7 +122,7 @@ impl Expression for Query {
                 //
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
-                    return TypeDef::object(BTreeMap::default()).infallible();
+                    return TypeDef::object(Collection::any()).infallible();
                 }
 
                 match state.1.target() {
@@ -217,5 +220,30 @@ impl fmt::Debug for Target {
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state;
+
+    use super::*;
+
+    #[test]
+    fn test_type_def() {
+        let query = Query {
+            target: Target::External,
+            path: LookupBuf::root(),
+        };
+
+        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
+        let type_def = query.type_def(state);
+
+        assert!(type_def.is_infallible());
+        assert!(type_def.is_object());
+
+        let object = type_def.as_object().unwrap();
+
+        assert!(object.is_any());
     }
 }

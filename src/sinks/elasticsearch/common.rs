@@ -70,14 +70,17 @@ impl ElasticsearchCommon {
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let region = match &config.aws {
-            Some(region) => region.region(),
-            None => None,
-        };
-
         let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
-            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.credentials_provider().await?),
+            Some(ElasticsearchAuth::Aws(aws)) => {
+                let region = config
+                    .aws
+                    .as_ref()
+                    .map(|config| config.region())
+                    .ok_or(ParseError::RegionRequired)?;
+
+                Some(aws.credentials_provider(region).await?)
+            }
         };
 
         let compression = config.compression;
@@ -116,6 +119,8 @@ impl ElasticsearchCommon {
             metric_config.host_tag,
             metric_config.timezone.unwrap_or_default(),
         );
+
+        let region = config.aws.as_ref().map(|config| config.region());
 
         Ok(Self {
             http_auth,

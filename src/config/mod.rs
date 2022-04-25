@@ -11,7 +11,7 @@ use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
+pub use vector_core::transform::{TransformConfig, TransformContext};
 
 use crate::{conditions, event::Metric, serde::OneOrMany};
 
@@ -1105,16 +1105,16 @@ mod pipelines_tests {
                   inputs = ["in"]
                   type = "pipelines"
 
-                  [transforms.processing.logs.pipelines.foo]
+                  [[transforms.processing.logs]]
                     name = "foo"
 
-                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                    [[transforms.processing.logs.transforms]]
                       type = "pipelines"
 
-                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                      [[transforms.processing.logs.transforms.logs]]
                         name = "bar"
 
-                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                          [[transforms.processing.logs.transforms.logs.transforms]]
                             type = "filter"
                             condition = ""
 

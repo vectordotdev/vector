@@ -25,7 +25,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
-use vector_core::{event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -257,6 +257,18 @@ impl DeserializerConfig {
             DeserializerConfig::NativeJson => {
                 Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
             }
+        }
+    }
+
+    /// The data type of returned events
+    pub fn output_type(&self) -> DataType {
+        match self {
+            DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
+            DeserializerConfig::Json => JsonDeserializerConfig.output_type(),
+            #[cfg(feature = "syslog")]
+            DeserializerConfig::Syslog => SyslogDeserializerConfig.output_type(),
+            DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
+            DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
         }
     }
 
