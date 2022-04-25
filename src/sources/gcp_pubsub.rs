@@ -455,6 +455,10 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // I have verified manually that the streaming code above omits the
+    // acknowledgements when events are rejected, but have been unable
+    // to verify the events are not acknowledged through the emulator.
+    #[ignore]
     async fn does_not_ack_rejected() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
 
