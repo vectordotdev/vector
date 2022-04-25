@@ -1,13 +1,17 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind};
+use value::{
+    kind::{remove, Collection},
+    Kind,
+};
 
 use crate::{
     expression::{assignment, Container, FunctionCall, Resolved, Variable},
     parser::ast::Ident,
+    state::{ExternalEnv, LocalEnv},
     vm::{self, OpCode},
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, TypeDef, Value,
 };
 
 #[derive(Clone, PartialEq)]
@@ -51,8 +55,11 @@ impl Query {
         }
     }
 
-    pub fn delete_type_def(&self, state: &mut State) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = state.target().as_mut() {
+    pub fn delete_type_def(
+        &self,
+        external: &mut ExternalEnv,
+    ) -> Result<Option<Kind>, remove::Error> {
+        if let Some(ref mut target) = external.target().as_mut() {
             let value = target.value.clone();
             let mut type_def = target.type_def.clone();
 
@@ -63,7 +70,7 @@ impl Query {
                 },
             );
 
-            state.update_target(assignment::Details { type_def, value });
+            external.update_target(assignment::Details { type_def, value });
 
             return result;
         }
@@ -106,7 +113,7 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Target::*;
 
         match &self.target {
@@ -115,10 +122,10 @@ impl Expression for Query {
                 //
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
-                    return TypeDef::object(BTreeMap::default()).infallible();
+                    return TypeDef::object(Collection::any()).infallible();
                 }
 
-                match state.target() {
+                match state.1.target() {
                     None => TypeDef::any().infallible(),
                     Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
                 }
@@ -133,7 +140,7 @@ impl Expression for Query {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Write the target depending on what target we are trying to retrieve.
         let variable = match &self.target {
@@ -213,5 +220,30 @@ impl fmt::Debug for Target {
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state;
+
+    use super::*;
+
+    #[test]
+    fn test_type_def() {
+        let query = Query {
+            target: Target::External,
+            path: LookupBuf::root(),
+        };
+
+        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
+        let type_def = query.type_def(state);
+
+        assert!(type_def.is_infallible());
+        assert!(type_def.is_object());
+
+        let object = type_def.as_object().unwrap();
+
+        assert!(object.is_any());
     }
 }

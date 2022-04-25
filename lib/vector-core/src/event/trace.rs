@@ -1,3 +1,4 @@
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
@@ -51,6 +52,10 @@ impl TraceEvent {
 
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.0.get(key.as_ref())
+    }
+
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.0.lookup(path)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {

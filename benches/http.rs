@@ -9,7 +9,7 @@ use hyper::{
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,
-    sinks::util::{encoding::EncodingConfigAdapter, BatchConfig, Compression},
+    sinks::util::{encoding::EncodingConfigWithFramingAdapter, BatchConfig, Compression},
     sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
@@ -53,7 +53,7 @@ fn benchmark_http(c: &mut Criterion) {
                                 auth: Default::default(),
                                 headers: Default::default(),
                                 batch,
-                                encoding: EncodingConfigAdapter::legacy(
+                                encoding: EncodingConfigWithFramingAdapter::legacy(
                                     sinks::http::Encoding::Text.into(),
                                 ),
                                 request: Default::default(),

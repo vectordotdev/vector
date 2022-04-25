@@ -21,7 +21,7 @@ components: sinks: gcp_pubsub: {
 				common:       false
 				max_bytes:    10_000_000
 				max_events:   1000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -94,6 +94,7 @@ components: sinks: gcp_pubsub: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

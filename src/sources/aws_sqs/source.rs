@@ -1,4 +1,4 @@
-use std::{collections::HashMap, panic, str::FromStr};
+use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
     model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
@@ -10,15 +10,17 @@ use tokio::{pin, select, time::Duration};
 
 use crate::{
     codecs::Decoder,
-    event::{BatchNotifier, BatchStatus},
+    event::BatchNotifier,
     internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
-    sources::util,
+    sources::util::{self, finalizer::UnorderedFinalizer},
     SourceSender,
 };
 
 // This is the maximum SQS supports in a single batch request
 const MAX_BATCH_SIZE: i32 = 10;
+
+type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 #[derive(Clone)]
 pub struct SqsSource {
@@ -35,17 +37,26 @@ pub struct SqsSource {
 impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
+        let shutdown = shutdown.shared();
+        let finalizer = self.acknowledgements.then(|| {
+            let client = self.client.clone();
+            let queue_url = self.queue_url.clone();
+            Arc::new(Finalizer::new(shutdown.clone(), move |receipts_to_ack| {
+                delete_messages(client.clone(), receipts_to_ack, queue_url.clone())
+            }))
+        });
 
         for _ in 0..self.concurrency {
             let source = self.clone();
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
+            let finalizer = finalizer.clone();
             task_handles.push(tokio::spawn(async move {
                 pin!(shutdown);
                 loop {
                     select! {
                         _ = &mut shutdown => break,
-                        _ = source.run_once(&mut out, self.acknowledgements) => {},
+                        _ = source.run_once(&mut out, finalizer.clone()) => {},
                     }
                 }
             }));
@@ -63,7 +74,7 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut SourceSender, acknowledgements: bool) {
+    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<Arc<Finalizer>>) {
         let result = self
             .client
             .receive_message()
@@ -96,7 +107,9 @@ impl SqsSource {
 
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
             let mut events = Vec::with_capacity(messages.len());
-            let (batch, batch_receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
+
+            let (batch, batch_receiver) =
+                BatchNotifier::maybe_new_with_receiver(finalizer.is_some());
             for message in messages {
                 if let Some(body) = message.body {
                     // a receipt handle should always exist
@@ -120,17 +133,18 @@ impl SqsSource {
             match out.send_batch(events).await {
                 Ok(()) => {
                     if self.delete_message {
-                        if let Some(receiver) = batch_receiver {
-                            let client = self.client.clone();
-                            let queue_url = self.queue_url.clone();
-                            tokio::spawn(async move {
-                                let batch_status = receiver.await;
-                                if batch_status == BatchStatus::Delivered {
-                                    delete_messages(&client, &receipts_to_ack, &queue_url).await;
-                                }
-                            });
-                        } else {
-                            delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
+                        match batch_receiver {
+                            Some(receiver) => finalizer
+                                .expect("Finalizer must exist for the batch receiver to be created")
+                                .add(receipts_to_ack, receiver),
+                            None => {
+                                delete_messages(
+                                    self.client.clone(),
+                                    receipts_to_ack,
+                                    self.queue_url.clone(),
+                                )
+                                .await
+                            }
                         }
                     }
                 }
@@ -149,11 +163,11 @@ fn get_timestamp(
     })
 }
 
-async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &str) {
+async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: String) {
     if !receipts.is_empty() {
         let mut batch = client.delete_message_batch().queue_url(queue_url);
 
-        for (id, receipt) in receipts.iter().enumerate() {
+        for (id, receipt) in receipts.into_iter().enumerate() {
             batch = batch.entries(
                 DeleteMessageBatchRequestEntry::builder()
                     .id(id.to_string())

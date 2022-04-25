@@ -1,6 +1,5 @@
 use std::{
     collections::BTreeMap,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -48,7 +47,7 @@ pub struct CloudWatchMetricsDefaultBatchSettings;
 impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -160,7 +159,7 @@ impl CloudWatchMetricsSinkConfig {
     async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchClient> {
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            Some(Region::new("us-east-1"))
+            Region::new("us-east-1")
         } else {
             self.region.region()
         };
@@ -365,7 +364,7 @@ mod tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("local".to_owned()),
+            region: RegionOrEndpoint::with_region("local".to_owned()),
             ..Default::default()
         }
     }
@@ -511,7 +510,7 @@ mod integration_tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
+            region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
             ..Default::default()
         }
     }

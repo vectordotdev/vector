@@ -47,7 +47,7 @@ impl Function for Ceil {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -91,7 +91,7 @@ impl Expression for CeilFn {
         ceil(value, precision)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),

@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     str::FromStr,
     sync::{Mutex, MutexGuard},
 };
@@ -6,11 +7,14 @@ use std::{
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::broadcast::{self, Receiver, Sender};
-use tracing::{span::Span, subscriber::Interest, Id, Metadata, Subscriber};
-use tracing_core::span;
+use tracing::{span::Span, Subscriber};
 pub use tracing_futures::Instrument;
 use tracing_limit::RateLimitedLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{
+    layer::{Context, SubscriberExt},
+    util::SubscriberInitExt,
+    Layer,
+};
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
 use crate::event::LogEvent;
@@ -38,7 +42,9 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let metrics_layer = metrics_layer_enabled()
         .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
 
-    let subscriber = tracing_subscriber::registry().with(metrics_layer);
+    let subscriber = tracing_subscriber::registry()
+        .with(metrics_layer)
+        .with(BroadcastLayer::new().with_filter(fmt_filter.clone()));
 
     #[cfg(feature = "tokio-console")]
     let subscriber = {
@@ -58,7 +64,6 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let rate_limited = RateLimitedLayer::new(formatter);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let subscriber = BroadcastSubscriber { subscriber };
         let _ = subscriber.try_init();
     } else {
         let formatter = tracing_subscriber::fmt::layer()
@@ -71,7 +76,6 @@ pub fn init(color: bool, json: bool, levels: &str) {
         let rate_limited = RateLimitedLayer::new(formatter);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
-        let subscriber = BroadcastSubscriber { subscriber };
         let _ = subscriber.try_init();
     }
 }
@@ -112,79 +116,28 @@ pub fn subscribe() -> TraceSubscription {
     TraceSubscription { buffer, receiver }
 }
 
-struct BroadcastSubscriber<S> {
-    subscriber: S,
+struct BroadcastLayer<S> {
+    _subscriber: PhantomData<S>,
 }
 
-impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
-    #[inline]
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        self.subscriber.enabled(metadata)
+impl<S> BroadcastLayer<S> {
+    const fn new() -> Self {
+        BroadcastLayer {
+            _subscriber: PhantomData,
+        }
     }
+}
 
-    #[inline]
-    fn new_span(&self, span: &tracing::span::Attributes<'_>) -> Id {
-        self.subscriber.new_span(span)
-    }
-
-    #[inline]
-    fn record(&self, span: &Id, record: &tracing::span::Record<'_>) {
-        self.subscriber.record(span, record)
-    }
-
-    #[inline]
-    fn record_follows_from(&self, span: &Id, follows: &Id) {
-        self.subscriber.record_follows_from(span, follows)
-    }
-
-    #[inline]
-    fn event(&self, event: &tracing::Event<'_>) {
+impl<S> Layer<S> for BroadcastLayer<S>
+where
+    S: Subscriber + 'static,
+{
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         if let Some(buffer) = early_buffer().as_mut() {
             buffer.push(event.into());
         }
         if let Some(sender) = SENDER.get() {
-            let _ = sender.send(event.into()); // Ignore errors
+            let _ = sender.send(event.into());
         }
-        self.subscriber.event(event)
-    }
-
-    #[inline]
-    fn enter(&self, span: &Id) {
-        self.subscriber.enter(span)
-    }
-
-    #[inline]
-    fn exit(&self, span: &Id) {
-        self.subscriber.exit(span)
-    }
-
-    #[inline]
-    fn current_span(&self) -> span::Current {
-        self.subscriber.current_span()
-    }
-
-    #[inline]
-    fn clone_span(&self, id: &Id) -> Id {
-        self.subscriber.clone_span(id)
-    }
-
-    #[inline]
-    fn try_close(&self, id: Id) -> bool {
-        self.subscriber.try_close(id)
-    }
-
-    #[inline]
-    fn register_callsite(&self, meta: &'static Metadata<'static>) -> Interest {
-        self.subscriber.register_callsite(meta)
-    }
-
-    #[inline]
-    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
-        self.subscriber.max_level_hint()
-    }
-
-    #[inline]
-    unsafe fn downcast_raw(&self, id: std::any::TypeId) -> Option<*const ()> {
-        self.subscriber.downcast_raw(id)
     }
 }

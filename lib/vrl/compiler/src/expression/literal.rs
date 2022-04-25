@@ -4,11 +4,15 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
 use regex::Regex;
 use value::ValueRegex;
 
-use crate::{expression::Resolved, vm::OpCode, Context, Expression, Span, State, TypeDef, Value};
+use crate::{
+    expression::Resolved,
+    state::{ExternalEnv, LocalEnv},
+    vm::OpCode,
+    Context, Expression, Span, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -37,31 +41,6 @@ impl Literal {
     }
 }
 
-impl TryFrom<Node<ast::Literal>> for Literal {
-    type Error = Error;
-
-    fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
-        use ast::Literal::*;
-
-        let (span, lit) = node.take();
-
-        let literal = match lit {
-            String(v) => Literal::String(Bytes::from(v)),
-            Integer(v) => Literal::Integer(v),
-            Float(v) => Literal::Float(v),
-            Boolean(v) => Literal::Boolean(v),
-            Regex(v) => regex::Regex::new(&v)
-                .map_err(|err| (span, err))
-                .map(|r| Literal::Regex(r.into()))?,
-            // TODO: support more formats (similar to Vector's `Convert` logic)
-            Timestamp(v) => Literal::Timestamp(v.parse().map_err(|err| (span, err))?),
-            Null => Literal::Null,
-        };
-
-        Ok(literal)
-    }
-}
-
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(self.to_value())
@@ -71,7 +50,7 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Literal::*;
 
         let type_def = match self {
@@ -90,7 +69,7 @@ impl Expression for Literal {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        _state: &mut crate::state::Compiler,
+        _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Add the literal as a constant.
         let constant = vm.add_constant(self.to_value());

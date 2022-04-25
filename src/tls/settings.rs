@@ -57,6 +57,7 @@ impl TlsConfig {
 
 /// Standard TLS options
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
     pub verify_hostname: Option<bool>,

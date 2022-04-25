@@ -23,7 +23,7 @@ use crate::{
     gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
     internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{self},
+    sources::util,
     tls::{TlsOptions, TlsSettings},
 };
 

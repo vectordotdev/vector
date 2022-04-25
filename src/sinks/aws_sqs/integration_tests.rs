@@ -27,7 +27,7 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Some(Region::new("localstack")),
+        Region::new("localstack"),
         Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
         &proxy,
         &None,
@@ -48,7 +48,7 @@ async fn sqs_send_message_batch() {
 
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
-        region: RegionOrEndpoint::with_endpoint(sqs_address().as_str()),
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
         encoding: Encoding::Text.into(),
         message_group_id: None,
         message_deduplication_id: None,

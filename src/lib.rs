@@ -48,8 +48,6 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
-#[cfg(feature = "codecs")]
-#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;

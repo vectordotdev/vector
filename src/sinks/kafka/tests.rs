@@ -59,7 +59,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -111,7 +111,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -154,7 +154,7 @@ mod integration_test {
         crate::test_util::trace_init();
         let mut batch = BatchConfig::default();
         batch.max_events = Some(10);
-        batch.timeout_secs = Some(2);
+        batch.timeout_secs = Some(2.0);
 
         kafka_batch_options_overrides(batch, indexmap::indexmap! {}.into_iter().collect())
             .await
@@ -183,7 +183,7 @@ mod integration_test {
     async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
         crate::test_util::trace_init();
         let mut batch = BatchConfig::default();
-        batch.timeout_secs = Some(10);
+        batch.timeout_secs = Some(10.0);
 
         assert!(kafka_batch_options_overrides(
             batch,
@@ -257,7 +257,7 @@ mod integration_test {
             bootstrap_servers: server.clone(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),

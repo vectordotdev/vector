@@ -45,7 +45,7 @@ impl PathsProvider for K8sPathsProvider {
             // filter out pods where we haven't fetched the namespace metadata yet
             // they will be picked up on a later run
             .filter(|pod| {
-                trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod);
+                trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod.metadata.name);
                 if let Some(namespace) = pod.metadata.namespace.as_ref() {
                     self.namespace_state
                         .get(&ObjectRef::<Namespace>::new(namespace))
@@ -55,7 +55,7 @@ impl PathsProvider for K8sPathsProvider {
                 }
             })
             .flat_map(|pod| {
-                trace!(message = "Providing log paths for pod.", pod = ?pod);
+                trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
                 let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
                 exclude_paths(paths_iter, &self.exclude_paths).collect::<Vec<_>>()
             })

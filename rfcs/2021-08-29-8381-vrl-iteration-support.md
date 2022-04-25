@@ -15,14 +15,25 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 * [Pain](#pain)
 * [Proposal](#proposal)
   * [User Experience](#user-experience)
-    * [Example Use-Case](#example-use-case)
-    * [Object Iteration](#object-iteration)
-    * [Array Iteration](#array-iteration)
+    * [Recursion](#recursion)
+    * [Functions](#functions)
+      * [`map_keys`](#map_keys)
+        * [function signature](#function-signature)
+        * [details](#details)
+      * [`map_values`](#map_values)
+        * [function signature](#function-signature-1)
+        * [details](#details-1)
+      * [`for_each`](#for_each)
+        * [function signature](#function-signature-2)
+        * [details](#details-2)
+      * [why no `map` function exists](#why-no-map-function-exists)
+  * [Use Cases](#use-cases)
+  * [In-Depth Example](#in-depth-example)
+  * [Function Signature](#function-signature-3)
   * [Implementation](#implementation)
     * [Closure-support For Functions](#closure-support-for-functions)
     * [Lexical Scoping](#lexical-scoping)
-    * [Returning Two-Element Array](#returning-two-element-array)
-      * [Tuple Type](#tuple-type)
+    * [Closure Return Types Matter](#closure-return-types-matter)
     * [Parser Changes](#parser-changes)
     * [Compiler Changes](#compiler-changes)
     * [Function Trait](#function-trait)
@@ -45,7 +56,7 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ## Context
 
-* Magic `*_keys` and *_values` Remap functions [#5785][]
+* Magic `*_keys` and `*_values` Remap functions [#5785][]
 * feat(remap): add for-loop statement [#5875][]
 * Remap enumerating/looping RFC [#6031][]
 
@@ -73,10 +84,11 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 * Ability to iterate/map over objects and arrays.
 * Additional language constructs to support iteration.
+* Initial set of enumeration functions to solve requested use-cases.
 
 ### Out of scope
 
-* Specialized forms of iteration (reduce, filter, etc...).
+* Other specialized forms of iteration (reduce, filter, etc...).
 * Iterating any types other than objects or arrays.
 * Iteration control-flow (e.g. `break` or `return`)
 * Boundless iteration (e.g. `loop`).
@@ -90,28 +102,381 @@ One gap in the language right now is the possibility to _dynamically remap
 fields_. That is, an event might have fields that can't be known at
 compile-time, which you still want to manipulate.
 
-To do this, you have to be able to _iterate_ over key/value pairs of your
-object, and remap them individually. This requires some form of iteration
-support in the language.
+To do this, you have to be able to _iterate_ over the data of your object or
+array, and remap them individually. This requires some form of iteration support
+in the language.
 
 ## Proposal
 
 ### User Experience
 
-Operators gain access to a new `map` function that allows them to iterate over
-objects or arrays, and manipulate key/value pairs.
+Operators gain access to a set of new functions that allows them to iterate over
+objects or arrays, and manipulate data within the collections.
 
-The function takes a value, an optional "recursive" flag, and a closure to apply
-to each individual key/value pair in an object or index/value pair in an array.
+To start, we’ll introduce _3_ iteration functions:
 
-There is no unbounded `loop` iterator, to avoid accidental infinite loops in
-programs. Additionally, control-flow statements (e.g. `break` or `return`) to
-manipulate the iteration is not supported at this time (see "[future
-improvements](#future-improvements)"). Iteration always runs to completion.
+* `map_keys`
+* `map_values`
+* `for_each`
 
-#### Example Use-Case
+These functions are sufficient to resolve [all reported use-cases](#use-cases)
+users have for iteration in VRL.
 
-Let's take a look at this function in action:
+More functions can be added in the future (e.g. `any`, `filter`, `reduce`, etc),
+but having the generic `for_each` allows us to take our time adding specialized
+functions when sufficient demand requires it.
+
+How each function handles iteration depends on the implementation of the
+function, but in general, the functions take a closure, which gets resolved for
+each item within the iterated collection. For function-specific details, see the
+”[Functions](#functions)” chapter.
+
+Function closures are tied to the function-call, meaning you cannot pass around
+closures in variables. This prevents tail-call recursion, which in turn prevents
+unbounded iteration, preventing operators from writing valid programs that
+become invalid (e.g. never resolve to completion) at runtime.
+
+There is no unbounded `loop` iterator, similarly to avoid accidental infinite
+loops in programs. Additionally, control-flow statements (e.g. `break` or
+`return`) to manipulate the iteration is not supported at this time (see
+"[future improvements](#future-improvements)"). Iteration always runs to
+completion.
+
+#### Recursion
+
+Because VRL does not support defining custom functions, and because we do not
+support tail-call recursion, there is no way to use VRL’s syntax to do any
+direct or indirect recursion during iteration.
+
+However, as the [examples](#use-cases) section shows, there is a clear need for
+multi-level recursion when mapping observability data.
+
+To support this, each function implementation itself can allow for recursive
+behavior, either by default, or depending on function-call arguments.
+
+For the starting set of iteration functions, all function support recursion, by
+providing an optional `recursive: bool` function parameter. See the description
+of the individual [functions](#functions) for more details on this.
+
+#### Functions
+
+##### `map_keys`
+
+Map each individual key of an object to a different key.
+
+###### function signature
+
+```coffee
+map_keys(value: object, recursive: bool) -> |string| { string }
+```
+
+###### details
+
+The `map_keys` function allows you to iterate over an **object**, and change the
+keys within that object.
+
+It supports recursion by passing `true` for the `recursive` parameter. When
+recursion is enabled, it will return the key of the to-be-recursed collection
+first, and then any items within that collection. Note that arrays are recursed
+as well, to allow recursing ”through” arrays into objects within those arrays.
+This allows for mapping _all_ keys in an object, even if those keys are deeply
+nested within objects within array(s) within the top-level object.
+
+##### `map_values`
+
+Map each individual value of an object or array to a different value.
+
+###### function signature
+
+```coffee
+map_values(value: object|array, recursive: bool) -> |any| { any }
+```
+
+###### details
+
+The function works similarly to `map_keys`, except that it maps the values
+instead of keys, and thus can also be used to map values within arrays.
+
+Recursion behaves similarly to `map_keys` as well.
+
+##### `for_each`
+
+Iterate over objects or arrays, without mutating any data.
+
+###### function signature
+
+```coffee
+for_each(value: object|array, recursive: bool) -> |string OR integer, any| { any }
+```
+
+###### details
+
+This can be considered a ”trap door” iteration function that allows you to
+tackle any use-case not solved by any of the existing (or future) specialized
+iteration functions.
+
+The drawback of such a function is that it potentially requires more manual
+”set-up” code to get the end-result (e.g. initializing empty collections to
+populate during a `for_each` run, for example).
+
+As the name implies, this function does not mutate the given collection, and
+instead always returns `null`. It can be used to mutate data external to the
+closure, while iterating over the collection. In a sense, it’s the most
+general-purpose iteration function that allows you to manually write mapping,
+reducing, filtering or counting logic.
+
+##### why no `map` function exists
+
+Some might note that there’s no `map` function, only specialized `map_keys` and
+`map_values`.
+
+The reason for this omission is that `map` becomes complicated when dealing
+with recursion, and the closure signature differs when dealing with an object or
+array, requiring us to know at compile-time the exact type of the iteration
+target.
+
+In the end, all current requested use-cases by operators could be solved by one
+of the three proposed iteration functions, allowing us to skip the additional
+work of figuring out how `map` would work exactly, until there’s an actual need
+for such a function (if ever).
+
+### Use Cases
+
+What follows is a list of reported use-cases, and a valid program that uses
+iteration to solve that use-case. Note that there are multiple ways to solve
+individual use-cases, this list shows one available solution per use-case.
+
+1. [nullify empty strings](https://discord.com/channels/742820443487993987/746070591097798688/950750550583050321)
+
+   ```coffee
+   . = map_values(., recursive: true) -> |value| { if value == "" { null } else { value } }
+   ```
+
+2. [converting a single metric into multiple metrics](https://discord.com/channels/742820443487993987/746070591097798688/946148752073326623)
+
+   ```coffee
+   . = { "id": "booster", "timestamp": 123456, "data": { "acceleration": 10, "velocity": 20 } }
+
+   data = del(.data)
+   metrics = []
+   for_each(data) -> |key, value| {
+     metric = set(., [key], value)
+     metrics = push(metrics, metric)
+   }
+   ```
+
+3. [de-dot keys for Elasticsearch](https://discord.com/channels/742820443487993987/764187584452493323/940359777958121504)
+
+   ```coffee
+   . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+   ```
+
+4. delete a field from all objects in an array
+
+   ```coffee
+   . = {"answers":[{"class":"IN","ttl":"264"},{"class":"IN","ttl":"264"}],"other":"data"}
+   .answers = map_values(.answers) -> |value| { del(value.ttl); value }
+   ```
+
+5. [check property on variable-sized array of objects](https://discord.com/channels/742820443487993987/746070591097798688/921124714020220978)
+
+   ```coffee
+   array =  [{ "a": 2}, {"a": 3}]
+   any_two = false
+   for_each(array) -> |_index, value| { if value == 2 { any_two = true } }
+   ```
+
+   **NOTE** This is a good use-case for future `any` and `all` iteration
+   functions:
+
+   ```coffee
+   any_two = any(array) -> |_index, value| { value == 2 }
+   any_two = all(array) -> |_index, value| { value != 2 }
+   ```
+
+6. [call `parse_timestamp` on array of Cloudtrail records](https://discord.com/channels/742820443487993987/746070604192415834/919984998482870302)
+
+   ```coffee
+   . = [{ ... }, { ... }]
+   . = map_values(.) -> |value| {
+     value.timestamp = parse_timestamp(value.eventTime, "%Y-%m-%dT%H:%M:%SZ") ?? now()
+     value
+   }
+   ```
+
+7. [”unzip” object into separate key/value arrays](https://discord.com/channels/742820443487993987/746070591097798688/915227297697628190)
+
+   ```coffee
+   keys = []
+   values = []
+
+   for_each(.) -> |key, value| {
+     keys = push(keys, key)
+     values = push(values, value)
+   }
+   ```
+
+8. [add fields to objects in array](https://discord.com/channels/742820443487993987/764187584452493323/914082502149283872)
+
+   ```coffee
+   . = { "foo": "bar", "items": [{}, {}] }
+   .items = map_values(.items) -> |value| { value.foo = .foo; value }
+   ```
+
+9. ["zip" an array of objects with fields `key` and `value` into one object](https://discord.com/channels/742820443487993987/764187584452493323/905803048851505174)
+
+   ```coffee
+   data = [{ "key": "name", "value": "value" }, { "key": "key", "value": "otherValue" }]
+   for_each(data) -> |_index, value| {
+     . = set(., [value.key], value.value)
+   }
+   ```
+
+10. [trim a character from all keys](https://discord.com/channels/742820443487993987/746070591097798688/905799877492101121)
+
+   ```coffee
+   . = map_keys(., recursive: true) -> |key| { trim_start(key, "_") }
+   ```
+
+11. [add prefix to all keys](https://discord.com/channels/742820443487993987/764187584452493323/883274684576182302)
+
+   ```coffee
+   . = map_keys(., recursive: true) -> |key| { "my_" + key }
+   ```
+
+
+12. [parse message using list of Grok patterns until one matches](https://discord.com/channels/742820443487993987/764187584452493323/870353108692271104)
+
+   ```coffee
+   patterns = []
+   matched = false
+
+   for_each(patterns) -> |_index, pattern| {
+     if !matched && (parsed, err = parse_grok(.message, pattern); err == null) {
+       matched = true
+       . |= parsed
+     }
+   }
+   ```
+
+13. [find match against list of regular expressions](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
+
+   ```coffee
+   matched = false
+   for_each(patterns) -> |pattern| {
+     if !matched && match(.message, pattern) {
+       matched = true
+     }
+   }
+   ```
+
+   **NOTE** this would be less verbose (and slightly more performant) using
+   a future `any` function:
+
+   ```coffee
+   matched = any(patterns) -> |pattern| { match(.message, pattern) }
+   ```
+
+14. [remove prefix from keys](https://discord.com/channels/742820443487993987/764187584452493323/864496206947942400)
+
+   ```coffee
+   . = map_keys(. ,recursive: true) -> |key| { replace(key, "my_prefix_", "") }
+   ```
+
+15. [run `encode_json` on all top-level object fields](https://discord.com/channels/742820443487993987/746070591097798688/841787442271879209)
+
+   ```coffee
+   . = map_values(.) -> |value| {
+     if value.is_object() {
+       encode_json(value)
+     } else {
+       value
+     }
+   }
+   ```
+
+16. [map key/value pairs to object with ”key” and ”value” fields](https://discord.com/channels/742820443487993987/746070591097798688/832684085771370587)
+
+   ```coffee
+   . = { "labels": { "key1": "value1", "key2": "value2" } }
+   new_labels = []
+   for_each(.labels) -> |key, value| {
+     new_labels = push(new_labels, { "key": key, "value": value })
+   }
+
+   .labels = new_labels
+  ```
+
+  **NOTE** this is similar to [Jq’s `to_entries`
+  function](https://stedolan.github.io/jq/manual/#to_entries,from_entries,with_entries),
+  and could be worth a custom `map_to_array` function in VRL, in which each
+  individual key/value pair is mapped to an element in the new array:
+
+  ```coffee
+  . = map_to_array(.) -> |key, value| { { "key": key, "value": value } }
+  ```
+
+  or even just a specialized `to_entries`, without any iteration closure:
+
+  ```coffee
+  . = to_entries(.)
+  ```
+
+17. [run `parse_json` on multiple strings in array, and emit as multiple
+    events](https://discord.com/channels/742820443487993987/746070591097798688/832257215506415657)
+
+   ```coffee
+   . = { "message": "{\"name\": \"Chase\"}\n{\"name\": \"Sky\"}\n" }
+   strings = split(.message, "\n")
+   . = compact(map_values(strings) -> |value| { parse_json(value) ?? null })
+   ```
+
+
+18. [convert object to specific string format](https://discord.com/channels/742820443487993987/764187584452493323/824574475495407639)
+
+   ```coffee
+   . = { "key1": "value1", "key2": "value2" }
+   strings = []
+   for_each(.) -> |key, value| { strings = push(strings, key + "=" encode_json(value)) }
+
+   "{" + join(strings, ",") + "}"
+   ```
+
+   **NOTE** this too would be (slightly) simpler with `map_to_array`:
+
+   ```coffee
+   . = { "key1": "value1", "key2": "value2" }
+   strings = map_to_array(.) -> |key, value| { key + "=" encode_json(value) }
+
+   "{" + join(strings, ",") + "}"
+   ```
+
+19. [re-introduce previous `only_fields` functionality using iteration](https://github.com/vectordotdev/vector/issues/7347)
+
+
+   ```coffee
+   only_fields = ["some", "set", "of", "fields"]
+   for_each(.) -> |key, _| {
+     if !includes(only_fields, key) {
+       . = remove(., [key])
+     }
+   }
+   ```
+
+   **NOTE** this would be easier (and more performant) with a `filter` iteration
+   function:
+
+   ```coffee
+   only_fields = ["some", "set", "of", "fields"]
+   . = filter(.) -> |key, _| { includes(only_fields, key) }
+   ```
+
+### In-Depth Example
+
+To explain iteration, let’s look at a more in-depth scenario, including comments
+to explain what is happening, using the `map_values` function.
+
+We’ll start with the following data:
 
 ```json
 {
@@ -136,56 +501,65 @@ Let's take a look at this function in action:
 ```
 
 ```coffee
-# Once "schema support" lands, this can be removed.
+# Once Vector’s "schema support" is enabled, this can be removed.
 .tags = object(.tags) ?? {}
 .ips = array(.ips) ?? []
 
-# Recursively map all `.tags` to their new values.
+# Recursively map all `.tags` values to their new values.
 #
-# A copy of the object is returned, with the key/value changes applied.
-.tags = map(.tags, recursive: true) { |tag, value|
-    # `value` can be a boolean, or any other value. We enforce it to be
-    # a boolean.
-    value = bool!(value) ?? false
+# A copy of the object is returned, with the value changes applied.
+.tags = map_values(.tags, recursive: true) { |value|
+    # Recursively iterating values also maps over collection types (objects or
+    # arrays). In this case, we don’t want to mutate those.
+    if is_object(value) || is_array(value) {
+      value
+    } else {
+      # `value` can be a boolean, or any other value. We enforce it to be
+      # a boolean.
+      value = bool!(value) ?? false
 
-    # Manipulate the field string ("tag") if the value returns `true`.
-    if value {
-        tag = "__" + upcase(tag)
+      # Change the value to an object.
+      value = { "enabled": value }
+
+      # Mapping an object requires you to return any value at the end of the
+      # closure.
+      #
+      # This invariant will be checked at compile-time.
+      value
     }
-
-    # Mapping an object requires you to return a two-element array, the first
-    # being the string to which the key is set, the second the value of the
-    # record.
-    #
-    # This invariant will be checked at compile-time.
-    [tag, value]
 }
 
 # Map all IP addresses in `.ips`.
-.ips = map(.ips) { |index, ip|
+order = 0
+.ips = map_values(.ips) { |ip|
     # Enforce `ip` to be a string.
     ip = string(ip) ?? "unknown"
 
-    # Mapping an array requires you to return a single value to which the
-    # item-under-iteration will be mapped to.
-    {
+    value = {
       "address": ip,
-      "order": index,
+      "order": order,
       "private": starts_with(ip, "180.14"),
     }
+
+    # We can access and mutate outer-scope variables.
+    order = order + 1
+
+    # Mapping an array requires you to return a single value to which the
+    # item-under-iteration will be mapped to.
+    value
 }
 ```
 
 ```json
 {
     "tags": {
-        "__FOO": true,
-        "bar": false,
-        "baz": false,
-        "qux": false,
+        "foo": { "enabled": true },
+        "bar": { "enabled": false },
+        "baz": { "enabled": false },
+        "qux": { "enabled": false },
         "quux": {
-            "__ONE": true,
-            "two": false
+            "one": { "enabled": true },
+            "two": { "enabled": false }
         }
     },
     "ips": [
@@ -198,31 +572,32 @@ Let's take a look at this function in action:
 }
 ```
 
-#### Object Iteration
+### Function Signature
 
-Let's start by looking at the function signature when iterating over an object
-(the same function can be used for array iteration, which is explained down
-below, but to keep the signature simple at first, we'll start with objects):
+Each iteration function can define its own set of function parameters to accept,
+and the signature of the enumeration closure.
+
+As an example, let’s take a look at the `map_keys` function signature.
 
 ```coffee
-map(value: OBJECT, recursive: BOOLEAN) { |<key variable>, <value variable>| [EXPRESSION, EXPRESSION] } -> OBJECT
+map_keys(value: OBJECT, recursive: BOOLEAN) -> |<key variable>| { EXPRESSION } -> OBJECT
 ```
 
 Let's break this down:
 
-* The function name is `map`.
+* The function name is `map_keys`.
 * It takes two arguments, `value` and `recursive`.
   * `value` has to be of type `object`, which is the object to be iterated over.
   * `recursive` has to be of type `boolean`, determining whether to iterate over
-    nested objects (_not_ arrays). It defaults to `false`.
+    nested objects and arrays. It defaults to `false`.
 * A closure-like expression is expected as part of the function call, but after
   the closing `)`.
-  * This takes the form of `{ |...| expression }`.
-  * When iterating over an object, `|...|` has to represent two variables, one
-    for the key, and one for the value (f.e. `|key, value|`).
-  * The expression has to return a 2-element `array`
-  * the first element is the new `key` value, the second the `value` value
-* The function returns a new `object`, with the manipulated keys/values.
+  * This takes the form of `-> |...| { expression }`.
+  * The function can dictate the number and types of arguments in `|...|`.
+  * In this case, it’s a single argument, that is always of type `string`.
+  * The expression has to return a single `string` value, representing the new
+    key.
+* The function returns a new `object`, with the mutated keys.
 
 Here's a simplified example on how to use the function:
 
@@ -231,64 +606,24 @@ Here's a simplified example on how to use the function:
 ```
 
 ```coffee
-. = map(.) { |key, value|
-    key = upcase(key)
-    value = !value
-
-    [key, value]
-}
+. = map_keys(.) -> |key| { upcase(key) }
 ```
 
 ```json
 { "FOO": false, "BAR": true }
 ```
 
-As an example, the shortest form to write the above example in would be:
-
-```coffee
-. = map(.) { |k,v| [upcase(k), !v] }
-```
-
 The object under iteration is not mutated, instead a copy of the value is
 iterated, and mutated, returning a new object or array after iteration
 completes.
 
-#### Array Iteration
-
-The signature for array iteration is as follows:
-
-```coffee
-map(value: ARRAY, recursive: BOOLEAN) { |<index variable>, <value variable>| EXPRESSION } -> ARRAY
-```
-
-This is nearly identical to the object signature, except that it takes an array,
-has a variable for the index of the current item, and returns a single
-expression to use as the value at the given index. Additionally, the `recursive`
-flag only recurses into nested arrays, _not_ objects.
-
-Here's an example:
-
-```json
-["foo", "bar"]
-```
-
-```coffee
-. = map(.) { |index, value|
-    value + "_" + to_string!(index)
-}
-```
-
-```json
-["foo_0", "bar_1"]
-```
-
 ### Implementation
 
-This proposal favors adding a _mapping_ function over _for-loop syntax_. That
+This proposal favors adding a _iteration_ function over _for-loop syntax_. That
 is, the RFC proposes:
 
 ```coffee
-map(.) { |key, value| [upcase(key), value] }
+map_keys(.) -> |key| { key }
 ```
 
 over:
@@ -310,7 +645,7 @@ be implemented:
 * lexical scoping
 
 Let's discuss these one by one, before we arrive at the final part, implementing
-the `map` function that uses both concepts.
+the `map_keys` function that uses both concepts.
 
 [doc]: https://github.com/vectordotdev/vector/blob/jean/vrl-design-doc/lib/vrl/DESIGN.md
 
@@ -327,17 +662,13 @@ as a stand-alone argument to their function call.
 this:
 
 ```coffee
-map(.) { |k, v|
-  [k, v]
-}
+map(.) -> |k, v| { [k, v] }
 ```
 
 over this:
 
 ```coffee
-map(., { |k, v|
-  [k, v]
-})
+map(., |k, v| { [k, v] })
 ```
 
 This choice is made to make it clear that closures in VRL _can't be passed
@@ -347,7 +678,7 @@ call_.
 That is, we don't want to allow this:
 
 ```coffee
-my_closure = { |k, v| [k, v] }
+my_closure = |k, v| { [k, v] }
 map(., my_closure)
 ```
 
@@ -372,7 +703,7 @@ functions that explicitly expose their ability to take a closure with `x`
 arguments that returns `y` value.
 
 The return type of a closure is checked at compile-time, including the
-requirement in `map` for a two-element array.
+requirement in `map_string` for a string return type.
 
 The variable names used to access the provided closure values (e.g. `|key,
 value|`) are checked at compile-time to make sure you are actually using the
@@ -430,43 +761,24 @@ scoping, the compiler returns an "undefined variable" compilation error instead.
 This is a breaking change, but because it results in a compilation error, there
 will not be any unexpected runtime behavior for this case.
 
-There is one additional case that _will_ result in a change in runtime behavior:
-
-```coffee
-foo = "bar"
-
-{
-  foo = "baz"
-}
-
-foo
-```
-
-Previously, `foo` would be set to `"baz"`, while lexical scoping means `foo`
-outside the block will stay at `"bar"`. While we'll treat this as a breaking
-change, we consider this pattern unlikely to be present in production code, and
-so we accept this change in VRL.
-
 In terms of exact rules, the following applies to lexical scoping in VRL:
 
 * A VRL program has a single "root" scope, to which any unnested code belongs.
 * A new scope is created by using the block (`{ ... }`) expression.
 * Nested block expressions result in nested scopes.
-* Function-closures also create a new scope.
 * Any variable defined in a higher-level scope is accessible in nested scopes.
 * Any variable defined in a lower-level scope _cannot_ be accessed in parent
   scopes.
 * If a variable with the same identifier is overwritten in a lower-level scope,
-  higher-level scopes will keep access to the original value assigned to that
-  variable.
+  the value is mutated for the higher-level scope as well.
 
-#### Returning Two-Element Array
+#### Closure Return Types Matter
 
-We require the `map` function closure to return a two-element `array` type.
+The return type of a closure matters for the actual result of the function call.
 Without this requirement, mapping would work as follows:
 
 ```coffee
-map(.) { |key, _|
+map_keys(.) { |key|
   key = upcase(key)
 }
 ```
@@ -486,45 +798,19 @@ implement `break`, but either way, the program itself becomes less readable, and
 operators have to read the language documentation to understand the semantic
 differences between how code behaves _inside_ a function-closure and _outside_.
 
-Instead, the `map` function-closure is required to return a two-element array of
-`[key, value]`, which the function machinery then uses to update the actual
-values of the object record, e.g.:
+Instead, the `map_keys` function-closure is required to return a string-type
+value, which the function machinery then uses to update the actual values of the
+object record, e.g.:
 
 ```coffee
-map(.) { |key, value|
+map_keys(.) { |key|
   key = upcase(key)
 
-  # The array return-value clearly defines the eventual key and value values.
-  [key, value]
+  # The string return-value clearly defines the eventual key value. The `key`
+  # variable is no longer ”unused”.
+  key
 }
 ```
-
-##### Tuple Type
-
-Alternatively, we could introduce a new `tuple` type to define the return-type
-of the closure:
-
-```coffee
-map(.) { |key, value|
-  key = upcase(key)
-
-  (key, value)
-}
-```
-
-They would semantically be the same, given that VRL supports mixing value types
-in arrays, which is usually the difference between a tuple and an array, that,
-and the fact that a tuple is immutable, but an array doesn't have to be.
-
-Semantically, using a tuple makes more sense, but it does add an extra `Value`
-type, and it does mean we have to convert that tuple to a type supported by
-JSON, which will likely be an array, so the external JSON representation of
-tuples remains the same, regardless of whether we use arrays or tuples inside
-VRL itself.
-
-Since there isn't a clear benefit at this moment to using a tuple over
-a two-element array, the choice is made to forgo adding the tuple type at this
-moment.
 
 #### Parser Changes
 
@@ -750,7 +1036,7 @@ As shown above, the default trait implementation for this new method returns
 `None`, which means any function (the vast majority) that doesn't accept
 a closure can forgo implementing this method, and continue to work as normal.
 
-In the case of the `map` function, we'd implement it like so:
+In the case of the `for_each` function, we'd implement it like so:
 
 ```rust
 fn closure(&self) -> Option<closure::Definition> {
@@ -762,9 +1048,7 @@ fn closure(&self) -> Option<closure::Definition> {
         parameter: "value",
         kind: kind::Object,
         variables: vec![field, value],
-        output: closure::Output::Array {
-            elements: vec![kind::String, kind::Any],
-        }
+        output: closure::Output::Any,
     };
 
     let array = closure::Input {
@@ -780,32 +1064,29 @@ fn closure(&self) -> Option<closure::Definition> {
 }
 ```
 
-With the above in place, `map` can now iterate over both objects and arrays, and
-depending on which type is detected at compile-time, the closure attached to the
-function call can make guarantees about which type the first variable name will
-have.
+With the above in place, `for_each` can now iterate over both objects and
+arrays, and depending on which type is detected at compile-time, the closure
+attached to the function call can make guarantees about which type the first
+variable name will have.
 
 For example:
 
 ```coffee
 . = { "foo": true }
-. = map(.) { |key, value| [key, value] }
+. = for_each(.) -> |key, value| { ... }
 ```
 
 ```coffee
 . = ["foo", true]
-. = map(.) { |_index, value| value }
+. = for_each(.) -> |index, value| { ... }
 ```
 
-In the first example, because the compiler knows `map` receives an object as its
-first argument, it can guarantee that `key` will be a string, and `value` of
-"any" type. Additionally, it can show a compile-time error if the last
-expression in the block is not an array, with two elements, and the first
-element being of the string kind.
+In the first example, because the compiler knows `for_each` receives an object
+as its first argument, it can guarantee that `key` will be a string, and `value`
+of "any" type.
 
-The second example is similar, except that it accepts any return value, and
-guarantees that the first variable is a number (the index of the value in the
-array).
+The second example is similar, except that it guarantees that the first variable
+is a number (the index of the value in the array).
 
 Note that for the above to work, the compiler must know the _exact_ type
 provided to (in this case) the `value` function parameter. It can't be _either
@@ -814,9 +1095,9 @@ this by using `to_object`, etc.
 
 #### Expression Trait
 
-With all of this in place, the `map` function can compile its expression given
-the closure details, and run the closure multiple times to completion, doing something
-like this:
+With all of this in place, the `for_each` function can compile its expression
+given the closure details, and run the closure multiple times to completion,
+doing something like this:
 
 ```rust
 fn resolve(&self, ctx: &mut Context) -> Result<Value, Error> {
@@ -858,7 +1139,7 @@ fn resolve(&self, ctx: &mut Context) -> Result<Value, Error> {
 ```
 
 This should get us most of the way towards adding function-closure support to
-VRL, and using that support in the initial `map` function to do its work.
+VRL, and using that support in the initial `for_each` function to do its work.
 
 ## Rationale
 
@@ -964,23 +1245,16 @@ object if you can't use `.`, and goes against the rules as laid out in the
 
 ---
 
-* What other approaches have been considered and why did you not choose them?
-* How about not doing this at all?
-
 ## Outstanding Questions
 
-* Do we want to introduce any form of lexical-scoping in this RFC, or keep the
-  status-quo for now?
-* Do we want to introduce tuple-expressions or are we satisfied with using
-  a two-element array as the return value for `map`?
-* ...
+None.
 
 ## Plan Of Attack
 
 * [ ] Add lexical scoping to VRL
 * [ ] Add support for parsing function-closure syntax
 * [ ] Add support for compiling function-closure syntax
-* [ ] Add new `map` function
+* [ ] Add new `map_keys`, `map_values` and `for_each` functions
 * [ ] Document new functionality
 
 ## Future Improvements
@@ -993,10 +1267,10 @@ inside iterators.
 They are likely to be one of the first enhancements to this feature, though:
 
 ```coffee
-. = map(.) |key, value| {
-  # Return default key/value pairs if the value is an object.
+. = map_values(.) -> |value| {
+  # Return default value pairs if the value is an object.
   if is_object(value) {
-    return [key, value]
+    return value
   }
 
   # ...
@@ -1012,7 +1286,7 @@ For example, filtering:
 
 ```coffee
 # Return a new array with "180.14.129.174" removed.
-.ips = filter(.ips) |_index, ip| {
+.ips = filter(.ips) -> |_index, ip| {
     ip = string(ip) ?? "unknown"
 
     !starts_with(ip, "180.14")
@@ -1023,7 +1297,7 @@ Or ensuring all elements adhere to a condition:
 
 ```coffee
 # Add new `all_public` boolean field.
-.all_public = all(.ips) |_index, ip| {
+.all_public = all(.ips) -> |_index, ip| {
     ip = string(ip) ?? "unknown"
 
     !starts_with(ip, "180.14")
@@ -1033,15 +1307,32 @@ Or ensuring all elements adhere to a condition:
 Some additional suggestions include `flatten`, `partition`, `fold`, `any`,
 `find`, `max`, `min`, etc...
 
+Potential list of future functions
+
+* `flatten`
+* `partition`
+* `fold`
+* `any`
+* `all`
+* `find`
+* `max`
+* `min`
+* `replace_keys`
+* `to_entries`
+* `from_entries`
+* `map_to_array`
+* `zip`
+* `chain`
+
 ### Schema Support
 
-Once [schema support][] lands, writing iterators can become less verbose.
+Once [schema support][] is enabled, writing iterators can become less verbose.
 
 For example, this example from the RFC:
 
 ```coffee
 .ips = array(.ips) ?? []
-.ips = filter(.ips) |_index, ip| {
+.ips = filter(.ips) -> |_index, ip| {
     ip = string(ip) ?? "unknown"
 
     !starts_with(ip, "180.14")
@@ -1051,7 +1342,7 @@ For example, this example from the RFC:
 Can be written as follows, when applying the correct schema:
 
 ```coffee
-.ips = filter(.ips) |_, ip| !starts_with(ip, "180.14")
+.ips = filter(.ips) -> |_, ip| !starts_with(ip, "180.14")
 ```
 
 Because a type schema could guarantee the compiler that `.ips` is an array, with
@@ -1063,7 +1354,7 @@ Once the [pipeline operations][] land, we can further expand the above example
 as follows:
 
 ```coffee
-.private_and_public_ips = filter(.ip) |_, ip| is_ip(ip) |> partition() |_, ip| starts_with(ip, "180.14")
+.private_and_public_ips = filter(.ip) -> |_, ip| is_ip(ip) |> partition() -> |_, ip| starts_with(ip, "180.14")
 ```
 
 ### Dynamic Field Assignment Support
@@ -1076,7 +1367,7 @@ well:
 ```
 
 ```coffee
-for_each(.) |index, value| .[value] = index
+for_each(.) |index, value| ."{{value}}" = index
 ```
 
 ```json

@@ -1,4 +1,4 @@
-use super::prelude::{error_stage, error_type};
+use super::prelude::{error_stage, error_type, io_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -18,6 +18,11 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserError {
         );
         counter!(
             "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -62,26 +67,30 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsEncoderError {
-    pub error: std::io::Error,
+    pub error: codecs::encoding::Error,
 }
 
 impl InternalEvent for AwsCloudwatchLogsEncoderError {
     fn emit(self) {
+        let error_code = io_error_code(&std::io::ErrorKind::InvalidData.into());
         error!(
             message = "Error when encoding event.",
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
+            error_code = error_code,
             internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
+            "error_code" => error_code,
             "stage" => error_stage::PROCESSING,
         );
         counter!(
             "component_discarded_events_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
+            "error_code" => error_code,
             "stage" => error_stage::PROCESSING,
         );
     }

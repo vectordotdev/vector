@@ -30,7 +30,7 @@ pub(crate) enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
     Us,

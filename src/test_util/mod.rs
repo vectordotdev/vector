@@ -125,7 +125,7 @@ pub fn trace_init() {
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
@@ -133,8 +133,11 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
     lines: impl IntoIterator<Item = I>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
+
     let mut sink = FramedWrite::new(stream, encoder);
 
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
@@ -143,7 +146,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     let stream = sink.get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub async fn send_lines_tls(
@@ -151,8 +154,10 @@ pub async fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
     ca: impl Into<Option<&Path>>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
     if let Some(ca) = ca.into() {
@@ -178,7 +183,7 @@ pub async fn send_lines_tls(
     let stream = sink.get_mut().get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub fn temp_file() -> PathBuf {

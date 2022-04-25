@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use serde::{Deserialize, Serialize};
@@ -46,7 +44,7 @@ pub struct DatadogMetricsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(2) };
+    const TIMEOUT_SECS: f64 = 2.0;
 }
 
 #[derive(Debug, Snafu)]
@@ -149,10 +147,18 @@ impl SinkConfig for DatadogMetricsConfig {
 }
 
 impl DatadogMetricsConfig {
-    /// Creates a default [`DatadogMetricsConfig`] with the given API key.
-    pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
+    /// Creates a [`DatadogMetricsConfig`] with enterprise reporting settings.
+    pub fn enterprise<T: Into<String>>(
+        api_key: T,
+        endpoint: Option<String>,
+        site: Option<String>,
+        region: Option<Region>,
+    ) -> Self {
         Self {
             default_api_key: api_key.into(),
+            endpoint,
+            site,
+            region,
             ..Self::default()
         }
     }

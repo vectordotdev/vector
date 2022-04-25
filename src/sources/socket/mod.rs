@@ -3,8 +3,6 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
-use std::net::SocketAddr;
-
 use codecs::NewlineDelimitedDecoderConfig;
 use serde::{Deserialize, Serialize};
 
@@ -45,8 +43,19 @@ impl SocketConfig {
         tcp_config.into()
     }
 
-    pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
+    pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
+    }
+
+    fn output_type(&self) -> DataType {
+        match &self.mode {
+            Mode::Tcp(config) => config.decoding().output_type(),
+            Mode::Udp(config) => config.decoding().output_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(config) => config.decoding.output_type(),
+            #[cfg(unix)]
+            Mode::UnixStream(config) => config.decoding.output_type(),
+        }
     }
 }
 
@@ -126,6 +135,7 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
+                    config.port_key().clone(),
                     config.receive_buffer_bytes(),
                     decoder,
                     cx.shutdown,
@@ -142,8 +152,9 @@ impl SourceConfig for SocketConfig {
                     config.decoding.clone(),
                 )
                 .build();
-                Ok(unix::unix_datagram(
+                unix::unix_datagram(
                     config.path,
+                    config.socket_file_mode,
                     config
                         .max_length
                         .unwrap_or_else(crate::serde::default_max_length),
@@ -151,7 +162,7 @@ impl SourceConfig for SocketConfig {
                     decoder,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
@@ -173,19 +184,20 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix_stream(
+                unix::unix_stream(
                     config.path,
+                    config.socket_file_mode,
                     host_key,
                     decoder,
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
         }
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -220,7 +232,7 @@ mod test {
         thread,
     };
 
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
@@ -233,6 +245,7 @@ mod test {
     use {
         super::{unix::UnixConfig, Mode},
         futures::{SinkExt, Stream},
+        std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
             io::AsyncWriteExt,
@@ -278,12 +291,16 @@ mod test {
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
-        send_lines(addr, vec!["test".to_owned()].into_iter())
+        let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
             .await
             .unwrap();
 
         let event = rx.next().await.unwrap();
-        assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[log_schema().host_key()],
+            addr.ip().to_string().into()
+        );
+        assert_eq!(event.as_log()["port"], addr.port().into());
 
         SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
@@ -527,12 +544,27 @@ mod test {
         // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
         // it down, exercising the logic we have to ensure timely shutdown even under load:
         let message = random_string(512);
-        let message_bytes = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone());
 
-        let sink_cx = SinkContext::new_test();
-        let encoder = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::from_address(addr.to_string());
-        let (sink, _healthcheck) = sink_config.build(sink_cx, encoder).unwrap();
+        let cx = SinkContext::new_test();
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = codecs::encoding::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
+                Ok(())
+            }
+        }
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
+            bytes: message_bytes,
+        };
+        let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat(())
@@ -704,6 +736,7 @@ mod test {
             events[0].as_log()[log_schema().host_key()],
             from.ip().to_string().into()
         );
+        assert_eq!(events[0].as_log()["port"], from.port().into());
     }
 
     #[tokio::test]
@@ -864,6 +897,19 @@ mod test {
         .unwrap()
     }
 
+    #[cfg(unix)]
+    fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
+        toml::from_str::<SocketConfig>(&format!(
+            r#"
+               mode = "{}"
+               path = "/does/not/exist"
+               socket_file_mode = 0o777
+            "#,
+            mode
+        ))
+        .unwrap()
+    }
+
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
@@ -921,6 +967,33 @@ mod test {
     fn parses_unix_datagram_config() {
         let config = parses_unix_config("unix_datagram");
         assert!(matches!(config.mode, Mode::UnixDatagram { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_unix_datagram_perms() {
+        let config = parses_unix_config_file_mode("unix_datagram");
+        assert!(matches!(config.mode, Mode::UnixDatagram { .. }));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_permissions() {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let (tx, _) = SourceSender::new_test();
+
+        let mut config = UnixConfig::new(in_path.clone());
+        config.socket_file_mode = Some(0o555);
+        let mode = Mode::UnixDatagram(config);
+        let server = SocketConfig { mode }
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        let meta = std::fs::metadata(in_path).unwrap();
+        // S_IFSOCK   0140000   socket
+        assert_eq!(0o140555, meta.permissions().mode());
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -988,8 +1061,35 @@ mod test {
 
     #[cfg(unix)]
     #[test]
+    fn parses_new_unix_datagram_perms() {
+        let config = parses_unix_config_file_mode("unix_stream");
+        assert!(matches!(config.mode, Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn parses_old_unix_stream_config() {
         let config = parses_unix_config("unix");
         assert!(matches!(config.mode, Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_permissions() {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let (tx, _) = SourceSender::new_test();
+
+        let mut config = UnixConfig::new(in_path.clone());
+        config.socket_file_mode = Some(0o421);
+        let mode = Mode::UnixStream(config);
+        let server = SocketConfig { mode }
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        let meta = std::fs::metadata(in_path).unwrap();
+        // S_IFSOCK   0140000   socket
+        assert_eq!(0o140421, meta.permissions().mode());
     }
 }
