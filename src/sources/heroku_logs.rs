@@ -19,8 +19,8 @@ use warp::http::{HeaderMap, StatusCode};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -108,7 +108,7 @@ impl SourceConfig for LogplexConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
