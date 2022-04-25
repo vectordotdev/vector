@@ -113,8 +113,7 @@ curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO
      --output "$TEMP/$PROTOC_ZIP"
 unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
 mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
-ldd /usr/bin/protoc
-protoc --version
+echo "PROTOC=/usr/bin/protoc" >> "$GITHUB_ENV"
 
 # Apt cleanup
 apt clean
