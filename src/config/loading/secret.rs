@@ -55,7 +55,7 @@ impl SecretBackendLoader {
                     debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
                     match backend.retrieve(keys.to_vec(), signal_rx) {
                         Err(e) => {
-                            vec![Err(format!("Error while retrieving secret from backend \"{}\": {}", backend_name, e))]
+                            vec![Err(format!("Error while retrieving secret from backend \"{}\": {}.", backend_name, e))]
                         },
                         Ok(s) => {
                             s.into_iter().map(|(k, v)| {
@@ -186,7 +186,6 @@ impl SecretBackend for ExecBackend {
                     tokio::select! {
                         biased;
                         Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
-                            warn!("signal");
                             break Err("Secret retrieval was interrupted.".into());
                         }
                         output = query_backend(&self.command, new_query(secret_keys.clone())) => break output,
