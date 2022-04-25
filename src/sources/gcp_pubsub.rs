@@ -201,20 +201,27 @@ impl PubsubSource {
         }
         let channel = channel.connect().await.context(ConnectSnafu)?;
 
-        let mut stream = proto::subscriber_client::SubscriberClient::with_interceptor(
+        let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             channel,
             |mut req: Request<()>| {
-                if let Some(authorization) = self.authorization.as_ref() {
+                if let Some(authorization) = &self.authorization {
                     req.metadata_mut()
                         .insert("authorization", authorization.clone());
                 }
                 Ok(req)
             },
-        )
-        .streaming_pull(self.request_stream())
-        .await
-        .context(PullSnafu)?
-        .into_inner();
+        );
+
+        // Handle shutdown during startup, the streaming pull doesn't
+        // start if there is no data in the subscription.
+        let stream = tokio::select! {
+            _ = &mut self.cx.shutdown.clone() => return Ok(()),
+            result = client.streaming_pull(self.request_stream()) => match result {
+                    Err(source) => return Err(PubsubError::Pull { source }.into()),
+                    Ok(stream) => stream,
+                }
+        };
+        let mut stream = stream.into_inner();
 
         loop {
             tokio::select! {
@@ -382,19 +389,19 @@ mod integration_tests {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
         let test_data = tester.send_test_events(99, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
-        tester.shutdown(shutdown).await;
+        tester.shutdown_check(shutdown).await;
     }
 
     #[tokio::test]
     async fn shuts_down0() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-        tester.shutdown(shutdown).await;
+        tester.shutdown(shutdown).await; // Not shutdown_check because this emits nothing
 
         assert!(rx.next().await.is_none());
         tester.send_test_events(1, btreemap![]).await;
         assert!(rx.next().await.is_none());
-        tester.pull_count(1).await;
+        assert_eq!(tester.pull_count(1).await, 1);
     }
 
     #[tokio::test]
@@ -404,12 +411,11 @@ mod integration_tests {
         let test_data = tester.send_test_events(1, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
 
-        tester.shutdown(shutdown).await;
+        tester.shutdown_check(shutdown).await;
 
         assert!(rx.next().await.is_none());
         tester.send_test_events(1, btreemap![]).await;
         assert!(rx.next().await.is_none());
-        tester.pull_count(1).await;
     }
 
     #[tokio::test]
@@ -419,7 +425,7 @@ mod integration_tests {
             let test_data = tester.send_test_events(9, btreemap![]).await;
             receive_events(&mut rx, test_data).await;
         }
-        tester.shutdown(shutdown).await;
+        tester.shutdown_check(shutdown).await;
     }
 
     #[tokio::test]
@@ -432,7 +438,7 @@ mod integration_tests {
         ];
         let test_data = tester.send_test_events(1, attributes).await;
         receive_events(&mut rx, test_data).await;
-        tester.shutdown(shutdown).await;
+        tester.shutdown_check(shutdown).await;
     }
 
     #[tokio::test]
@@ -442,7 +448,7 @@ mod integration_tests {
         let test_data = tester.send_test_events(1, btreemap![]).await;
         receive_events(&mut rx, test_data).await;
 
-        tester.shutdown(shutdown).await;
+        tester.shutdown_check(shutdown).await;
 
         // Make sure there are no messages left in the queue
         assert_eq!(tester.pull_count(10).await, 0);
@@ -612,11 +618,15 @@ mod integration_tests {
             serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
         }
 
+        async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {
+            self.shutdown(shutdown).await;
+            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
+        }
+
         async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
             let deadline = Instant::now() + Duration::from_secs(1);
             let shutdown = shutdown.shutdown_source(&self.component, deadline);
             assert!(shutdown.await);
-            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
         }
     }
 
