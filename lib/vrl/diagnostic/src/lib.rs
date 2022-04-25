@@ -18,7 +18,7 @@ const VRL_FUNCS_ROOT_URL: &str = "https://functions.vrl.dev";
 
 /// A trait that can be implemented by error types to provide diagnostic
 /// information about the given error.
-pub trait DiagnosticError: std::error::Error {
+pub trait DiagnosticMessage: std::error::Error {
     fn code(&self) -> usize;
 
     /// The subject message of the error.

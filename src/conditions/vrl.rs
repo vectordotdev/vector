@@ -128,7 +128,7 @@ impl Conditional for Vrl {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -139,7 +139,7 @@ impl Conditional for Vrl {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -207,7 +207,7 @@ impl Conditional for VrlVm {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -218,7 +218,7 @@ impl Conditional for VrlVm {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()

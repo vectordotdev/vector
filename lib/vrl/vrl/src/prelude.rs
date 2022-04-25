@@ -29,7 +29,7 @@ pub use compiler::{
     bench_function, expr, expression::FunctionArgument, func_args, map, test_function,
     test_type_def, type_def, value, vm::VmArgumentList,
 };
-pub use diagnostic::DiagnosticError;
+pub use diagnostic::DiagnosticMessage;
 pub use indoc::indoc;
 pub use ordered_float::NotNan;
 

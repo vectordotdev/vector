@@ -1,4 +1,4 @@
-use diagnostic::DiagnosticError;
+use diagnostic::DiagnosticMessage;
 
 use crate::{
     expression::{Expr, FunctionArgument},
@@ -122,7 +122,7 @@ impl<'a> VmArgumentList<'a> {
 
 /// Keeps clippy happy.
 type CompiledArguments =
-    Result<BTreeMap<&'static str, Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticError>>;
+    Result<BTreeMap<&'static str, Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
 /// Compiles the function arguments with the given argument list.
 /// This is used by the stdlib unit tests.

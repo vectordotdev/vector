@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use diagnostic::DiagnosticError;
+use diagnostic::DiagnosticMessage;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
 
@@ -10,11 +10,11 @@ use crate::{
     Function, Program, Value,
 };
 
-pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
+pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
 
 pub(crate) struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
-    errors: Errors,
+    errors: Diagnostics,
     fallible: bool,
     abortable: bool,
     local: LocalEnv,
@@ -44,7 +44,7 @@ impl<'a> Compiler<'a> {
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<Program, Errors> {
+    ) -> Result<Program, Diagnostics> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()

@@ -30,7 +30,7 @@ use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
-pub type Result<T = Program> = std::result::Result<T, compiler::Errors>;
+pub type Result<T = Program> = std::result::Result<T, compiler::Diagnostics>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]

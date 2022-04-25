@@ -12,7 +12,7 @@ use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
-    prelude::{DiagnosticError, ExpressionError},
+    prelude::{DiagnosticMessage, ExpressionError},
     Program, Runtime, Terminate, Vm, VrlRuntime,
 };
 
