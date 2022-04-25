@@ -12,7 +12,7 @@ use crate::{
         SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub mod errors;
@@ -24,7 +24,7 @@ mod models;
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,

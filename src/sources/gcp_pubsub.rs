@@ -24,7 +24,7 @@ use crate::{
     internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
@@ -98,7 +98,7 @@ pub struct PubsubConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(default = "default_ack_deadline")]
     pub ack_deadline_seconds: i32,

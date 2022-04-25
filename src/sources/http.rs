@@ -23,7 +23,7 @@ use crate::{
     sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -35,7 +35,7 @@ pub(super) struct SimpleHttpConfig {
     headers: Vec<String>,
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,

@@ -41,7 +41,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const NAME: &str = "gcp_cloud_storage";
@@ -66,7 +66,7 @@ pub struct GcsSinkConfig {
     request: TowerRequestConfig,
     #[serde(flatten)]
     auth: GcpAuthConfig,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

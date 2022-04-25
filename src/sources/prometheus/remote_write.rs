@@ -19,7 +19,7 @@ use crate::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
@@ -28,7 +28,7 @@ const SOURCE_NAME: &str = "prometheus_remote_write";
 struct PrometheusRemoteWriteConfig {
     address: SocketAddr,
 
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
 
@@ -152,10 +152,10 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_over_https() {
-        receives_metrics(Some(TlsConfig::test_config())).await;
+        receives_metrics(Some(TlsEnableableConfig::test_config())).await;
     }
 
-    async fn receives_metrics(tls: Option<TlsConfig>) {
+    async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
         components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);

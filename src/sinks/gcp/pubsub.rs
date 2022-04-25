@@ -20,7 +20,7 @@ use crate::{
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -62,7 +62,7 @@ pub struct PubsubConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,

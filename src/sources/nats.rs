@@ -15,7 +15,7 @@ use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
     SourceSender,
 };
 
@@ -38,7 +38,7 @@ struct NatsSourceConfig {
     connection_name: String,
     subject: String,
     queue: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -203,7 +203,7 @@ mod integration_tests {
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::test_util::{collect_n, random_string};
-    use crate::tls::TlsOptions;
+    use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
         let subject = conf.subject.clone();
@@ -422,9 +422,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -474,9 +474,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     crt_file: Some("tests/data/nats_client_cert.pem".into()),
                     key_file: Some("tests/data/nats_client_key.pem".into()),
@@ -505,9 +505,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -534,9 +534,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -567,9 +567,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },

@@ -26,7 +26,7 @@ use crate::{
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -34,7 +34,7 @@ pub(crate) struct LogplexConfig {
     address: SocketAddr,
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,

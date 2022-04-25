@@ -82,7 +82,7 @@ pub fn compile_for_repl(
     fns: &[Box<dyn Function>],
     local: state::LocalEnv,
     external: &mut ExternalEnv,
-) -> Result<(Program, state::LocalEnv)> {
+) -> Result<Program> {
     compiler::Compiler::new_with_local_state(fns, local).compile(ast, external)
 }
 
@@ -98,9 +98,7 @@ pub fn compile_with_state(
     fns: &[Box<dyn Function>],
     state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns)
-        .compile(ast, state)
-        .map(|(program, _)| program)
+    compiler::Compiler::new(fns).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.
