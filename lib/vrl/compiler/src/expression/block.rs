@@ -66,6 +66,24 @@ impl Expression for Block {
         type_def.with_fallibility(fallible)
     }
 
+    fn as_value(&self) -> Option<Value> {
+        let mut values = self
+            .inner
+            .iter()
+            .map(Expression::as_value)
+            .collect::<Vec<Option<_>>>();
+
+        // Even though we only care about the last expression in the block, we
+        // still want to make sure *all* expressions in the block are constant
+        // values, to avoid other parts of the compiler assuming the block can
+        // be optimized away, causing expressions with potential side-effects
+        // from being ignored at runtime.
+        match values.contains(&None) {
+            true => None,
+            false => values.pop().flatten(),
+        }
+    }
+
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,

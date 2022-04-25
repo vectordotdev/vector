@@ -1,5 +1,6 @@
+# object: { "true" : true }
 # result: "yes"
 
-if true == true {
+if .true == true {
     "yes"
 }

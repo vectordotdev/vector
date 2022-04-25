@@ -19,6 +19,10 @@ impl Expression for Noop {
         TypeDef::null().infallible()
     }
 
+    fn as_value(&self) -> Option<Value> {
+        Some(Value::Null)
+    }
+
     fn compile_to_vm(
         &self,
         vm: &mut Vm,

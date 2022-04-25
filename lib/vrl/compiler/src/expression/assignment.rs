@@ -156,6 +156,13 @@ impl Expression for Assignment {
         self.variant.type_def(state)
     }
 
+    fn as_value(&self) -> Option<Value> {
+        match &self.variant {
+            Variant::Single { expr, .. } => expr.as_value(),
+            Variant::Infallible { expr, .. } => expr.as_value(),
+        }
+    }
+
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,

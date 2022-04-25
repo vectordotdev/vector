@@ -1,6 +1,7 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
+use value::Value;
 
 use crate::value::VrlValueConvert;
 use crate::{
@@ -53,6 +54,13 @@ impl Expression for Not {
         let fallible = self.inner.type_def(state).is_fallible();
 
         TypeDef::boolean().with_fallibility(fallible)
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        self.inner.as_value().and_then(|value| match value {
+            Value::Boolean(bool) => Some((!bool).into()),
+            _ => None,
+        })
     }
 
     fn compile_to_vm(

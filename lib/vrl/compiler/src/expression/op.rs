@@ -86,15 +86,10 @@ impl Op {
             opcode: ast::Opcode::Eq,
         }
     }
-}
 
-impl Expression for Op {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve_values(&self, lhs: Resolved, mut rhs: impl FnMut() -> Resolved) -> Resolved {
         use ast::Opcode::*;
         use Value::*;
-
-        let lhs = self.lhs.resolve(ctx);
-        let mut rhs = || self.rhs.resolve(ctx);
 
         match self.opcode {
             Mul => lhs?.try_mul(rhs()?),
@@ -117,6 +112,21 @@ impl Expression for Op {
             Merge => lhs?.try_merge(rhs()?),
         }
         .map_err(Into::into)
+    }
+}
+
+impl Expression for Op {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let lhs = self.lhs.resolve(ctx);
+        let rhs = || self.rhs.resolve(ctx);
+
+        self.resolve_values(lhs, rhs)
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        let (lhs, rhs) = self.lhs.as_value().zip(self.rhs.as_value())?;
+
+        self.resolve_values(Ok(lhs), || Ok(rhs.clone())).ok()
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

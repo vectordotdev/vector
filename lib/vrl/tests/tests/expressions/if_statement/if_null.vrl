@@ -1,5 +1,0 @@
-# result: null
-
-if null == true {
-    "yes"
-}
