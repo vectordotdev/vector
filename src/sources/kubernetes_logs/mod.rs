@@ -417,6 +417,7 @@ impl Source {
                 file: &line.filename,
                 byte_size: event.size_of(),
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
+                pod_namespace: file_info.as_ref().map(|info| info.pod_namespace),
             });
 
             if file_info.is_none() {
