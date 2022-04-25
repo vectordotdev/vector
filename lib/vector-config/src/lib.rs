@@ -22,7 +22,7 @@
 // TODO: Is there a way that we could attempt to brute force detect the types of fields being used with a validation to
 // give a compile-time error when validators are used incorrectly? For example, we throw a runtime error if you use a
 // negative `min` range bound on an unsigned integer field, but it's a bit opaque and hard to decipher.  Could we simply
-// briute force match the qualified path field to see if there's any known unsigned integer type in it -- i.e. `u8`,
+// brute force match the qualified path field to see if there's any known unsigned integer type in it -- i.e. `u8`,
 // `u64`, etc -- and then throw a compile-error from the macro? We would still end up throwing an error at runtime if
 // our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error closer to the
 // problem, which would be much better.
