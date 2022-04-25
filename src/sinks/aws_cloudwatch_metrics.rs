@@ -33,7 +33,7 @@ use crate::{
         retries::RetryLogic,
         Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]

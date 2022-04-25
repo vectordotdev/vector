@@ -16,7 +16,7 @@ use crate::{
     },
     http::HttpClient,
     signal,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -40,7 +40,7 @@ pub(crate) struct HttpConfig {
     request: RequestConfig,
     poll_interval_secs: u64,
     #[serde(flatten)]
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -63,7 +63,7 @@ impl Default for HttpConfig {
 /// Makes an HTTP request to the provided endpoint, returning the String body.
 async fn http_request(
     url: &Url,
-    tls_options: &Option<TlsOptions>,
+    tls_options: &Option<TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> std::result::Result<bytes::Bytes, &'static str> {
@@ -116,7 +116,7 @@ async fn http_request(
 /// Calls `http_request`, serializing the result to a `ConfigBuilder`.
 async fn http_request_to_config_builder(
     url: &Url,
-    tls_options: &Option<TlsOptions>,
+    tls_options: &Option<TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> Result {
@@ -138,7 +138,7 @@ async fn http_request_to_config_builder(
 fn poll_http(
     poll_interval_secs: u64,
     url: Url,
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
     headers: IndexMap<String, String>,
     proxy: ProxyConfig,
 ) -> impl Stream<Item = signal::SignalTo> {
