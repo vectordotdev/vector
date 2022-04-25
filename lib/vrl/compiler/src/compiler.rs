@@ -44,7 +44,7 @@ impl<'a> Compiler<'a> {
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<(Program, LocalEnv), Errors> {
+    ) -> Result<Program, Errors> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
@@ -55,13 +55,12 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        let program = Program {
+        Ok(Program {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-        };
-
-        Ok((program, self.local))
+            local_env: self.local,
+        })
     }
 
     fn compile_root_exprs(
