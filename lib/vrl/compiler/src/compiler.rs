@@ -419,6 +419,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
+            ..
         } = node.into_inner();
 
         let arguments = arguments

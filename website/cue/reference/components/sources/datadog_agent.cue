@@ -186,16 +186,26 @@ components: sources: datadog_agent: {
 		decompression: {
 			title: "Configuring the Datadog Agent"
 			body:  """
+				Sending logs or metrics to Vector requires the [Datadog Agent](\(urls.datadog_agent_doc)) v7.35/6.35 or greater.
+
 				To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
 				must be updated to use:
 
 				```yaml
-				logs_config:
-					dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"
-					use_v2_api: false # source does not yet support new v2 API
-					use_http: true # this source only supports HTTP/HTTPS
-					logs_no_ssl: true|false # should match source SSL configuration.
+				vector:
+					logs.enabled: true
+					logs.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
+
+				In order to send metrics the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				following options:
+
+				```yaml
+				vector:
+					metrics.enabled: true
+					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				```
+
 				"""
 		}
 	}

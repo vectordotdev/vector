@@ -50,6 +50,7 @@ extern {
         ":" => Token::Colon,
         "." => Token::Dot,
         "!" => Token::Bang,
+        "->" => Token::Arrow,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
@@ -371,18 +372,37 @@ FunctionCall: FunctionCall = {
     <ident: Sp<"function call">> <abort_on_error: "!"?> "("
         NonterminalNewline*
         <arguments: CommaMultiline<Sp<FunctionArgument>>?>
-    ")" => {
+    ")" <closure: Sp<FunctionClosure>?> => {
         let ident = ident.map(|s| Ident(s.to_owned()));
         let abort_on_error = abort_on_error.is_some();
         let arguments = arguments.unwrap_or_default();
 
-        FunctionCall { ident, abort_on_error, arguments }
+        FunctionCall { ident, abort_on_error, arguments, closure }
     },
 };
 
 #[inline]
 FunctionArgument: FunctionArgument = {
     <ident: (<Sp<AnyIdent>> ":")?> <expr: ArithmeticExpr> => FunctionArgument { <> },
+};
+
+#[inline]
+FunctionClosure: FunctionClosure = {
+    "->" <variables: ClosureVariables> NonterminalNewline* <block: Sp<Block>> =>
+        FunctionClosure { variables, block }
+};
+
+#[inline]
+ClosureVariables: Vec<Node<Ident>> = {
+    "||" => vec![],
+    "|" <variables: CommaMultiline<ClosureVariable>?> "|" =>
+        variables.unwrap_or_default()
+};
+
+#[inline]
+ClosureVariable: Node<Ident> = {
+    Sp<Ident> => <>,
+    Sp<"_"> => <>.map(|s| Ident("".to_owned())),
 };
 
 // -----------------------------------------------------------------------------
