@@ -1,10 +1,10 @@
 ---
-date: "2022-03-31"
+date: "2022-04-25"
 title: "New `native` and `native_json` codecs"
 description: ""
 authors: ["lukesteensen"]
 pr_numbers: []
-release: "0.21.0"
+release: "0.22.0"
 hide_on_release_notes: false
 badges:
   type: "announcement"
