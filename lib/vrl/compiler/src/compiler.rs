@@ -196,14 +196,28 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
-        // We track the original local state, as any mutations within the block
-        // are removed after the block returns.
-        let local = self.local.clone();
+        // We get a copy of the current local state, so that we can use it to
+        // remove any *new* state added in the block, as that state is lexically
+        // scoped to the block, and must not be visible to the rest of the
+        // program.
+        let local_snapshot = self.local.clone();
 
+        // We can now start compiling the expressions within the block, which
+        // will use the existing local state of the compiler, as blocks have
+        // access to any state of their parent expressions.
         let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
+
+        // Now that we've compiled the expressions, we pass them into the block,
+        // and also a copy of the local state, which includes any state added by
+        // the compiled expressions in the block.
         let block = Block::new(exprs, self.local.clone());
 
-        self.local = local;
+        // Take the local state snapshot captured before we started compiling
+        // the block, and merge back into it any mutations that happened to
+        // state the snapshot was already tracking. Then, revert the compiler
+        // local state to the updated snapshot.
+        self.local = local_snapshot.merge_mutations(self.local.clone());
+
         block
     }
 
