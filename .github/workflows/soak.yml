@@ -231,7 +231,7 @@ jobs:
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline - ${{ matrix.replica }}
-    runs-on: [self-hosted, linux, x64, soak, dev]
+    runs-on: [self-hosted, linux, x64, soak-asg, dev]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
@@ -317,7 +317,7 @@ jobs:
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison - ${{ matrix.replica }}
-    runs-on: [self-hosted, linux, x64, soak, dev]
+    runs-on: [self-hosted, linux, x64, soak-asg, dev]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
