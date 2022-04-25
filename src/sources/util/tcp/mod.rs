@@ -19,7 +19,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead};
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;

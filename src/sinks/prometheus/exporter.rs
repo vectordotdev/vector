@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use tracing_futures::Instrument;
+use tracing::{Instrument, Span};
 use vector_core::{
     buffers::Acker,
     event::metric::MetricSeries,
@@ -374,14 +374,14 @@ impl PrometheusExporter {
             return;
         }
 
-        let span = crate::trace::current_span();
+        let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
 
         let new_service = make_service_fn(move |_| {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let metrics = Arc::clone(&metrics);
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();

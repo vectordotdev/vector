@@ -7,7 +7,7 @@ use tonic::{
     transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
-use tracing_futures::Instrument;
+use tracing::{Instrument, Span};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -149,7 +149,7 @@ async fn run(
     cx: SourceContext,
     acknowledgements: bool,
 ) -> crate::Result<()> {
-    let span = crate::trace::current_span();
+    let span = Span::current();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,

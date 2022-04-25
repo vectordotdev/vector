@@ -23,8 +23,7 @@ use futures::{
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
-use tracing::field;
-use tracing_futures::Instrument;
+use tracing::{field, Instrument};
 
 use crate::{
     event::Event,
