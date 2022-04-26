@@ -8,7 +8,6 @@
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::too_many_arguments)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]

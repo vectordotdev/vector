@@ -43,7 +43,8 @@ enum State {
 
 impl CloudwatchFuture {
     /// Panics if events.is_empty()
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn new(
         client: CloudwatchLogsClient,
         stream_name: String,
         group_name: String,

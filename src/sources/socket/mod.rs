@@ -131,16 +131,7 @@ impl SourceConfig for SocketConfig {
                 let decoder =
                     DecodingConfig::new(config.framing().clone(), config.decoding().clone())
                         .build();
-                Ok(udp::udp(
-                    config.address(),
-                    config.max_length(),
-                    host_key,
-                    config.port_key().clone(),
-                    config.receive_buffer_bytes(),
-                    decoder,
-                    cx.shutdown,
-                    cx.out,
-                ))
+                Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {

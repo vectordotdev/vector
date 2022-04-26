@@ -263,6 +263,7 @@ mod tests {
         crate::test_util::test_generate_config::<SimpleHttpConfig>();
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
         query_parameters: Vec<String>,

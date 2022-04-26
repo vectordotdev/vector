@@ -6,7 +6,6 @@ use serde::Deserialize;
 use vector_core::{
     config::log_schema,
     event::{Event, Value},
-    ByteSizeOf,
 };
 
 use super::sink::HecProcessedEvent;

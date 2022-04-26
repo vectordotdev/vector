@@ -42,32 +42,20 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub const fn host_key(&self) -> &Option<String> {
+    pub(super) const fn host_key(&self) -> &Option<String> {
         &self.host_key
     }
 
-    pub const fn port_key(&self) -> &Option<String> {
-        &self.port_key
-    }
-
-    pub const fn framing(&self) -> &FramingConfig {
+    pub(super) const fn framing(&self) -> &FramingConfig {
         &self.framing
     }
 
-    pub const fn decoding(&self) -> &DeserializerConfig {
+    pub(super) const fn decoding(&self) -> &DeserializerConfig {
         &self.decoding
     }
 
-    pub const fn address(&self) -> SocketAddr {
+    pub(super) const fn address(&self) -> SocketAddr {
         self.address
-    }
-
-    pub const fn max_length(&self) -> usize {
-        self.max_length
-    }
-
-    pub const fn receive_buffer_bytes(&self) -> Option<usize> {
-        self.receive_buffer_bytes
     }
 
     pub fn from_address(address: SocketAddr) -> Self {
@@ -83,34 +71,30 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(
-    address: SocketAddr,
-    max_length: usize,
+pub(super) fn udp(
+    config: UdpConfig,
     host_key: String,
-    port_key: Option<String>,
-    receive_buffer_bytes: Option<usize>,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Source {
     Box::pin(async move {
-        let socket = UdpSocket::bind(&address)
+        let socket = UdpSocket::bind(&config.address)
             .await
             .expect("Failed to bind to udp listener socket");
 
-        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
             }
         }
 
-        let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            std::cmp::min(max_length, receive_buffer_bytes)
-        } else {
-            max_length
+        let max_length = match config.receive_buffer_bytes {
+            Some(receive_buffer_bytes) => std::cmp::min(config.max_length, receive_buffer_bytes),
+            None => config.max_length,
         };
 
-        info!(message = "Listening.", address = %address);
+        info!(message = "Listening.", address = %config.address);
 
         let mut buf = BytesMut::with_capacity(max_length);
         loop {
@@ -149,7 +133,7 @@ pub fn udp(
                                         log.try_insert(log_schema().timestamp_key(), now);
                                         log.try_insert(host_key.as_str(), address.ip().to_string());
 
-                                        if let Some(port_key) = &port_key {
+                                        if let Some(port_key) = &config.port_key {
                                             log.try_insert(port_key.as_str(), address.port());
                                         }
                                     }
