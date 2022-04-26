@@ -214,9 +214,10 @@ impl PubsubSource {
 
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
+        let request_stream = self.request_stream();
         let stream = tokio::select! {
-            _ = &mut self.cx.shutdown.clone() => return Ok(()),
-            result = client.streaming_pull(self.request_stream()) => match result {
+            _ = &mut self.cx.shutdown => return Ok(()),
+            result = client.streaming_pull(request_stream) => match result {
                     Err(source) => return Err(PubsubError::Pull { source }.into()),
                     Ok(stream) => stream,
                 }
