@@ -123,7 +123,7 @@ impl TransformConfig for RemapConfig {
         // for printing warnings (including potentially emiting metrics),
         // instead of individual transforms.
         if !warnings.is_empty() {
-            eprintln!("{warnings}");
+            warn!(message = "VRL compilation warning.", %warnings);
         }
 
         Ok(transform)

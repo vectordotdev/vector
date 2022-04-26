@@ -53,13 +53,17 @@ impl ConditionConfig for VrlConfig {
         let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(enrichment_tables.clone());
 
-        let (program, _) = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
-            |diagnostics| {
+        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
+            .map_err(|diagnostics| {
                 Formatter::new(&self.source, diagnostics)
                     .colored()
                     .to_string()
-            },
-        )?;
+            })?;
+
+        if !warnings.is_empty() {
+            let warnings = Formatter::new(&self.source, warnings).colored().to_string();
+            warn!(message = "VRL compilation warning.", %warnings);
+        }
 
         match self.runtime {
             VrlRuntime::Vm => {
