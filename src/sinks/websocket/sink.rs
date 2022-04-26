@@ -366,7 +366,7 @@ mod tests {
         event::{Event, Value as EventValue},
         sinks::util::encoding::StandardEncodings,
         test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
-        tls::{self, TlsConfig, TlsOptions},
+        tls::{self, TlsConfig, TlsEnableableConfig},
     };
 
     use super::*;
@@ -416,14 +416,14 @@ mod tests {
         trace_init();
 
         let addr = next_addr();
-        let tls_config = Some(TlsConfig::test_config());
+        let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
 
         let config = WebSocketSinkConfig {
             uri: format!("wss://{}", addr),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     verify_certificate: Some(false),
                     verify_hostname: Some(true),
                     ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
