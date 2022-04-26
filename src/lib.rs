@@ -6,7 +6,6 @@
 #![deny(unused_comparisons)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::too_many_arguments)]
