@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, task};
+use std::task;
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -6,7 +6,6 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
@@ -21,12 +20,12 @@ use crate::{
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            SinkBatchSettings, TowerRequestConfig,
+            EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+            TowerRequestConfig,
         },
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -35,7 +34,7 @@ pub struct PrometheusRemoteWriteDefaultBatchSettings;
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Snafu)]
@@ -64,7 +63,7 @@ pub struct RemoteWriteConfig {
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     pub auth: Option<Auth>,
 }
@@ -85,7 +84,7 @@ impl SinkConfig for RemoteWriteConfig {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let batch = self.batch.into_batch_settings()?;
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 
@@ -104,12 +103,11 @@ impl SinkConfig for RemoteWriteConfig {
         };
 
         let sink = {
-            let service = request.service(HttpRetryLogic, service);
-            let service = ServiceBuilder::new().service(service);
             let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
-            PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
+            request_settings
+                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
                     stream::iter(normalizer.apply(event.into_metric()).map(|event| {
@@ -117,7 +115,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingError {
+                                    emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,
@@ -464,7 +462,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     const HTTP_URL: &str = "http://localhost:8086";
@@ -489,7 +487,7 @@ mod integration_tests {
 
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),

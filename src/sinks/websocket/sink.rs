@@ -140,11 +140,11 @@ impl WebSocketConnector {
         loop {
             match self.connect().await {
                 Ok(ws_stream) => {
-                    emit!(&WsConnectionEstablished {});
+                    emit!(WsConnectionEstablished {});
                     return ws_stream;
                 }
                 Err(error) => {
-                    emit!(&WsConnectionFailed { error });
+                    emit!(WsConnectionFailed { error });
                     time::sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -237,7 +237,7 @@ impl WebSocketSink {
         let mut ping_interval = PingInterval::new(self.ping_interval);
 
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
-            emit!(&WsConnectionError { error });
+            emit!(WsConnectionError { error });
             return Err(());
         }
         let mut last_pong = Instant::now();
@@ -272,12 +272,12 @@ impl WebSocketSink {
                         Some(msg) => {
                             let msg_len = msg.len();
                             ws_sink.send(msg).await.map(|_| {
-                                emit!(&EventsSent {
+                                emit!(EventsSent {
                                     count: 1,
                                     byte_size: msg_len,
                                     output: None
                                 });
-                                emit!(&BytesSent {
+                                emit!(BytesSent {
                                     byte_size: msg_len,
                                     protocol: "websocket"
                                 });
@@ -295,9 +295,9 @@ impl WebSocketSink {
 
             if let Err(error) = result {
                 if is_closed(&error) {
-                    emit!(&WsConnectionShutdown);
+                    emit!(WsConnectionShutdown);
                 } else {
-                    emit!(&WsConnectionError { error });
+                    emit!(WsConnectionError { error });
                 }
                 return Err(());
             }
@@ -318,7 +318,7 @@ impl StreamSink<Event> for WebSocketSink {
             pin_mut!(ws_sink);
             pin_mut!(ws_stream);
 
-            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             if self
                 .handle_events(&mut input, &mut ws_stream, &mut ws_sink)

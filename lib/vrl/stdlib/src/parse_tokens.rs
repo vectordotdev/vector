@@ -1,6 +1,19 @@
 use vector_common::tokenize;
 use vrl::prelude::*;
 
+fn parse_tokens(value: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let tokens: Value = tokenize::parse(&string)
+        .into_iter()
+        .map(|token| match token {
+            "" | "-" => Value::Null,
+            _ => token.to_owned().into(),
+        })
+        .collect::<Vec<_>>()
+        .into();
+    Ok(tokens)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTokens;
 
@@ -21,7 +34,7 @@ impl Function for ParseTokens {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -37,6 +50,11 @@ impl Function for ParseTokens {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_tokens(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,21 +65,10 @@ struct ParseTokensFn {
 impl Expression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
-
-        let tokens: Value = tokenize::parse(&string)
-            .into_iter()
-            .map(|token| match token {
-                "" | "-" => Value::Null,
-                _ => token.to_owned().into(),
-            })
-            .collect::<Vec<_>>()
-            .into();
-
-        Ok(tokens)
+        parse_tokens(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }

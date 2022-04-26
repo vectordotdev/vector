@@ -7,12 +7,13 @@ use vector_core::internal_event::InternalEvent;
 pub struct WsConnectionEstablished;
 
 impl InternalEvent for WsConnectionEstablished {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Connected.");
+        counter!("connection_established_total", 1);
     }
 
-    fn emit_metrics(&self) {
-        counter!("connection_established_total", 1);
+    fn name(&self) -> Option<&'static str> {
+        Some("WsConnectionEstablished")
     }
 }
 
@@ -25,12 +26,13 @@ impl<E> InternalEvent for WsConnectionFailed<E>
 where
     E: Error,
 {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "Unable to connect.", error = %self.error);
+        counter!("connection_failed_total", 1);
     }
 
-    fn emit_metrics(&self) {
-        counter!("connection_failed_total", 1);
+    fn name(&self) -> Option<&'static str> {
+        Some("WsConnectionFailed")
     }
 }
 
@@ -38,12 +40,13 @@ where
 pub struct WsConnectionShutdown;
 
 impl InternalEvent for WsConnectionShutdown {
-    fn emit_logs(&self) {
+    fn emit(self) {
         warn!(message = "Closed by the server.");
+        counter!("connection_shutdown_total", 1);
     }
 
-    fn emit_metrics(&self) {
-        counter!("connection_shutdown_total", 1);
+    fn name(&self) -> Option<&'static str> {
+        Some("WsConnectionShutdown")
     }
 }
 
@@ -56,11 +59,12 @@ impl<E> InternalEvent for WsConnectionError<E>
 where
     E: Error,
 {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(message = "WebSocket connection error.", error = %self.error);
+        counter!("connection_errors_total", 1);
     }
 
-    fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1);
+    fn name(&self) -> Option<&'static str> {
+        Some("WsConnectionError")
     }
 }

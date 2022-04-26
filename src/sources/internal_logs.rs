@@ -17,6 +17,10 @@ use crate::{
 pub struct InternalLogsConfig {
     host_key: Option<String>,
     pid_key: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
 }
 
 inventory::submit! {
@@ -24,6 +28,17 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
+
+impl InternalLogsConfig {
+    /// Return an internal logs config with enterprise reporting defaults.
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
+        Self {
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
+            ..Self::default()
+        }
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_logs")]
@@ -36,7 +51,14 @@ impl SourceConfig for InternalLogsConfig {
             .to_owned();
         let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
 
-        Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
+        Ok(Box::pin(run(
+            host_key,
+            pid_key,
+            cx.out,
+            cx.shutdown,
+            self.configuration_key.to_owned(),
+            self.version.to_owned(),
+        )))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -57,6 +79,8 @@ async fn run(
     pid_key: String,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
+    configuration_key: Option<String>,
+    version: Option<String>,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
@@ -78,20 +102,26 @@ async fn run(
     while let Some(mut log) = rx.next().await {
         let byte_size = log.size_of();
         // This event doesn't emit any log
-        emit!(&InternalLogsBytesReceived { byte_size });
-        emit!(&InternalLogsEventsReceived {
+        emit!(InternalLogsBytesReceived { byte_size });
+        emit!(InternalLogsEventsReceived {
             count: 1,
             byte_size,
         });
         if let Ok(hostname) = &hostname {
-            log.insert(host_key.clone(), hostname.to_owned());
+            log.insert(host_key.as_str(), hostname.to_owned());
         }
-        log.insert(pid_key.clone(), pid);
+        log.insert(pid_key.as_str(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
-        if let Err(error) = out.send(Event::from(log)).await {
+        if let Some(ref config_key) = configuration_key {
+            log.try_insert("configuration_key", Bytes::from(config_key.clone()));
+        }
+        if let Some(ref version) = version {
+            log.try_insert("version", Bytes::from(version.clone()));
+        }
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(&StreamClosedError { error, count: 1 });
+            emit!(StreamClosedError { error, count: 1 });
             return Err(());
         }
     }
@@ -101,11 +131,12 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use futures::Stream;
     use tokio::time::{sleep, Duration};
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, source_sender::ReceiverStream, test_util::collect_ready, trace};
+    use crate::{event::Event, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {
@@ -154,7 +185,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> ReceiverStream<Event> {
+    async fn start_source() -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

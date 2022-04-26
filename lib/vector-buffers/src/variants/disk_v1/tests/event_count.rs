@@ -1,5 +1,3 @@
-use futures::{SinkExt, StreamExt};
-
 use super::create_default_buffer_v1;
 use crate::{
     assert_reader_writer_v1_positions,
@@ -19,10 +17,8 @@ async fn ensure_event_count_makes_it_through_unfettered() {
             // Write a simple multi-event record and make sure the writer offset moves forward by
             // the expected amount, since the entry key should be increment by event count:
             let record = MultiEventRecord(12);
-            writer
-                .send(record.clone())
-                .await
-                .expect("write should not fail");
+            writer.send(record).await;
+            writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, 12);
 
             // And now read it out which should give us a matching record:
@@ -54,7 +50,8 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
                 total_write_offset += count;
                 let record = MultiEventRecord(count);
 
-                writer.send(record).await.expect("write should not fail");
+                writer.send(record).await;
+                writer.flush();
                 assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset as usize);
             }
 

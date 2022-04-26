@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn to_string(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
     use Value::*;
     let value = match value {
@@ -94,7 +94,7 @@ impl Function for ToString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -122,7 +122,7 @@ impl Expression for ToStringFn {
         to_string(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::bytes()

@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn push(list: Value, item: Value) -> std::result::Result<Value, ExpressionError> {
+fn push(list: Value, item: Value) -> Resolved {
     let mut list = list.try_array()?;
     list.push(item);
     Ok(list.into())
@@ -46,7 +46,7 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,7 +78,7 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let item = TypeDef::array(BTreeMap::from([(
             0.into(),
             self.item.type_def(state).into(),

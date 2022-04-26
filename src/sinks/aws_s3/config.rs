@@ -1,13 +1,13 @@
 use std::convert::TryInto;
 
-use rusoto_s3::S3Client;
+use aws_sdk_s3::Client as S3Client;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
@@ -24,7 +24,7 @@ use crate::{
         },
         Healthcheck,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
@@ -50,9 +50,7 @@ pub struct S3SinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -77,8 +75,7 @@ impl GenerateConfig for S3SinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            tls: Some(TlsOptions::default()),
-            assume_role: None,
+            tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
         })
@@ -90,7 +87,7 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy)?;
+        let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
@@ -163,8 +160,8 @@ impl S3SinkConfig {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
+    pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
     }
 }
 

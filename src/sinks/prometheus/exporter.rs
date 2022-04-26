@@ -46,7 +46,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
@@ -65,7 +65,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<TlsEnableableConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -346,7 +346,7 @@ fn handle(
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
 
-            emit!(&BytesSent {
+            emit!(BytesSent {
                 byte_size: body_size,
                 protocol: "http",
             });
@@ -406,13 +406,13 @@ impl PrometheusExporter {
                             &metrics,
                         );
 
-                        emit!(&EventsSent {
+                        emit!(EventsSent {
                             count,
                             byte_size,
                             output: None
                         });
 
-                        emit!(&PrometheusServerRequestComplete {
+                        emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
                         });
 
@@ -466,7 +466,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
-            // tracking and remove any which have exceeded the the flush interval in terms of not
+            // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
             //
             // TODO: Can we be smarter about this? As is, we might wait up to 2x the flush period to
@@ -547,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_tls() {
-        let mut tls_config = TlsConfig::test_config();
+        let mut tls_config = TlsEnableableConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
         export_and_fetch_simple(Some(tls_config)).await;
     }
@@ -578,7 +578,10 @@ mod tests {
         );
     }
 
-    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
+    async fn export_and_fetch(
+        tls_config: Option<TlsEnableableConfig>,
+        events: Vec<Event>,
+    ) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -619,7 +622,7 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
-    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
+    async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];

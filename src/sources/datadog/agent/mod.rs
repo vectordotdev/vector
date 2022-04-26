@@ -10,6 +10,7 @@ pub mod traces;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
@@ -21,10 +22,7 @@ use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext,
@@ -34,7 +32,7 @@ use crate::{
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self, util::ErrorMessage},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -45,7 +43,7 @@ pub const TRACES: &str = "traces";
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct DatadogAgentConfig {
     address: SocketAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
@@ -167,6 +165,9 @@ impl SourceConfig for DatadogAgentConfig {
             // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
             #[cfg(feature = "sources-syslog")]
             DeserializerConfig::Syslog => self.decoding.schema_definition(),
+
+            DeserializerConfig::Native => self.decoding.schema_definition(),
+            DeserializerConfig::NativeJson => self.decoding.schema_definition(),
         };
 
         if self.multiple_outputs {
@@ -214,7 +215,7 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_schema_host_key: &'static str,
     pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
-    pub(crate) decoder: codecs::Decoder,
+    pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
     metrics_schema_definition: Arc<schema::Definition>,
@@ -250,7 +251,7 @@ impl ApiKeyExtractor {
 impl DatadogAgentSource {
     pub(crate) fn new(
         store_api_key: bool,
-        decoder: codecs::Decoder,
+        decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
         metrics_schema_definition: schema::Definition,
@@ -345,7 +346,7 @@ impl DatadogAgentSource {
                 }
             }
         }
-        emit!(&HttpBytesReceived {
+        emit!(HttpBytesReceived {
             byte_size: body.len(),
             http_path: path,
             protocol: self.protocol,
@@ -371,7 +372,7 @@ pub(crate) async fn handle_request(
                 out.send_batch(events).await
             }
             .map_err(move |error: crate::source_sender::ClosedError| {
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
             match receiver {
@@ -394,7 +395,7 @@ pub(crate) async fn handle_request(
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(&HttpDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });

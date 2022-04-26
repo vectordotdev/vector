@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn append(value: Value, items: Value) -> Resolved {
+    let mut value = value.try_array()?;
+    let mut items = items.try_array()?;
+    value.append(&mut items);
+    Ok(value.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Append;
 
@@ -33,7 +40,7 @@ impl Function for Append {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -41,6 +48,13 @@ impl Function for Append {
         let items = arguments.required("items");
 
         Ok(Box::new(AppendFn { value, items }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let items = args.required("items");
+
+        append(value, items)
     }
 }
 
@@ -52,15 +66,13 @@ struct AppendFn {
 
 impl Expression for AppendFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut value = self.value.resolve(ctx)?.try_array()?;
-        let mut items = self.items.resolve(ctx)?.try_array()?;
+        let value = self.value.resolve(ctx)?;
+        let items = self.items.resolve(ctx)?;
 
-        value.append(&mut items);
-
-        Ok(value.into())
+        append(value, items)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)
             .merge_append(self.items.type_def(state))

@@ -25,7 +25,7 @@ use super::{
 use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -44,7 +44,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &str,
         strict_path: bool,
-        tls: &Option<TlsConfig>,
+        tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
@@ -89,7 +89,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-                        emit!(&HttpBytesReceived {
+                        emit!(HttpBytesReceived {
                             byte_size: body.len(),
                             http_path,
                             protocol,
@@ -102,7 +102,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 self.build_events(body, headers, query_parameters, path.as_str())
                             })
                             .map(|events| {
-                                emit!(&HttpEventsReceived {
+                                emit!(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
                                     http_path,
@@ -172,10 +172,7 @@ async fn handle_request(
                 .await
         }
         Err(error) => {
-            emit!(&HttpBadRequest {
-                code: error.code(),
-                message: error.message(),
-            });
+            emit!(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

@@ -43,6 +43,7 @@ components: sinks: statsd: {
 			set:          true
 			summary:      false
 		}
+		traces: false
 	}
 
 	configuration: sinks.socket.configuration & {

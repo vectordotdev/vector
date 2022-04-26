@@ -10,6 +10,11 @@ use nom::{
 };
 use vrl::prelude::*;
 
+fn parse_aws_alb_log(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    parse_log(&String::from_utf8_lossy(&bytes))
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
 
@@ -30,7 +35,7 @@ impl Function for ParseAwsAlbLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -45,6 +50,11 @@ impl Function for ParseAwsAlbLog {
             kind: kind::BYTES,
             required: true,
         }]
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_aws_alb_log(value)
     }
 }
 
@@ -61,12 +71,11 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        parse_log(&String::from_utf8_lossy(&bytes))
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_alb_log(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }

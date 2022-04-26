@@ -73,14 +73,14 @@ impl FunctionTransform for RenameFields {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key, self.drop_empty) {
+            match log.remove_prune(old_key.as_str(), self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key, v).is_some() {
-                        emit!(&RenameFieldsFieldOverwritten { field: old_key });
+                    if event.as_mut_log().insert(new_key.as_str(), v).is_some() {
+                        emit!(RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(&RenameFieldsFieldDoesNotExist { field: old_key });
+                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }

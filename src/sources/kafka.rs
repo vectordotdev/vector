@@ -6,6 +6,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{FutureExt, Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
@@ -19,13 +23,9 @@ use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, Output, SourceConfig, SourceContext, SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
@@ -35,7 +35,6 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 use async_stream::stream;
@@ -157,7 +156,7 @@ impl SourceConfig for KafkaSourceConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -176,25 +175,36 @@ async fn kafka_source(
     partition_key: String,
     offset_key: String,
     headers_key: String,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
-    let mut finalizer = acknowledgements
-        .then(|| OrderedFinalizer::new(shutdown.clone(), mark_done(Arc::clone(&consumer))));
+    let mut finalizer = acknowledgements.then(|| {
+        let consumer = Arc::clone(&consumer);
+        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
+            let consumer = Arc::clone(&consumer);
+            async move {
+                if let Err(error) =
+                    consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                {
+                    emit!(KafkaOffsetUpdateError { error });
+                }
+            }
+        })
+    });
     let mut stream = consumer.stream().take_until(shutdown);
     let schema = log_schema();
 
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(&KafkaReadError { error });
+                emit!(KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(&BytesReceived {
+                emit!(BytesReceived {
                     byte_size: msg.payload_len(),
                     protocol: "tcp",
                 });
@@ -213,7 +223,7 @@ async fn kafka_source(
 
                 let msg_key = msg
                     .key()
-                    .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
+                    .map(|key| Value::from(Bytes::from(key.to_owned())))
                     .unwrap_or(Value::Null);
 
                 let mut headers_map = BTreeMap::new();
@@ -248,7 +258,7 @@ async fn kafka_source(
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((events, _byte_size)) => {
-                                emit!(&KafkaEventsReceived {
+                                emit!(KafkaEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
                                 });
@@ -256,18 +266,18 @@ async fn kafka_source(
                                     if let Event::Log(ref mut log) = event {
                                         log.insert(schema.source_type_key(), Bytes::from("kafka"));
                                         log.insert(schema.timestamp_key(), timestamp);
-                                        log.insert(key_field, msg_key.clone());
-                                        log.insert(topic_key, Value::from(msg_topic.clone()));
-                                        log.insert(partition_key, Value::from(msg_partition));
-                                        log.insert(offset_key, Value::from(msg_offset));
-                                        log.insert(headers_key, Value::from(headers_map.clone()));
+                                        log.insert(key_field.as_str(), msg_key.clone());
+                                        log.insert(topic_key.as_str(), Value::from(msg_topic.clone()));
+                                        log.insert(partition_key.as_str(), Value::from(msg_partition));
+                                        log.insert(offset_key.as_str(), Value::from(msg_offset));
+                                        log.insert(headers_key.as_str(), Value::from(headers_map.clone()));
                                     }
 
                                     yield event;
                                 }
                             },
                             Err(error) => {
-                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                                // Error is logged by `codecs::Decoder`, no further handling
                                 // is needed here.
                                 if !error.can_continue() {
                                     break;
@@ -282,9 +292,9 @@ async fn kafka_source(
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                        match out.send_stream(&mut stream).await {
+                        match out.send_event_stream(&mut stream).await {
                             Err(error) => {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                             }
                             Ok(_) => {
                                 // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
@@ -294,15 +304,15 @@ async fn kafka_source(
                             }
                         }
                     }
-                    None => match out.send_stream(&mut stream).await {
+                    None => match out.send_event_stream(&mut stream).await {
                         Err(error) => {
-                            emit!(&StreamClosedError { error, count });
+                            emit!(StreamClosedError { error, count });
                         }
                         Ok(_) => {
                             if let Err(error) =
                                 consumer.store_offset(msg.topic(), msg.partition(), msg.offset())
                             {
-                                emit!(&KafkaOffsetUpdateError { error });
+                                emit!(KafkaOffsetUpdateError { error });
                             }
                         }
                     },
@@ -327,14 +337,6 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
             topic: msg.topic().into(),
             partition: msg.partition(),
             offset: msg.offset(),
-        }
-    }
-}
-
-fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
-    move |entry| {
-        if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-            emit!(&KafkaOffsetUpdateError { error });
         }
     }
 }
@@ -526,7 +528,7 @@ mod integration_test {
             config.partition_key,
             config.offset_key,
             config.headers_key,
-            codecs::Decoder::default(),
+            crate::codecs::Decoder::default(),
             shutdown,
             tx,
             acknowledgements,

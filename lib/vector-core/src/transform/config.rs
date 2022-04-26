@@ -8,18 +8,30 @@ use crate::{
     schema,
 };
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
-pub enum ExpandType {
-    /// Chain components together one after another. Components will be named according
-    /// to this order (e.g. component_name.0 and so on). If alias is set to true,
-    /// then a Noop transform will be added as the last component and given the raw
-    /// component_name identifier so that it can be used as an input for other components.
-    Parallel { aggregates: bool },
-    /// This ways of expanding will take all the components and chain then in order.
-    /// The first node will be renamed `component_name.0` and so on.
-    /// If `alias` is set to `true, then a `Noop` transform will be added as the
-    /// last component and named `component_name` so that it can be used as an input.
-    Serial { alias: bool },
+#[derive(Debug, serde::Serialize)]
+pub struct InnerTopologyTransform {
+    pub inputs: Vec<String>,
+    pub inner: Box<dyn TransformConfig>,
+}
+
+#[derive(Debug, Default)]
+pub struct InnerTopology {
+    pub inner: IndexMap<ComponentKey, InnerTopologyTransform>,
+    pub outputs: Vec<(ComponentKey, Vec<Output>)>,
+}
+
+impl InnerTopology {
+    pub fn outputs(&self) -> Vec<String> {
+        self.outputs
+            .iter()
+            .flat_map(|(name, outputs)| {
+                outputs.iter().map(|output| match output.port {
+                    Some(ref port) => name.port(port),
+                    None => name.id().to_string(),
+                })
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug)]
@@ -93,6 +105,11 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// of events flowing through the transform.
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
 
+    /// Verifies that the provided outputs and the inner plumbing of the transform are valid.
+    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
     fn transform_type(&self) -> &'static str;
 
     /// Return true if the transform is able to be run across multiple tasks simultaneously with no
@@ -112,7 +129,9 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     /// for various patterns.
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
+        _name: &ComponentKey,
+        _inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
         Ok(None)
     }
 }

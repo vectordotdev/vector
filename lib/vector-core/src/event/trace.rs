@@ -1,3 +1,4 @@
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
@@ -35,10 +36,12 @@ impl TraceEvent {
         self.0.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         Self(self.0.with_batch_notifier(batch))
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         Self(self.0.with_batch_notifier_option(batch))
     }
@@ -48,7 +51,11 @@ impl TraceEvent {
     }
 
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.0.as_map(), key.as_ref())
+        self.0.get(key.as_ref())
+    }
+
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.0.lookup(path)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
@@ -56,7 +63,7 @@ impl TraceEvent {
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.0.as_map_mut(), key.as_ref())
+        self.0.get_mut(key.as_ref())
     }
 
     pub fn contains(&self, key: impl AsRef<str>) -> bool {

@@ -19,7 +19,7 @@ use crate::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
@@ -28,7 +28,7 @@ const SOURCE_NAME: &str = "prometheus_remote_write";
 struct PrometheusRemoteWriteConfig {
     address: SocketAddr,
 
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
 
@@ -87,7 +87,7 @@ struct RemoteWriteSource;
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(&PrometheusRemoteWriteParseError {
+            emit!(PrometheusRemoteWriteParseError {
                 error: error.clone()
             });
             ErrorMessage::new(
@@ -152,10 +152,10 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_over_https() {
-        receives_metrics(Some(TlsConfig::test_config())).await;
+        receives_metrics(Some(TlsEnableableConfig::test_config())).await;
     }
 
-    async fn receives_metrics(tls: Option<TlsConfig>) {
+    async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
         components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
@@ -249,7 +249,9 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use futures_util::StreamExt;
     use tokio::time::Duration;
+    use vector_core::event::into_event_stream;
 
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
@@ -283,6 +285,8 @@ mod integration_tests {
         tokio::spawn(source);
 
         tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let rx = rx.into_stream().flat_map(into_event_stream);
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 

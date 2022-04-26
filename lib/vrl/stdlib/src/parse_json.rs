@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn parse_json(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn parse_json(value: Value) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = serde_json::from_slice::<'_, Value>(&bytes)
         .map_err(|e| format!("unable to parse json: {}", e))?;
@@ -80,7 +80,7 @@ impl Function for ParseJson {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -89,11 +89,7 @@ impl Function for ParseJson {
         Ok(Box::new(ParseJsonFn { value }))
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         parse_json(value)
     }
@@ -110,7 +106,7 @@ impl Expression for ParseJsonFn {
         parse_json(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }

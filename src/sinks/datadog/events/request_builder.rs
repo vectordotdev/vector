@@ -1,11 +1,11 @@
 use bytes::Bytes;
+use lookup::lookup_v2::OwnedSegment;
 use std::{io, sync::Arc};
 
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
-    event::{EventFinalizers, Finalizable, LogEvent, PathComponent},
-    internal_events::DatadogEventsProcessed,
+    event::{EventFinalizers, Finalizable, LogEvent},
     sinks::util::{
         encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
         Compression, ElementCount, RequestBuilder,
@@ -87,11 +87,6 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     }
 
     fn build_request(&self, metadata: Self::Metadata, body: Self::Payload) -> Self::Request {
-        // deprecated - kept for backwards compatibility
-        emit!(&DatadogEventsProcessed {
-            byte_size: body.len(),
-        });
-
         DatadogEventsRequest { body, metadata }
     }
 }
@@ -115,7 +110,7 @@ fn encoder() -> EncodingConfigFixed<StandardJsonEncoding> {
                 "title",
             ]
             .iter()
-            .map(|field| vec![PathComponent::Key((*field).into())])
+            .map(|field| vec![OwnedSegment::Field((*field).into())].into())
             .collect(),
         ),
         // DataDog Event API requires unix timestamp.

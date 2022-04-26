@@ -12,7 +12,7 @@ pub struct ConcatSubstringError<'a> {
 }
 
 impl<'a> InternalEvent for ConcatSubstringError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Substring error.",
             error = "Unable to split string.",
@@ -25,12 +25,8 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
             length = self.length,
             internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_errors_total", 1,
-            "error" => "Substring error.",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
@@ -45,7 +41,7 @@ pub struct ConcatSubstringSourceMissing<'a> {
 }
 
 impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(
             message = "Substring source missing.",
             self.source,

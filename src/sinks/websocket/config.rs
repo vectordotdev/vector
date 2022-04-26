@@ -8,13 +8,13 @@ use crate::{
         websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WebSocketSinkConfig {
     pub uri: String,
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<TlsEnableableConfig>,
     pub encoding: EncodingConfig<StandardEncodings>,
     pub ping_interval: Option<u64>,
     pub ping_timeout: Option<u64>,

@@ -1,13 +1,10 @@
 #[cfg(any(feature = "sources-http"))]
 mod body_decoding;
-#[cfg(any(
-    all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "codecs",
-))]
-mod codecs;
 mod encoding_config;
 #[cfg(any(
+    feature = "sources-aws_sqs",
     feature = "sources-file",
+    feature = "sources-journald",
     feature = "sources-kafka",
     feature = "sources-splunk_hec"
 ))]
@@ -25,6 +22,8 @@ mod http;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
+#[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
+mod unix;
 #[cfg(all(unix, feature = "sources-socket"))]
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
@@ -32,15 +31,13 @@ mod unix_stream;
 #[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
 mod wrappers;
 
-#[cfg(any(
-    all(feature = "sources-utils-tls", feature = "listenfd"),
-    feature = "codecs",
-))]
-pub use codecs::StreamDecodingError;
+#[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
+#[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
+pub use unix::change_socket_permissions;
 #[cfg(all(unix, feature = "sources-socket",))]
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]

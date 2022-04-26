@@ -132,6 +132,7 @@ components: transforms: reduce: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [
@@ -190,7 +191,7 @@ components: transforms: reduce: {
 				merge_strategies: {
 					message: "concat_newline"
 				}
-				starts_when: #"match(.message, /^[^\s]/)"#
+				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
 
 			output: [

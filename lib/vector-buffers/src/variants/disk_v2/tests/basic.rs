@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use futures::{stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
@@ -23,7 +25,7 @@ async fn basic_read_write_loop() {
             let expected_items = (512..768)
                 .into_iter()
                 .cycle()
-                .take(2000)
+                .take(10)
                 .map(SizedRecord)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
@@ -90,8 +92,6 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             assert_eq!(first_read, Some(SizedRecord(32)));
             assert_buffer_records!(ledger, 1);
 
-            debug!("MARK MARK MARK");
-
             // Now, we haven't acknowledged that read yet, so our next read should see the writer as
             // done but the total buffer size as >= 0, which means it has to wait for something,
             // which in this case is going to be the wakeup after we acknowledge the read.
@@ -136,7 +136,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     });
 
     let parent = trace_span!("reader_exits_cleanly_when_writer_done_and_in_flight_acks");
-    fut.instrument(parent).await;
+    fut.instrument(parent.or_current()).await;
 }
 
 #[tokio::test]
@@ -168,19 +168,21 @@ async fn initial_size_correct_with_multievents() {
             // Technically, we aggregate the bytes written value from each write, but we also want
             // to verify that is accurate, so we record each record by hand to make sure our totals
             // are identical:
-            let expected_bytes = stream::iter(input_items.iter().cloned())
+            let expected_bytes = stream::iter(input_items.iter().copied())
                 .filter_map(|record| async move {
-                    let mut record_writer = RecordWriter::new(Vec::new(), 0, u64::MAX, usize::MAX);
-                    let bytes_written = record_writer
+                    let mut record_writer =
+                        RecordWriter::new(Cursor::new(Vec::new()), 0, 16_384, u64::MAX, usize::MAX);
+                    let (bytes_written, flush_result) = record_writer
                         .write_record(0, record)
                         .await
                         .expect("record writing should not fail");
                     record_writer.flush().await.expect("flush should not fail");
-                    let inner_buf_len = record_writer.get_ref().len();
+                    let inner_buf_len = record_writer.get_ref().get_ref().len();
 
                     // The bytes that it reports writing should be identical to what the underlying
                     // write buffer has, since this is a fresh record writer.
                     assert_eq!(bytes_written, inner_buf_len);
+                    assert_eq!(flush_result, None);
 
                     Some(inner_buf_len)
                 })

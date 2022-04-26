@@ -3,6 +3,16 @@ use std::net::IpAddr;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
+fn reverse_dns(value: Value) -> Resolved {
+    let ip: IpAddr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+    let host = lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {}", err))?;
+
+    Ok(host.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ReverseDns;
 
@@ -29,13 +39,18 @@ impl Function for ReverseDns {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ReverseDnsFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        reverse_dns(value)
     }
 }
 
@@ -46,20 +61,11 @@ struct ReverseDnsFn {
 
 impl Expression for ReverseDnsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: IpAddr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
-        let host =
-            lookup_addr(&ip).map_err(|err| format!("unable to perform a lookup : {}", err))?;
-
-        Ok(host.into())
+        let value = self.value.resolve(ctx)?;
+        reverse_dns(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

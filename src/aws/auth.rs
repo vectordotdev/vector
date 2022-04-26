@@ -1,3 +1,7 @@
+use aws_config::{
+    default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
+};
+use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for configuring authentication strategy for AWS.
@@ -23,6 +27,54 @@ pub enum AwsAuthentication {
     // {} is required to work around a bug in serde. https://github.com/serde-rs/serde/issues/1374
     #[derivative(Default)]
     Default {},
+}
+
+impl AwsAuthentication {
+    pub async fn credentials_provider(
+        &self,
+        region: Region,
+    ) -> crate::Result<SharedCredentialsProvider> {
+        match self {
+            Self::Static {
+                access_key_id,
+                secret_access_key,
+            } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
+                access_key_id,
+                secret_access_key,
+                None,
+            ))),
+            AwsAuthentication::File { .. } => {
+                Err("Overriding the credentials file is not supported.".into())
+            }
+            AwsAuthentication::Role { assume_role } => {
+                let provider = AssumeRoleProviderBuilder::new(assume_role)
+                    .region(region.clone())
+                    .build(default_credentials_provider(region).await);
+
+                Ok(SharedCredentialsProvider::new(provider))
+            }
+            AwsAuthentication::Default {} => Ok(SharedCredentialsProvider::new(
+                default_credentials_provider(region).await,
+            )),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn test_auth() -> AwsAuthentication {
+        AwsAuthentication::Static {
+            access_key_id: "dummy".to_string(),
+            secret_access_key: "dummy".to_string(),
+        }
+    }
+}
+
+async fn default_credentials_provider(region: Region) -> SharedCredentialsProvider {
+    let chain = DefaultCredentialsChain::builder()
+        .region(region)
+        .build()
+        .await;
+
+    SharedCredentialsProvider::new(chain)
 }
 
 #[cfg(test)]

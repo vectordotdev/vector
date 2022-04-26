@@ -1,6 +1,7 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
@@ -8,14 +9,15 @@ use tracing::field;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs,
+    codecs::Decoder,
     event::Event,
     internal_events::{
         BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
+    sources::util::change_socket_permissions,
+    sources::Source,
     SourceSender,
 };
 
@@ -25,34 +27,37 @@ use crate::{
 /// syslog source).
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
+    socket_file_mode: Option<u32>,
     max_length: usize,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
-    Box::pin(async move {
-        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
-        info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
+) -> crate::Result<Source> {
+    let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+    info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 
+    change_socket_permissions(&listen_path, socket_file_mode)?;
+
+    Ok(Box::pin(async move {
         let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteError {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });
         }
 
         result
-    })
+    }))
 }
 
 async fn listen(
     socket: UnixDatagram,
     max_length: usize,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
@@ -64,13 +69,13 @@ async fn listen(
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
                     let error = codecs::decoding::Error::FramingError(error.into());
-                    emit!(&SocketReceiveError {
+                    emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
                     })
                 })?;
 
-                emit!(&BytesReceived {
+                emit!(BytesReceived {
                     protocol: "unix",
                     byte_size,
                 });
@@ -91,7 +96,7 @@ async fn listen(
                 loop {
                     match stream.next().await {
                         Some(Ok((mut events, _byte_size))) => {
-                            emit!(&SocketEventsReceived {
+                            emit!(SocketEventsReceived {
                                 mode: SocketMode::Unix,
                                 byte_size: events.size_of(),
                                 count: events.len()
@@ -101,11 +106,11 @@ async fn listen(
 
                             let count = events.len();
                             if let Err(error) = out.send_batch(events).await {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                             }
                         },
                         Some(Err(error)) => {
-                            emit!(&SocketReceiveError {
+                            emit!(SocketReceiveError {
                                 mode: SocketMode::Unix,
                                 error: &error
                             });

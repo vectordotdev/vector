@@ -1,5 +1,20 @@
 use vrl::prelude::*;
 
+fn length(value: Value) -> Resolved {
+    match value {
+        Value::Array(v) => Ok(v.len().into()),
+        Value::Object(v) => Ok(v.len().into()),
+        Value::Bytes(v) => Ok(v.len().into()),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::array(Collection::any())
+                | Kind::object(Collection::any())
+                | Kind::bytes(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Length;
 
@@ -38,13 +53,18 @@ impl Function for Length {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(LengthFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        length(value)
     }
 }
 
@@ -55,25 +75,12 @@ struct LengthFn {
 
 impl Expression for LengthFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
         let value = self.value.resolve(ctx)?;
 
-        match value {
-            Array(v) => Ok(v.len().into()),
-            Object(v) => Ok(v.len().into()),
-            Bytes(v) => Ok(v.len().into()),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::array(Collection::any())
-                    | Kind::object(Collection::any())
-                    | Kind::bytes(),
-            }
-            .into()),
-        }
+        length(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

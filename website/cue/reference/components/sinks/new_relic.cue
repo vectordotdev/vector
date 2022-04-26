@@ -20,7 +20,7 @@ components: sinks: new_relic: {
 				enabled:      true
 				common:       false
 				max_events:   50
-				timeout_secs: 30
+				timeout_secs: 30.0
 			}
 			compression: {
 				enabled: true
@@ -121,6 +121,7 @@ components: sinks: new_relic: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	telemetry: components.sinks.http.telemetry

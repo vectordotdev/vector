@@ -1,17 +1,18 @@
 use std::{fmt, net::SocketAddr};
 
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use warp::Filter;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    codecs::DecodingConfig,
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
+        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub mod errors;
@@ -23,7 +24,7 @@ mod models;
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
@@ -85,7 +86,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

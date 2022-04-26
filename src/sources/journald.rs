@@ -11,7 +11,8 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream::BoxStream, StreamExt};
+use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
+use futures::{future, future::Shared, stream::BoxStream, FutureExt, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -24,25 +25,27 @@ use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
+    sync::{Mutex, MutexGuard},
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, LogEvent, Value},
+    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
+    sources::util::finalizer::OrderedFinalizer,
     SourceSender,
 };
 
 const DEFAULT_BATCH_SIZE: usize = 16;
+const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 const CURSOR: &str = "__CURSOR";
@@ -78,6 +81,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
+    pub since_now: Option<bool>,
     pub current_boot_only: Option<bool>,
     pub units: Vec<String>,
     pub include_units: Vec<String>,
@@ -171,6 +175,7 @@ impl SourceConfig for JournaldConfig {
 
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
+        let since_now = self.since_now.unwrap_or(false);
         let journal_dir = self.journal_directory.clone();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
@@ -179,6 +184,7 @@ impl SourceConfig for JournaldConfig {
                 &journalctl_path,
                 journal_dir.as_ref(),
                 current_boot_only,
+                since_now,
                 cursor,
             );
             start_journalctl(&mut command)
@@ -227,7 +233,7 @@ impl JournaldSource {
         shutdown: ShutdownSignal,
         start_journalctl: StartJournalctlFn,
     ) -> Result<(), ()> {
-        let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
+        let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 error!(
@@ -237,51 +243,32 @@ impl JournaldSource {
                 );
             })?;
 
-        let mut cursor = match checkpointer.get().await {
-            Ok(cursor) => cursor,
-            Err(error) => {
-                error!(
-                    message = "Could not retrieve saved journald checkpoint.",
-                    %error
-                );
-                None
-            }
-        };
+        let checkpointer = SharedCheckpointer::new(checkpointer);
+        let shutdown = shutdown.shared();
+        let finalizer = Finalizer::new(
+            self.acknowledgements,
+            checkpointer.clone(),
+            shutdown.clone(),
+        );
 
-        let mut on_stop = None;
-        let run = Box::pin(self.run(
-            &mut checkpointer,
-            &mut cursor,
-            &mut on_stop,
-            start_journalctl,
-        ));
+        let run = Box::pin(self.run(checkpointer, finalizer, start_journalctl));
         future::select(run, shutdown).await;
-
-        if let Some(stop) = on_stop {
-            stop();
-        }
-
-        Self::save_checkpoint(&mut checkpointer, &cursor).await;
 
         Ok(())
     }
 
-    async fn run<'a>(
+    async fn run(
         mut self,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
-        on_stop: &'a mut Option<StopJournalctlFn>,
+        checkpointer: SharedCheckpointer,
+        finalizer: Finalizer,
         start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
-            match start_journalctl(&*cursor) {
-                Ok((stream, stop)) => {
-                    *on_stop = Some(stop);
-                    let should_restart = self.run_stream(stream, checkpointer, cursor).await;
-                    if let Some(stop) = on_stop.take() {
-                        stop();
-                    }
+            match start_journalctl(&checkpointer.lock().await.cursor) {
+                Ok(RunningJournal(stream, stop)) => {
+                    let should_restart = self.run_stream(stream, &finalizer).await;
+                    stop();
                     if !should_restart {
                         return;
                     }
@@ -302,103 +289,131 @@ impl JournaldSource {
     async fn run_stream<'a>(
         &'a mut self,
         mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
+        finalizer: &'a Finalizer,
     ) -> bool {
+        let batch_size = self.batch_size;
         loop {
-            let mut record_size = 0;
-            let mut count = 0;
-            let mut byte_size = 0;
-            let mut events = Vec::new();
-            let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-            let mut exiting = None;
+            let mut batch = Batch::new(self);
 
-            for _ in 0..self.batch_size {
-                let bytes = match stream.next().await {
-                    None => {
-                        warn!("Journalctl process stopped.");
-                        exiting = Some(true);
+            if !batch.handle_next(stream.next().await) {
+                break true;
+            }
+
+            let timeout = tokio::time::sleep(BATCH_TIMEOUT);
+            tokio::pin!(timeout);
+
+            for _ in 1..batch_size {
+                tokio::select! {
+                    _ = &mut timeout => break,
+                    result = stream.next() => if !batch.handle_next(result) {
                         break;
                     }
-                    Some(Ok(text)) => text,
-                    Some(Err(error)) => {
-                        error!(
-                            message = "Could not read from journald source.",
-                            %error,
-                        );
-                        break;
-                    }
-                };
-
-                let mut record = match decode_record(&bytes, self.remap_priority) {
-                    Ok(record) => record,
-                    Err(error) => {
-                        emit!(&JournaldInvalidRecordError {
-                            error,
-                            text: String::from_utf8_lossy(&bytes).into_owned()
-                        });
-                        continue;
-                    }
-                };
-                if let Some(tmp) = record.remove(&*CURSOR) {
-                    *cursor = Some(tmp);
-                }
-
-                if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
-                    record_size += bytes.len();
-                    let event = create_event(record, &batch);
-                    count += 1;
-                    byte_size += event.size_of();
-                    events.push(event);
                 }
             }
-            drop(batch);
-
-            if record_size > 0 {
-                emit!(&BytesReceived {
-                    byte_size: record_size,
-                    protocol: "journald",
-                });
-            }
-
-            if count > 0 {
-                emit!(&JournaldEventsReceived { count, byte_size });
-                if !events.is_empty() {
-                    match self.out.send_batch(events).await {
-                        Ok(_) => {
-                            if let Some(receiver) = receiver {
-                                // Ignore the received status, we can't do anything with failures here.
-                                receiver.await;
-                            }
-                        }
-                        Err(error) => {
-                            error!(message = "Could not send journald log.", %error);
-                            // `out` channel is closed, don't restart journalctl.
-                            exiting = Some(false);
-                        }
-                    }
-                }
-                if exiting != Some(false) {
-                    Self::save_checkpoint(checkpointer, &*cursor).await;
-                }
-            }
-
-            if let Some(x) = exiting {
+            if let Some(x) = batch.finish(finalizer).await {
                 break x;
             }
         }
     }
+}
 
-    async fn save_checkpoint(checkpointer: &mut Checkpointer, cursor: &Option<String>) {
-        if let Some(cursor) = cursor {
-            if let Err(error) = checkpointer.set(cursor).await {
+struct Batch<'a> {
+    events: Vec<LogEvent>,
+    record_size: usize,
+    exiting: Option<bool>,
+    batch: Option<Arc<BatchNotifier>>,
+    receiver: Option<BatchStatusReceiver>,
+    source: &'a mut JournaldSource,
+    cursor: Option<String>,
+}
+
+impl<'a> Batch<'a> {
+    fn new(source: &'a mut JournaldSource) -> Self {
+        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(source.acknowledgements);
+        Self {
+            events: Vec::new(),
+            record_size: 0,
+            exiting: None,
+            batch,
+            receiver,
+            source,
+            cursor: None,
+        }
+    }
+
+    fn handle_next(&mut self, result: Option<Result<Bytes, BoxedFramingError>>) -> bool {
+        match result {
+            None => {
+                warn!("Journalctl process stopped.");
+                self.exiting = Some(true);
+                false
+            }
+            Some(Err(error)) => {
                 error!(
-                    message = "Could not set journald checkpoint.",
+                    message = "Could not read from journald source.",
                     %error,
-                    filename = ?checkpointer.filename,
                 );
+                false
+            }
+            Some(Ok(bytes)) => {
+                match decode_record(&bytes, self.source.remap_priority) {
+                    Ok(mut record) => {
+                        if let Some(tmp) = record.remove(&*CURSOR) {
+                            self.cursor = Some(tmp);
+                        }
+
+                        if !filter_matches(
+                            &record,
+                            &self.source.include_matches,
+                            &self.source.exclude_matches,
+                        ) {
+                            self.record_size += bytes.len();
+                            let event = create_event(record, &self.batch);
+                            self.events.push(event);
+                        }
+                    }
+                    Err(error) => {
+                        emit!(JournaldInvalidRecordError {
+                            error,
+                            text: String::from_utf8_lossy(&bytes).into_owned()
+                        });
+                    }
+                }
+                true
             }
         }
+    }
+
+    async fn finish(mut self, finalizer: &Finalizer) -> Option<bool> {
+        drop(self.batch);
+
+        if self.record_size > 0 {
+            emit!(BytesReceived {
+                byte_size: self.record_size,
+                protocol: "journald",
+            });
+        }
+
+        if !self.events.is_empty() {
+            emit!(JournaldEventsReceived {
+                count: self.events.len(),
+                byte_size: self.events.size_of(),
+            });
+
+            match self.source.out.send_batch(self.events).await {
+                Ok(_) => {
+                    if let Some(cursor) = self.cursor {
+                        finalizer.finalize(cursor, self.receiver).await;
+                    }
+                }
+                Err(error) => {
+                    error!(message = "Could not send journald log.", %error);
+                    // `out` channel is closed, don't restart journalctl.
+                    self.exiting = Some(false);
+                }
+            }
+        }
+        self.exiting
     }
 }
 
@@ -407,24 +422,17 @@ impl JournaldSource {
 ///
 /// Code uses `start_journalctl` below,
 /// but we need this type to implement fake journald source in testing.
-type StartJournalctlFn = Box<
-    dyn Fn(
-            &Option<String>, // cursor
-        ) -> crate::Result<(
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        )> + Send
-        + Sync,
->;
+type StartJournalctlFn =
+    Box<dyn Fn(&Option<String>) -> crate::Result<RunningJournal> + Send + Sync>;
 
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
-fn start_journalctl(
-    command: &mut Command,
-) -> crate::Result<(
+struct RunningJournal(
     BoxStream<'static, Result<Bytes, BoxedFramingError>>,
     StopJournalctlFn,
-)> {
+);
+
+fn start_journalctl(command: &mut Command) -> crate::Result<RunningJournal> {
     let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
     let stream = FramedRead::new(
@@ -438,13 +446,14 @@ fn start_journalctl(
         let _ = kill(pid, Signal::SIGTERM);
     });
 
-    Ok((stream, stop))
+    Ok(RunningJournal(stream, stop))
 }
 
 fn create_command(
     path: &Path,
     journal_dir: Option<&PathBuf>,
     current_boot_only: bool,
+    since_now: bool,
     cursor: &Option<String>,
 ) -> Command {
     let mut command = Command::new(path);
@@ -464,6 +473,8 @@ fn create_command(
 
     if let Some(cursor) = cursor {
         command.arg(format!("--after-cursor={}", cursor));
+    } else if since_now {
+        command.arg("--since=now");
     } else {
         // journalctl --follow only outputs a few lines without a starting point
         command.arg("--since=2000-01-01");
@@ -601,6 +612,40 @@ fn find_duplicate_match(a_matches: &Matches, b_matches: &Matches) -> Option<(Str
     None
 }
 
+enum Finalizer {
+    Sync(SharedCheckpointer),
+    Async(OrderedFinalizer<String>),
+}
+
+impl Finalizer {
+    fn new(
+        acknowledgements: bool,
+        checkpointer: SharedCheckpointer,
+        shutdown: Shared<ShutdownSignal>,
+    ) -> Self {
+        if acknowledgements {
+            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
+                let checkpointer = checkpointer.clone();
+                async move {
+                    checkpointer.lock().await.set(cursor).await;
+                }
+            }))
+        } else {
+            Self::Sync(checkpointer)
+        }
+    }
+
+    async fn finalize(&self, cursor: String, receiver: Option<BatchStatusReceiver>) {
+        match (self, receiver) {
+            (Self::Sync(checkpointer), None) => checkpointer.lock().await.set(cursor).await,
+            (Self::Async(finalizer), Some(receiver)) => finalizer.add(cursor, receiver),
+            _ => {
+                unreachable!("Cannot have async finalization without a receiver in journald source")
+            }
+        }
+    }
+}
+
 struct Checkpointer {
     file: File,
     filename: PathBuf,
@@ -639,6 +684,47 @@ impl Checkpointer {
                 }
             }
         }
+    }
+}
+
+struct StatefulCheckpointer {
+    checkpointer: Checkpointer,
+    cursor: Option<String>,
+}
+
+impl StatefulCheckpointer {
+    async fn new(filename: PathBuf) -> Result<Self, io::Error> {
+        let mut checkpointer = Checkpointer::new(filename).await?;
+        let cursor = checkpointer.get().await?;
+        Ok(Self {
+            checkpointer,
+            cursor,
+        })
+    }
+
+    async fn set(&mut self, token: impl Into<String>) {
+        let token = token.into();
+        if let Err(error) = self.checkpointer.set(&token).await {
+            error!(
+                message = "Could not set journald checkpoint.",
+                %error,
+                filename = ?self.checkpointer.filename,
+            );
+        }
+        self.cursor = Some(token);
+    }
+}
+
+#[derive(Clone)]
+struct SharedCheckpointer(Arc<Mutex<StatefulCheckpointer>>);
+
+impl SharedCheckpointer {
+    fn new(c: StatefulCheckpointer) -> Self {
+        Self(Arc::new(Mutex::new(c)))
+    }
+
+    async fn lock(&self) -> MutexGuard<'_, StatefulCheckpointer> {
+        self.0.lock().await
     }
 }
 
@@ -739,12 +825,7 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn new(
-            checkpoint: &Option<String>,
-        ) -> (
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        ) {
+        fn new(checkpoint: &Option<String>) -> RunningJournal {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -757,7 +838,7 @@ mod tests {
                 }
             }
 
-            (Box::pin(journal), Box::new(|| ()))
+            RunningJournal(Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -798,7 +879,7 @@ mod tests {
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
             out: tx,
-            acknowledgements: true,
+            acknowledgements: false,
         }
         .run_shutdown(
             shutdown,
@@ -960,18 +1041,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn waits_for_acknowledgements() {
+    async fn handles_acknowledgements() {
         let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
         let mut checkpoint_path = tempdir.path().to_path_buf();
         checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
+        let checkpointer = StatefulCheckpointer::new(checkpoint_path.clone())
             .await
             .expect("Creating checkpointer failed!");
-
-        let mut cursor = checkpointer.get().await.unwrap();
 
         let mut source = JournaldSource {
             include_matches: Default::default(),
@@ -982,22 +1061,30 @@ mod tests {
             out: tx,
             acknowledgements: true,
         };
-        let (stream, _stop) = FakeJournal::new(&cursor);
-        let mut handle =
-            tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer, &mut cursor));
+        let RunningJournal(stream, _stop) = FakeJournal::new(&checkpointer.cursor);
+        let checkpointer = SharedCheckpointer::new(checkpointer);
+        let (_trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown.shared());
 
-        // Drive the journal until it waits for the acknowledgement.
-        assert_eq!(handle.poll(), Poll::Pending);
-        assert!(!handle.is_woken());
+        // The source runs to completion without setting the checkpoint
+        source.run_stream(stream, &finalizer).await;
+
+        // Make sure the checkpointer cursor is empty
+        assert_eq!(checkpointer.lock().await.cursor, None);
+
         // Acknowledge all the received events.
         let mut count = 0;
         while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            // The checkpointer shouldn't set the cursor until the end of the batch.
+            assert_eq!(checkpointer.lock().await.cursor, None);
             event.metadata().update_status(EventStatus::Delivered);
             count += 1;
         }
         assert_eq!(count, 8);
-        // Make sure it is woken up again after receiving the acknowledgement.
-        assert!(handle.is_woken());
+
+        // Let the async finalizer update the cursor
+        tokio::task::yield_now().await;
+        assert_eq!(checkpointer.lock().await.cursor.as_deref(), Some("6"));
     }
 
     #[test]
@@ -1095,18 +1182,31 @@ mod tests {
         let journal_dir = None;
         let current_boot_only = false;
         let cursor = None;
+        let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
+        let since_now = true;
+
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(cmd_line.contains("--since=now"));
+
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
         let current_boot_only = true;
         let cursor = Some(String::from("2021-01-01"));
 
-        let command = create_command(&path, journal_dir.as_ref(), current_boot_only, &cursor);
+        let command = create_command(
+            &path,
+            journal_dir.as_ref(),
+            current_boot_only,
+            since_now,
+            &cursor,
+        );
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));

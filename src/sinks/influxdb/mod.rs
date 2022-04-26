@@ -526,7 +526,7 @@ mod tests {
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
-            format!("{}", settings.expect_err("expected error")),
+            settings.expect_err("expected error").to_string(),
             "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
         );
     }
@@ -538,7 +538,7 @@ mod tests {
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
-            format!("{}", settings.expect_err("expected error")),
+            settings.expect_err("expected error").to_string(),
             "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
         );
     }

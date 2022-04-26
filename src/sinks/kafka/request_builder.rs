@@ -1,13 +1,15 @@
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use rdkafka::message::OwnedHeaders;
+use tokio_util::codec::Encoder as _;
 use vector_core::{config::LogSchema, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     event::{Event, Finalizable, Value},
     internal_events::KafkaHeaderExtractionError,
     sinks::{
         kafka::service::{KafkaRequest, KafkaRequestMetadata},
-        util::encoding::{Encoder, EncodingConfig, StandardEncodings},
+        util::encoding::Transformer,
     },
     template::Template,
 };
@@ -16,12 +18,13 @@ pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
     pub headers_key: Option<String>,
     pub topic_template: Template,
-    pub encoder: EncodingConfig<StandardEncodings>,
+    pub transformer: Transformer,
+    pub encoder: Encoder<()>,
     pub log_schema: &'static LogSchema,
 }
 
 impl KafkaRequestBuilder {
-    pub fn build_request(&self, mut event: Event) -> Option<KafkaRequest> {
+    pub fn build_request(&mut self, mut event: Event) -> Option<KafkaRequest> {
         let topic = self.topic_template.render_string(&event).ok()?;
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
@@ -30,9 +33,11 @@ impl KafkaRequestBuilder {
             headers: get_headers(&event, &self.headers_key),
             topic,
         };
-        let mut body = vec![];
         let event_byte_size = event.size_of();
-        self.encoder.encode_input(event, &mut body).ok()?;
+        self.transformer.transform(&mut event);
+        let mut body = BytesMut::new();
+        self.encoder.encode(event, &mut body).ok()?;
+        let body = body.freeze();
         Some(KafkaRequest {
             body,
             metadata,
@@ -43,7 +48,9 @@ impl KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
+        Event::Log(log) => log
+            .get(key_field.as_str())
+            .map(|value| value.coerce_to_bytes()),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))
@@ -67,7 +74,7 @@ fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option
 fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeaders> {
     headers_key.as_ref().and_then(|headers_key| {
         if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_key) {
+            if let Some(headers) = log.get(headers_key.as_str()) {
                 match headers {
                     Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
@@ -75,7 +82,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                             if let Value::Bytes(value_bytes) = value {
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {
-                                emit!(&KafkaHeaderExtractionError {
+                                emit!(KafkaHeaderExtractionError {
                                     header_field: headers_key
                                 });
                             }
@@ -83,7 +90,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                         return Some(owned_headers);
                     }
                     _ => {
-                        emit!(&KafkaHeaderExtractionError {
+                        emit!(KafkaHeaderExtractionError {
                             header_field: headers_key
                         });
                     }

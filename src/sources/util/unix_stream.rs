@@ -1,6 +1,7 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{FutureExt, StreamExt};
 use tokio::{
     io::AsyncWriteExt,
@@ -16,14 +17,15 @@ use vector_core::ByteSizeOf;
 use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs,
+    codecs::Decoder,
     event::Event,
     internal_events::{
         BytesReceived, ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode,
         StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
+    sources::util::change_socket_permissions,
+    sources::Source,
     SourceSender,
 };
 
@@ -33,15 +35,18 @@ use crate::{
 /// syslog source).
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
-    decoder: codecs::Decoder,
+    socket_file_mode: Option<u32>,
+    decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
-    Box::pin(async move {
-        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
-        info!(message = "Listening.", path = ?listen_path, r#type = "unix");
+) -> crate::Result<Source> {
+    let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+    info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
+    change_socket_permissions(&listen_path, socket_file_mode)?;
+
+    Ok(Box::pin(async move {
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
         tokio::pin!(stream);
@@ -74,7 +79,7 @@ pub fn build_unix_stream_source(
 
             let stream = socket
                 .after_read(|byte_size| {
-                    emit!(&BytesReceived {
+                    emit!(BytesReceived {
                         protocol: "unix",
                         byte_size,
                     });
@@ -86,13 +91,12 @@ pub fn build_unix_stream_source(
             let mut out = out.clone();
             tokio::spawn(
                 async move {
-                    let _open_token =
-                        connection_open.open(|count| emit!(&ConnectionOpen { count }));
+                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
 
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok((mut events, _byte_size)) => {
-                                emit!(&SocketEventsReceived {
+                                emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.size_of(),
                                     count: events.len(),
@@ -102,11 +106,11 @@ pub fn build_unix_stream_source(
 
                                 let count = events.len();
                                 if let Err(error) = out.send_batch(events).await {
-                                    emit!(&StreamClosedError { error, count });
+                                    emit!(StreamClosedError { error, count });
                                 }
                             }
                             Err(error) => {
-                                emit!(&UnixSocketError {
+                                emit!(UnixSocketError {
                                     error: &error,
                                     path: &listen_path
                                 });
@@ -125,7 +129,7 @@ pub fn build_unix_stream_source(
                         error!(message = "Failed shutting down socket.", %error);
                     }
                 }
-                .instrument(span),
+                .instrument(span.or_current()),
             );
         }
 
@@ -139,12 +143,12 @@ pub fn build_unix_stream_source(
 
         // Delete socket file
         if let Err(error) = remove_file(&listen_path) {
-            emit!(&UnixSocketFileDeleteError {
+            emit!(UnixSocketFileDeleteError {
                 path: &listen_path,
                 error
             });
         }
 
         Ok(())
-    })
+    }))
 }

@@ -2,10 +2,13 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
+use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;
-#[cfg(unix)]
-use codecs::Decoder;
+use codecs::{
+    decoding::{Deserializer, Framer},
+    BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -15,11 +18,6 @@ use tokio_util::udp::UdpFramed;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    codecs::{
-        self,
-        decoding::{Deserializer, Framer},
-        BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
-    },
     config::{
         log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -29,7 +27,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
 };
 
@@ -51,7 +49,7 @@ pub enum Mode {
     Tcp {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         receive_buffer_bytes: Option<usize>,
         connection_limit: Option<u32>,
     },
@@ -60,7 +58,10 @@ pub enum Mode {
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix { path: PathBuf },
+    Unix {
+        path: PathBuf,
+        socket_file_mode: Option<u32>,
+    },
 }
 
 impl SyslogConfig {
@@ -140,7 +141,10 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => {
+            Mode::Unix {
+                path,
+                socket_file_mode,
+            } => {
                 let decoder = Decoder::new(
                     Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
                         self.max_length,
@@ -148,13 +152,14 @@ impl SourceConfig for SyslogConfig {
                     Deserializer::Syslog(SyslogDeserializer),
                 );
 
-                Ok(build_unix_stream_source(
+                build_unix_stream_source(
                     path,
+                    socket_file_mode,
                     decoder,
                     move |events, host| handle_events(events, &host_key, host),
                     cx.shutdown,
                     cx.out,
-                ))
+                )
             }
         }
     }
@@ -190,18 +195,18 @@ struct SyslogTcpSource {
 impl TcpSource for SyslogTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
             Deserializer::Syslog(SyslogDeserializer),
         )
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
-        handle_events(events, &self.host_key, Some(host));
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
+        handle_events(events, &self.host_key, Some(host.ip().to_string().into()));
     }
 
     fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
@@ -236,7 +241,7 @@ pub fn udp(
 
         let mut stream = UdpFramed::new(
             socket,
-            codecs::Decoder::new(
+            Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
                 Deserializer::Syslog(SyslogDeserializer),
             ),
@@ -252,7 +257,7 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(&SyslogUdpReadError { error });
+                        emit!(SyslogUdpReadError { error });
                         None
                     }
                 }
@@ -260,7 +265,7 @@ pub fn udp(
         })
         .boxed();
 
-        match out.send_stream(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
@@ -310,10 +315,11 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 #[cfg(test)]
 mod test {
     use chrono::prelude::*;
+    use codecs::decoding::format::Deserializer;
     use vector_common::assert_event_data_eq;
 
     use super::*;
-    use crate::{codecs::decoding::format::Deserializer, config::log_schema, event::Event};
+    use crate::{config::log_schema, event::Event};
 
     fn event_from_bytes(
         host_key: &str,
@@ -451,6 +457,28 @@ mod test {
         )
         .unwrap();
         assert!(matches!(config.mode, Mode::Unix { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_unix_permissions() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "unix"
+            path = "127.0.0.1:1235"
+            socket_file_mode = 0o777
+          "#,
+        )
+        .unwrap();
+        let socket_file_mode = match config.mode {
+            Mode::Unix {
+                path: _,
+                socket_file_mode,
+            } => socket_file_mode,
+            _ => panic!("expected Mode::Unix"),
+        };
+
+        assert_eq!(socket_file_mode, Some(0o777));
     }
 
     #[test]
