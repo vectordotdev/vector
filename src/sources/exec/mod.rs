@@ -609,7 +609,7 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         };
 
@@ -721,7 +721,7 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
