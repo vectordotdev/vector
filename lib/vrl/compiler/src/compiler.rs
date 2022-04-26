@@ -52,12 +52,9 @@ impl<'a> Compiler<'a> {
             .collect();
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
-            self.diagnostics
-                .into_iter()
-                .partition(|diagnostic| match diagnostic.severity() {
-                    Severity::Bug | Severity::Error => true,
-                    _ => false,
-                });
+            self.diagnostics.into_iter().partition(|diagnostic| {
+                matches!(diagnostic.severity(), Severity::Bug | Severity::Error)
+            });
 
         if !errors.is_empty() {
             return Err(errors.into());
