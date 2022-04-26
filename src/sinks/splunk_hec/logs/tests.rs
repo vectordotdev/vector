@@ -76,7 +76,6 @@ fn get_processed_event() -> HecProcessedEvent {
         indexed_fields.as_slice(),
         timestamp_nanos_key.as_deref(),
     )
-    .unwrap()
 }
 
 fn get_event_with_token(msg: &str, token: &str) -> Event {
