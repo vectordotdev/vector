@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
-use futures::{stream, Stream, StreamExt, TryFutureExt};
+use futures::{future::Shared, stream, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -19,16 +19,20 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
+    event::{BatchNotifier, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
     internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util,
+    shutdown::ShutdownSignal,
+    sources::util::{self, finalizer::UnorderedFinalizer},
     tls::{TlsConfig, TlsSettings},
+    SourceSender,
 };
 
 const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
 const MAX_ACK_DEADLINE_SECONDS: i32 = 600;
+
+type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // prost emits some generated code that includes clones on `Arc`
 // objects, which causes a clippy ding on this block. We don't
@@ -150,7 +154,8 @@ impl SourceConfig for PubsubConfig {
             decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
             tls: TlsSettings::from_options(&self.tls)?,
-            cx,
+            shutdown: cx.shutdown.shared(),
+            out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             ack_ids: Default::default(),
         }
@@ -183,7 +188,8 @@ struct PubsubSource {
     acknowledgements: bool,
     tls: TlsSettings,
     ack_deadline_seconds: i32,
-    cx: SourceContext,
+    shutdown: Shared<ShutdownSignal>,
+    out: SourceSender,
     // The acknowledgement IDs are pulled out of the response message
     // and then inserted into the request. However, the request is
     // generated in a separate async task from the response handling,
@@ -216,7 +222,7 @@ impl PubsubSource {
         // start if there is no data in the subscription.
         let request_stream = self.request_stream();
         let stream = tokio::select! {
-            _ = &mut self.cx.shutdown => return Ok(()),
+            _ = &mut self.shutdown => return Ok(()),
             result = client.streaming_pull(request_stream) => match result {
                     Err(source) => return Err(PubsubError::Pull { source }.into()),
                     Ok(stream) => stream,
@@ -224,11 +230,21 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
+        let finalizer = self.acknowledgements.then(|| {
+            let ack_ids = Arc::clone(&self.ack_ids);
+            Finalizer::new(self.shutdown.clone(), move |receipts| {
+                let ack_ids = Arc::clone(&ack_ids);
+                async move {
+                    ack_ids.lock().await.extend(receipts);
+                }
+            })
+        });
+
         loop {
             tokio::select! {
-                _ = &mut self.cx.shutdown => break,
+                _ = &mut self.shutdown => break,
                 response = stream.next() => match response {
-                    Some(Ok(response)) => self.handle_response(response).await,
+                    Some(Ok(response)) => self.handle_response(response, &finalizer).await,
                     Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
                     None => break,
                 },
@@ -273,7 +289,11 @@ impl PubsubSource {
         })
     }
 
-    async fn handle_response(&mut self, response: proto::StreamingPullResponse) {
+    async fn handle_response(
+        &mut self,
+        response: proto::StreamingPullResponse,
+        finalizer: &Option<Finalizer>,
+    ) {
         emit!(HttpClientBytesReceived {
             byte_size: response.size_of(),
             protocol: self.uri.scheme().map(Scheme::as_str).unwrap_or("http"),
@@ -284,18 +304,14 @@ impl PubsubSource {
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
 
         let count = events.len();
-        match self.cx.out.send_batch(events).await {
+        match self.out.send_batch(events).await {
             Err(error) => emit!(StreamClosedError { error, count }),
             Ok(()) => match notifier {
                 None => self.ack_ids.lock().await.extend(ids),
-                Some(notifier) => {
-                    let ack_ids = Arc::clone(&self.ack_ids);
-                    tokio::spawn(async move {
-                        if notifier.await == BatchStatus::Delivered {
-                            ack_ids.lock().await.extend(ids);
-                        }
-                    });
-                }
+                Some(notifier) => finalizer
+                    .as_ref()
+                    .expect("Finalizer must have been set up for acknowledgements")
+                    .add(ids, notifier),
             },
         }
     }

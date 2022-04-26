@@ -21,7 +21,11 @@ pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFu
 /// The `UnorderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order the finalization
 /// happens on the event batches*, using `FinalizerSet`.
-#[cfg(any(feature = "sources-aws_sqs", feature = "sources-splunk_hec"))]
+#[cfg(any(
+    feature = "sources-aws_sqs",
+    feature = "sources-splunk_hec",
+    feature = "sources-gcp_pubsub"
+))]
 pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
 
 /// The `FinalizerSet` framework here is a mechanism for marking
