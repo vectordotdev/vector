@@ -208,7 +208,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 drop_on_abort: true,
                     ..Default::default()
             }, &Default::default())
-            .unwrap().0,
+            .unwrap()
+            .0,
         );
 
         let mut event = Event::from("coerce me");
