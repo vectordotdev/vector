@@ -21,7 +21,7 @@ use aws_sdk_sqs::Client as SqsClient;
 use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
@@ -66,7 +66,7 @@ pub(super) struct Config {
 
     #[serde(default)]
     #[derivative(Default)]
-    pub(super) tls_options: Option<TlsOptions>,
+    pub(super) tls_options: Option<TlsConfig>,
 }
 
 const fn default_poll_secs() -> u32 {

@@ -21,7 +21,7 @@ use crate::{
         HealthcheckError,
     },
     test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
+    tls::{self, TlsConfig},
 };
 
 fn aws_server() -> String {
@@ -223,7 +223,7 @@ async fn insert_events_over_https() {
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),

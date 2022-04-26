@@ -33,7 +33,7 @@ use crate::{
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self, util::ErrorMessage},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -44,7 +44,7 @@ pub const TRACES: &str = "traces";
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct DatadogAgentConfig {
     address: SocketAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]

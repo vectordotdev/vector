@@ -20,7 +20,7 @@ use crate::{
     serde::bool_or_struct,
     shutdown::ShutdownSignalToken,
     sources::{util::AfterReadExt as _, Source},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -97,7 +97,7 @@ pub struct VectorConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

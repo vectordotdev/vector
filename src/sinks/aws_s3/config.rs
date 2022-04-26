@@ -24,7 +24,7 @@ use crate::{
         },
         Healthcheck,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
@@ -50,7 +50,7 @@ pub struct S3SinkConfig {
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -75,7 +75,7 @@ impl GenerateConfig for S3SinkConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            tls: Some(TlsOptions::default()),
+            tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
         })

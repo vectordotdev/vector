@@ -21,7 +21,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -60,7 +60,7 @@ pub(crate) struct DatadogLogsConfig {
         default
     )]
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -151,7 +151,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
