@@ -432,7 +432,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
-            ..
+            closure,
         } = node.into_inner();
 
         let arguments = arguments
@@ -444,7 +444,18 @@ impl<'a> Compiler<'a> {
             self.fallible = true;
         }
 
-        FunctionCall::new(
+        let (closure_variables, closure_block) = match closure {
+            Some(closure) => {
+                let span = closure.span();
+                let ast::FunctionClosure { variables, block } = closure.into_inner();
+                (Some(Node::new(span, variables)), Some(block))
+            }
+            None => (None, None),
+        };
+
+        // First, we create a new function-call builder to validate the
+        // expression.
+        function_call::Builder::new(
             call_span,
             ident,
             abort_on_error,
@@ -452,7 +463,20 @@ impl<'a> Compiler<'a> {
             self.fns,
             &mut self.local,
             external,
+            closure_variables,
         )
+        // Then, we compile the closure block, and compile the final
+        // function-call expression, including the attached closure.
+        .and_then(|builder| {
+            let block = closure_block.map(|block| {
+                let span = block.span();
+                let block = self.compile_block(block, external);
+
+                Node::new(span, block)
+            });
+
+            builder.compile(&mut self.local, external, block)
+        })
         .unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             FunctionCall::noop()
