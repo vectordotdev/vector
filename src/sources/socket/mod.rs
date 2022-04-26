@@ -228,10 +228,10 @@ mod test {
         time::{timeout, Duration, Instant},
     };
 
-    use codecs::{
-        decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig,
-        NewlineDelimitedDecoderConfig,
-    };
+    use codecs::NewlineDelimitedDecoderConfig;
+    #[cfg(unix)]
+    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
+
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -763,8 +763,8 @@ mod test {
         );
     }
 
-    #[tokio::test]
     #[cfg(unix)]
+    #[tokio::test]
     /// This test only works on Unix.
     /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
     /// Windows will drop the entire packet if we exceed the max_length so we are unable to
