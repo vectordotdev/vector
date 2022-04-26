@@ -71,7 +71,7 @@ impl Function for ForEach {
 
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         // TODO: this work will happen in a follow-up PR
-        Ok(Value::Null)
+        Err("function currently unavailable in VM runtime".into())
     }
 }
 
