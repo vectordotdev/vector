@@ -118,13 +118,29 @@ pub fn udp(
             buf.resize(max_length + 1, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = recv.map_err(|error| {
-                        let error = codecs::decoding::Error::FramingError(error.into());
-                        emit!(SocketReceiveError {
-                            mode: SocketMode::Udp,
-                            error: &error
-                        })
-                    })?;
+                    let (byte_size, address) = match recv {
+                        Ok(res) => res,
+                        Err(error) => {
+                            #[cfg(windows)]
+                            if let Some(err) = error.raw_os_error() {
+                                if err == 10040 {
+                                    // 10040 is the Windows error that the Udp message has exceeded max_length
+                                    warn!(
+                                        message = "Discarding frame larger than max_length.",
+                                        max_length = max_length,
+                                        internal_log_rate_secs = 30
+                                    );
+                                    continue;
+                                }
+                            }
+
+                            let error = codecs::decoding::Error::FramingError(error.into());
+                            return Err(emit!(SocketReceiveError {
+                                mode: SocketMode::Udp,
+                                error: &error
+                            }));
+                       }
+                    };
 
                     emit!(BytesReceived { byte_size, protocol: "udp" });
 

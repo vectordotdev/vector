@@ -764,6 +764,11 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg(unix)]
+    /// This test only works on Unix.
+    /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
+    /// Windows will drop the entire packet if we exceed the max_length so we are unable to
+    /// extract anything.
     async fn udp_max_length_delimited() {
         let (tx, rx) = SourceSender::new_test();
         let address = next_addr();
