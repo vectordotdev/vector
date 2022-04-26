@@ -62,7 +62,7 @@ jobs:
               - "Cargo.lock"
               - "Cargo.toml"
               - "Makefile"
-              - "rust-toolchain"
+              - "rust-toolchain.toml"
             deny:
               - 'deny.toml'
             dependencies:

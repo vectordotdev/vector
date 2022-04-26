@@ -57,6 +57,8 @@ mod flatten;
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "for_each")]
+mod for_each;
 #[cfg(feature = "format_int")]
 mod format_int;
 #[cfg(feature = "format_number")]
@@ -326,6 +328,8 @@ pub use flatten::Flatten;
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "for_each")]
+pub use for_each::ForEach;
 #[cfg(feature = "format_int")]
 pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
@@ -581,6 +585,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "for_each")]
+        Box::new(ForEach),
         #[cfg(feature = "format_int")]
         Box::new(FormatInt),
         #[cfg(feature = "format_number")]
