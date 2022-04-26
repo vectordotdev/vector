@@ -4,8 +4,12 @@ use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
-    function::{ArgumentList, FunctionCompileContext, Parameter},
+    expression::assignment::Details,
+    expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
+    function::{
+        closure::{self, VariableKind},
+        ArgumentList, Example, FunctionCompileContext, Parameter,
+    },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -13,35 +17,31 @@ use crate::{
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
-#[derive(Clone)]
-pub struct FunctionCall {
+use super::Block;
+
+pub(crate) struct Builder<'a> {
     abort_on_error: bool,
-    expr: Box<dyn Expression>,
     maybe_fallible_arguments: bool,
-
-    // used for enhancing runtime error messages (using abort-instruction).
-    //
-    // TODO: have span store line/col details to further improve this.
-    span: Span,
-
-    // used for equality check
-    ident: &'static str,
-
-    // The index of the function in the list of stdlib functions.
-    // Used by the VM to identify this function when called.
+    call_span: Span,
+    ident_span: Span,
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
+    closure: Option<(Vec<Node<Ident>>, closure::Input)>,
+    list: ArgumentList,
+    function: &'a dyn Function,
 }
 
-impl FunctionCall {
-    pub fn new(
+impl<'a> Builder<'a> {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
         call_span: Span,
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-        funcs: &[Box<dyn Function>],
+        funcs: &'a [Box<dyn Function>],
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
+        closure_variables: Option<Node<Vec<Node<Ident>>>>,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
@@ -167,16 +167,244 @@ impl FunctionCall {
                 })
             })?;
 
+        // Check function closure validity.
+        let closure = match (function.closure(), closure_variables) {
+            // Error if closure is provided for function that doesn't support
+            // any.
+            (None, Some(variables)) => {
+                let closure_span = variables.span();
+
+                return Err(Error::UnexpectedClosure {
+                    call_span,
+                    closure_span,
+                });
+            }
+
+            // Error if closure is missing from function that expects one.
+            (Some(definition), None) => {
+                let example = definition.inputs.get(0).map(|input| input.example);
+
+                return Err(Error::MissingClosure { call_span, example });
+            }
+
+            // Check for invalid closure signature.
+            (Some(definition), Some(variables)) => {
+                let mut matched = None;
+                let mut err_found_type_def = None;
+
+                'outer: for input in definition.inputs {
+                    // Check type definition for linked parameter.
+                    match list.arguments.get(input.parameter_keyword) {
+                        // No argument provided for the given parameter keyword.
+                        //
+                        // This means the closure can't act on the input
+                        // definition, so we continue on to the next. If no
+                        // input definitions are valid, the closure is invalid.
+                        None => continue,
+
+                        // We've found the function argument over which the
+                        // closure is going to resolve. We need to ensure the
+                        // type of this argument is as expected by the closure.
+                        Some(expr) => {
+                            let type_def = expr.type_def((local, external));
+
+                            // The type definition of the value does not match
+                            // the expected closure type, continue to check if
+                            // the closure eventually accepts this definition.
+                            //
+                            // Keep track of the type information, so that we
+                            // can report these in a diagnostic error if no
+                            // other input definition matches.
+                            if !input.kind.is_superset(type_def.kind()) {
+                                err_found_type_def = Some(type_def.kind().clone());
+                                continue;
+                            }
+
+                            matched = Some((input.clone(), expr));
+                            break 'outer;
+                        }
+                    };
+                }
+
+                // None of the inputs matched the value type, this is a user error.
+                match matched {
+                    None => {
+                        return Err(Error::ClosureParameterTypeMismatch {
+                            call_span,
+                            found_kind: err_found_type_def.unwrap_or_else(Kind::any),
+                        })
+                    }
+
+                    Some((input, target)) => {
+                        // Now that we know we have a matching parameter argument with a valid type
+                        // definition, we can move on to checking/defining the closure arguments.
+                        //
+                        // In doing so we:
+                        //
+                        // - check the arity of the closure arguments
+                        // - set the expected type definition of each argument
+                        if input.variables.len() != variables.len() {
+                            let closure_arguments_span =
+                                variables.first().map_or(call_span, |node| {
+                                    (node.span().start(), variables.last().unwrap().span().end())
+                                        .into()
+                                });
+
+                            return Err(Error::ClosureArityMismatch {
+                                ident_span,
+                                closure_arguments_span,
+                                expected: input.variables.len(),
+                                supplied: variables.len(),
+                            });
+                        }
+
+                        // Get the provided argument identifier in the same position as defined in the
+                        // input definition.
+                        //
+                        // That is, if the function closure definition expects:
+                        //
+                        //   [bytes, integer]
+                        //
+                        // Then, given for an actual implementation of:
+                        //
+                        //   foo() -> { |bar, baz| }
+                        //
+                        // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
+                        // integer.
+                        for (index, input_var) in input.variables.clone().into_iter().enumerate() {
+                            let call_ident = &variables[index];
+                            let type_def = target.type_def((local, external));
+
+                            let (type_def, value) = match input_var.kind {
+                                // The variable kind is expected to be exactly
+                                // the kind provided by the closure definition.
+                                VariableKind::Exact(kind) => (kind.into(), None),
+
+                                // The variable kind is expected to be equal to
+                                // the ind of the target of the closure.
+                                VariableKind::Target => {
+                                    (target.type_def((local, external)), target.as_value())
+                                }
+
+                                // The variable kind is expected to be equal to
+                                // the recuded kind of all values within the
+                                // target collection type.
+                                //
+                                // This assumes the target is a collection type,
+                                // or else it'll return "any".
+                                VariableKind::TargetInnerValue => {
+                                    let kind = if let Some(object) = type_def.as_object() {
+                                        object.reduced_kind()
+                                    } else if let Some(array) = type_def.as_array() {
+                                        array.reduced_kind()
+                                    } else {
+                                        Kind::any()
+                                    };
+
+                                    (kind.into(), None)
+                                }
+
+                                // The variable kind is expected to be equal to
+                                // the kind of all keys within the target
+                                // collection type.
+                                //
+                                // This means it's either a string for an
+                                // object, integer for an array, or
+                                // a combination of the two if the target isn't
+                                // known to be exactly one of the two.
+                                //
+                                // If the target can resolve to a non-collection
+                                // type, this again returns "any".
+                                VariableKind::TargetInnerKey => {
+                                    let mut kind = Kind::empty();
+
+                                    if !type_def.is_collection() {
+                                        kind = Kind::any()
+                                    } else {
+                                        if type_def.is_object() {
+                                            kind.add_bytes();
+                                        }
+                                        if type_def.is_array() {
+                                            kind.add_integer();
+                                        }
+                                    }
+
+                                    (kind.into(), None)
+                                }
+                            };
+
+                            let details = Details { type_def, value };
+
+                            local.insert_variable(call_ident.to_owned().into_inner(), details);
+                        }
+
+                        Some((variables.into_inner(), input))
+                    }
+                }
+            }
+
+            _ => None,
+        };
+
+        Ok(Self {
+            abort_on_error,
+            maybe_fallible_arguments,
+            call_span,
+            ident_span,
+            function_id,
+            arguments: Arc::new(arguments),
+            closure,
+            list,
+            function: function.as_ref(),
+        })
+    }
+
+    pub(crate) fn compile(
+        mut self,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+        closure_block: Option<Node<Block>>,
+    ) -> Result<FunctionCall, Error> {
+        let mut closure_fallible = false;
+
+        // Check if we have a closure we need to compile.
+        if let Some((variables, input)) = self.closure.clone() {
+            let block = closure_block.expect("closure must contain block");
+            closure_fallible = block.type_def((local, external)).is_fallible();
+
+            let (block_span, block) = block.take();
+
+            // Check the type definition of the resulting block.This needs to match
+            // whatever is configured by the closure input type.
+            let found_kind = block.type_def((local, external)).into();
+            let expected_kind = input.output.into_kind();
+            if !expected_kind.is_superset(&found_kind) {
+                return Err(Error::ReturnTypeMismatch {
+                    block_span,
+                    found_kind,
+                    expected_kind,
+                });
+            }
+
+            let variables = variables.into_iter().map(Node::into_inner).collect();
+            let closure = FunctionClosure::new(variables, block);
+            self.list.set_closure(closure);
+        };
+
+        let call_span = self.call_span;
+        let ident_span = self.ident_span;
+
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
         let external_context = external.swap_external_context(AnyMap::new());
 
         let mut compile_ctx =
-            FunctionCompileContext::new(call_span).with_external_context(external_context);
+            FunctionCompileContext::new(self.call_span).with_external_context(external_context);
 
-        let mut expr = function
-            .compile((local, external), &mut compile_ctx, list)
+        let mut expr = self
+            .function
+            .compile((local, external), &mut compile_ctx, self.list.clone())
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
@@ -185,8 +413,8 @@ impl FunctionCall {
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error
-            && !maybe_fallible_arguments
+        if self.abort_on_error
+            && !self.maybe_fallible_arguments
             && !expr.type_def((local, external)).is_fallible()
         {
             return Err(Error::AbortInfallible {
@@ -202,17 +430,41 @@ impl FunctionCall {
                 error: err.to_string(),
             })?;
 
-        Ok(Self {
-            abort_on_error,
+        Ok(FunctionCall {
+            abort_on_error: self.abort_on_error,
             expr,
-            maybe_fallible_arguments,
+            maybe_fallible_arguments: self.maybe_fallible_arguments,
+            closure_fallible,
             span: call_span,
-            ident: function.identifier(),
-            function_id,
-            arguments: Arc::new(arguments),
+            ident: self.function.identifier(),
+            function_id: self.function_id,
+            arguments: self.arguments.clone(),
         })
     }
+}
 
+#[derive(Clone)]
+pub struct FunctionCall {
+    abort_on_error: bool,
+    expr: Box<dyn Expression>,
+    maybe_fallible_arguments: bool,
+    closure_fallible: bool,
+
+    // used for enhancing runtime error messages (using abort-instruction).
+    //
+    // TODO: have span store line/col details to further improve this.
+    span: Span,
+
+    // used for equality check
+    ident: &'static str,
+
+    // The index of the function in the list of stdlib functions.
+    // Used by the VM to identify this function when called.
+    function_id: usize,
+    arguments: Arc<Vec<Node<FunctionArgument>>>,
+}
+
+impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
     /// The error path in this function should never really be hit as the compiler should
@@ -271,6 +523,7 @@ impl FunctionCall {
             abort_on_error: false,
             expr,
             maybe_fallible_arguments: false,
+            closure_fallible: false,
             span: Span::default(),
             ident: "noop",
             arguments: Arc::new(Vec::new()),
@@ -381,6 +634,22 @@ impl Expression for FunctionCall {
         // For the third event, both functions fail.
         //
         if self.maybe_fallible_arguments {
+            type_def = type_def.with_fallibility(true);
+        }
+
+        // If the function has a closure attached, and that closure is fallible,
+        // then the function call itself becomes fallible.
+        //
+        // Given that `FunctionClosure` also implements `Expression`, and
+        // function implementations can access this closure, it is possible the
+        // function implementation already handles potential closure
+        // fallibility, but to be on the safe side, we ensure it is set properly
+        // here.
+        //
+        // Note that, since closures are tied to function calls, it is still
+        // possible to silence potential closure errors using the "abort on
+        // error" function-call feature (see below).
+        if self.closure_fallible {
             type_def = type_def.with_fallibility(true);
         }
 
@@ -507,7 +776,7 @@ impl PartialEq for FunctionCall {
 
 #[derive(thiserror::Error, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum Error {
+pub(crate) enum Error {
     #[error("call to undefined function")]
     Undefined {
         ident_span: Span,
@@ -557,6 +826,31 @@ pub enum Error {
 
     #[error("error updating state {}", error)]
     UpdateState { call_span: Span, error: String },
+
+    #[error("unexpected closure")]
+    UnexpectedClosure { call_span: Span, closure_span: Span },
+
+    #[error("missing closure")]
+    MissingClosure {
+        call_span: Span,
+        example: Option<Example>,
+    },
+
+    #[error("invalid closure arity")]
+    ClosureArityMismatch {
+        ident_span: Span,
+        closure_arguments_span: Span,
+        expected: usize,
+        supplied: usize,
+    },
+    #[error("type mismatch in closure parameter")]
+    ClosureParameterTypeMismatch { call_span: Span, found_kind: Kind },
+    #[error("type mismatch in closure return type")]
+    ReturnTypeMismatch {
+        block_span: Span,
+        found_kind: Kind,
+        expected_kind: Kind,
+    },
 }
 
 impl DiagnosticError for Error {
@@ -573,6 +867,11 @@ impl DiagnosticError for Error {
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
             UpdateState { .. } => 640,
+            UnexpectedClosure { .. } => 109,
+            MissingClosure { .. } => 111,
+            ClosureArityMismatch { .. } => 120,
+            ClosureParameterTypeMismatch { .. } => 121,
+            ReturnTypeMismatch { .. } => 122,
         }
     }
 
@@ -726,6 +1025,29 @@ impl DiagnosticError for Error {
                 format!("an error occurred updating the compiler state: {}", error),
                 call_span,
             )],
+            UnexpectedClosure { call_span, closure_span } => vec![
+                Label::primary("unexpected closure", closure_span),
+                Label::context("this function does not accept a closure", call_span)
+            ],
+            MissingClosure { call_span, .. } => vec![Label::primary("this function expects a closure", call_span)],
+            ClosureArityMismatch { ident_span, closure_arguments_span, expected, supplied } => vec![
+                Label::primary(format!("this function requires a closure with {expected} argument(s)"), ident_span),
+                Label::context(format!("but {supplied} argument(s) are supplied"), closure_arguments_span)
+            ],
+            ClosureParameterTypeMismatch {
+                call_span,
+                found_kind,
+            } => vec![
+                Label::primary("the closure tied to this function call expects a different input value", call_span),
+                Label::context(format!("expression has an inferred type of {found_kind} where an array or object was expected"), call_span)],
+            ReturnTypeMismatch {
+                block_span,
+                found_kind,
+                expected_kind,
+            } => vec![
+                Label::primary("block returns invalid value type", block_span),
+                Label::context(format!("expected: {expected_kind}"), block_span),
+                Label::context(format!("received: {found_kind}"), block_span)],
         }
     }
 
@@ -817,6 +1139,11 @@ impl DiagnosticError for Error {
             }
 
             Compilation { error, .. } => error.notes(),
+
+            MissingClosure { example, .. } if example.is_some() => {
+                let code = example.unwrap().source.to_owned();
+                vec![Note::Example(code)]
+            }
 
             _ => vec![],
         }
@@ -911,7 +1238,7 @@ mod tests {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
 
-        FunctionCall::new(
+        Builder::new(
             Span::new(0, 0),
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
@@ -919,7 +1246,10 @@ mod tests {
             &[Box::new(TestFn) as _],
             &mut local,
             &mut external,
+            None,
         )
+        .unwrap()
+        .compile(&mut local, &mut external, None)
         .unwrap()
     }
 

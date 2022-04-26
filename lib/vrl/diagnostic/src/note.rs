@@ -5,6 +5,7 @@ use crate::Urls;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Note {
     Hint(String),
+    Example(String),
     CoerceValue,
     SeeFunctionDocs(&'static str),
     SeeErrorDocs,
@@ -39,6 +40,9 @@ impl fmt::Display for Note {
         match self {
             Hint(hint) => {
                 write!(f, "hint: {}", hint)
+            }
+            Example(example) => {
+                write!(f, "example: {}", example)
             }
             CoerceValue => {
                 Hint("coerce the value to the required type using a coercion function".to_owned())

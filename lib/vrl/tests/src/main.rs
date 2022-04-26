@@ -104,6 +104,23 @@ fn main() {
                 .into_iter()
                 .chain(enrichment::vrl_functions())
                 .for_each(|function| {
+                    if let Some(closure) = function.closure() {
+                        closure.inputs.iter().for_each(|input| {
+                            let test = Test::from_example(
+                                format!("{} (closure)", function.identifier()),
+                                &input.example,
+                            );
+
+                            if let Some(pat) = &cmd.pattern {
+                                if !format!("{}/{}", test.category, test.name).contains(pat) {
+                                    return;
+                                }
+                            }
+
+                            tests.push(test);
+                        });
+                    }
+
                     function.examples().iter().for_each(|example| {
                         let test = Test::from_example(function.identifier(), example);
 
