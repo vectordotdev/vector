@@ -673,7 +673,9 @@ sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
 # Datadog integration
 enterprise = [
   "sources-host_metrics",
+  "sources-internal_logs",
   "sources-internal_metrics",
+  "sinks-datadog_logs",
   "sinks-datadog_metrics",
   "sha2",
   "hex"
