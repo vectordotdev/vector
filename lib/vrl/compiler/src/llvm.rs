@@ -118,14 +118,14 @@ impl Compiler {
         let dylib = lljit.get_main_jit_dylib();
 
         lljit
-            .add_module(&dylib, self.0.create_module(context.module))
+            .add_module(&dylib, self.0.create_module(context.consume()))
             .unwrap();
 
         let definition_generator = Box::new(DefinitionGenerator {
             symbols: precompiled::symbols(),
         });
 
-        Ok(Library::new(lljit, definition_generator))
+        Ok(Library::new(self.0, lljit, definition_generator))
     }
 }
 
@@ -330,6 +330,10 @@ impl<'ctx> Context<'ctx> {
             Ok(())
         }
     }
+
+    fn consume(self) -> Module<'ctx> {
+        self.module
+    }
 }
 
 struct DefinitionGenerator {
@@ -391,14 +395,18 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
     }
 }
 
-pub struct Library<'jit>(LLJIT<'jit>, Box<DefinitionGenerator>);
+pub struct Library<'jit>(ThreadSafeContext, LLJIT<'jit>, Box<DefinitionGenerator>);
 
 impl<'jit> Library<'jit> {
-    fn new(lljit: LLJIT<'jit>, mut definition_generator: Box<DefinitionGenerator>) -> Self {
+    fn new(
+        thread_safe_context: ThreadSafeContext,
+        lljit: LLJIT<'jit>,
+        mut definition_generator: Box<DefinitionGenerator>,
+    ) -> Self {
         let dylib = lljit.get_main_jit_dylib();
         dylib.add_generator(definition_generator.as_mut());
 
-        Self(lljit, definition_generator)
+        Self(thread_safe_context, lljit, definition_generator)
     }
 
     pub fn get_function(
@@ -407,7 +415,7 @@ impl<'jit> Library<'jit> {
         Function<for<'a> unsafe extern "C" fn(&'a mut core::Context<'a>, &'a mut crate::Resolved)>,
         LLVMError,
     > {
-        unsafe { self.0.get_function(VRL_EXECUTE_SYMBOL) }.map(
+        unsafe { self.1.get_function(VRL_EXECUTE_SYMBOL) }.map(
             |function: Function<unsafe extern "C" fn()>| unsafe { std::mem::transmute(function) },
         )
     }
