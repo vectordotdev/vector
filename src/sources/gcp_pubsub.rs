@@ -393,7 +393,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn shuts_down0() {
+    async fn shuts_down_before_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
         tester.shutdown(shutdown).await; // Not shutdown_check because this emits nothing
@@ -405,7 +405,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn shuts_down1() {
+    async fn shuts_down_after_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
         let test_data = tester.send_test_events(1, btreemap![]).await;
