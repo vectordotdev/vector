@@ -52,11 +52,9 @@ where
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
-            .map(|event| (event.size_of(), event.into_log()))
-            .map(move |(event_byte_size, log)| {
+            .map(move |event| {
                 process_log(
-                    log,
-                    event_byte_size,
+                    event,
                     sourcetype,
                     source,
                     index,
@@ -131,8 +129,7 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 pub fn process_log(
-    mut log: LogEvent,
-    event_byte_size: usize,
+    event: Event,
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
@@ -140,6 +137,9 @@ pub fn process_log(
     indexed_fields: &[String],
     timestamp_nanos_key: Option<&str>,
 ) -> HecProcessedEvent {
+    let event_byte_size = event.size_of();
+    let mut log = event.into_log();
+
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
