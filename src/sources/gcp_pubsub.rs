@@ -416,6 +416,12 @@ mod integration_tests {
         assert!(rx.next().await.is_none());
         tester.send_test_events(1, btreemap![]).await;
         assert!(rx.next().await.is_none());
+        // The following assert is there to test that the source isn't
+        // pulling anything out of the subscription after it reports
+        // shutdown. It works when there wasn't anything previously in
+        // the topic, but does not work here despite evidence that the
+        // entire tokio task has exited.
+        // assert_eq!(tester.pull_count(1).await, 1);
     }
 
     #[tokio::test]
