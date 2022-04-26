@@ -1,11 +1,15 @@
 use std::{
+    cmp,
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
     iter::FromIterator,
+    mem::size_of,
+    num::NonZeroUsize,
     sync::Arc,
 };
 
+use atomig::{Atomic, Ordering};
 use bytes::Bytes;
 use chrono::Utc;
 use lookup::{lookup_v2::Path, LookupBuf};
@@ -19,13 +23,40 @@ use super::{
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LogEvent {
     #[serde(flatten)]
     fields: Arc<Value>,
 
     #[serde(skip)]
     metadata: EventMetadata,
+
+    #[serde(skip)]
+    byte_size_cache: Atomic<Option<NonZeroUsize>>,
+}
+
+impl Clone for LogEvent {
+    fn clone(&self) -> Self {
+        Self {
+            fields: Arc::clone(&self.fields),
+            metadata: self.metadata.clone(),
+            byte_size_cache: self.byte_size_cache.load(Ordering::Relaxed).into(),
+        }
+    }
+}
+
+impl PartialEq for LogEvent {
+    fn eq(&self, other: &Self) -> bool {
+        self.fields.eq(&other.fields) && self.metadata.eq(&other.metadata)
+    }
+}
+
+impl PartialOrd for LogEvent {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.fields
+            .partial_cmp(&other.fields)
+            .or_else(|| self.metadata.partial_cmp(&other.metadata))
+    }
 }
 
 impl LogEvent {
@@ -34,6 +65,7 @@ impl LogEvent {
     }
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         &mut self.metadata
     }
 }
@@ -44,11 +76,25 @@ impl Default for LogEvent {
             // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Arc::new(Value::Object(BTreeMap::new())),
             metadata: EventMetadata::default(),
+            byte_size_cache: Default::default(),
         }
     }
 }
 
 impl ByteSizeOf for LogEvent {
+    fn size_of(&self) -> usize {
+        self.byte_size_cache
+            .load(Ordering::Relaxed)
+            .unwrap_or_else(|| {
+                let byte_size = size_of::<Self>() + self.allocated_bytes();
+                let non_zero_size = NonZeroUsize::new(byte_size).expect("Size cannot be zero");
+                self.byte_size_cache
+                    .store(Some(non_zero_size), Ordering::Relaxed);
+                non_zero_size
+            })
+            .into()
+    }
+
     fn allocated_bytes(&self) -> usize {
         self.fields.allocated_bytes() + self.metadata.allocated_bytes()
     }
@@ -56,6 +102,7 @@ impl ByteSizeOf for LogEvent {
 
 impl Finalizable for LogEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         self.metadata.take_finalizers()
     }
 }
@@ -66,6 +113,7 @@ impl LogEvent {
         Self {
             fields: Arc::new(Value::Object(Default::default())),
             metadata,
+            byte_size_cache: Default::default(),
         }
     }
 
@@ -75,6 +123,7 @@ impl LogEvent {
         Self {
             fields: Arc::new(fields),
             metadata,
+            byte_size_cache: Default::default(),
         }
     }
 
@@ -107,6 +156,7 @@ impl LogEvent {
     }
 
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         self.metadata.add_finalizer(finalizer);
     }
 
@@ -130,6 +180,7 @@ impl LogEvent {
     }
 
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         Arc::make_mut(&mut self.fields).get_mut_by_path_v2(path)
     }
 
@@ -142,6 +193,7 @@ impl LogEvent {
         path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         util::log::insert(self.as_map_mut(), path, value.into())
     }
 
@@ -171,6 +223,7 @@ impl LogEvent {
                 .as_object_mut_unwrap()
                 .remove(from_key.as_ref())
             {
+                self.byte_size_cache.store(None, Ordering::Relaxed);
                 self.insert_flat(to_key, val);
             }
         }
@@ -201,6 +254,7 @@ impl LogEvent {
     }
 
     pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         util::log::remove(Arc::make_mut(&mut self.fields), path, prune)
     }
 
@@ -227,6 +281,7 @@ impl LogEvent {
     }
 
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         match Arc::make_mut(&mut self.fields) {
             Value::Object(ref mut map) => map,
             _ => unreachable!(),
@@ -253,6 +308,7 @@ impl LogEvent {
 
 impl MaybeAsLogMut for LogEvent {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        self.byte_size_cache.store(None, Ordering::Relaxed);
         Some(self)
     }
 }
@@ -291,6 +347,7 @@ impl From<BTreeMap<String, Value>> for LogEvent {
         LogEvent {
             fields: Arc::new(Value::Object(map)),
             metadata: EventMetadata::default(),
+            byte_size_cache: Default::default(),
         }
     }
 }
@@ -310,6 +367,7 @@ impl From<HashMap<String, Value>> for LogEvent {
         LogEvent {
             fields: Arc::new(map.into_iter().collect()),
             metadata: EventMetadata::default(),
+            byte_size_cache: Default::default(),
         }
     }
 }
