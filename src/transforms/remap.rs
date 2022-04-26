@@ -107,7 +107,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        let (transform, _) = match self.runtime {
+        let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
                 let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
@@ -117,6 +117,14 @@ impl TransformConfig for RemapConfig {
                 (Transform::synchronous(remap), warnings)
             }
         };
+
+        // TODO: We could improve on this by adding support for non-fatal error
+        // messages in the topology. This would make the topology responsible
+        // for printing warnings (including potentially emiting metrics),
+        // instead of individual transforms.
+        if !warnings.is_empty() {
+            eprintln!("{warnings}");
+        }
 
         Ok(transform)
     }
