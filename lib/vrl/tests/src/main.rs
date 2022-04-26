@@ -41,6 +41,7 @@ static AST_ONLY_TESTS: &[&str] = &[
     "functions/for_each/recursively iterate object",
     "functions/for_each/iterate array",
     "functions/for_each/recursively iterate array",
+    "functions/for_each (closure)/iterate array",
     // end: iteration-specific tests
 ];
 
