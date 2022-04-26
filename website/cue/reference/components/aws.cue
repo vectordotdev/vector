@@ -152,9 +152,10 @@ components: _aws: {
 
 				1. The [`access_key_id`](#auth.access_key_id) and [`secret_access_key`](#auth.secret_access_key) options.
 				2. The [`AWS_ACCESS_KEY_ID`](#auth.access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#auth.secret_access_key) environment variables.
-				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file (usually located at `~/.aws/config`).
-				4. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
-				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
+				3. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
+				4. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance
+				   with an instance profile/role). Requires IMDSv2 to be enabled. For EKS, you may need to increase the
+				   metadata token response hop limit to 2.
 
 				Note that use of
 				[`credentials_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)

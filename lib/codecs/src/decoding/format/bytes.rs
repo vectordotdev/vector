@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
 use vector_core::{
-    config::log_schema,
+    config::{log_schema, DataType},
     event::{Event, LogEvent},
     schema,
 };
@@ -23,6 +23,11 @@ impl BytesDeserializerConfig {
     /// Build the `BytesDeserializer` from this configuration.
     pub fn build(&self) -> BytesDeserializer {
         BytesDeserializer::new()
+    }
+
+    /// The data type of returned events
+    pub fn output_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

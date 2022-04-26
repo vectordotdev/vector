@@ -5,9 +5,14 @@ releases: "0.21.0": {
 	codename: ""
 
 	known_issues: [
-		"The `kubernetes_logs` source can panic when while processing Kubernetes watcher events. Will be fixed in `0.21.1`.",
-		"The `elasticsearch` sink fails to include the security token when signing requests for AWS authentication to OpenSearch. Will be fixed in `0.21.1`.",
-		"The `nats` source and sink authentication is not configured using snake_case keys. Will be fixed in `0.21.1`.",
+		"The `kubernetes_logs` source can panic when while processing Kubernetes watcher events when there is an error. [#12245](https://github.com/vectordotdev/vector/issues/12245). Fixed in `0.21.1`.",
+		"The `elasticsearch` sink fails to include the security token when signing requests for AWS authentication to OpenSearch. [#12249](https://github.com/vectordotdev/vector/issues/12249). Fixed in `0.21.1`.",
+		"The `nats` source and sink authentication options were not configurable. [#12262](https://github.com/vectordotdev/vector/issues/12262). Fixed in `0.21.1`.",
+		"The `internal_logs` source includes excess trace logs whenever `vector top` is used. [#12251](https://github.com/vectordotdev/vector/issues/12251). Fixed in `0.21.1`.",
+		"The `aws_cloudwatch_logs` source does not handle throttle responses from AWS. [#12253](https://github.com/vectordotdev/vector/issues/12253). Fixed in `0.21.1`.",
+		"Vector panics when loading configuration that includes event paths like `encoding.only_fields`. [#12256](https://github.com/vectordotdev/vector/issues/12256). Fixed in `0.21.1`.",
+		"Vector panicked when reloading configuration that added components to a running topology. [#12273](https://github.com/vectordotdev/vector/issues/12273). Fixed in `0.21.1`.",
+		"Using `assume_role` on AWS components did not function correctly. [#12314](https://github.com/vectordotdev/vector/issues/12314). Fixed in `0.21.1`.",
 	]
 
 	whats_next: [
@@ -79,7 +84,8 @@ releases: "0.21.0": {
 		  [report](https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+bug&template=bug.yml) any
 		  issues you find.
 		- A new `redis` source to complement the `redis` sink.
-		- Initial support for ingesting traces from the Datadog Agent and forwarding them to Datadog.
+		- Initial support for ingesting traces from the Datadog Agent (version < 6/7.33) and forwarding them to Datadog.
+		  We are working on adding support for newer Datadog Agents.
 		- The `kubernetes_logs` source has been rewritten to use the community supported
 		  [`kube-rs`](https://github.com/kube-rs/kube-rs) library. We expect that this will resolve some long
 		  outstanding bugs with Vector ceasing to process container logs. It also adds support for Kubernetes

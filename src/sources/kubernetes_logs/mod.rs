@@ -37,7 +37,7 @@ use crate::{
     internal_events::{
         BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
-        KubernetesLogsEventsReceived, StreamClosedError,
+        KubernetesLogsEventsReceived, KubernetesLogsPodInfo, StreamClosedError,
     },
     kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
@@ -416,7 +416,10 @@ impl Source {
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event.size_of(),
-                pod_name: file_info.as_ref().map(|info| info.pod_name),
+                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                    name: info.pod_name.to_owned(),
+                    namespace: info.pod_namespace.to_owned(),
+                }),
             });
 
             if file_info.is_none() {

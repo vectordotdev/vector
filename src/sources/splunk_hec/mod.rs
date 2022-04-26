@@ -34,7 +34,7 @@ use crate::{
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -49,15 +49,15 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub(self) struct SplunkConfig {
+pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
-    address: SocketAddr,
+    pub address: SocketAddr,
     /// Splunk HEC token. Deprecated - use `valid_tokens` instead
     token: Option<String>,
     /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     /// Splunk HEC indexer acknowledgement settings
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,

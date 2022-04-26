@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::convert::TryInto;
 use value::Kind;
-use vector_core::{config::log_schema, event::Event, schema};
+use vector_core::{
+    config::{log_schema, DataType},
+    event::Event,
+    schema,
+};
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -15,6 +19,11 @@ impl JsonDeserializerConfig {
     /// Build the `JsonDeserializer` from this configuration.
     pub fn build(&self) -> JsonDeserializer {
         Into::<JsonDeserializer>::into(self)
+    }
+
+    /// The data type of returned events
+    pub fn output_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

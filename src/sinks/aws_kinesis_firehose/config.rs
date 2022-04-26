@@ -30,7 +30,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -61,7 +61,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
