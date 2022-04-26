@@ -161,7 +161,7 @@ impl SourceConfig for SimpleHttpConfig {
                 ),
             }
         } else {
-            let decoding = self.decoding.clone().unwrap_or_else(|| default_decoding());
+            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
             let framing = self
                 .framing
                 .clone()
