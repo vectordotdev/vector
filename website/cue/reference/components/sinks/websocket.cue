@@ -27,7 +27,6 @@ components: sinks: websocket: {
 			request: enabled: false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -100,6 +99,7 @@ components: sinks: websocket: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {
