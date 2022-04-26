@@ -114,44 +114,29 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
         let mut encoder = self.1.clone();
-        let num_events = events.len();
         let mut bytes_written = 0;
-        match num_events {
-            0 => {
-                bytes_written += writer.write(encoder.batch_prefix())?;
-                bytes_written += writer.write(encoder.batch_suffix())?;
-            }
-            1 => {
-                let mut event = events.pop().unwrap();
-                bytes_written += writer.write(encoder.batch_prefix())?;
+        if events.is_empty() {
+            bytes_written += writer.write(encoder.batch_prefix())?;
+            bytes_written += writer.write(encoder.batch_suffix())?;
+        } else {
+            let last = events.pop().unwrap();
+            bytes_written += writer.write(encoder.batch_prefix())?;
+            for mut event in events {
                 self.0.transform(&mut event);
                 let mut bytes = BytesMut::new();
                 encoder
-                    .serialize(event, &mut bytes)
+                    .encode(event, &mut bytes)
                     .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
                 bytes_written += writer.write(&bytes)?;
-                bytes_written += writer.write(encoder.batch_suffix())?;
             }
-            _ => {
-                let last = events.pop().unwrap();
-                bytes_written += writer.write(encoder.batch_prefix())?;
-                for mut event in events {
-                    self.0.transform(&mut event);
-                    let mut bytes = BytesMut::new();
-                    encoder
-                        .encode(event, &mut bytes)
-                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                    bytes_written += writer.write(&bytes)?;
-                }
-                let mut event = last;
-                self.0.transform(&mut event);
-                let mut bytes = BytesMut::new();
-                encoder
-                    .serialize(event, &mut bytes)
-                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                bytes_written += writer.write(&bytes)?;
-                bytes_written += writer.write(encoder.batch_suffix())?;
-            }
+            let mut event = last;
+            self.0.transform(&mut event);
+            let mut bytes = BytesMut::new();
+            encoder
+                .serialize(event, &mut bytes)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            bytes_written += writer.write(&bytes)?;
+            bytes_written += writer.write(encoder.batch_suffix())?;
         }
 
         Ok(bytes_written)
