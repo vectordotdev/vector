@@ -19,7 +19,7 @@ use crate::{
         BytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 pub mod parser;
@@ -61,7 +61,7 @@ struct NginxMetricsConfig {
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
     namespace: String,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     auth: Option<Auth>,
 }
 

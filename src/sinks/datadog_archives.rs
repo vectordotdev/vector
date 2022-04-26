@@ -59,7 +59,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
@@ -91,7 +91,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

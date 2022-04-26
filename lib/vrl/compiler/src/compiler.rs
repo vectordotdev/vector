@@ -44,7 +44,7 @@ impl<'a> Compiler<'a> {
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<(Program, LocalEnv), Errors> {
+    ) -> Result<Program, Errors> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
@@ -55,13 +55,12 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        let program = Program {
+        Ok(Program {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
-        };
-
-        Ok((program, self.local))
+            local_env: self.local,
+        })
     }
 
     fn compile_root_exprs(
@@ -196,14 +195,28 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
-        // We track the original local state, as any mutations within the block
-        // are removed after the block returns.
-        let local = self.local.clone();
+        // We get a copy of the current local state, so that we can use it to
+        // remove any *new* state added in the block, as that state is lexically
+        // scoped to the block, and must not be visible to the rest of the
+        // program.
+        let local_snapshot = self.local.clone();
 
+        // We can now start compiling the expressions within the block, which
+        // will use the existing local state of the compiler, as blocks have
+        // access to any state of their parent expressions.
         let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
+
+        // Now that we've compiled the expressions, we pass them into the block,
+        // and also a copy of the local state, which includes any state added by
+        // the compiled expressions in the block.
         let block = Block::new(exprs, self.local.clone());
 
-        self.local = local;
+        // Take the local state snapshot captured before we started compiling
+        // the block, and merge back into it any mutations that happened to
+        // state the snapshot was already tracking. Then, revert the compiler
+        // local state to the updated snapshot.
+        self.local = local_snapshot.merge_mutations(self.local.clone());
+
         block
     }
 
@@ -419,6 +432,7 @@ impl<'a> Compiler<'a> {
             ident,
             abort_on_error,
             arguments,
+            closure,
         } = node.into_inner();
 
         let arguments = arguments
@@ -430,7 +444,18 @@ impl<'a> Compiler<'a> {
             self.fallible = true;
         }
 
-        FunctionCall::new(
+        let (closure_variables, closure_block) = match closure {
+            Some(closure) => {
+                let span = closure.span();
+                let ast::FunctionClosure { variables, block } = closure.into_inner();
+                (Some(Node::new(span, variables)), Some(block))
+            }
+            None => (None, None),
+        };
+
+        // First, we create a new function-call builder to validate the
+        // expression.
+        function_call::Builder::new(
             call_span,
             ident,
             abort_on_error,
@@ -438,7 +463,20 @@ impl<'a> Compiler<'a> {
             self.fns,
             &mut self.local,
             external,
+            closure_variables,
         )
+        // Then, we compile the closure block, and compile the final
+        // function-call expression, including the attached closure.
+        .and_then(|builder| {
+            let block = closure_block.map(|block| {
+                let span = block.span();
+                let block = self.compile_block(block, external);
+
+                Node::new(span, block)
+            });
+
+            builder.compile(&mut self.local, external, block)
+        })
         .unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             FunctionCall::noop()

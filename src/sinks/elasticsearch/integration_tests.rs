@@ -13,6 +13,7 @@ use vector_core::{
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
+    aws::RegionOrEndpoint,
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -20,7 +21,7 @@ use crate::{
         HealthcheckError,
     },
     test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
+    tls::{self, TlsConfig},
 };
 
 fn aws_server() -> String {
@@ -222,7 +223,7 @@ async fn insert_events_over_https() {
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -242,6 +243,7 @@ async fn insert_events_on_aws() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
         false,
@@ -258,6 +260,7 @@ async fn insert_events_on_aws_with_compression() {
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
         },

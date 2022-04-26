@@ -262,6 +262,7 @@ impl<'a> ArbitraryDepth<'a> for FunctionCall {
             ident,
             abort_on_error,
             arguments,
+            closure: None,
         })
     }
 }

@@ -47,10 +47,12 @@ async fn firehose_put_records() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
+    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
+        region: region.clone(),
+        encoding: EncodingConfig::from(StandardEncodings::Json).into(), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -82,6 +84,7 @@ async fn firehose_put_records() {
             index: Some(stream.clone()),
             action: None,
         }),
+        aws: Some(region),
         ..Default::default()
     };
     let common = ElasticsearchCommon::parse_config(&config)

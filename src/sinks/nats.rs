@@ -18,7 +18,7 @@ use crate::{
         StreamSink,
     },
     template::{Template, TemplateParseError},
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -43,7 +43,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
     subject: String,
     url: String,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<NatsAuthConfig>,
 }
 
@@ -233,7 +233,7 @@ mod integration_tests {
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use crate::tls::TlsOptions;
+    use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), BuildError> {
         // Publish `N` messages to NATS.
@@ -481,9 +481,9 @@ mod integration_tests {
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://localhost:4227".to_owned(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -533,9 +533,9 @@ mod integration_tests {
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://localhost:4228".to_owned(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     crt_file: Some("tests/data/nats_client_cert.pem".into()),
                     key_file: Some("tests/data/nats_client_key.pem".into()),
@@ -564,9 +564,9 @@ mod integration_tests {
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://localhost:4228".to_owned(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -593,9 +593,9 @@ mod integration_tests {
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://localhost:4229".to_owned(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -626,9 +626,9 @@ mod integration_tests {
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://localhost:4229".to_owned(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },

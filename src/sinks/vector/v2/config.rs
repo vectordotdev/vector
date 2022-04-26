@@ -23,7 +23,7 @@ use crate::{
         },
         Healthcheck, VectorSink as VectorSinkType,
     },
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -37,7 +37,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

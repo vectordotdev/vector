@@ -46,6 +46,17 @@ impl SocketConfig {
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
+
+    fn output_type(&self) -> DataType {
+        match &self.mode {
+            Mode::Tcp(config) => config.decoding().output_type(),
+            Mode::Udp(config) => config.decoding().output_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(config) => config.decoding.output_type(),
+            #[cfg(unix)]
+            Mode::UnixStream(config) => config.decoding.output_type(),
+        }
+    }
 }
 
 impl From<tcp::TcpConfig> for SocketConfig {
@@ -186,7 +197,7 @@ impl SourceConfig for SocketConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -260,7 +271,7 @@ mod test {
             components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{self, TlsConfig, TlsOptions},
+        tls::{self, TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -392,7 +403,7 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_tls(Some(TlsConfig::test_config()));
+        config.set_tls(Some(TlsEnableableConfig::test_config()));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx, None))
@@ -429,9 +440,9 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_tls(Some(TlsConfig {
+        config.set_tls(Some(TlsEnableableConfig {
             enabled: Some(true),
-            options: TlsOptions {
+            options: TlsConfig {
                 crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
                 key_file: Some("tests/data/Crt_from_intermediate.key".into()),
                 ..Default::default()

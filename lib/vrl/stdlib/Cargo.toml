@@ -91,6 +91,7 @@ default = [
     "flatten",
     "float",
     "floor",
+    "for_each",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -222,6 +223,7 @@ find_table_row = []
 flatten = []
 float = []
 floor = []
+for_each = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
