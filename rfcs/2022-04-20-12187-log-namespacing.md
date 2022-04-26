@@ -78,7 +78,8 @@ and no support is being added here.
 
 #### Native / Native JSON
 
-The behavior for these do not change. Sources such as the "Vector" source will pass through the event as-is.
+When these are used in the "Vector" source, the behavior will not change, and events will be passed through as-is.
+For any other source, deserialized data should be nested under "data", unless it can be elided (same rules as the JSON source).
 
 ### Event Metadata
 
@@ -341,6 +342,48 @@ metadata
 ```
 
 -----
+
+#### Kafka source / Native codec / Vector namespace
+
+This is an example where an event came from a Kafka source (JSON codec), through a Kafka sink (using native codec), and then back out a Kafka source (native codec).
+
+event
+
+```json
+{
+  "data": {
+    "data": {
+      "derivative": -2.266778047142367e+125,
+      "integral": "13028769352377685187",
+      "mineral": "H 9 ",
+      "proportional": 3673342615,
+      "vegetable": -30083
+    },
+    "key": "the key of the message (from the 1st kafka source)"
+    "headers": {
+      "header-a-key": "header-a-value (from the 1st kafka source)",
+      "header-b-key": "header-b-value (from the 1st kafka source)",
+    }
+  },
+  "key": "the key of the message (from the 2nd kafka source)"
+  "headers": {
+    "header-a-key": "header-a-value (from the 2nd kafka source)",
+    "header-b-key": "header-b-value (from the 2nd kafka source)",
+  }
+}
+```
+
+metadata (only from the 2nd kafka source)
+
+```json
+{
+  "topic": "name of topic",
+  "partition": 3,
+  "offset": 1829448,
+  "source_type": "kafka",
+  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
+}
+```
 
 
 
