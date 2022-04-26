@@ -16,7 +16,7 @@ use super::util::MultilineConfig;
 use crate::aws::RegionOrEndpoint;
 use crate::aws::{create_client, ClientBuilder};
 use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -70,7 +70,7 @@ struct AwsS3Config {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
 }
 
 inventory::submit! {

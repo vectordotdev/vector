@@ -1672,7 +1672,7 @@ dependencies = [
  "indoc",
  "memchr",
  "pretty_assertions",
- "prost 0.9.0",
+ "prost 0.10.1",
  "serde",
  "serde_json",
  "smallvec",
@@ -1748,9 +1748,9 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24cb05777feccbb2642d4f2df44d0505601a2cd88ca517d8c913f263a5a8dc8b"
 dependencies = [
- "prost 0.10.0",
- "prost-types 0.10.0",
- "tonic 0.7.1",
+ "prost 0.10.1",
+ "prost-types 0.10.1",
+ "tonic",
  "tracing-core 0.1.26",
 ]
 
@@ -1766,13 +1766,13 @@ dependencies = [
  "futures 0.3.21",
  "hdrhistogram",
  "humantime",
- "prost-types 0.10.0",
+ "prost-types 0.10.1",
  "serde",
  "serde_json",
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.7.1",
+ "tonic",
  "tracing 0.1.34",
  "tracing-core 0.1.26",
  "tracing-subscriber",
@@ -5781,6 +5781,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b83ec2d0af5c5c556257ff52c9f98934e243b9fd39604bfb2a9b75ec2e97f18"
+dependencies = [
+ "proc-macro2 1.0.37",
+ "syn 1.0.91",
+]
+
+[[package]]
 name = "prettytable-rs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5859,9 +5869,9 @@ dependencies = [
  "indexmap",
  "nom 7.1.1",
  "num_enum",
- "prost 0.9.0",
- "prost-build 0.9.0",
- "prost-types 0.9.0",
+ "prost 0.10.1",
+ "prost-build 0.10.1",
+ "prost-types 0.10.1",
  "snafu",
  "vector_common",
 ]
@@ -5910,19 +5920,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "444879275cb4fd84958b1a1d5420d15e6fcf7c235fe47f053c9c2a80aceb6001"
-dependencies = [
- "bytes 1.1.0",
- "prost-derive 0.9.0",
-]
-
-[[package]]
-name = "prost"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bd5316aa8f5c82add416dfbc25116b84b748a21153f512917e8143640a71bbd"
+checksum = "a07b0857a71a8cb765763950499cae2413c3f9cede1133478c43600d9e146890"
 dependencies = [
  "bytes 1.1.0",
  "prost-derive 0.10.0",
@@ -5948,19 +5948,21 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62941722fb675d463659e49c4f3fe1fe792ff24fe5bbaa9c08cd3b98a1c354f5"
+checksum = "120fbe7988713f39d780a58cf1a7ef0d7ef66c6d87e5aa3438940c05357929f4"
 dependencies = [
  "bytes 1.1.0",
- "heck 0.3.3",
+ "cfg-if 1.0.0",
+ "cmake",
+ "heck 0.4.0",
  "itertools",
  "lazy_static",
  "log",
  "multimap",
  "petgraph 0.6.0",
- "prost 0.9.0",
- "prost-types 0.9.0",
+ "prost 0.10.1",
+ "prost-types 0.10.1",
  "regex",
  "tempfile",
  "which 4.2.2",
@@ -5971,19 +5973,6 @@ name = "prost-derive"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
-dependencies = [
- "anyhow",
- "itertools",
- "proc-macro2 1.0.37",
- "quote 1.0.18",
- "syn 1.0.91",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9cc1a3263e07e0bf68e96268f37665207b49560d98739662cdfaae215c720fe"
 dependencies = [
  "anyhow",
  "itertools",
@@ -6017,22 +6006,12 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534b7a0e836e3c482d2693070f982e39e7611da9695d4d1f5a4b186b51faef0a"
+checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.1.0",
- "prost 0.9.0",
-]
-
-[[package]]
-name = "prost-types"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "926681c118ae6e512a3ccefd4abbe5521a14f4cc1e207356d4d00c0b7f2006fd"
-dependencies = [
- "bytes 1.1.0",
- "prost 0.10.0",
+ "prost 0.10.1",
 ]
 
 [[package]]
@@ -8002,12 +7981,13 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.6.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff08f4649d10a70ffa3522ca559031285d8e421d727ac85c60825761818f5d0a"
+checksum = "30fb54bf1e446f44d870d260d99957e7d11fb9d0a0f5bd1a662ad1411cc103f9"
 dependencies = [
  "async-stream",
  "async-trait",
+ "axum",
  "base64 0.13.0",
  "bytes 1.1.0",
  "flate2",
@@ -8020,42 +8000,11 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project 1.0.10",
- "prost 0.9.0",
- "prost-derive 0.9.0",
- "tokio",
- "tokio-rustls 0.22.0",
- "tokio-stream",
- "tokio-util 0.6.8",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing 0.1.34",
- "tracing-futures 0.2.5",
-]
-
-[[package]]
-name = "tonic"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30fb54bf1e446f44d870d260d99957e7d11fb9d0a0f5bd1a662ad1411cc103f9"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum",
- "base64 0.13.0",
- "bytes 1.1.0",
- "futures-core",
- "futures-util",
- "h2",
- "http",
- "http-body",
- "hyper",
- "hyper-timeout",
- "percent-encoding",
- "pin-project 1.0.10",
- "prost 0.10.0",
+ "prost 0.10.1",
  "prost-derive 0.10.0",
+ "rustls-pemfile 0.3.0",
  "tokio",
+ "tokio-rustls 0.23.3",
  "tokio-stream",
  "tokio-util 0.7.0",
  "tower",
@@ -8067,12 +8016,13 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9403f1bafde247186684b230dc6f38b5cd514584e8bec1dd32514be4745fa757"
+checksum = "4d17087af5c80e5d5fc8ba9878e60258065a0a757e35efe7a05b7904bece1943"
 dependencies = [
+ "prettyplease",
  "proc-macro2 1.0.37",
- "prost-build 0.9.0",
+ "prost-build 0.10.1",
  "quote 1.0.18",
  "syn 1.0.91",
 ]
@@ -8819,8 +8769,8 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "proptest",
- "prost 0.9.0",
- "prost-build 0.9.0",
+ "prost 0.10.1",
+ "prost-build 0.10.1",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -8862,7 +8812,7 @@ dependencies = [
  "tokio-test",
  "tokio-util 0.6.8",
  "toml",
- "tonic 0.6.2",
+ "tonic",
  "tonic-build",
  "tower",
  "tower-test",
@@ -9062,9 +9012,9 @@ dependencies = [
  "pin-project 1.0.10",
  "pretty_assertions",
  "proptest",
- "prost 0.9.0",
- "prost-build 0.9.0",
- "prost-types 0.9.0",
+ "prost 0.10.1",
+ "prost-build 0.10.1",
+ "prost-types 0.10.1",
  "quickcheck",
  "rand 0.8.5",
  "rand_distr",

@@ -35,7 +35,7 @@ use crate::{
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -88,7 +88,7 @@ pub struct HttpSinkConfig {
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

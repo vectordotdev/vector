@@ -25,7 +25,7 @@ use super::{
 use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -44,7 +44,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &str,
         strict_path: bool,
-        tls: &Option<TlsConfig>,
+        tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,

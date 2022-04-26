@@ -1,7 +1,7 @@
 use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
 use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
     config::{AcknowledgementsConfig, Output, SourceConfig, SourceContext},
@@ -50,7 +50,7 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 }
 
 #[async_trait::async_trait]
