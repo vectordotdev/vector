@@ -4,6 +4,10 @@ use aws_config::{
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
 
+// matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
+// default rather than relying on the SDK default to not change
+const DEFAULT_LOAD_TIMEOUT_SECS: u64 = 5;
+
 /// Configuration for configuring authentication strategy for AWS.
 #[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -20,13 +24,12 @@ pub enum AwsAuthentication {
     },
     Role {
         assume_role: String,
+        load_timeout_secs: Option<u64>,
     },
     // Default variant is used instead of Option<AWSAuthentication> since even for
     // None we need to build `AwsCredentialsProvider`.
-    //
-    // {} is required to work around a bug in serde. https://github.com/serde-rs/serde/issues/1374
     #[derivative(Default)]
-    Default {},
+    Default { load_timeout_secs: Option<u64> },
 }
 
 impl AwsAuthentication {
@@ -46,15 +49,18 @@ impl AwsAuthentication {
             AwsAuthentication::File { .. } => {
                 Err("Overriding the credentials file is not supported.".into())
             }
-            AwsAuthentication::Role { assume_role } => {
+            AwsAuthentication::Role {
+                assume_role,
+                load_timeout_secs,
+            } => {
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
                     .region(region.clone())
-                    .build(default_credentials_provider(region).await);
+                    .build(default_credentials_provider(region, *load_timeout_secs).await);
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
-            AwsAuthentication::Default {} => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(region).await,
+            AwsAuthentication::Default { load_timeout_secs } => Ok(SharedCredentialsProvider::new(
+                default_credentials_provider(region, *load_timeout_secs).await,
             )),
         }
     }
@@ -68,13 +74,17 @@ impl AwsAuthentication {
     }
 }
 
-async fn default_credentials_provider(region: Region) -> SharedCredentialsProvider {
+async fn default_credentials_provider(
+    region: Region,
+    load_timeout_secs: Option<u64>,
+) -> SharedCredentialsProvider {
     let chain = DefaultCredentialsChain::builder()
         .region(region)
-        .build()
-        .await;
+        .load_timeout(std::time::Duration::from_secs(
+            load_timeout_secs.unwrap_or(DEFAULT_LOAD_TIMEOUT_SECS),
+        ));
 
-    SharedCredentialsProvider::new(chain)
+    SharedCredentialsProvider::new(chain.build().await)
 }
 
 #[cfg(test)]
