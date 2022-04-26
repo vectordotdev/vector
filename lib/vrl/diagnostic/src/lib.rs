@@ -41,6 +41,13 @@ pub trait DiagnosticMessage: std::error::Error {
     fn notes(&self) -> Vec<Note> {
         vec![]
     }
+
+    /// The severity of the message.
+    ///
+    /// Defaults to `error`.
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
 }
 
 pub struct Urls;

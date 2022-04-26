@@ -106,13 +106,13 @@ impl Diagnostic {
 }
 
 impl From<Box<dyn DiagnosticMessage>> for Diagnostic {
-    fn from(error: Box<dyn DiagnosticMessage>) -> Self {
+    fn from(message: Box<dyn DiagnosticMessage>) -> Self {
         Self {
-            severity: Severity::Error,
-            code: error.code(),
-            message: error.message(),
-            labels: error.labels(),
-            notes: error.notes(),
+            severity: message.severity(),
+            code: message.code(),
+            message: message.message(),
+            labels: message.labels(),
+            notes: message.notes(),
         }
     }
 }
