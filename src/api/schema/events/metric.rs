@@ -78,7 +78,7 @@ impl Metric {
 
     /// Metric timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.data().timestamp().as_ref()
+        self.event.data().timestamp()
     }
 
     /// Metric name

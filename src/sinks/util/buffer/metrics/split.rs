@@ -147,9 +147,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                         value: f64::from(count),
                     },
                 );
-                let count_metadata = metadata
-                    .clone()
-                    .with_finalizers(metadata.finalizers().fork());
+                let count_metadata = metadata.clone();
 
                 metrics.push_back(Metric::from_parts(count_series, count_data, count_metadata));
 
@@ -164,9 +162,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                             value: quantile.value,
                         },
                     );
-                    let quantile_metadata = metadata
-                        .clone()
-                        .with_finalizers(metadata.finalizers().fork());
+                    let quantile_metadata = metadata.clone();
 
                     metrics.push_back(Metric::from_parts(
                         quantile_series,
