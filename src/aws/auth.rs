@@ -3,10 +3,11 @@ use aws_config::{
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
-const DEFAULT_LOAD_TIMEOUT_SECS: u64 = 5;
+const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Configuration for configuring authentication strategy for AWS.
 #[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
@@ -80,9 +81,11 @@ async fn default_credentials_provider(
 ) -> SharedCredentialsProvider {
     let chain = DefaultCredentialsChain::builder()
         .region(region)
-        .load_timeout(std::time::Duration::from_secs(
-            load_timeout_secs.unwrap_or(DEFAULT_LOAD_TIMEOUT_SECS),
-        ));
+        .load_timeout(
+            load_timeout_secs
+                .map(Duration::from_secs)
+                .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+        );
 
     SharedCredentialsProvider::new(chain.build().await)
 }
@@ -106,7 +109,24 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AwsAuthentication::Default {}));
+        assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
+    }
+
+    #[test]
+    fn parsing_default_with_load_timeout() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            load_timeout_secs = 10
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            config.auth,
+            AwsAuthentication::Default {
+                load_timeout_secs: Some(10)
+            }
+        ));
     }
 
     #[test]
@@ -118,7 +138,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AwsAuthentication::Default {}));
+        assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
     }
 
     #[test]
@@ -126,6 +146,7 @@ mod tests {
         let config = toml::from_str::<ComponentConfig>(
             r#"
             auth.assume_role = "root"
+            auth.load_timeout_secs = 10
         "#,
         )
         .unwrap();
@@ -139,12 +160,19 @@ mod tests {
             r#"
             assume_role = "root"
             auth.assume_role = "auth.root"
+            auth.load_timeout_secs = 10
         "#,
         )
         .unwrap();
 
         match config.auth {
-            AwsAuthentication::Role { assume_role } => assert_eq!(&assume_role, "auth.root"),
+            AwsAuthentication::Role {
+                assume_role,
+                load_timeout_secs,
+            } => {
+                assert_eq!(&assume_role, "auth.root");
+                assert_eq!(load_timeout_secs, Some(10));
+            }
             _ => panic!(),
         }
     }

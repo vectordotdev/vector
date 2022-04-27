@@ -241,7 +241,9 @@ async fn insert_events_on_aws() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
@@ -258,7 +260,9 @@ async fn insert_events_on_aws_with_compression() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
