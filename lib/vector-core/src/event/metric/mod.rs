@@ -474,7 +474,8 @@ macro_rules! quantiles {
     }
 }
 
-pub fn zip_samples(
+#[inline]
+pub(crate) fn zip_samples(
     values: impl IntoIterator<Item = f64>,
     rates: impl IntoIterator<Item = u32>,
 ) -> Vec<Sample> {
@@ -485,7 +486,8 @@ pub fn zip_samples(
         .collect()
 }
 
-pub fn zip_buckets(
+#[inline]
+pub(crate) fn zip_buckets(
     limits: impl IntoIterator<Item = f64>,
     counts: impl IntoIterator<Item = u32>,
 ) -> Vec<Bucket> {
@@ -496,7 +498,8 @@ pub fn zip_buckets(
         .collect()
 }
 
-pub fn zip_quantiles(
+#[inline]
+pub(crate) fn zip_quantiles(
     quantiles: impl IntoIterator<Item = f64>,
     values: impl IntoIterator<Item = f64>,
 ) -> Vec<Quantile> {
