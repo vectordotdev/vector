@@ -148,7 +148,11 @@ impl Display for ReportingError {
         match self {
             Self::Http(err) => write!(f, "{}", err),
             Self::StatusCode(status) => {
-                write!(f, "Request was unsuccessful: {}", status)
+                write!(
+                    f,
+                    "Request was unsuccessful and could not be retried: {}",
+                    status
+                )
             }
             Self::EndpointError(err) => write!(f, "{}", err),
             Self::TooManyRedirects => {
@@ -185,7 +189,7 @@ impl ReportingRetryBackoff {
     async fn wait(&mut self) {
         let retry_backoff = self.next().unwrap();
         info!(
-            "Retrying config reporting to {} in {} seconds.",
+            "Retrying configuration reporting to {} in {} seconds.",
             DATADOG_REPORTING_PRODUCT,
             retry_backoff.as_secs_f32()
         );
@@ -470,6 +474,7 @@ async fn report_serialized_config_to_datadog<'a>(
         let res = client.send(req).await;
         if let Err(HttpError::CallRequest { source: error }) = &res {
             if error.is_timeout() {
+                info!(message = "Configuration reporting request timed out.", error = %error);
                 backoff.wait().await;
                 continue;
             }
@@ -491,10 +496,12 @@ async fn report_serialized_config_to_datadog<'a>(
                         .map_err(|_| ReportingError::InvalidRedirectUrl)?,
                 )
                 .map_err(ReportingError::EndpointError)?;
+            info!(message = "Configuration reporting request redirected.", endpoint = %endpoint);
             continue;
         } else if status.is_redirection() && redirected {
             return Err(ReportingError::TooManyRedirects);
         } else if status.is_client_error() || status.is_server_error() {
+            info!(message = "Encountered retriable error.", status = %status);
             backoff.wait().await;
             continue;
         } else if status.is_success() {
