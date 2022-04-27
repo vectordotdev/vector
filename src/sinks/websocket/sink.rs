@@ -35,7 +35,7 @@ use crate::{
     dns, emit,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished, WsConnectionFailed,
+        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished, WsConnectionFailedError,
         WsConnectionShutdown,
     },
     sinks::util::{
@@ -144,7 +144,7 @@ impl WebSocketConnector {
                     return ws_stream;
                 }
                 Err(error) => {
-                    emit!(WsConnectionFailed { error });
+                    emit!(WsConnectionFailedError { error: Box::new(error) });
                     time::sleep(backoff.next().unwrap()).await;
                 }
             }

@@ -2,6 +2,7 @@ use metrics::counter;
 use std::error::Error;
 use std::fmt::Debug;
 use vector_core::internal_event::InternalEvent;
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct WsConnectionEstablished;
@@ -18,17 +19,25 @@ impl InternalEvent for WsConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct WsConnectionFailed<E> {
-    pub error: E,
+pub struct WsConnectionFailedError {
+    pub error: Box<dyn Error>,
 }
 
-impl<E> InternalEvent for WsConnectionFailed<E>
-where
-    E: Error,
-{
+impl InternalEvent for WsConnectionFailedError {
     fn emit(self) {
-        error!(message = "Unable to connect.", error = %self.error);
-        counter!("connection_failed_total", 1);
+        error!(
+            message = "WebSocket connection failed.",
+            error = %self.error,
+            error_code = "ws_connection_error",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "ws_connection_failed",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::SENDING,
+        );
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -51,17 +60,25 @@ impl InternalEvent for WsConnectionShutdown {
 }
 
 #[derive(Debug)]
-pub struct WsConnectionError<E> {
-    pub error: E,
+pub struct WsConnectionError {
+    pub error: tokio_tungstenite::tungstenite::Error,
 }
 
-impl<E> InternalEvent for WsConnectionError<E>
-where
-    E: Error,
-{
+impl InternalEvent for WsConnectionError {
     fn emit(self) {
-        error!(message = "WebSocket connection error.", error = %self.error);
-        counter!("connection_errors_total", 1);
+        error!(
+            message = "WebSocket connection error.",
+            error = %self.error,
+            error_code = "ws_connection_error",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "ws_connection_error",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
     }
 
     fn name(&self) -> Option<&'static str> {
