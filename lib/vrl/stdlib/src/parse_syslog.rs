@@ -37,9 +37,11 @@ impl Function for ParseSyslog {
             source: r#"parse_syslog!(s'<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!')"#,
             result: Ok(indoc! {r#"{
                 "appname": "non",
-                "exampleSDID@32473.eventID": "1011",
-                "exampleSDID@32473.eventSource": "Application",
-                "exampleSDID@32473.iut": "3",
+                "exampleSDID@32473": {
+                    "eventID": "1011",
+                    "eventSource": "Application",
+                    "iut": "3"
+                },
                 "facility": "user",
                 "hostname": "dynamicwireless.name",
                 "message": "Try to override the THX port, maybe it will reboot the neural interface!",
