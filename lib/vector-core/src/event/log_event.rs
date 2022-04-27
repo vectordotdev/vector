@@ -44,6 +44,10 @@ impl ByteSizeOf for Inner {
             .load(Ordering::Relaxed)
             .unwrap_or_else(|| {
                 let size = size_of::<Self>() + self.allocated_bytes();
+                // The size of self will always be non-zero, and
+                // adding the allocated bytes cannot make it overflow
+                // since `usize` has a range the same as pointer
+                // space. Hence, the expect below cannot fail.
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
                 self.size_cache.store(Some(size), Ordering::Relaxed);
                 size
