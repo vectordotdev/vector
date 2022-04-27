@@ -1,1 +1,1 @@
-{"metric":{"name":"z","namespace":"p","timestamp":"1969-12-31T18:49:16.000018253Z","kind":"incremental","counter":{"value":-851328.0}}}
+{"metric":{"name":"z","tags":{"b":"u"},"kind":"incremental","counter":{"value":82816.0}}}
