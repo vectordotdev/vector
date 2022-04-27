@@ -443,7 +443,7 @@ impl<'a> Compiler<'a> {
         // Keep track of the known scope *before* we compile the closure.
         //
         // This allows us to revert to any known state that the closure
-        // arguments.might overwrite.
+        // arguments might overwrite.
         let local_snapshot = self.local.clone();
 
         // First, we create a new function-call builder to validate the
