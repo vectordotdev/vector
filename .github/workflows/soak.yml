@@ -35,20 +35,24 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
+
       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
+
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
       coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
       erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
-      runner-node-replicas: ${{ steps.experimental-meta.RUNNER_NODE_REPLICAS }}
-      warmup-seconds: ${{ steps.experimental-meta.WARMUP_SECONDS }}
-      total-samples: ${{ steps.experimental-meta.TOTAL_SAMPLES }}
-      p-value: ${{ steps.experimental-meta.P_VALUE }}
-      mean-drift-percentage: ${{ steps.experimental-meta.MEAN_DRIFT_PERCENTAGE }}
+
+      runner-node-replicas: ${{ steps.experimental-meta.outputs.RUNNER_NODE_REPLICAS }}
+      warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
+      total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
+      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
+      mean-drift-percentage: ${{ steps.experimental-meta.outputs.MEAN_DRIFT_PERCENTAGE }}
     steps:
       - uses: actions/checkout@v3
         with:
