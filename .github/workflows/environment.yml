@@ -31,12 +31,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@f2a13332ac1ce8c0a71aeac48a150dbb1838ab67
         with:
-          images: timberio/ci_image
+          images: timberio/vector-dev
           flavor: |
             latest=true
           tags: type=sha, format=long
           labels: |
-            org.opencontainers.image.description=Image for Vector's CI workflows and Docker development environment
+            org.opencontainers.image.description=Image for Vector's Docker development environment
             org.opencontainers.image.source=https://github.com/vectordotdev/vector/tree/master/scripts/environment/Dockerfile
             org.opencontainers.image.title=Vector CI image
             org.opencontainers.image.url=https://github.com/vectordotdev/vector
