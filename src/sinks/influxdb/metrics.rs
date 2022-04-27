@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
-    num::NonZeroU64,
     task::Poll,
 };
 
@@ -35,7 +34,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone)]
@@ -51,7 +50,7 @@ pub struct InfluxDbDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -69,7 +68,7 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
     #[serde(
@@ -938,14 +937,14 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
         insert_metrics_v1(
             address_v1(true).as_str(),
-            Some(TlsOptions {
+            Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -958,7 +957,7 @@ mod integration_tests {
         insert_metrics_v1(address_v1(false).as_str(), None).await
     }
 
-    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 

@@ -1,1 +1,1 @@
-{"metric":{"name":"n","kind":"absolute","distribution":{"samples":[{"value":-231680.0,"rate":4150087077},{"value":135.6699,"rate":4239696954},{"value":631168.0,"rate":3648445607},{"value":-237440.0,"rate":190460158}],"statistic":"histogram"}}}
+{"metric":{"name":"w","namespace":"r","timestamp":"1969-12-31T16:13:47.000015856Z","kind":"incremental","counter":{"value":-858368.0}}}

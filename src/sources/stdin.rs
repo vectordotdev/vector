@@ -14,9 +14,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::DecodingConfig,
-    config::{
-        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
@@ -65,7 +63,7 @@ impl SourceConfig for StdinConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {

@@ -1,4 +1,3 @@
-#[cfg(feature = "codecs")]
 use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
@@ -58,14 +57,12 @@ impl InternalEvent for SocketEventsSent {
     }
 }
 
-#[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
     pub error: &'a codecs::decoding::Error,
 }
 
-#[cfg(feature = "codecs")]
 impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit(self) {
         error!(

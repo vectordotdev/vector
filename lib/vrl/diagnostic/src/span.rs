@@ -42,6 +42,12 @@ impl From<&Span> for Span {
     }
 }
 
+impl From<(usize, usize)> for Span {
+    fn from((start, end): (usize, usize)) -> Self {
+        Self { start, end }
+    }
+}
+
 pub fn span(start: usize, end: usize) -> Span {
     Span { start, end }
 }

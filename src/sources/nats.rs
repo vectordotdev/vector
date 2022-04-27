@@ -9,16 +9,13 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
     SourceSender,
 };
 
@@ -41,8 +38,7 @@ struct NatsSourceConfig {
     connection_name: String,
     subject: String,
     queue: Option<String>,
-    tls: Option<TlsConfig>,
-    #[serde(flatten)]
+    tls: Option<TlsEnableableConfig>,
     auth: Option<NatsAuthConfig>,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -85,7 +81,7 @@ impl SourceConfig for NatsSourceConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -205,12 +201,9 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use super::*;
-    use crate::nats::{
-        NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthStrategy, NatsAuthToken,
-        NatsAuthUserPassword,
-    };
+    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::test_util::{collect_n, random_string};
-    use crate::tls::TlsOptions;
+    use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
         let subject = conf.subject.clone();
@@ -264,13 +257,11 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::UserPassword,
-                user_password: Some(NatsAuthUserPassword {
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
                     user: "natsuser".into(),
                     password: "natspass".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -294,13 +285,11 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::UserPassword,
-                user_password: Some(NatsAuthUserPassword {
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
                     user: "natsuser".into(),
                     password: "wrongpass".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -324,12 +313,10 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::Token,
-                token: Some(NatsAuthToken {
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
                     value: "secret".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -353,12 +340,10 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::Token,
-                token: Some(NatsAuthToken {
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
                     value: "wrongsecret".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -382,13 +367,11 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                nkey: Some(NatsAuthNKey {
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
                     nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
                     seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -412,13 +395,11 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: None,
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                nkey: Some(NatsAuthNKey {
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
                     nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
                     seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -441,9 +422,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -493,9 +474,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     crt_file: Some("tests/data/nats_client_cert.pem".into()),
                     key_file: Some("tests/data/nats_client_key.pem".into()),
@@ -524,9 +505,9 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
@@ -553,19 +534,17 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                credentials_file: Some(NatsAuthCredentialsFile {
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
                     path: "tests/data/nats.creds".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 
@@ -588,19 +567,17 @@ mod integration_tests {
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            tls: Some(TlsConfig {
+            tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
-            auth: Some(NatsAuthConfig {
-                strategy: NatsAuthStrategy::NKey,
-                credentials_file: Some(NatsAuthCredentialsFile {
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
                     path: "tests/data/nats-bad.creds".into(),
-                }),
-                ..Default::default()
+                },
             }),
         };
 

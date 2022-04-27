@@ -2,7 +2,6 @@ use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
-#[cfg(feature = "codecs")]
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
@@ -23,17 +22,14 @@ pub fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-#[cfg(feature = "codecs")]
 pub fn default_framing_message_based() -> FramingConfig {
     BytesDecoderConfig::new().into()
 }
 
-#[cfg(feature = "codecs")]
 pub fn default_framing_stream_based() -> FramingConfig {
     NewlineDelimitedDecoderConfig::new().into()
 }
 
-#[cfg(feature = "codecs")]
 pub fn default_decoding() -> DeserializerConfig {
     BytesDeserializerConfig::new().into()
 }
@@ -96,5 +92,48 @@ impl<V: 'static> Fields<V> {
                     ),
                 }
             })
+    }
+}
+
+/// Structure to handle when a configuration field can be a value
+/// or a list of values.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T: ToString> OneOrMany<T> {
+    pub fn stringify(&self) -> OneOrMany<String> {
+        match self {
+            Self::One(value) => value.to_string().into(),
+            Self::Many(values) => values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .into(),
+        }
+    }
+}
+
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(list) => list,
+        }
+    }
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        Self::One(value)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Many(value)
     }
 }

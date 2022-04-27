@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
-    num::NonZeroU64,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -60,7 +59,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
@@ -75,7 +74,7 @@ pub struct DatadogArchivesDefaultBatchSettings;
 impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(100_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(900) };
+    const TIMEOUT_SECS: f64 = 900.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -92,7 +91,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -242,7 +241,7 @@ impl DatadogArchivesSinkConfig {
         cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
-        // thus no need in the the higher number of outcoming requests
+        // thus no need of the higher number of outcoming requests
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
@@ -923,7 +922,7 @@ mod tests {
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
-        // check the the second batch has a different UUID
+        // check that the second batch has a different UUID
         let log2 = Event::new_empty_log();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");

@@ -24,7 +24,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::{Template, TemplateRenderingError},
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -56,7 +56,7 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,

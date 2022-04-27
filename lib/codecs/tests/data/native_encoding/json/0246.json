@@ -1,1 +1,1 @@
-{"log":{"^":{},"\u0007":null}}
+{"metric":{"name":"u","tags":{"a":"k","q":"a"},"kind":"absolute","gauge":{"value":-858368.0}}}

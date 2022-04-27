@@ -34,7 +34,7 @@ use crate::{
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -49,15 +49,15 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub(self) struct SplunkConfig {
+pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
-    address: SocketAddr,
+    pub address: SocketAddr,
     /// Splunk HEC token. Deprecated - use `valid_tokens` instead
     token: Option<String>,
     /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     /// Splunk HEC indexer acknowledgement settings
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
@@ -364,25 +364,20 @@ impl SplunkSource {
     }
 
     fn health_service(&self) -> BoxedFilter<(Response,)> {
-        let valid_credentials = self.valid_credentials.clone();
-        let authorize =
-            warp::header::optional("Authorization").and_then(move |token: Option<String>| {
-                let valid_credentials = valid_credentials.clone();
-                async move {
-                    if valid_credentials.is_empty() {
-                        return Ok(());
-                    }
-                    match token {
-                        Some(token) if valid_credentials.contains(&token) => Ok(()),
-                        _ => Err(Rejection::from(ApiError::BadRequest)),
-                    }
-                }
-            });
-
+        // The Splunk docs document this endpoint as returning a 400 if given an invalid Splunk
+        // token, but, in practice, it seems to ignore the token altogether
+        //
+        // The response body was taken from Splunk 8.2.4
+        //
+        // https://docs.splunk.com/Documentation/Splunk/8.2.5/RESTREF/RESTinput#services.2Fcollector.2Fhealth
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
-            .and(authorize)
-            .map(move |_, _| warp::reply().into_response())
+            .map(move |_| {
+                http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
+                    .expect("static response")
+            })
             .boxed()
     }
 
@@ -1460,6 +1455,33 @@ mod tests {
             401,
             send_with(address, "services/collector/event", "", "nope", &opts).await
         );
+    }
+
+    #[tokio::test]
+    async fn health_ignores_token() {
+        let (_source, address) = source(None).await;
+
+        let res = reqwest::Client::new()
+            .get(&format!("http://{}/services/collector/health", address))
+            .header("Authorization", format!("Splunk {}", "invalid token"))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+    }
+
+    #[tokio::test]
+    async fn health() {
+        let (_source, address) = source(None).await;
+
+        let res = reqwest::Client::new()
+            .get(&format!("http://{}/services/collector/health", address))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
     }
 
     #[tokio::test]

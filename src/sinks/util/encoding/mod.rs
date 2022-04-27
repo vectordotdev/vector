@@ -57,28 +57,34 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
-#[cfg(feature = "codecs")]
 mod adapter;
 mod codec;
 mod config;
 mod fixed;
 mod with_default;
 
-use std::{fmt::Debug, io, sync::Arc};
-
-use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, io};
 
 use crate::{
     event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
 
-#[cfg(feature = "codecs")]
-pub use adapter::{EncodingConfigAdapter, EncodingConfigMigrator, Transformer};
-pub use codec::{as_tracked_write, StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+pub use adapter::{
+    EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
+    EncodingConfigWithFramingMigrator, Transformer,
+};
+use bytes::BytesMut;
+pub use codec::{
+    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
+    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
+};
+use codecs::encoding::Framer;
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
 
 pub trait Encoder<T> {
@@ -101,12 +107,51 @@ pub trait Encoder<T> {
     }
 }
 
-impl<E, T> Encoder<T> for Arc<E>
-where
-    E: Encoder<T>,
-{
-    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
-        (**self).encode_input(input, writer)
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
+    fn encode_input(
+        &self,
+        mut events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        let mut bytes_written = 0;
+        if events.is_empty() {
+            bytes_written += writer.write(encoder.batch_prefix())?;
+            bytes_written += writer.write(encoder.batch_suffix())?;
+        } else {
+            let last = events.pop().unwrap();
+            bytes_written += writer.write(encoder.batch_prefix())?;
+            for mut event in events {
+                self.0.transform(&mut event);
+                let mut bytes = BytesMut::new();
+                encoder
+                    .encode(event, &mut bytes)
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                bytes_written += writer.write(&bytes)?;
+            }
+            let mut event = last;
+            self.0.transform(&mut event);
+            let mut bytes = BytesMut::new();
+            encoder
+                .serialize(event, &mut bytes)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            bytes_written += writer.write(&bytes)?;
+            bytes_written += writer.write(encoder.batch_suffix())?;
+        }
+
+        Ok(bytes_written)
+    }
+}
+
+impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
+    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        self.0.transform(&mut event);
+        let mut bytes = BytesMut::new();
+        encoder
+            .serialize(event, &mut bytes)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        writer.write(&bytes)
     }
 }
 
@@ -282,11 +327,14 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use codecs::{
+        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, RawMessageSerializer,
+    };
     use indoc::indoc;
     use vector_common::btreemap;
 
     use super::*;
-    use crate::config::log_schema;
+    use crate::{config::log_schema, sinks::util::encoding::Transformer};
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -457,5 +505,199 @@ mod tests {
                 e
             ),
         }
+    }
+
+    #[test]
+    fn test_encode_batch_json_empty() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 2);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "[]");
+    }
+
+    #[test]
+    fn test_encode_batch_json_single() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![Event::from(btreemap! {
+                    "key" => "value"
+                })],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 17);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"[{"key":"value"}]"#);
+    }
+
+    #[test]
+    fn test_encode_batch_json_multiple() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![
+                    Event::from(btreemap! {
+                        "key" => "value1"
+                    }),
+                    Event::from(btreemap! {
+                        "key" => "value2"
+                    }),
+                    Event::from(btreemap! {
+                        "key" => "value3"
+                    }),
+                ],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 52);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            r#"[{"key":"value1"},{"key":"value2"},{"key":"value3"}]"#
+        );
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_empty() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 0);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "");
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_single() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![Event::from(btreemap! {
+                    "key" => "value"
+                })],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 15);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_multiple() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![
+                    Event::from(btreemap! {
+                        "key" => "value1"
+                    }),
+                    Event::from(btreemap! {
+                        "key" => "value2"
+                    }),
+                    Event::from(btreemap! {
+                        "key" => "value3"
+                    }),
+                ],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 50);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}"
+        );
+    }
+
+    #[test]
+    fn test_encode_event_json() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<()>::new(JsonSerializer::new().into()),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                Event::from(btreemap! {
+                    "key" => "value"
+                }),
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 15);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+    }
+
+    #[test]
+    fn test_encode_event_text() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<()>::new(RawMessageSerializer::new().into()),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                Event::from(btreemap! {
+                    "message" => "value"
+                }),
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 5);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"value"#);
     }
 }

@@ -112,7 +112,7 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -279,19 +279,19 @@ impl Expression for ParseXmlFn {
         parse_xml(value, options)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .fallible()
         .add_object(Collection::from_unknown(inner_kind()))
+        .fallible()
 }
 
 fn inner_kind() -> Kind {
-    Kind::object(BTreeMap::default())
+    Kind::object(Collection::any())
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -350,7 +350,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 
         NodeType::Element => {
             match (config.always_use_text_key, node.attributes().is_empty()) {
-                // If the the node has attributes, *always* recurse to expand default keys.
+                // If the node has attributes, *always* recurse to expand default keys.
                 (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),
@@ -694,4 +694,45 @@ mod tests {
             tdef: type_def(),
         }
     ];
+
+    #[test]
+    fn test_kind() {
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::default();
+
+        let func = ParseXmlFn {
+            value: value!(true).into_expression(),
+            trim: None,
+            include_attr: None,
+            attr_prefix: None,
+            text_key: None,
+            always_use_text_key: None,
+            parse_bool: None,
+            parse_null: None,
+            parse_number: None,
+        };
+
+        let type_def = func.type_def((&local, &external));
+
+        assert!(type_def.is_fallible());
+        assert!(!type_def.is_exact());
+        assert!(type_def.contains_bytes());
+        assert!(type_def.contains_object());
+
+        let object1 = type_def.as_object().unwrap();
+
+        assert!(object1.known().is_empty());
+        assert!(object1.unknown().unwrap().as_exact().unwrap().is_object());
+
+        let object2 = object1
+            .unknown()
+            .unwrap()
+            .as_exact()
+            .unwrap()
+            .as_object()
+            .unwrap();
+
+        assert!(object2.known().is_empty());
+        assert!(object2.unknown().unwrap().is_any());
+    }
 }

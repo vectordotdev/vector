@@ -11,6 +11,7 @@ mod arbitrary;
 mod arbitrary_depth;
 pub mod ast;
 mod lex;
+mod template_string;
 
 pub use ast::{Literal, Program};
 pub use diagnostic::Span;
@@ -63,8 +64,4 @@ pub fn parse_literal(input: impl AsRef<str>) -> Result<Literal, Error> {
                 .map_error(|err| err.to_string()),
             dropped_tokens: vec![],
         })
-}
-
-pub mod test {
-    pub use super::parser::TestParser as Parser;
 }

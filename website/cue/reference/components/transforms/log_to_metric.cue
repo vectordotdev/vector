@@ -130,6 +130,7 @@ components: transforms: log_to_metric: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	output: metrics: {

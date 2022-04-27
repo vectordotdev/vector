@@ -6,8 +6,7 @@ components: sources: datadog_agent: {
 	title: "Datadog Agent"
 
 	description: """
-		Receives observability data from a Datadog Agent over HTTP or HTTPS. For now, this is limited to logs and metrics
-		but will be expanded in the future cover traces.
+		Receives observability data from a Datadog Agent over HTTP or HTTPS.
 		"""
 
 	classes: {
@@ -62,9 +61,9 @@ components: sources: datadog_agent: {
 		multiple_outputs: {
 			common: false
 			description: """
-				If this setting is set to `true` metrics and logs will be sent to different ouputs. For a source component
-				named `agent` the received logs and metrics can then be accessed by specifying `agent.logs` and `agent.metrics`,
-				respectively, as the input to another component.
+				If this setting is set to `true` logs, metrics and traces will be sent to different ouputs. For a source
+				component named `agent` the received logs, metrics, and traces can then be accessed by specifying
+				`agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
 				"""
 			required: false
 			type: bool: default: false
@@ -170,22 +169,50 @@ components: sources: datadog_agent: {
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
 		}
+		traces: {
+			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
+			fields: {
+				spans: {
+					description: "The list of spans composing the trace."
+					required:    true
+					type: array: items: type: object: options: {}
+				}
+			}
+		}
 	}
 
 	how_it_works: {
 		decompression: {
 			title: "Configuring the Datadog Agent"
 			body:  """
+				Sending logs or metrics to Vector requires the [Datadog Agent](\(urls.datadog_agent_doc)) v7.35/6.35 or greater.
+
 				To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
 				must be updated to use:
 
 				```yaml
-				logs_config:
-					dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"
-					use_v2_api: false # source does not yet support new v2 API
-					use_http: true # this source only supports HTTP/HTTPS
-					logs_no_ssl: true|false # should match source SSL configuration.
+				vector:
+					logs.enabled: true
+					logs.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
+
+				In order to send metrics the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				following options:
+
+				```yaml
+				vector:
+					metrics.enabled: true
+					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				```
+
+				"""
+		}
+		trace_support: {
+			title: "Trace support"
+			body: """
+				The `datadog_agent` source is capable of receiving traces from the Datadog Agent for versions < 6/7.33.
+				We are working on adding support for the newer agent versions as well as support for passing along APM
+				statistics used by Datadog.
 				"""
 		}
 	}

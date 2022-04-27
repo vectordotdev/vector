@@ -7,14 +7,12 @@ publish = false
 
 [dependencies]
 bytes = "1.1.0"
-core = { package = "vrl-core", path = "../core" }
 compiler = { package = "vrl-compiler", path = "../compiler" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "1"
 lookup = { path = "../../lookup" }
 ordered-float = "2"
 parser = { package = "vrl-parser", path = "../parser" }
-thiserror = "1"
 vector_common = { path = "../../vector-common", default-features = false }
 
 [dev-dependencies]

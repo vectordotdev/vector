@@ -52,7 +52,7 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -69,7 +69,7 @@ impl Function for SetSemanticMeaning {
             return Err(Box::new(ExpressionError::from(format!(
                 "meaning must be set on an external field: {}",
                 query
-            ))) as Box<dyn DiagnosticError>);
+            ))) as Box<dyn DiagnosticMessage>);
         }
 
         if let Some(list) = ctx.get_external_context_mut::<MeaningList>() {
@@ -92,7 +92,7 @@ impl Expression for SetSemanticMeaningFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

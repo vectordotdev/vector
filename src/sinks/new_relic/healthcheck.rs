@@ -1,6 +1,6 @@
 use super::NewRelicCredentials;
 use crate::{http::HttpClient, sinks::HealthcheckError};
-use http::{Request, StatusCode};
+use http::Request;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ pub(crate) async fn healthcheck(
     let response = client.send(request).await?;
 
     match response.status() {
-        StatusCode::OK => Ok(()),
+        status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }

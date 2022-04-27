@@ -1,4 +1,5 @@
 use std::io::{self, Read};
+use std::net::SocketAddr;
 
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
@@ -18,7 +19,7 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 mod message;
@@ -27,7 +28,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
     address: SocketListenAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -102,12 +103,12 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         for event in events {
             let log = event.as_mut_log();
 
             if !log.contains(log_schema().host_key()) {
-                log.insert(log_schema().host_key(), host.clone());
+                log.insert(log_schema().host_key(), host.ip().to_string());
             }
         }
     }

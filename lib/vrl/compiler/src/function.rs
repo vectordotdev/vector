@@ -1,25 +1,29 @@
+pub mod closure;
+
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
 
 use anymap::AnyMap;
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use value::kind::Collection;
 
 use crate::{
     expression::{
-        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+        container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure,
+        Literal, Query,
     },
     parser::Node,
+    state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
     vm::VmArgumentList,
     Context, ExpressionError, Span, Value,
 };
 
-pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
-    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
 pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
@@ -52,8 +56,8 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(
         &self,
-        state: &super::State,
-        info: &mut FunctionCompileContext,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -73,7 +77,7 @@ pub trait Function: Send + Sync + fmt::Debug {
         _ctx: &mut FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
-    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
         Ok(None)
     }
 
@@ -83,6 +87,14 @@ pub trait Function: Send + Sync + fmt::Debug {
         _ctx: &mut Context,
         _args: &mut VmArgumentList,
     ) -> Result<Value, ExpressionError>;
+
+    /// An optional closure definition for the function.
+    ///
+    /// This returns `None` by default, indicating the function doesn't accept
+    /// a closure.
+    fn closure(&self) -> Option<closure::Definition> {
+        None
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -208,7 +220,17 @@ impl Parameter {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug, Default, Clone)]
-pub struct ArgumentList(HashMap<&'static str, Expr>);
+pub struct ArgumentList {
+    pub(crate) arguments: HashMap<&'static str, Expr>,
+
+    /// A closure argument differs from regular arguments, in that it isn't an
+    /// expression by itself, and it also isn't tied to a parameter string in
+    /// the function call.
+    ///
+    /// We do still want to store the closure in the argument list, to allow
+    /// function implementors access to the closure through `Function::compile`.
+    closure: Option<FunctionClosure>,
+}
 
 impl ArgumentList {
     pub fn optional(&mut self, keyword: &'static str) -> Option<Box<dyn Expression>> {
@@ -366,16 +388,30 @@ impl ArgumentList {
         Ok(required(self.optional_array(keyword)?))
     }
 
+    pub fn optional_closure(&self) -> Option<&FunctionClosure> {
+        self.closure.as_ref()
+    }
+
+    pub fn required_closure(&self) -> Result<FunctionClosure, Error> {
+        self.optional_closure()
+            .cloned()
+            .ok_or(Error::ExpectedFunctionClosure)
+    }
+
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
-        self.0.keys().copied().collect::<Vec<_>>()
+        self.arguments.keys().copied().collect::<Vec<_>>()
     }
 
     pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
-        self.0.insert(k, v);
+        self.arguments.insert(k, v);
+    }
+
+    pub(crate) fn set_closure(&mut self, closure: FunctionClosure) {
+        self.closure = Some(closure);
     }
 
     fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.0.remove(keyword)
+        self.arguments.remove(keyword)
     }
 
     fn required_expr(&mut self, keyword: &'static str) -> Expr {
@@ -389,11 +425,13 @@ fn required<T>(argument: Option<T>) -> T {
 
 impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
-        Self(
-            map.into_iter()
+        Self {
+            arguments: map
+                .into_iter()
                 .map(|(k, v)| (k, v.into()))
                 .collect::<HashMap<_, _>>(),
-        )
+            closure: None,
+        }
     }
 }
 
@@ -411,13 +449,16 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
             })
             .collect::<HashMap<_, _>>();
 
-        Self(arguments)
+        Self {
+            arguments,
+            ..Default::default()
+        }
     }
 }
 
 impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
     fn from(args: ArgumentList) -> Self {
-        args.0
+        args.arguments
             .iter()
             .map(|(key, expr)| {
                 (
@@ -459,9 +500,12 @@ pub enum Error {
         value: Value,
         error: &'static str,
     },
+
+    #[error(r#"missing function closure"#)]
+    ExpectedFunctionClosure,
 }
 
-impl diagnostic::DiagnosticError for Error {
+impl diagnostic::DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 
@@ -470,6 +514,7 @@ impl diagnostic::DiagnosticError for Error {
             InvalidEnumVariant { .. } => 401,
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
+            ExpectedFunctionClosure => 420,
         }
     }
 
@@ -533,6 +578,8 @@ impl diagnostic::DiagnosticError for Error {
                 Label::context(format!("received: {}", value), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
+
+            ExpectedFunctionClosure => vec![],
         }
     }
 
@@ -541,7 +588,7 @@ impl diagnostic::DiagnosticError for Error {
     }
 }
 
-impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
+impl From<Error> for Box<dyn diagnostic::DiagnosticMessage> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
     }

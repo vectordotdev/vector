@@ -47,10 +47,12 @@ async fn firehose_put_records() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
+    let region = RegionOrEndpoint::with_both("localstack", kinesis_address().as_str());
+
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
+        region: region.clone(),
+        encoding: EncodingConfig::from(StandardEncodings::Json).into(), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -76,12 +78,15 @@ async fn firehose_put_records() {
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+        })),
         endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
             action: None,
         }),
+        aws: Some(region),
         ..Default::default()
     };
     let common = ElasticsearchCommon::parse_config(&config)
@@ -151,7 +156,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
                 AwsAuthentication::test_auth()
-                    .credentials_provider()
+                    .credentials_provider(test_region_endpoint().region())
                     .await
                     .unwrap(),
             )
