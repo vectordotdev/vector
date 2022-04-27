@@ -123,10 +123,10 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     }
 
     for element in parsed.structured_data.into_iter() {
-        let mut sdata: BTreeMap<String, String> = BTreeMap::new();
+        let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
         for (name, value) in element.params() {
             sdata.insert(name.to_string(), value.into());
         }
-        log.insert(element.id, sdata.into());
+        log.insert(element.id, sdata);
     }
 }
