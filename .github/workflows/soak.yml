@@ -44,11 +44,37 @@ jobs:
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
       coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
       erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
+      runner-node-replicas: ${{ steps.experimental-meta.RUNNER_NODE_REPLICAS }}
+      warmup-seconds: ${{ steps.experimental-meta.WARMUP_SECONDS }}
+      total-samples: ${{ steps.experimental-meta.TOTAL_SAMPLES }}
+      p-value: ${{ steps.experimental-meta.P_VALUE }}
+      mean-drift-percentage: ${{ steps.experimental-meta.MEAN_DRIFT_PERCENTAGE }}
     steps:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
           path: baseline-vector
+
+      - name: Setup experimental metadata
+        id: experimental-meta
+        run: |
+          export RUNNER_NODE_REPLICAS="1"
+          export WARMUP_SECONDS="30"
+          export TOTAL_SAMPLES="120"
+          export P_VALUE="0.1"
+          export MEAN_DRIFT_PERCENTAGE="8.87"
+
+          echo "soak warmup seconds: ${WARMUP_SECONDS}"
+          echo "soak node replicas: ${RUNNER_NODE_REPLICAS}"
+          echo "soak total samples: ${TOTAL_SAMPLES}"
+          echo "soak p-value: ${P_VALUE}"
+          echo "soak mean drift percentage: ${MEAN_DRIFT_PERCENTAGE}"
+
+          echo "::set-output name=WARMUP_SECONDS::${WARMUP_SECONDS}"
+          echo "::set-output name=RUNNER_NODE_REPLICAS::${RUNNER_NODE_REPLICAS}"
+          echo "::set-output name=TOTAL_SAMPLES::${TOTAL_SAMPLES}"
+          echo "::set-output name=P_VALUE::${P_VALUE}"
+          echo "::set-output name=MEAN_DRIFT_PERCENTAGE::${MEAN_DRIFT_PERCENTAGE}"
 
       - name: Report on PR metadata
         id: pr-metadata
@@ -251,22 +277,6 @@ jobs:
         run: |
           docker load --input /tmp/baseline-image.tar
 
-      - name: Run baseline experiment
-        run: |
-          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --build-image "false" \
-                                  --variant "baseline" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
-                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
-                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
-                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --warmup-seconds 30 \
-                                  --total-samples 180 \
-                                  --replicas 10 \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
-
       - name: Download comparison image
         uses: actions/download-artifact@v3
         with:
@@ -277,10 +287,28 @@ jobs:
         run: |
           docker load --input /tmp/comparison-image.tar
 
-      - name: Run comparison experiment
+      - name: Create capture directory
         run: |
           rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
+
+      - name: Run baseline experiment
+        run: |
+          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
+                                  --build-image "false" \
+                                  --variant "baseline" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
+                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
+                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
+                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                  --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
+                                  --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
+                                  --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
+
+
+      - name: Run comparison experiment
+        run: |
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
                                   --variant "comparison" \
@@ -288,9 +316,9 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --warmup-seconds 30 \
-                                  --total-samples 180 \
-                                  --replicas 10 \
+                                  --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
+                                  --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
+                                  --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
@@ -338,7 +366,7 @@ jobs:
         run: |
           ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
+                                     --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                      --variant baseline \
                                      --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
@@ -377,7 +405,7 @@ jobs:
         run: |
           ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
+                                     --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                      --variant comparison \
                                      --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
@@ -418,11 +446,11 @@ jobs:
                                          --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 8.87 \
-                                         --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
+                                         --mean-drift-percentage ${{ needs.compute-soak-meta.outputs.mean-drift-percentage }} \
+                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }} > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
       - uses: actions/upload-artifact@v3
         with:
           name: soak-analysis
@@ -469,10 +497,10 @@ jobs:
       - name: Detect regressions
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 8.87 \
-                                         --p-value 0.1
+                                         --mean-drift-percentage ${{ needs.compute-soak-meta.outputs.mean-drift-percentage }} \
+                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }}
 
   plot-analysis:
     name: Plot analysis
