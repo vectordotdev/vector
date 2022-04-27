@@ -488,16 +488,9 @@ fn build_predicates(
     let mut errors = Vec::new();
 
     for (target_pred, arg) in map {
-        if target_pred
-            .rfind('.')
-            .and_then(|i| {
-                if i > 0 && i < target_pred.len() - 1 {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .map(|i| {
+        match target_pred.rfind('.')
+        {
+            Some(i) if i > 0 && i < target_pred.len() - 1 => {
                 let mut target = target_pred.clone();
                 let pred = target.split_off(i + 1);
                 target.truncate(target.len() - 1);
@@ -506,11 +499,11 @@ fn build_predicates(
                         predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
                     }
                     Err(err) => errors.push(err),
-                };
-            })
-            .is_none()
-        {
-            errors.push(format!("predicate not found in check_fields value '{}', format must be <target>.<predicate>", target_pred));
+                }
+            }
+            _ => errors.push(format!(
+                "predicate not found in check_fields value '{target_pred}', format must be <target>.<predicate>"
+            )),
         }
     }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label};
+use diagnostic::{DiagnosticMessage, Label};
 
 use crate::{
     expression::{levenstein, Resolved},
@@ -120,7 +120,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 
