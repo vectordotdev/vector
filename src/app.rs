@@ -191,6 +191,7 @@ impl Application {
                     )
                     .await
                 {
+                    error!(message = "Exiting due to configuration reporting failure.");
                     return Err(exitcode::UNAVAILABLE);
                 }
 
@@ -279,6 +280,7 @@ impl Application {
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                             config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                         {
+                                            error!(message = "Shutting down due to configuration reporting failure.");
                                             break SignalTo::Shutdown;
                                         }
 
@@ -327,6 +329,7 @@ impl Application {
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                         config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                     {
+                                        error!(message = "Shutting down due to configuration reporting failure.");
                                         break SignalTo::Shutdown;
                                     }
 

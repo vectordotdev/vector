@@ -5,7 +5,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
-use rand::Rng;
+use rand::{prelude::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
@@ -67,9 +67,6 @@ pub struct Options {
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
 
-    #[serde(default = "default_retry_interval_secs")]
-    pub retry_interval_secs: u32,
-
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -90,7 +87,6 @@ impl Default for Options {
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
-            retry_interval_secs: default_retry_interval_secs(),
             proxy: ProxyConfig::default(),
         }
     }
@@ -102,6 +98,7 @@ pub enum PipelinesError {
     Disabled,
     MissingApiKey,
     FatalCouldNotReportConfig,
+    CouldNotReportConfig,
     Interrupt,
 }
 
@@ -168,6 +165,8 @@ struct ReportingRetryBackoff {
 }
 
 impl ReportingRetryBackoff {
+    /// Retry every 2^n seconds with a maximum delay of 60 seconds (and any
+    /// additional jitter)
     fn new() -> Self {
         let backoff = ExponentialBackoff::from_millis(2)
             .factor(1000)
@@ -178,6 +177,17 @@ impl ReportingRetryBackoff {
             backoff,
             jitter_rng,
         }
+    }
+
+    /// Wait before retrying as determined by the backoff and jitter
+    async fn wait(&mut self) {
+        let retry_backoff = self.next().unwrap();
+        info!(
+            "Retrying config reporting to {} in {} seconds.",
+            DATADOG_REPORTING_PRODUCT,
+            retry_backoff.as_secs_f32()
+        );
+        sleep(retry_backoff).await;
     }
 }
 
@@ -291,56 +301,31 @@ pub async fn try_attach(
     // Datadog uses a JSON:API, so we'll serialize the config to a JSON
     let payload = PipelinesVersionPayload::new(&table, &fields);
 
-    // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
-    // of `max_retries`.
-    for _ in 0..datadog.max_retries {
-        select! {
-            biased;
-            Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
-            report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
-                match report {
-                    Ok(()) => {
-                        info!(
-                            "Vector config {} successfully reported to {}.",
-                            &config_version, DATADOG_REPORTING_PRODUCT
-                        );
-                        break;
-                    }
-                    Err(err) => {
-                        error!(
-                            err = ?err.to_string(),
-                            "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                        );
+    select! {
+        biased;
+        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
+        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
+            match report {
+                Ok(()) => {
+                    info!(
+                        "Vector config {} successfully reported to {}.",
+                        &config_version, DATADOG_REPORTING_PRODUCT
+                    );
+                }
+                Err(err) => {
+                    error!(
+                        err = ?err.to_string(),
+                        "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                    );
 
-                        if let ReportingError::StatusCode(status) = err {
-                            // If the error is 'fatal', and the user has elected to exit on fatal errors,
-                            // return control back upstream.
-                            //
-                            // A fatal error is currently determined to be one of the following:
-                            //
-                            // - 4xx class of status code (429 excepted; treated as a retry).
-                            if status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS {
-                                if datadog.exit_on_fatal_error {
-                                    return Err(PipelinesError::FatalCouldNotReportConfig);
-                                } else {
-                                    // Otherwise, break out of the loop, to avoid hitting the same error.
-                                    break;
-                                }
-                            }
-                        }
+                    if datadog.exit_on_fatal_error {
+                        return Err(PipelinesError::FatalCouldNotReportConfig);
+                    } else {
+                        return Err(PipelinesError::CouldNotReportConfig);
                     }
                 }
             }
         }
-
-        // If we're at this point, there was an error that was deemed non-fatal, so retry.
-        info!(
-            "Retrying config reporting to {} in {} seconds.",
-            DATADOG_REPORTING_PRODUCT, datadog.retry_interval_secs
-        );
-
-        // Sleep for the user-provided interval before retrying.
-        sleep(Duration::from_secs(datadog.retry_interval_secs as u64)).await;
     }
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
@@ -426,11 +411,6 @@ const fn default_max_retries() -> u32 {
     u32::MAX
 }
 
-/// By default, retry (recoverable) failed reporting every 5 seconds.
-const fn default_retry_interval_secs() -> u32 {
-    5
-}
-
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
@@ -483,9 +463,9 @@ async fn report_serialized_config_to_datadog<'a>(
     loop {
         let req = build_request(&endpoint, auth, payload);
         let res = client.send(req).await;
-        if let Err(HttpError::CallRequest { source: error }) = res {
+        if let Err(HttpError::CallRequest { source: error }) = &res {
             if error.is_timeout() {
-                sleep(backoff.next().unwrap()).await;
+                backoff.wait().await;
                 continue;
             }
         }
@@ -510,7 +490,7 @@ async fn report_serialized_config_to_datadog<'a>(
         } else if status.is_redirection() && redirected {
             return Err(ReportingError::TooManyRedirects);
         } else if status.is_client_error() || status.is_server_error() {
-            sleep(backoff.next().unwrap()).await;
+            backoff.wait().await;
             continue;
         } else if status.is_success() {
             return Ok(());
@@ -547,6 +527,8 @@ mod test {
         }
     }
 
+    /// This mocked server will reply with the configured status code 3 times
+    /// before falling back to a 200 OK
     async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockServer {
         let mock_server = MockServer::start().await;
 
