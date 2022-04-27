@@ -261,7 +261,7 @@ jobs:
 
   soak:
     name: Soak (${{ matrix.target }})
-    runs-on: [self-hosted, linux, x64, soak-asg, dev]
+    runs-on: [self-hosted, linux, x64, soak-asg]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
