@@ -46,6 +46,10 @@ pub struct Opts {
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    // Should the CLI emit warnings
+    #[clap(long = "print-warnings")]
+    print_warnings: bool,
 }
 
 impl Opts {
@@ -117,9 +121,14 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
+
+        if opts.print_warnings {
+            let warnings = Formatter::new(&source, warnings).colored().to_string();
+            eprintln!("{warnings}")
+        }
 
         for mut object in objects {
             let state = state::Runtime::default();

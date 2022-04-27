@@ -220,7 +220,7 @@ fn main() {
             .unwrap_or_default();
 
         match program {
-            Ok(program) => {
+            Ok((program, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
@@ -361,7 +361,7 @@ fn main() {
                     }
                 }
             }
-            Err(diagnostics) => {
+            Ok((_, diagnostics)) | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {
