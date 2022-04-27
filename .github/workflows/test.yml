@@ -299,7 +299,6 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    container: timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -308,6 +307,8 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - uses: actions/cache@v3
         name: Cache Cargo registry + index
         with:
