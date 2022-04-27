@@ -115,15 +115,24 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 ///
 /// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
 /// successfully buffered and `None` is returned.
-fn try_buffer_event(event: LogEvent) -> Option<LogEvent> {
+fn try_buffer_event(event: &Event<'_>) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(event);
-            return None;
+            buffer.push(event.into());
+            return true;
         }
     }
 
-    Some(event)
+    false
+}
+
+/// Attempts to broadcast an event to subscribers.
+///
+/// If no subscribers are connected, this does nothing.
+fn try_broadcast_event(event: &Event<'_>) {
+    if let Some(sender) = maybe_get_trace_sender() {
+        let _ = sender.send(event.into());
+    }
 }
 
 /// Consumes the early buffered events.
@@ -137,12 +146,21 @@ fn consume_early_buffer() -> Vec<LogEvent> {
         .expect("early buffer was already consumed")
 }
 
-/// Creates a trace sender for sending internal log events.
+/// Gets or creates a trace sender for sending internal log events.
 fn get_trace_sender() -> &'static broadcast::Sender<LogEvent> {
     SENDER.get_or_init(|| broadcast::channel(99).0)
 }
 
-/// Creates a trace receiver that rieceives internal log events.
+/// Attempts to get the trace sender for sending internal log events.
+///
+/// If the trace sender has not yet been created, `None` is returned.
+fn maybe_get_trace_sender() -> Option<&'static broadcast::Sender<LogEvent>> {
+    SENDER.get()
+}
+
+/// Creates a trace receiver that receives internal log events.
+///
+/// This will create a trace sender if one did not already exist.
 fn get_trace_receiver() -> broadcast::Receiver<LogEvent> {
     get_trace_sender().subscribe()
 }
@@ -256,10 +274,10 @@ where
     S: Subscriber + 'static,
 {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // Try buffering the event, and if we're not buffering anymore, just send it along via the
-        // trace sender.
-        if let Some(event) = try_buffer_event(event.into()) {
-            let _ = get_trace_sender().send(event);
+        // Try buffering the event, and if we're not buffering anymore, try to send it along via the
+        // trace sender if it's been established.
+        if !try_buffer_event(event) {
+            try_broadcast_event(event);
         }
     }
 }
