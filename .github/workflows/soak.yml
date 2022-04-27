@@ -129,7 +129,7 @@ jobs:
             // jobs to run. For example, the first job might have the values:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
-              target: target, replica: [1,2,3,4,5,6,7,8,9,10] // run each experiment
+              target: target,  // run each experiment
             }
 
             // export this variable to be available to other github steps
@@ -229,10 +229,10 @@ jobs:
           name: comparison-image
           path: /tmp/comparison-image.tar
 
-  soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline - ${{ matrix.replica }}
+  soak:
+    name: Soak (${{ matrix.target }})
     runs-on: [self-hosted, linux, x64, soak-asg, dev]
-    needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
+    needs: [compute-soak-meta, compute-test-plan, build-image-baseline, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
@@ -262,70 +262,10 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 1 \
+                                  --warmup-seconds 30 \
+                                  --total-samples 180 \
+                                  --replicas 10 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Upload timing captures
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-${{ matrix.replica }}-baseline
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
-
-      - name: Clean up machine
-        run: |
-          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          docker system prune --all --volumes --force
-
-  detect-erratic-baseline:
-    name: Erratic detection - baseline
-    runs-on: [linux, soak, soak-analysis]
-    needs:
-      - compute-soak-meta
-      - soak-baseline
-
-    steps:
-      - name: Set up Python3
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10.2"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
-      - name: Download captures artifact
-        uses: actions/download-artifact@v3
-        with:
-          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Detect erratic
-        run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
-                                     --variant baseline \
-                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
-                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
-
-  soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison - ${{ matrix.replica }}
-    runs-on: [self-hosted, linux, x64, soak-asg, dev]
-    needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
 
       - name: Download comparison image
         uses: actions/download-artifact@v3
@@ -348,13 +288,15 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 1 \
+                                  --warmup-seconds 30 \
+                                  --total-samples 180 \
+                                  --replicas 10 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-${{ matrix.replica }}-comparison
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clean up machine
@@ -362,12 +304,12 @@ jobs:
           rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
-  detect-erratic-comparison:
-    name: Erratic detection - comparison
+  detect-erratic-baseline:
+    name: Erratic detection - baseline
     runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -386,15 +328,54 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v3
         with:
-          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline
 
       - name: Detect erratic
         run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds 30 \
+                                     --variant baseline \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
+
+  detect-erratic-comparison:
+    name: Erratic detection - comparison
+    runs-on: [linux, soak, soak-analysis]
+    needs:
+      - compute-soak-meta
+      - soak
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10.2"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v3
+        with:
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
                                      --warmup-seconds 30 \
                                      --variant comparison \
@@ -406,8 +387,7 @@ jobs:
     runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -461,8 +441,7 @@ jobs:
     runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -500,8 +479,7 @@ jobs:
     runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
