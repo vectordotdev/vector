@@ -30,8 +30,8 @@ use crate::event::LogEvent;
 /// buffering being stopped, which occurs once the topology reports as having successfully started.
 ///
 /// This means that callers must subscribe during the configuration phase of their components, and not in the core loop
-/// of the component, as the topology can only report when a component has been spawned, but not always when it has
-/// necessary started doing, or waiting, for input.
+/// of the component, as the topology can only report when a component has been spawned, but not necessarily always
+/// when it has started doing, or waiting, for input.
 static BUFFER: OnceCell<Mutex<Option<Vec<LogEvent>>>> = OnceCell::new();
 
 /// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
