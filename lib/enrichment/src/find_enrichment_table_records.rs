@@ -94,7 +94,7 @@ impl Function for FindEnrichmentTableRecords {
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -149,9 +149,10 @@ impl Function for FindEnrichmentTableRecords {
     ) -> CompiledArgument {
         match (name, expr) {
             ("table", Some(expr)) => {
-                let registry = ctx
-                    .get_external_context_mut::<TableRegistry>()
-                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
 
                 let tables = registry
                     .table_ids()

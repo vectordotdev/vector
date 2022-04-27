@@ -81,17 +81,20 @@ impl SourceConfig for InternalMetricsConfig {
             .pid_key
             .as_deref()
             .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
-        Ok(Box::pin(run(
-            namespace,
-            version,
-            configuration_key,
-            host_key,
-            pid_key,
-            Controller::get()?,
-            interval,
-            cx.out,
-            cx.shutdown,
-        )))
+        Ok(Box::pin(
+            InternalMetrics {
+                namespace,
+                version,
+                configuration_key,
+                host_key,
+                pid_key,
+                controller: Controller::get()?,
+                interval,
+                out: cx.out,
+                shutdown: cx.shutdown,
+            }
+            .run(),
+        ))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -107,60 +110,65 @@ impl SourceConfig for InternalMetricsConfig {
     }
 }
 
-async fn run(
+struct InternalMetrics<'a> {
     namespace: Option<String>,
     version: Option<String>,
     configuration_key: Option<String>,
     host_key: Option<String>,
     pid_key: Option<String>,
-    controller: &Controller,
+    controller: &'a Controller,
     interval: time::Duration,
-    mut out: SourceSender,
+    out: SourceSender,
     shutdown: ShutdownSignal,
-) -> Result<(), ()> {
-    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
-    while interval.next().await.is_some() {
-        let hostname = crate::get_hostname();
-        let pid = std::process::id().to_string();
+}
 
-        let metrics = controller.capture_metrics();
-        let count = metrics.len();
-        let byte_size = metrics.size_of();
-        emit!(EventsReceived { count, byte_size });
+impl<'a> InternalMetrics<'a> {
+    async fn run(mut self) -> Result<(), ()> {
+        let mut interval =
+            IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
+        while interval.next().await.is_some() {
+            let hostname = crate::get_hostname();
+            let pid = std::process::id().to_string();
 
-        let batch = metrics.into_iter().map(|mut metric| {
-            // A metric starts out with a default "vector" namespace, but will be overridden
-            // if an explicit namespace is provided to this source.
-            if namespace.is_some() {
-                metric = metric.with_namespace(namespace.as_ref());
-            }
+            let metrics = self.controller.capture_metrics();
+            let count = metrics.len();
+            let byte_size = metrics.size_of();
+            emit!(EventsReceived { count, byte_size });
 
-            // Version and configuration key are reported in enterprise.
-            if let Some(version) = &version {
-                metric.insert_tag("version".to_owned(), version.clone());
-            }
-            if let Some(configuration_key) = &configuration_key {
-                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-            }
-
-            if let Some(host_key) = &host_key {
-                if let Ok(hostname) = &hostname {
-                    metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+            let batch = metrics.into_iter().map(|mut metric| {
+                // A metric starts out with a default "vector" namespace, but will be overridden
+                // if an explicit namespace is provided to this source.
+                if let Some(namespace) = &self.namespace {
+                    metric = metric.with_namespace(Some(namespace));
                 }
-            }
-            if let Some(pid_key) = &pid_key {
-                metric.insert_tag(pid_key.to_owned(), pid.clone());
-            }
-            metric
-        });
 
-        if let Err(error) = out.send_batch(batch).await {
-            emit!(StreamClosedError { error, count });
-            return Err(());
+                // Version and configuration key are reported in enterprise.
+                if let Some(version) = &self.version {
+                    metric.insert_tag("version".to_owned(), version.clone());
+                }
+                if let Some(configuration_key) = &self.configuration_key {
+                    metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
+                }
+
+                if let Some(host_key) = &self.host_key {
+                    if let Ok(hostname) = &hostname {
+                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                    }
+                }
+                if let Some(pid_key) = &self.pid_key {
+                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                }
+                metric
+            });
+
+            if let Err(error) = self.out.send_batch(batch).await {
+                emit!(StreamClosedError { error, count });
+                return Err(());
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 #[cfg(test)]
