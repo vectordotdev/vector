@@ -140,6 +140,7 @@ enum ReportingError {
     EndpointError(ParseError),
     TooManyRedirects,
     InvalidRedirectUrl,
+    MaxRetriesReached,
 }
 
 impl Display for ReportingError {
@@ -154,6 +155,7 @@ impl Display for ReportingError {
                 write!(f, "Too many redirects from the server")
             }
             Self::InvalidRedirectUrl => write!(f, "Server responded with an invalid redirect URL"),
+            Self::MaxRetriesReached => write!(f, "Maximum number of retries reached"),
         }
     }
 }
@@ -304,7 +306,7 @@ pub async fn try_attach(
     select! {
         biased;
         Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
-        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
+        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, datadog.max_retries) => {
             match report {
                 Ok(()) => {
                     info!(
@@ -450,6 +452,7 @@ async fn report_serialized_config_to_datadog<'a>(
     endpoint: &'a str,
     auth: &'a PipelinesAuth<'a>,
     payload: &'a PipelinesVersionPayload<'a>,
+    max_retries: u32,
 ) -> Result<(), ReportingError> {
     info!(
         "Attempting to report configuration to {}.",
@@ -459,8 +462,10 @@ async fn report_serialized_config_to_datadog<'a>(
     let mut endpoint = Url::parse(endpoint).map_err(ReportingError::EndpointError)?;
     let mut redirected = false;
     let mut backoff = ReportingRetryBackoff::new();
+    let mut retries = 0;
 
-    loop {
+    while retries < max_retries {
+        retries += 1;
         let req = build_request(&endpoint, auth, payload);
         let res = client.send(req).await;
         if let Err(HttpError::CallRequest { source: error }) = &res {
@@ -498,6 +503,8 @@ async fn report_serialized_config_to_datadog<'a>(
             return Err(ReportingError::StatusCode(status));
         }
     }
+
+    Err(ReportingError::MaxRetriesReached)
 }
 
 #[cfg(test)]
@@ -506,7 +513,7 @@ mod test {
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
-    use crate::http::HttpClient;
+    use crate::{config::enterprise::default_max_retries, http::HttpClient};
 
     use super::{
         report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
@@ -560,11 +567,15 @@ mod test {
         let config = toml::map::Map::new();
         let payload = PipelinesVersionPayload::new(&config, &fields);
 
-        assert!(
-            report_serialized_config_to_datadog(&client, endpoint.as_ref(), &auth, &payload)
-                .await
-                .is_ok()
-        );
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            default_max_retries()
+        )
+        .await
+        .is_ok());
     }
 
     #[tokio::test]
@@ -579,10 +590,37 @@ mod test {
         let config = toml::map::Map::new();
         let payload = PipelinesVersionPayload::new(&config, &fields);
 
-        assert!(
-            report_serialized_config_to_datadog(&client, endpoint.as_ref(), &auth, &payload)
-                .await
-                .is_ok()
-        );
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            default_max_retries()
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn error_exceed_max_retries() {
+        let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            1
+        )
+        .await
+        .is_err());
     }
 }
