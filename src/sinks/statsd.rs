@@ -215,8 +215,12 @@ impl Encoder<Event> for StatsdEncoder {
                     StatisticKind::Histogram => "h",
                     StatisticKind::Summary => "d",
                 };
-                let samples = compress_distribution(samples.clone());
-                for sample in samples {
+
+                // TODO: This is a good example of where it'd be nice to bake this into a dedicated combinator or
+                // normalizer feature, although this sink also needs to be rewritten in the new-style to begin with.
+                let mut samples = samples.clone();
+                let compressed_samples = compress_distribution(&mut samples);
+                for sample in compressed_samples {
                     push_event(
                         &mut buf,
                         metric,

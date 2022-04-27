@@ -20,6 +20,8 @@ use crate::{
     ByteSizeOf,
 };
 
+pub type MetricTags = BTreeMap<String, String>;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
@@ -88,7 +90,56 @@ pub struct MetricSeries {
     pub tags: Option<MetricTags>,
 }
 
-pub type MetricTags = BTreeMap<String, String>;
+impl MetricSeries {
+    /// Gets a reference to the name of the series.
+    pub fn name(&self) -> &MetricName {
+        &self.name
+    }
+
+    /// Gets a mutable reference to the name of the series.
+    pub fn name_mut(&mut self) -> &mut MetricName {
+        &mut self.name
+    }
+
+    /// Gets an optional reference to the tags of the series.
+    pub fn tags(&self) -> Option<&MetricTags> {
+        self.tags.as_ref()
+    }
+
+    /// Gets an optional mutable reference to the tags of the series.
+    pub fn tags_mut(&mut self) -> &mut Option<MetricTags> {
+        &mut self.tags
+    }
+
+    /// Set or updates the string value of a tag. *Note:* This will
+    /// create the tags map if it is not present.
+    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
+    }
+
+    /// Remove the tag entry for the named key, if it exists, and return
+    /// the old value. *Note:* This will drop the tags map if the tag
+    /// was the last entry in it.
+    pub fn remove_tag(&mut self, key: &str) -> Option<String> {
+        match &mut self.tags {
+            None => None,
+            Some(tags) => {
+                let result = tags.remove(key);
+                if tags.is_empty() {
+                    self.tags = None;
+                }
+                result
+            }
+        }
+    }
+
+    /// Get the tag entry for the named key. *Note:* This will create
+    /// the tags map if it is not present, even if nothing is later
+    /// inserted.
+    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
+        self.tags.get_or_insert_with(Default::default).entry(key)
+    }
+}
 
 impl ByteSizeOf for MetricSeries {
     fn allocated_bytes(&self) -> usize {
@@ -101,6 +152,28 @@ pub struct MetricName {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+}
+
+impl MetricName {
+    /// Gets a reference to the name component of this name.
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Gets a mutable reference to the name component of this name.
+    pub fn name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Gets a reference to the namespace component of this name.
+    pub fn namespace(&self) -> Option<&String> {
+        self.namespace.as_ref()
+    }
+
+    /// Gets a mutable reference to the namespace component of this name.
+    pub fn namespace_mut(&mut self) -> &mut Option<String> {
+        &mut self.namespace
+    }
 }
 
 impl ByteSizeOf for MetricName {
@@ -415,19 +488,32 @@ pub struct Quantile {
 }
 
 impl Quantile {
-    /// Formats this quantile as a percentile.
+    /// Renders this quantile as a string, scaled to be a percentile.
     ///
-    /// Up to two decimal places are maintained.  The rendered value will be without a decimal
-    /// point, however.  For example, a quantile of 0.25 will be rendered as "25" and a quantile of
-    /// 0.9999 will be rendered as "9999", but a quantile of 0.99999 would also be rendered as
-    /// "9999".
-    pub fn as_percentile(&self) -> String {
-        let clamped = self.quantile.clamp(0.0, 1.0);
-        let raw = (clamped * 100.0).to_string();
-        raw.chars()
+    /// Up to four significant digits are maintained, but the resulting string will be without a decimal point.
+    ///
+    /// For example, a quantile of 0.25, which represents a percentile of 25, will be rendered as "25" and a quantile of
+    /// 0.9999, which represents a percentile of 99.99, will be rendered as "9999". A quantile of 0.99999, which
+    /// represents a percentile of 99.999, would also be rendered as "9999", though.
+    pub fn to_percentile_string(&self) -> String {
+        let clamped = self.quantile.clamp(0.0, 1.0) * 100.0;
+        clamped
+            .to_string()
+            .chars()
             .take(5)
-            .filter(|c| c.is_numeric())
-            .collect::<String>()
+            .filter(|c| *c != '.')
+            .collect()
+    }
+
+    /// Renders this quantile as a string.
+    ///
+    /// Up to four significant digits are maintained.
+    ///
+    /// For example, a quantile of 0.25 will be rendered as "0.25", and a quantile of 0.9999 will be rendered as
+    /// "0.9999", but a quantile of 0.99999 will be rendered as "0.9999".
+    pub fn to_quantile_string(&self) -> String {
+        let clamped = self.quantile.clamp(0.0, 1.0);
+        clamped.to_string().chars().take(6).collect()
     }
 }
 
@@ -813,37 +899,6 @@ impl EventDataEq for Metric {
         self.series == other.series
             && self.data == other.data
             && self.metadata.event_data_eq(&other.metadata)
-    }
-}
-
-impl MetricSeries {
-    /// Set or updates the string value of a tag. *Note:* This will
-    /// create the tags map if it is not present.
-    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
-        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
-    }
-
-    /// Remove the tag entry for the named key, if it exists, and return
-    /// the old value. *Note:* This will drop the tags map if the tag
-    /// was the last entry in it.
-    pub fn remove_tag(&mut self, key: &str) -> Option<String> {
-        match &mut self.tags {
-            None => None,
-            Some(tags) => {
-                let result = tags.remove(key);
-                if tags.is_empty() {
-                    self.tags = None;
-                }
-                result
-            }
-        }
-    }
-
-    /// Get the tag entry for the named key. *Note:* This will create
-    /// the tags map if it is not present, even if nothing is later
-    /// inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.tags.get_or_insert_with(Default::default).entry(key)
     }
 }
 
@@ -1241,7 +1296,7 @@ impl Display for MetricValue {
                             write!(
                                 fmt,
                                 "{}={:?}",
-                                q.as_percentile(),
+                                q.to_percentile_string(),
                                 ddsketch.quantile(q.quantile)
                             )
                         })
@@ -1659,7 +1714,7 @@ mod test {
     }
 
     #[test]
-    fn quantile_as_percentile() {
+    fn quantile_to_percentile_string() {
         let quantiles = [
             (-1.0, "0"),
             (0.0, "0"),
@@ -1677,7 +1732,31 @@ mod test {
                 quantile,
                 value: 1.0,
             };
-            let result = quantile.as_percentile();
+            let result = quantile.to_percentile_string();
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[test]
+    fn quantile_to_string() {
+        let quantiles = [
+            (-1.0, "0"),
+            (0.0, "0"),
+            (0.25, "0.25"),
+            (0.50, "0.5"),
+            (0.999, "0.999"),
+            (0.9999, "0.9999"),
+            (0.99999, "0.9999"),
+            (1.0, "1"),
+            (3.0, "1"),
+        ];
+
+        for (quantile, expected) in quantiles {
+            let quantile = Quantile {
+                quantile,
+                value: 1.0,
+            };
+            let result = quantile.to_quantile_string();
             assert_eq!(result, expected);
         }
     }

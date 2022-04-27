@@ -76,10 +76,17 @@ impl ByteSizeOf for EventMetadata {
 }
 
 impl EventMetadata {
-    /// Replace the finalizers array with the given one.
+    /// Replaces the existing event finalizers with the given one.
     #[must_use]
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
         self.finalizers = EventFinalizers::new(finalizer);
+        self
+    }
+
+    /// Replaces the existing event finalizers with the given ones.
+    #[must_use]
+    pub fn with_finalizers(mut self, finalizers: EventFinalizers) -> Self {
+        self.finalizers = finalizers;
         self
     }
 
@@ -128,17 +135,22 @@ impl EventMetadata {
         self.finalizers.update_sources();
     }
 
-    /// Add a new finalizer to the array
+    /// Gets a reference to the event finalizers.
+    pub fn finalizers(&self) -> &EventFinalizers {
+        &self.finalizers
+    }
+
+    /// Add a new event finalizer to the existing list of event finalizers.
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.finalizers.add(finalizer);
     }
 
-    /// Swap the finalizers list with an empty list and return the original.
+    /// Consumes all event finalizers and returns them, leaving the list of event finalizers empty.
     pub fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
 
-    /// Merges the given finalizers into the existing set of finalizers.
+    /// Merges the given event finalizers into the existing list of event finalizers.
     pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
         self.finalizers.merge(finalizers);
     }

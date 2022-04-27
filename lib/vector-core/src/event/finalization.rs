@@ -10,8 +10,11 @@ use tokio::sync::oneshot;
 use super::Event;
 use crate::ByteSizeOf;
 
-/// Wrapper type for an array of event finalizers. This is the primary
-/// public interface to event finalization metadata.
+/// A set of event finalizers.
+//
+// TODO: Should we actually allow cloning finalizers? Allowing this technically means we could have N copies of the original event that can
+// update the finalization status for it, which feels incorrect.  If there's a real reason to allow that, or a reason to
+// add more finalizers i.e. fork, then that should be provided explicitly and be required to happen explicitly.
 #[derive(Clone, Debug, Default)]
 pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
 
@@ -43,31 +46,36 @@ impl ByteSizeOf for EventFinalizers {
 }
 
 impl EventFinalizers {
-    /// Create a new array of event finalizer with the single event.
+    /// Create a new set of event finalizers based on the given event finalizer.
     pub fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)])
     }
 
-    /// Add a single finalizer to this array.
+    /// Creates a fork of the event finalizers in this set.
+    ///
+    /// For more information, see the documentation for [`EventFinalizer::fork`].
+    pub fn fork(&self) -> Self {
+        Self(self.0.iter().map(|f| Arc::new(f.fork())).collect())
+    }
+
+    /// Add a new event finalizer.
     pub fn add(&mut self, finalizer: EventFinalizer) {
         self.0.push(Arc::new(finalizer));
     }
 
-    /// Merge the given list of finalizers into this array.
+    /// Merge the given collection of event finalizers into this set.
     pub fn merge(&mut self, other: Self) {
         self.0.extend(other.0.into_iter());
     }
 
-    /// Update the status of all finalizers in this set.
+    /// Update the status of all event finalizers in this set.
     pub fn update_status(&self, status: EventStatus) {
         for finalizer in &self.0 {
             finalizer.update_status(status);
         }
     }
 
-    /// Update all sources for this finalizer with the current
-    /// status. This *drops* the finalizer array elements so they may
-    /// immediately signal the source batch.
+    /// Consumes all event finalizers and updates their underlying batches immediately.
     pub fn update_sources(&mut self) {
         let finalizers = mem::take(&mut self.0);
         for finalizer in &finalizers {
@@ -103,10 +111,23 @@ impl ByteSizeOf for EventFinalizer {
 }
 
 impl EventFinalizer {
-    /// Create a new event in a batch.
+    /// Create a new event finalizer attached to the given batch.
     pub fn new(batch: Arc<BatchNotifier>) -> Self {
         let status = Atomic::new(EventStatus::Dropped);
         Self { status, batch }
+    }
+
+    /// Creates a fork of this finalizer.
+    ///
+    /// A forked finalizer is attached as a new finalizer to the underlying batch notifier. This allows you to take an
+    /// event, and its finalizer, and fork it such that where if a batch notifier only had the one event finalizer
+    /// attached before, it can now have N event finalizers attached.
+    ///
+    /// Said another way, this is a way to add more event finalizers to an existing batch notifier after the fact.
+    /// Cloning the existing event finalizer itself is not enough, as each finalizer hs its own discrete status, even
+    /// if the batch notifier is the same, so a new event finalizer is required for correctness.
+    pub fn fork(&self) -> Self {
+        Self::new(self.batch.clone())
     }
 
     /// Update this finalizer's status in place with the given `EventStatus`.
@@ -523,5 +544,36 @@ mod tests {
         assert_eq!(Rejected.update(EventStatus::Errored), Rejected);
         assert_eq!(Rejected.update(EventStatus::Rejected), Rejected);
         assert_eq!(Rejected.update(EventStatus::Recorded), Rejected);
+    }
+
+    #[test]
+    fn finalizer_fork() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event1 = EventFinalizer::new(batch);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+
+        let event2 = event1.fork();
+        assert_eq!(receiver.try_recv(), Err(Empty));
+
+        drop(event1);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(event2);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn finalizers_fork() {
+        let (event1, mut receiver) = make_finalizer();
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(1, event1.count_finalizers());
+
+        let event2 = event1.fork();
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        assert_eq!(1, event2.count_finalizers());
+
+        drop(event1);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(event2);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 }

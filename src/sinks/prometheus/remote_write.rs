@@ -110,7 +110,7 @@ impl SinkConfig for RemoteWriteConfig {
                 .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
-                    stream::iter(normalizer.apply(event.into_metric()).map(|event| {
+                    stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
@@ -173,7 +173,7 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
 pub struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
