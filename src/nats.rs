@@ -1,4 +1,4 @@
-use crate::tls::TlsConfig;
+use crate::tls::TlsEnableableConfig;
 use nkeys::error::Error as NKeysError;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -96,7 +96,7 @@ impl NatsAuthConfig {
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: &Option<NatsAuthConfig>,
-    tls_config: &Option<TlsConfig>,
+    tls_config: &Option<TlsEnableableConfig>,
 ) -> Result<nats::asynk::Options, NatsConfigError> {
     let nats_options = match &auth_config {
         None => nats::asynk::Options::new(),

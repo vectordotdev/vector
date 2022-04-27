@@ -27,6 +27,17 @@ impl LocalEnv {
     pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<assignment::Details> {
         self.bindings.remove(ident)
     }
+
+    /// Merge state present in both `self` and `other`.
+    pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings.into_iter() {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = other_details;
+            }
+        }
+
+        self
+    }
 }
 
 /// A lexical scope within the program.

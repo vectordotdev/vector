@@ -17,7 +17,7 @@ use crate::{
         UriParseSnafu,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -38,7 +38,7 @@ pub enum HealthcheckError {
 }
 
 pub fn create_client(
-    tls: &Option<TlsOptions>,
+    tls: &Option<TlsConfig>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;

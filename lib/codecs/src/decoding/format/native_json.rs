@@ -4,7 +4,7 @@ use smallvec::{smallvec, SmallVec};
 use value::Kind;
 
 use super::Deserializer;
-use vector_core::{event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema};
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -14,6 +14,11 @@ impl NativeJsonDeserializerConfig {
     /// Build the `NativeJsonDeserializer` from this configuration.
     pub const fn build(&self) -> NativeJsonDeserializer {
         NativeJsonDeserializer
+    }
+
+    /// The data type of returned events
+    pub fn output_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema produced by the deserializer.

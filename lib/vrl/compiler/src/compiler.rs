@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use diagnostic::DiagnosticError;
+use diagnostic::{DiagnosticList, DiagnosticMessage, Severity};
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
 
@@ -10,11 +10,11 @@ use crate::{
     Function, Program, Value,
 };
 
-pub(crate) type Errors = Vec<Box<dyn DiagnosticError>>;
+pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
 
 pub(crate) struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
-    errors: Errors,
+    diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
     local: LocalEnv,
@@ -24,7 +24,7 @@ impl<'a> Compiler<'a> {
     pub(super) fn new(fns: &'a [Box<dyn Function>]) -> Self {
         Self {
             fns,
-            errors: vec![],
+            diagnostics: vec![],
             fallible: false,
             abortable: false,
             local: LocalEnv::default(),
@@ -44,24 +44,31 @@ impl<'a> Compiler<'a> {
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<(Program, LocalEnv), Errors> {
+    ) -> Result<(Program, DiagnosticList), DiagnosticList> {
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
             .map(|expr| Box::new(expr) as _)
             .collect();
 
-        if !self.errors.is_empty() {
-            return Err(self.errors);
+        let (errors, warnings): (Vec<_>, Vec<_>) =
+            self.diagnostics.into_iter().partition(|diagnostic| {
+                matches!(diagnostic.severity(), Severity::Bug | Severity::Error)
+            });
+
+        if !errors.is_empty() {
+            return Err(errors.into());
         }
 
-        let program = Program {
-            expressions,
-            fallible: self.fallible,
-            abortable: self.abortable,
-        };
-
-        Ok((program, self.local))
+        Ok((
+            Program {
+                expressions,
+                fallible: self.fallible,
+                abortable: self.abortable,
+                local_env: self.local,
+            },
+            warnings.into(),
+        ))
     }
 
     fn compile_root_exprs(
@@ -82,7 +89,7 @@ impl<'a> Compiler<'a> {
                         if expr.type_def((&self.local, external)).is_fallible() {
                             use crate::expression::Error;
                             let err = Error::Fallible { span };
-                            self.errors.push(Box::new(err));
+                            self.diagnostics.push(Box::new(err));
                         }
 
                         Some(expr)
@@ -165,7 +172,7 @@ impl<'a> Compiler<'a> {
                 NanFloat => NotNan::new(0.0).unwrap().into(),
             };
 
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             value
         });
 
@@ -196,14 +203,28 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
-        // We track the original local state, as any mutations within the block
-        // are removed after the block returns.
-        let local = self.local.clone();
+        // We get a copy of the current local state, so that we can use it to
+        // remove any *new* state added in the block, as that state is lexically
+        // scoped to the block, and must not be visible to the rest of the
+        // program.
+        let local_snapshot = self.local.clone();
 
+        // We can now start compiling the expressions within the block, which
+        // will use the existing local state of the compiler, as blocks have
+        // access to any state of their parent expressions.
         let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
+
+        // Now that we've compiled the expressions, we pass them into the block,
+        // and also a copy of the local state, which includes any state added by
+        // the compiled expressions in the block.
         let block = Block::new(exprs, self.local.clone());
 
-        self.local = local;
+        // Take the local state snapshot captured before we started compiling
+        // the block, and merge back into it any mutations that happened to
+        // state the snapshot was already tracking. Then, revert the compiler
+        // local state to the updated snapshot.
+        self.local = local_snapshot.merge_mutations(self.local.clone());
+
         block
     }
 
@@ -239,7 +260,7 @@ impl<'a> Compiler<'a> {
         let predicate = match self.compile_predicate(predicate, external) {
             Ok(v) => v,
             Err(err) => {
-                self.errors.push(Box::new(err));
+                self.diagnostics.push(Box::new(err));
                 return IfStatement::noop();
             }
         };
@@ -282,7 +303,7 @@ impl<'a> Compiler<'a> {
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, external));
 
         Op::new(lhs, opcode, rhs, (&mut self.local, external)).unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             Op::noop()
         })
     }
@@ -371,7 +392,7 @@ impl<'a> Compiler<'a> {
         };
 
         Assignment::new(node, &mut self.local, external).unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             Assignment::noop()
         })
     }
@@ -471,7 +492,7 @@ impl<'a> Compiler<'a> {
             builder.compile(&mut self.local, external, block, local_snapshot)
         })
         .unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             FunctionCall::noop()
         })
     }
@@ -494,7 +515,7 @@ impl<'a> Compiler<'a> {
         let (span, ident) = node.take();
 
         Variable::new(span, ident.clone(), &self.local).unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             Variable::noop(ident)
         })
     }
@@ -515,7 +536,7 @@ impl<'a> Compiler<'a> {
         let node = Node::new(expr.span(), self.compile_expr(*expr, external));
 
         Not::new(node, not.span(), (&self.local, external)).unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             Not::noop()
         })
     }
@@ -528,12 +549,12 @@ impl<'a> Compiler<'a> {
             .map(|expr| Node::new(expr.span(), self.compile_expr(*expr, external)));
 
         Abort::new(span, message, (&self.local, external)).unwrap_or_else(|err| {
-            self.errors.push(Box::new(err));
+            self.diagnostics.push(Box::new(err));
             Abort::noop(span)
         })
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {
-        self.errors.push(Box::new(error))
+        self.diagnostics.push(Box::new(error))
     }
 }

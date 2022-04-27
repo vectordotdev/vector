@@ -9,18 +9,11 @@ impl Function for ForEach {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                kind: kind::OBJECT | kind::ARRAY,
-                required: true,
-            },
-            Parameter {
-                keyword: "recursive",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-        ]
+        &[Parameter {
+            keyword: "value",
+            kind: kind::OBJECT | kind::ARRAY,
+            required: true,
+        }]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -31,19 +24,9 @@ impl Function for ForEach {
                 result: Ok("3"),
             },
             Example {
-                title: "recursively iterate object",
-                source: r#"count = 0; for_each({ "a": 1, "b": { "c": 2, "d": 3 } }, recursive: true) -> |_, value| { count = count + (int(value) ?? 0) }; count"#,
-                result: Ok("6"),
-            },
-            Example {
                 title: "iterate array",
                 source: r#"count = 0; for_each([1,2,3]) -> |index, value| { count = count + index + value }; count"#,
                 result: Ok("9"),
-            },
-            Example {
-                title: "recursively iterate array",
-                source: r#"count = 0; for_each([1,2,[3,4]], recursive: true) -> |index, value| { count = count + index + (int(value) ?? 0) }; count"#,
-                result: Ok("14"),
             },
         ]
     }
@@ -55,14 +38,9 @@ impl Function for ForEach {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let recursive = arguments.optional("recursive");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(ForEachFn {
-            value,
-            closure,
-            recursive,
-        }))
+        Ok(Box::new(ForEachFn { value, closure }))
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -93,84 +71,26 @@ impl Function for ForEach {
 
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         // TODO: this work will happen in a follow-up PR
-        Ok(Value::Null)
+        Err("function currently unavailable in VM runtime".into())
     }
 }
 
 #[derive(Debug, Clone)]
 struct ForEachFn {
     value: Box<dyn Expression>,
-    recursive: Option<Box<dyn Expression>>,
     closure: FunctionClosure,
 }
 
 impl Expression for ForEachFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
-        let recursive = match &self.recursive {
-            None => false,
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-        };
-
         let value = self.value.resolve(ctx)?;
-        let top_level_kind = value.kind();
-
-        let mut iter = value.into_iter(recursive);
+        let mut iter = value.into_iter(false);
 
         for item in iter.by_ref() {
             match item {
-                // NOTE:
-                //
-                // `for_each` currently only supports recursively reading nested
-                // key/value pairs if the top-level type is an object. It does
-                // still recurse "through" arrays though, but the array values
-                // aren't returned during iteration.
-                //
-                // Meaning, for this data structure:
-                //
-                // ```
-                // { "foo": { "bar": [{ "baz": true }] } }
-                // ```
-                //
-                // A recursive iterator would return the following items:
-                //
-                // ```
-                // ("foo", { "bar": [{ "baz": true }] })
-                // ("bar", [{ "baz": true }])
-                // ("baz", true)
-                // ```
-                //
-                // Notably missing here is the tuple:
-                //
-                // ```
-                // (0, { "baz": true })
-                // ```
-                //
-                // Because this returns a non-key/value pair (it returns an
-                // index/value pair instead).
-                //
-                // Technically we can support this (easily), but it would mean
-                // the first element in the tuple will almost always be marked
-                // as "either a string or an integer", which would mean more
-                // type coercion needs to be done by the caller, which is
-                // annoying. The only case where type coercion wouldn't be
-                // needed would be when iterating an object in which all
-                // nested collections are known to be the same type as the
-                // top-level collection, which is almost never the case (that
-                // is, it's almost never the case we _know_ that this is so at
-                // compile-time, not that the structure will actually be so at
-                // runtime).
-                //
-                // We could in the future add a new `mixed: bool` option to the
-                // function call, to optionally support this type of recursion,
-                // at the expense of more type coercion requirements by the
-                // caller.
-                IterItem::KeyValue(key, value) if top_level_kind.is_object() => {
-                    self.closure.run_key_value(ctx, key, value)?
-                }
+                IterItem::KeyValue(key, value) => self.closure.run_key_value(ctx, key, value)?,
 
-                // The same applies here as above, i.e. index/value pairs are
-                // only returned if the top-level item is an array.
-                IterItem::IndexValue(index, value) if top_level_kind.is_array() => {
+                IterItem::IndexValue(index, value) => {
                     self.closure.run_index_value(ctx, index, value)?
                 }
 

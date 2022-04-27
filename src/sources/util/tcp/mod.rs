@@ -115,6 +115,7 @@ where
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         addr: SocketListenAddr,
@@ -226,6 +227,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,

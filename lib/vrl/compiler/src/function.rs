@@ -6,7 +6,7 @@ use std::{
 };
 
 use anymap::AnyMap;
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use value::kind::Collection;
 
 use crate::{
@@ -21,9 +21,9 @@ use crate::{
     Context, ExpressionError, Span, Value,
 };
 
-pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
-    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>>;
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
 pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
@@ -77,7 +77,7 @@ pub trait Function: Send + Sync + fmt::Debug {
         _ctx: &mut FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
-    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticError>> {
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
         Ok(None)
     }
 
@@ -505,7 +505,7 @@ pub enum Error {
     ExpectedFunctionClosure,
 }
 
-impl diagnostic::DiagnosticError for Error {
+impl diagnostic::DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 
@@ -588,7 +588,7 @@ impl diagnostic::DiagnosticError for Error {
     }
 }
 
-impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
+impl From<Error> for Box<dyn diagnostic::DiagnosticMessage> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
     }

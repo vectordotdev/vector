@@ -23,7 +23,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         111
     }
@@ -84,7 +84,7 @@ pub(crate) fn add_index(
 }
 
 /// Takes a static boolean argument and return the value it resolves to.
-fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn DiagnosticError>> {
+fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn DiagnosticMessage>> {
     arg.expr()
         .as_value()
         .as_ref()
@@ -102,7 +102,7 @@ fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn Diag
 }
 
 /// Takes a function argument (expected to be a static boolean) and returns a `Case`.
-fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn DiagnosticError>> {
+fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn DiagnosticMessage>> {
     if arg_to_bool(arg)? {
         Ok(Case::Sensitive)
     } else {
@@ -123,7 +123,7 @@ pub(crate) fn index_from_args(
     table: String,
     registry: &mut TableRegistry,
     args: &[(&'static str, Option<FunctionArgument>)],
-) -> std::result::Result<EnrichmentTableRecord, Box<dyn DiagnosticError>> {
+) -> std::result::Result<EnrichmentTableRecord, Box<dyn DiagnosticMessage>> {
     let case_sensitive = args
         .iter()
         .find(|(name, _)| *name == "case_sensitive")

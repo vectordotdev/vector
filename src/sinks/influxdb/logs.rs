@@ -25,7 +25,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -58,7 +58,7 @@ pub struct InfluxDbLogsConfig {
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

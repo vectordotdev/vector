@@ -1,12 +1,21 @@
 use std::{iter::IntoIterator, ops::Deref};
 
-use crate::Expression;
+use crate::{state::LocalEnv, Expression};
 
 #[derive(Debug, Clone)]
 pub struct Program {
     pub(crate) expressions: Vec<Box<dyn Expression>>,
     pub(crate) fallible: bool,
     pub(crate) abortable: bool,
+
+    /// A copy of the local environment at program compilation.
+    ///
+    /// Can be used to instantiate a new program with the same local state as
+    /// the previous program.
+    ///
+    /// Specifically, this is used by the VRL REPL to incrementally compile
+    /// a program as each line is compiled.
+    pub(crate) local_env: LocalEnv,
 }
 
 impl Program {
@@ -24,6 +33,12 @@ impl Program {
     /// statement in the source.
     pub fn can_abort(&self) -> bool {
         self.abortable
+    }
+
+    /// Get a reference to the final local environment of the compiler that
+    /// compiled the current program.
+    pub fn local_env(&self) -> &LocalEnv {
+        &self.local_env
     }
 }
 

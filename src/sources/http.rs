@@ -23,7 +23,7 @@ use crate::{
     sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -35,7 +35,7 @@ pub(super) struct SimpleHttpConfig {
     headers: Vec<String>,
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
@@ -192,7 +192,12 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(
+            self.decoding
+                .as_ref()
+                .map(|d| d.output_type())
+                .unwrap_or(DataType::Log),
+        )]
     }
 
     fn source_type(&self) -> &'static str {
@@ -258,6 +263,7 @@ mod tests {
         crate::test_util::test_generate_config::<SimpleHttpConfig>();
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
         query_parameters: Vec<String>,

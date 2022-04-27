@@ -6,7 +6,6 @@ use serde::Deserialize;
 use vector_core::{
     config::log_schema,
     event::{Event, Value},
-    ByteSizeOf,
 };
 
 use super::sink::HecProcessedEvent;
@@ -58,7 +57,6 @@ fn get_processed_event() -> HecProcessedEvent {
         log_schema().timestamp_key(),
         Utc.timestamp_nanos(1638366107111456123),
     );
-    let event_byte_size = event.size_of();
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
@@ -67,8 +65,7 @@ fn get_processed_event() -> HecProcessedEvent {
     let timestamp_nanos_key = Some(String::from("ts_nanos_key"));
 
     process_log(
-        event.into_log(),
-        event_byte_size,
+        event,
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
@@ -76,7 +73,6 @@ fn get_processed_event() -> HecProcessedEvent {
         indexed_fields.as_slice(),
         timestamp_nanos_key.as_deref(),
     )
-    .unwrap()
 }
 
 fn get_event_with_token(msg: &str, token: &str) -> Event {

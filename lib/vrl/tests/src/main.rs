@@ -42,6 +42,7 @@ static AST_ONLY_TESTS: &[&str] = &[
     "functions/for_each/recursively iterate object",
     "functions/for_each/iterate array",
     "functions/for_each/recursively iterate array",
+    "functions/for_each (closure)/iterate array",
     // end: iteration-specific tests
 ];
 
@@ -220,7 +221,7 @@ fn main() {
             .unwrap_or_default();
 
         match program {
-            Ok(program) => {
+            Ok((program, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
@@ -361,7 +362,7 @@ fn main() {
                     }
                 }
             }
-            Err(diagnostics) => {
+            Ok((_, diagnostics)) | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {

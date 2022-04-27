@@ -24,7 +24,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         109
     }
@@ -163,7 +163,7 @@ impl Function for ParseGroks {
                 // We use a datadog library here because it is a superset of grok.
                 let grok_rules =
                     parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
-                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
                     })?;
 
                 Ok(Some(Box::new(grok_rules) as _))
@@ -239,7 +239,7 @@ impl Function for ParseGroks {
 
         // we use a datadog library here because it is a superset of grok
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
-            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?;
+            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
 
         let remove_empty = arguments
             .optional("remove_empty")
