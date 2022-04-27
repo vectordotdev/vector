@@ -116,7 +116,7 @@ mod tests {
     fn parsing_default_with_load_timeout() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
-            load_timeout_secs = 10
+            auth.load_timeout_secs = 10
         "#,
         )
         .unwrap();
