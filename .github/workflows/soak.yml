@@ -62,7 +62,7 @@ jobs:
       - name: Setup experimental metadata
         id: experimental-meta
         run: |
-          export RUNNER_NODE_REPLICAS="1"
+          export RUNNER_NODE_REPLICAS="10"
           export WARMUP_SECONDS="30"
           export TOTAL_SAMPLES="120"
           export P_VALUE="0.1"
