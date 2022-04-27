@@ -16,7 +16,7 @@ use crate::shutdown::ShutdownSignal;
     feature = "sources-journald",
     feature = "sources-kafka",
 ))]
-pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
+pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>, true>;
 
 /// The `UnorderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order the finalization
@@ -26,18 +26,19 @@ pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFu
     feature = "sources-splunk_hec",
     feature = "sources-gcp_pubsub"
 ))]
-pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
+pub(crate) type UnorderedFinalizer<T> =
+    FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>, false>;
 
 /// The `FinalizerSet` framework here is a mechanism for marking
 /// events from a source as done in a single background task. The type
 /// `T` is the source-specific data associated with each entry to be
 /// used to complete the finalization.
-pub(crate) struct FinalizerSet<T, S> {
+pub(crate) struct FinalizerSet<T, S, const SOE: bool> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
     _phantom: PhantomData<S>,
 }
 
-impl<T, S> FinalizerSet<T, S>
+impl<T, S, const SOE: bool> FinalizerSet<T, S, SOE>
 where
     T: Send + 'static,
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
@@ -48,7 +49,12 @@ where
         Fut: Future<Output = ()> + Send + 'static,
     {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown, receiver, apply_done, S::default()));
+        tokio::spawn(run_finalizer::<T, S, F, Fut, SOE>(
+            shutdown,
+            receiver,
+            apply_done,
+            S::default(),
+        ));
         Self {
             sender: Some(sender),
             _phantom: Default::default(),
@@ -64,12 +70,16 @@ where
     }
 }
 
-async fn run_finalizer<T, F: Future<Output = ()>>(
+async fn run_finalizer<T, S, F, Fut, const SOE: bool>(
     shutdown: ShutdownSignal,
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
-    apply_done: impl Fn(T) -> F,
-    mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,
-) {
+    apply_done: F,
+    mut status_receivers: S,
+) where
+    S: FuturesSet<FinalizerFuture<T>> + Unpin,
+    F: Fn(T) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
     loop {
         tokio::select! {
             _ = shutdown.clone() => break,
@@ -84,7 +94,9 @@ async fn run_finalizer<T, F: Future<Output = ()>>(
             },
             finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
                 Some((status, entry)) => if status == BatchStatus::Delivered {
-                    apply_done(entry).await;
+                    apply_done(entry).await
+                } else if SOE {
+                    return
                 }
                 // The is_empty guard above prevents this from being reachable.
                 None => unreachable!(),
@@ -97,9 +109,12 @@ async fn run_finalizer<T, F: Future<Output = ()>>(
     while let Some((status, entry)) = status_receivers.next().await {
         if status == BatchStatus::Delivered {
             apply_done(entry).await;
+        } else if SOE {
+            return;
         }
     }
-    drop(shutdown);
+    // Note: `shutdown` is automatically dropped on return from this
+    // function, signalling this component is completed.
 }
 
 pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
