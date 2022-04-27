@@ -77,24 +77,7 @@ impl_generate_config_from_default!(DnstapConfig);
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
-        let host_key = self
-            .host_key
-            .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
-
-        let frame_handler = DnstapFrameHandler::new(
-            self.max_frame_length,
-            self.socket_path.clone(),
-            self.content_type(),
-            self.raw_data_only.unwrap_or(false),
-            self.multithreaded.unwrap_or(false),
-            self.max_frame_handling_tasks.unwrap_or(1000),
-            self.socket_file_mode,
-            self.socket_receive_buffer_size,
-            self.socket_send_buffer_size,
-            host_key,
-            log_schema().timestamp_key(),
-        );
+        let frame_handler = DnstapFrameHandler::new(self);
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
@@ -128,35 +111,30 @@ pub struct DnstapFrameHandler {
 }
 
 impl DnstapFrameHandler {
-    pub fn new(
-        max_frame_length: usize,
-        socket_path: PathBuf,
-        content_type: String,
-        raw_data_only: bool,
-        multithreaded: bool,
-        max_frame_handling_tasks: u32,
-        socket_file_mode: Option<u32>,
-        socket_receive_buffer_size: Option<usize>,
-        socket_send_buffer_size: Option<usize>,
-        host_key: String,
-        timestamp_key: &'static str,
-    ) -> Self {
+    pub fn new(config: &DnstapConfig) -> Self {
+        let timestamp_key = log_schema().timestamp_key();
+
         let mut schema = DnstapEventSchema::new();
         schema
             .dnstap_root_data_schema_mut()
             .set_timestamp(timestamp_key);
 
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
+
         Self {
-            max_frame_length,
-            socket_path,
-            content_type,
+            max_frame_length: config.max_frame_length,
+            socket_path: config.socket_path.clone(),
+            content_type: config.content_type(),
             schema,
-            raw_data_only,
-            multithreaded,
-            max_frame_handling_tasks,
-            socket_file_mode,
-            socket_receive_buffer_size,
-            socket_send_buffer_size,
+            raw_data_only: config.raw_data_only.unwrap_or(false),
+            multithreaded: config.multithreaded.unwrap_or(false),
+            max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
+            socket_file_mode: config.socket_file_mode,
+            socket_receive_buffer_size: config.socket_receive_buffer_size,
+            socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
         }

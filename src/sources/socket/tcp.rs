@@ -36,34 +36,6 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
-        address: SocketListenAddr,
-        keepalive: Option<TcpKeepaliveConfig>,
-        max_length: Option<usize>,
-        shutdown_timeout_secs: u64,
-        host_key: Option<String>,
-        port_key: Option<String>,
-        tls: Option<TlsEnableableConfig>,
-        receive_buffer_bytes: Option<usize>,
-        framing: Option<FramingConfig>,
-        decoding: DeserializerConfig,
-        connection_limit: Option<u32>,
-    ) -> Self {
-        Self {
-            address,
-            keepalive,
-            max_length,
-            shutdown_timeout_secs,
-            host_key,
-            port_key,
-            tls,
-            receive_buffer_bytes,
-            framing,
-            decoding,
-            connection_limit,
-        }
-    }
-
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
