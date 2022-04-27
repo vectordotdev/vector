@@ -184,7 +184,7 @@ components: sources: syslog: {
 				}
 			}
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
+				description: "In addition to the defined fields, any [Syslog 5424 structured fields](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) are parsed and inserted, namespaced under the name of each structured data section."
 				required:    true
 				type: string: {
 					examples: ["hello world"]
@@ -210,19 +210,21 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				"""
 			output: log: {
-				severity:    "notice"
-				facility:    "user"
-				timestamp:   _timestamp
-				host:        _values.local_host
-				source_ip:   _values.remote_host
-				hostname:    _hostname
-				appname:     _app_name
-				procid:      _procid
-				msgid:       _msgid
-				iut:         _iut
-				eventSource: _event_source
-				eventID:     _event_id
-				message:     _message
+				severity:  "notice"
+				facility:  "user"
+				timestamp: _timestamp
+				host:      _values.local_host
+				source_ip: _values.remote_host
+				hostname:  _hostname
+				appname:   _app_name
+				procid:    _procid
+				msgid:     _msgid
+				"exampleSDID@32473": {
+					iut:         _iut
+					eventSource: _event_source
+					eventID:     _event_id
+				}
+				message: _message
 			}
 		},
 	]
