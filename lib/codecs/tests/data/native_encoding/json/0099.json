@@ -1,1 +1,1 @@
-{"log":{":,":"."}}
+{"metric":{"name":"j","tags":{"k":"a","m":"q"},"timestamp":"1969-12-31T17:22:17.000023841Z","kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":-248768.0,"count":3760221650}],"count":1,"sum":139072.0}}}

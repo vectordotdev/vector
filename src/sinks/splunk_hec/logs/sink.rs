@@ -1,7 +1,7 @@
 use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
-use futures_util::{future, stream::BoxStream, StreamExt};
+use futures_util::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
     config::log_schema,
@@ -52,18 +52,16 @@ where
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
-            .map(|event| (event.size_of(), event.into_log()))
-            .filter_map(move |(event_byte_size, log)| {
-                future::ready(process_log(
-                    log,
-                    event_byte_size,
+            .map(move |event| {
+                process_log(
+                    event,
                     sourcetype,
                     source,
                     index,
                     host,
                     indexed_fields,
                     timestamp_nanos_key,
-                ))
+                )
             })
             .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
@@ -131,15 +129,17 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 pub fn process_log(
-    mut log: LogEvent,
-    event_byte_size: usize,
+    event: Event,
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
     host_key: &str,
     indexed_fields: &[String],
     timestamp_nanos_key: Option<&str>,
-) -> Option<HecProcessedEvent> {
+) -> HecProcessedEvent {
+    let event_byte_size = event.size_of();
+    let mut log = event.into_log();
+
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
@@ -175,8 +175,8 @@ pub fn process_log(
         fields,
     };
 
-    Some(ProcessedEvent {
+    ProcessedEvent {
         event: log,
         metadata,
-    })
+    }
 }

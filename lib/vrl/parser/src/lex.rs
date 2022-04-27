@@ -1,6 +1,6 @@
 use std::{fmt, iter::Peekable, str::CharIndices};
 
-use diagnostic::{DiagnosticError, Label, Span};
+use diagnostic::{DiagnosticMessage, Label, Span};
 use ordered_float::NotNan;
 
 use crate::template_string::{StringSegment, TemplateString};
@@ -45,7 +45,7 @@ pub enum Error {
     UnexpectedParseError(String),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 

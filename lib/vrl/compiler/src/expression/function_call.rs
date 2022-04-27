@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use anymap::AnyMap;
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use crate::{
     expression::assignment::Details,
@@ -804,7 +804,7 @@ pub(crate) enum Error {
     #[error("function compilation error: error[E{}] {}", error.code(), error)]
     Compilation {
         call_span: Span,
-        error: Box<dyn DiagnosticError>,
+        error: Box<dyn DiagnosticMessage>,
     },
 
     #[error("can't abort infallible function")]
@@ -853,7 +853,7 @@ pub(crate) enum Error {
     },
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 
