@@ -339,7 +339,7 @@ impl Source {
                 label_selector: Some(namespace_label_selector),
                 ..Default::default()
             },
-        };
+        );
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
