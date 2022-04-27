@@ -38,7 +38,10 @@ impl PartialOrd for EventFinalizers {
 
 impl ByteSizeOf for EventFinalizers {
     fn allocated_bytes(&self) -> usize {
-        self.0.iter().fold(0, |acc, arc| acc + arc.size_of())
+        // Don't count the allocated data here, it's not really event
+        // data we're interested in tracking but rather an artifact of
+        // tracking and merging events.
+        0
     }
 }
 
@@ -98,6 +101,8 @@ pub struct EventFinalizer {
 
 impl ByteSizeOf for EventFinalizer {
     fn allocated_bytes(&self) -> usize {
+        // Don't count the batch notifier, as it's shared across
+        // events in a batch.
         0
     }
 }
