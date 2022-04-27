@@ -49,6 +49,10 @@ impl Default for LogEvent {
 }
 
 impl ByteSizeOf for LogEvent {
+    fn size_of(&self) -> usize {
+        0
+    }
+
     fn allocated_bytes(&self) -> usize {
         self.fields.allocated_bytes() + self.metadata.allocated_bytes()
     }
