@@ -527,14 +527,14 @@ mod test {
         PipelinesVersionPayload,
     };
 
-    fn get_pipelines_auth() -> PipelinesAuth<'static> {
+    const fn get_pipelines_auth() -> PipelinesAuth<'static> {
         PipelinesAuth {
             api_key: "api_key",
             application_key: "application_key",
         }
     }
 
-    fn get_pipelines_fields() -> PipelinesStrFields<'static> {
+    const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
             config_version: "config_version",
             vector_version: "vector_version",
