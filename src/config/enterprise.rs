@@ -5,6 +5,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
@@ -20,7 +21,10 @@ use crate::{
     common::datadog::{get_api_base_endpoint, Region},
     http::{HttpClient, HttpError},
     signal::{SignalRx, SignalTo},
-    sinks::datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+    sinks::{
+        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+        util::retries::ExponentialBackoff,
+    },
     sources::{
         host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
@@ -154,6 +158,40 @@ impl Display for ReportingError {
             }
             Self::InvalidRedirectUrl => write!(f, "Server responded with an invalid redirect URL"),
         }
+    }
+}
+
+/// Exponential backoff with random jitter for retrying configuration reporting
+struct ReportingRetryBackoff {
+    backoff: ExponentialBackoff,
+    jitter_rng: ThreadRng,
+}
+
+impl ReportingRetryBackoff {
+    fn new() -> Self {
+        let backoff = ExponentialBackoff::from_millis(2)
+            .factor(1000)
+            .max_delay(Duration::from_secs(60));
+        let jitter_rng = rand::thread_rng();
+
+        Self {
+            backoff,
+            jitter_rng,
+        }
+    }
+}
+
+impl Iterator for ReportingRetryBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let jitter_milliseconds = Duration::from_millis(self.jitter_rng.gen_range(0..1000));
+        Some(
+            self.backoff
+                .next()
+                .unwrap()
+                .saturating_add(jitter_milliseconds),
+        )
     }
 }
 
@@ -439,14 +477,24 @@ async fn report_serialized_config_to_datadog<'a>(
     );
 
     let mut endpoint = Url::parse(endpoint).map_err(ReportingError::EndpointError)?;
+    let mut redirected = false;
+    let mut backoff = ReportingRetryBackoff::new();
 
-    // Follow redirection responses a maximum of one time.
-    for _ in 0..=1 {
+    loop {
         let req = build_request(&endpoint, auth, payload);
-        let res = client.send(req).await.map_err(ReportingError::Http)?;
+        let res = client.send(req).await;
+        if let Err(HttpError::CallRequest { source: error }) = res {
+            if error.is_timeout() {
+                sleep(backoff.next().unwrap()).await;
+                continue;
+            }
+        }
+        let res = res.map_err(ReportingError::Http)?;
         let status = res.status();
 
-        if status.is_redirection() {
+        // Follow redirection responses a maximum of one time.
+        if status.is_redirection() && !redirected {
+            redirected = true;
             // A `Location` header could contain a relative path. To guard against that, we'll
             // join the location to the original URL to get a new absolute path.
             endpoint = endpoint
@@ -459,14 +507,17 @@ async fn report_serialized_config_to_datadog<'a>(
                 )
                 .map_err(ReportingError::EndpointError)?;
             continue;
+        } else if status.is_redirection() && redirected {
+            return Err(ReportingError::TooManyRedirects);
+        } else if status.is_client_error() || status.is_server_error() {
+            sleep(backoff.next().unwrap()).await;
+            continue;
         } else if status.is_success() {
             return Ok(());
         } else {
             return Err(ReportingError::StatusCode(status));
         }
     }
-
-    Err(ReportingError::TooManyRedirects)
 }
 
 #[cfg(test)]
@@ -501,7 +552,7 @@ mod test {
 
         Mock::given(matchers::method("POST"))
             .respond_with(ResponseTemplate::new(status_code))
-            .up_to_n_times(5)
+            .up_to_n_times(3)
             .with_priority(1)
             .mount(&mock_server)
             .await;
