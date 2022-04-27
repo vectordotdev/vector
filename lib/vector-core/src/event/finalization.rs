@@ -12,9 +12,14 @@ use crate::ByteSizeOf;
 
 /// A set of event finalizers.
 //
-// TODO: Should we actually allow cloning finalizers? Allowing this technically means we could have N copies of the original event that can
-// update the finalization status for it, which feels incorrect.  If there's a real reason to allow that, or a reason to
-// add more finalizers i.e. fork, then that should be provided explicitly and be required to happen explicitly.
+// TODO: Should we actually allow cloning finalizers? Allowing this technically means we could have N copies of the
+// original event that can update the finalization status for it, which feels incorrect.  If there's a real reason to
+// allow that, or a reason to add more finalizers i.e. fork, then that should be provided explicitly and be required to
+// happen explicitly.
+//
+// This is also somewhat indicated by the `clone_and_merge_events` test being ignored, as cloning individual finalizers
+// and merging them back together is tricky when they effectively have no unique identifier to distinguish them with,
+// yet they are inherently unique by virtue of being attached (at least initially) to a single event.
 #[derive(Clone, Debug, Default)]
 pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
 
