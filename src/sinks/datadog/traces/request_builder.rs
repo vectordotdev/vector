@@ -312,6 +312,8 @@ impl DatadogTracesEncoder {
             })
             .unwrap_or_else(BTreeMap::new);
 
+        let meta_struct = BTreeMap::new();
+
         let metrics = span
             .get("metrics")
             .map(|m| m.as_object())
@@ -354,6 +356,7 @@ impl DatadogTracesEncoder {
             duration,
             meta,
             metrics,
+            meta_struct,
         }
     }
 }

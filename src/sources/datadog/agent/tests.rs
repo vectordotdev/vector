@@ -912,6 +912,7 @@ async fn decode_traces() {
         meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
         metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
         r#type: "a_type".to_string(),
+        meta_struct: BTreeMap::new(),
     };
 
     let trace = dd_traces_proto::ApiTrace {
