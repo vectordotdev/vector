@@ -671,7 +671,7 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
-sinks-websocket = ["tokio-tungstenite"]
+sinks-websocket = ["tokio-tungstenite", "sources-utils-tls"]
 
 # Datadog integration
 enterprise = [
