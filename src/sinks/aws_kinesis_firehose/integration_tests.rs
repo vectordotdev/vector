@@ -78,7 +78,9 @@ async fn firehose_put_records() {
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+        })),
         endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
