@@ -468,3 +468,88 @@ async fn report_serialized_config_to_datadog<'a>(
 
     Err(ReportingError::TooManyRedirects)
 }
+
+#[cfg(test)]
+mod test {
+    use http::StatusCode;
+    use vector_core::config::proxy::ProxyConfig;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    use crate::http::HttpClient;
+
+    use super::{
+        report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
+        PipelinesVersionPayload,
+    };
+
+    fn get_pipelines_auth() -> PipelinesAuth<'static> {
+        PipelinesAuth {
+            api_key: "api_key",
+            application_key: "application_key",
+        }
+    }
+
+    fn get_pipelines_fields() -> PipelinesStrFields<'static> {
+        PipelinesStrFields {
+            config_version: "config_version",
+            vector_version: "vector_version",
+        }
+    }
+
+    async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockServer {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(status_code))
+            .up_to_n_times(5)
+            .with_priority(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK))
+            .with_priority(2)
+            .mount(&mock_server)
+            .await;
+
+        mock_server
+    }
+
+    #[tokio::test]
+    async fn retry_on_client_error_status_codes() {
+        let server = build_test_server_error_and_recover(StatusCode::BAD_REQUEST).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(
+            report_serialized_config_to_datadog(&client, endpoint.as_ref(), &auth, &payload)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn retry_on_server_error_status_codes() {
+        let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(
+            report_serialized_config_to_datadog(&client, endpoint.as_ref(), &auth, &payload)
+                .await
+                .is_ok()
+        );
+    }
+}
