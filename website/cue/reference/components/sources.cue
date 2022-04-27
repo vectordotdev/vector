@@ -169,8 +169,8 @@ components: sources: [Name=string]: {
 									bytes:       "Events containing the byte frame as-is."
 									json:        "Events being parsed from a JSON string."
 									syslog:      "Events being parsed from a Syslog message."
-									native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) (EXPERIMENTAL)."
-									native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) (EXPERIMENTAL)."
+									native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
+									native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
 								}
 							}
 						}
