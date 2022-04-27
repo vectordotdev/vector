@@ -296,7 +296,7 @@ jobs:
     needs: [changes, compute-check-features-matrix]
     if: ${{ needs.changes.outputs.source == 'true' }}
     strategy:
-      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.packages ) }}
+      matrix: ${{ fromJson(needs.compute-check-features-matrix.outputs.matrix ) }}
     steps:
       - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
