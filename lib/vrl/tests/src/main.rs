@@ -54,6 +54,7 @@ static AST_ONLY_TESTS: &[&str] = &[
     "functions/map_keys (closure)/map object keys",
     "functions/map_keys/map object keys",
     "functions/map_keys/recursively map object keys",
+    "functions/map_keys/map nested object keys",
 ];
 
 #[derive(Parser, Debug)]

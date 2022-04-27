@@ -35,6 +35,11 @@ impl Function for MapKeys {
                 source: r#"map_keys({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }, recursive: true) -> |key| { upcase(key) }"#,
                 result: Ok(r#"{ "A": 1, "B": [{ "C": 2 }, { "D": 3 }], "E": { "F": 4 } }"#),
             },
+            Example {
+                title: "map nested object keys",
+                source: r#"map_keys({ "a": 1, "b": { "c": 2, "d": 3, "e": { "f": 4 } } }.b) -> |key| { upcase(key) }"#,
+                result: Ok(r#"{ "C": 2, "D": 3, "E": { "f": 4 } }"#),
+            },
         ]
     }
 
@@ -78,7 +83,7 @@ impl Function for MapKeys {
 
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         // TODO: this work will happen in a follow-up PR
-        Ok(Value::Null)
+        Err("function currently unavailable in VM runtime".into())
     }
 }
 
