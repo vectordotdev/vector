@@ -27,12 +27,12 @@ impl Function for MapValues {
         &[
             Example {
                 title: "map object values",
-                source: r#"map_values({ "a": 1, "b": 2 }) -> |value| { value = value + 1 }"#,
+                source: r#"map_values({ "a": 1, "b": 2 }) -> |value| { value + 1 }"#,
                 result: Ok(r#"{ "a": 2, "b": 3 }"#),
             },
             Example {
                 title: "recursively map object values",
-                source: r#"map_values({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }, recursive: true) -> |value| { value = if is_integer(value) { int!(value) + 1 } else { value } }"#,
+                source: r#"map_values({ "a": 1, "b": [{ "c": 2 }, { "d": 3 }], "e": { "f": 4 } }, recursive: true) -> |value| { if is_integer(value) { int!(value) + 1 } else { value } }"#,
                 result: Ok(r#"{ "a": 2, "b": [{ "c": 3 }, { "d": 4 }], "e": { "f": 5 } }"#),
             },
         ]
@@ -78,7 +78,7 @@ impl Function for MapValues {
 
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         // TODO: this work will happen in a follow-up PR
-        Ok(Value::Null)
+        Err("function currently unavailable in VM runtime".into())
     }
 }
 
