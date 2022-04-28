@@ -49,7 +49,7 @@ impl SyslogDeserializerConfig {
             .optional_field("procid", Kind::integer().or_bytes(), None)
             // "structured data" in a syslog message can be stored in any field, but will always be
             // a map of string -> string.
-            .unknown_fields(Kind::object(BTreeMap::default()))
+            .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
     }
 }
 
