@@ -17,7 +17,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-use value::Kind;
+use value::{kind::Collection, Kind};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -1265,7 +1265,7 @@ fn test_config_outputs() {
                             .optional_field("appname", Kind::bytes(), None)
                             .optional_field("msgid", Kind::bytes(), None)
                             .optional_field("procid", Kind::integer().or_bytes(), None)
-                            .unknown_fields(Kind::bytes()),
+                            .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes()))),
                     ),
                 )]),
             },
@@ -1290,7 +1290,9 @@ fn test_config_outputs() {
                                 .optional_field("appname", Kind::bytes(), None)
                                 .optional_field("msgid", Kind::bytes(), None)
                                 .optional_field("procid", Kind::integer().or_bytes(), None)
-                                .unknown_fields(Kind::bytes()),
+                                .unknown_fields(Kind::object(Collection::from_unknown(
+                                    Kind::bytes(),
+                                ))),
                         ),
                     ),
                     (Some(METRICS), None),
