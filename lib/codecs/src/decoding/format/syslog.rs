@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use value::Kind;
+use value::{kind::Collection, Kind};
 
 use super::Deserializer;
 use vector_core::{

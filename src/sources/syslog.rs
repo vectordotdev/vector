@@ -565,9 +565,9 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .all_fields()
-                .find(|(key, _)| (&key[..]).starts_with("empty"))
-                == None
+                .get("empty")
+                .expect("empty exists")
+                .is_object()
         }
 
         let msg = format!(
@@ -600,7 +600,7 @@ mod test {
         );
 
         let event = event_from_bytes("host", None, msg.into()).unwrap();
-        assert!(!there_is_map_called_empty(event));
+        assert!(there_is_map_called_empty(event));
     }
 
     #[test]
