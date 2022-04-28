@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(default)]
 pub struct RegionOrEndpoint {
     pub region: String,
+    #[serde(default)]
     pub endpoint: Option<String>,
 }
 
@@ -36,5 +36,35 @@ impl RegionOrEndpoint {
 
     pub fn region(&self) -> Region {
         Region::new(self.region.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn region_required() {
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint = "http://localhost:8080"
+        "#})
+        .is_err());
+
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint = "http://localhost:8080"
+            region = "us-east-1"
+        "#})
+        .is_ok());
+    }
+
+    #[test]
+    fn endpoint_optional() {
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint = "http://localhost:8080"
+            region = "us-east-1"
+        "#})
+        .is_ok());
     }
 }
