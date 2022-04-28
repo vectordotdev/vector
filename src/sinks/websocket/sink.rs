@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(expected, encoded.unwrap());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_websocket() {
         trace_init();
 
@@ -413,7 +413,7 @@ mod tests {
     }
 
     #[cfg(feature = "sources-utils-tls")]
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_tls_websocket() {
         trace_init();
 
