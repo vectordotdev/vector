@@ -35,20 +35,50 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
+
       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
+
       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
       coefficient-of-variation: ${{ steps.system.outputs.COEFFICIENT_OF_VARIATION }}
       erratic-soaks: ${{ steps.system.outputs.ERRATIC_SOAKS }}
+
+      runner-node-replicas: ${{ steps.experimental-meta.outputs.RUNNER_NODE_REPLICAS }}
+      warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
+      total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
+      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
+      mean-drift-percentage: ${{ steps.experimental-meta.outputs.MEAN_DRIFT_PERCENTAGE }}
     steps:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
           path: baseline-vector
+
+      - name: Setup experimental metadata
+        id: experimental-meta
+        run: |
+          export RUNNER_NODE_REPLICAS="10"
+          export WARMUP_SECONDS="30"
+          export TOTAL_SAMPLES="120"
+          export P_VALUE="0.1"
+          export MEAN_DRIFT_PERCENTAGE="8.87"
+
+          echo "soak warmup seconds: ${WARMUP_SECONDS}"
+          echo "soak node replicas: ${RUNNER_NODE_REPLICAS}"
+          echo "soak total samples: ${TOTAL_SAMPLES}"
+          echo "soak p-value: ${P_VALUE}"
+          echo "soak mean drift percentage: ${MEAN_DRIFT_PERCENTAGE}"
+
+          echo "::set-output name=WARMUP_SECONDS::${WARMUP_SECONDS}"
+          echo "::set-output name=RUNNER_NODE_REPLICAS::${RUNNER_NODE_REPLICAS}"
+          echo "::set-output name=TOTAL_SAMPLES::${TOTAL_SAMPLES}"
+          echo "::set-output name=P_VALUE::${P_VALUE}"
+          echo "::set-output name=MEAN_DRIFT_PERCENTAGE::${MEAN_DRIFT_PERCENTAGE}"
 
       - name: Report on PR metadata
         id: pr-metadata
@@ -92,6 +122,7 @@ jobs:
           export COEFFICIENT_OF_VARIATION="0.3"
           export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
 
+
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
           echo "vector cpus: ${VECTOR_CPUS}"
@@ -128,7 +159,7 @@ jobs:
             // jobs to run. For example, the first job might have the values:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
-              target: target,     // run each experiment
+              target: target,  // run each experiment
             }
 
             // export this variable to be available to other github steps
@@ -140,7 +171,7 @@ jobs:
 
   build-image-baseline:
     name: Build baseline 'soak-vector' container
-    runs-on: [linux, soak, soak-builder]
+    runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -158,7 +189,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        uses: docker/metadata-action@f2a13332ac1ce8c0a71aeac48a150dbb1838ab67
         with:
           flavor: |
             latest=false
@@ -178,14 +209,14 @@ jobs:
           outputs: type=docker,dest=/tmp/baseline-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: baseline-image
           path: /tmp/baseline-image.tar
 
   build-image-comparison:
     name: Build comparison 'soak-vector' container
-    runs-on: [linux, soak, soak-builder]
+    runs-on: [linux, soak-builder]
     needs: [compute-soak-meta]
     steps:
       - uses: colpal/actions-clean@v1
@@ -203,7 +234,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
+        uses: docker/metadata-action@f2a13332ac1ce8c0a71aeac48a150dbb1838ab67
         with:
           flavor: |
             latest=false
@@ -223,15 +254,15 @@ jobs:
           outputs: type=docker,dest=/tmp/comparison-image.tar
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: comparison-image
           path: /tmp/comparison-image.tar
 
-  soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
+  soak:
+    name: Soak (${{ matrix.target }})
+    runs-on: [self-hosted, linux, x64, soak-asg]
+    needs: [compute-soak-meta, compute-test-plan, build-image-baseline, build-image-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
@@ -241,7 +272,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download baseline image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: baseline-image
           path: /tmp
@@ -250,84 +281,8 @@ jobs:
         run: |
           docker load --input /tmp/baseline-image.tar
 
-      - name: Run baseline experiment
-        run: |
-          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --build-image "false" \
-                                  --variant "baseline" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
-                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
-                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
-                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Upload timing captures
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
-          path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
-
-      - name: Clear up unused images
-        run: |
-          minikube delete --all --purge
-          docker system prune --all --volumes --force
-
-  detect-erratic-baseline:
-    name: Erratic detection - baseline
-    runs-on: ubuntu-20.04
-    needs:
-      - compute-soak-meta
-      - soak-baseline
-
-    steps:
-      - name: Set up Python3
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10.2"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
-      - name: Download captures artifact
-        uses: actions/download-artifact@v2
-        with:
-          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
-
-      - name: Detect erratic
-        run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
-                                     --variant baseline \
-                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
-                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
-
-  soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - uses: colpal/actions-clean@v1
-
-      - name: Check out the repo
-        uses: actions/checkout@v3
-
       - name: Download comparison image
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: comparison-image
           path: /tmp
@@ -336,10 +291,28 @@ jobs:
         run: |
           docker load --input /tmp/comparison-image.tar
 
-      - name: Run comparison experiment
+      - name: Create capture directory
         run: |
           rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
+
+      - name: Run baseline experiment
+        run: |
+          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
+                                  --build-image "false" \
+                                  --variant "baseline" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
+                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
+                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
+                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                  --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
+                                  --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
+                                  --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
+
+
+      - name: Run comparison experiment
+        run: |
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
                                   --variant "comparison" \
@@ -347,26 +320,28 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
+                                  --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
+                                  --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
+                                  --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Clear up unused images
+      - name: Clean up machine
         run: |
-          minikube delete --all --purge
+          rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
           docker system prune --all --volumes --force
 
-  detect-erratic-comparison:
-    name: Erratic detection - comparison
-    runs-on: ubuntu-20.04
+  detect-erratic-baseline:
+    name: Erratic detection - baseline
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -383,30 +358,68 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
-          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline
 
       - name: Display structure of downloaded files
         run: ls -R
-        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline
 
       - name: Detect erratic
         run: |
-          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/baseline \
                                      --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                     --warmup-seconds 30 \
+                                     --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
+                                     --variant baseline \
+                                     --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
+                                     --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
+
+  detect-erratic-comparison:
+    name: Erratic detection - comparison
+    runs-on: [linux, soak, soak-analysis]
+    needs:
+      - compute-soak-meta
+      - soak
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10.2"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy==1.8.* pandas==1.4.* tabulate==0.8.*
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v3
+        with:
+          path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison
+
+      - name: Detect erratic
+        run: |
+          ./soaks/bin/detect_erratic --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/comparison \
+                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                     --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                      --variant comparison \
                                      --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   analyze-results:
     name: Soak analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -423,7 +436,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -437,12 +450,12 @@ jobs:
                                          --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 7 \
-                                         --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
-      - uses: actions/upload-artifact@v2
+                                         --mean-drift-percentage ${{ needs.compute-soak-meta.outputs.mean-drift-percentage }} \
+                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }} > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
+      - uses: actions/upload-artifact@v3
         with:
           name: soak-analysis
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}-analysis
@@ -450,18 +463,17 @@ jobs:
       - name: Save PR number for subsequent workflow
         run: |
           echo ${{ github.event.number }} > /tmp/pr.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: pr-number
           path: /tmp/pr.txt
 
   detect-regressions:
     name: Regression analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -478,7 +490,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -489,18 +501,17 @@ jobs:
       - name: Detect regressions
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 7 \
-                                         --p-value 0.1
+                                         --mean-drift-percentage ${{ needs.compute-soak-meta.outputs.mean-drift-percentage }} \
+                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }}
 
   plot-analysis:
     name: Plot analysis
-    runs-on: ubuntu-20.04
+    runs-on: [linux, soak, soak-analysis]
     needs:
       - compute-soak-meta
-      - soak-baseline
-      - soak-comparison
+      - soak
 
     steps:
       - name: Set up Python3
@@ -517,7 +528,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: ${{ github.run_id }}-${{ github.run_attempt }}-captures/
 
@@ -533,7 +544,7 @@ jobs:
                                     --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }}
 
       - name: Upload plots
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ github.run_id }}-${{ github.run_attempt }}-captures-plots
           path: "${{ github.run_id }}-${{ github.run_attempt }}-captures/plots"
