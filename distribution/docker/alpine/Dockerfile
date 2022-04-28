@@ -3,12 +3,12 @@ FROM alpine:3.14 AS builder
 WORKDIR /vector
 
 COPY vector-*-unknown-linux-musl*.tar.gz ./
-RUN tar -xvf vector-0*-$(cat /etc/apk/arch)-unknown-linux-musl*.tar.gz --strip-components=2
+RUN tar -xvf vector-0*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz --strip-components=2
 
 RUN mkdir -p /var/lib/vector
 
 FROM alpine:3.14
-RUN apk update && apk add ca-certificates tzdata && rm -rf /var/cache/apk/*
+RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
 COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml

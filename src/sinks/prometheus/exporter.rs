@@ -288,7 +288,7 @@ struct PrometheusExporterMetricNormalizer {
 }
 
 impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         let new_metric = match metric.value() {
             MetricValue::Distribution { .. } => {
                 // Convert the distribution as-is, and then let the normalizer absolute-ify it.
@@ -492,7 +492,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
             // Now process the metric we got.
             let metric = event.into_metric();
-            if let Some(normalized) = normalizer.apply(metric) {
+            if let Some(normalized) = normalizer.normalize(metric) {
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
