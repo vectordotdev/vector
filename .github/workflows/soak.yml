@@ -129,7 +129,7 @@ jobs:
             // jobs to run. For example, the first job might have the values:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
-              target: target,     // run each experiment
+              target: target, replica: [1,2,3,4,5,6,7,8,9,10] // run each experiment
             }
 
             // export this variable to be available to other github steps
@@ -230,7 +230,7 @@ jobs:
           path: /tmp/comparison-image.tar
 
   soak-baseline:
-    name: Soak (${{ matrix.target }}) - baseline
+    name: Soak (${{ matrix.target }}) - baseline - ${{ matrix.replica }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline]
     strategy:
@@ -262,13 +262,13 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
+                                  --replicas 1 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-${{ matrix.replica }}-baseline
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clean up machine
@@ -316,7 +316,7 @@ jobs:
                                      --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }}
 
   soak-comparison:
-    name: Soak (${{ matrix.target }}) - comparison
+    name: Soak (${{ matrix.target }}) - comparison - ${{ matrix.replica }}
     runs-on: [self-hosted, linux, x64, soak]
     needs: [compute-soak-meta, compute-test-plan, build-image-comparison]
     strategy:
@@ -348,13 +348,13 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --replicas 4 \
+                                  --replicas 1 \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-${{ matrix.replica }}-comparison
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clean up machine
@@ -441,7 +441,7 @@ jobs:
                                          --warmup-seconds 30 \
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 7 \
+                                         --mean-drift-percentage 8.87 \
                                          --p-value 0.1 > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
       - uses: actions/upload-artifact@v3
         with:
@@ -492,7 +492,7 @@ jobs:
           ./soaks/bin/detect_regressions --capture-dir ${{ github.run_id }}-${{ github.run_attempt }}-captures/ \
                                          --warmup-seconds 30 \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
-                                         --mean-drift-percentage 7 \
+                                         --mean-drift-percentage 8.87 \
                                          --p-value 0.1
 
   plot-analysis:

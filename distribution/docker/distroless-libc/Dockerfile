@@ -1,7 +1,9 @@
 FROM debian:bullseye-slim AS builder
 
+WORKDIR /vector
+
 COPY vector_*.deb ./
-RUN dpkg -i vector_*_$(dpkg --print-architecture).deb
+RUN dpkg -i vector_*_"$(dpkg --print-architecture)".deb
 
 RUN mkdir -p /var/lib/vector
 

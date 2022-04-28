@@ -31,12 +31,12 @@ use crate::{
 pub struct UdpConfig {
     address: SocketAddr,
     #[serde(default = "crate::serde::default_max_length")]
-    max_length: usize,
+    pub(super) max_length: usize,
     host_key: Option<String>,
     port_key: Option<String>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default = "default_framing_message_based")]
-    framing: FramingConfig,
+    pub(super) framing: FramingConfig,
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
@@ -96,28 +96,61 @@ pub(super) fn udp(
 
         info!(message = "Listening.", address = %config.address);
 
-        let mut buf = BytesMut::with_capacity(max_length);
+        // We add 1 to the max_length in order to determine if the received data has been truncated.
+        let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
-            buf.resize(max_length, 0);
+            buf.resize(max_length + 1, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = recv.map_err(|error| {
-                        let error = codecs::decoding::Error::FramingError(error.into());
-                        emit!(SocketReceiveError {
-                            mode: SocketMode::Udp,
-                            error: &error
-                        })
-                    })?;
+                    let (byte_size, address) = match recv {
+                        Ok(res) => res,
+                        Err(error) => {
+                            #[cfg(windows)]
+                            if let Some(err) = error.raw_os_error() {
+                                if err == 10040 {
+                                    // 10040 is the Windows error that the Udp message has exceeded max_length
+                                    warn!(
+                                        message = "Discarding frame larger than max_length.",
+                                        max_length = max_length,
+                                        internal_log_rate_secs = 30
+                                    );
+                                    continue;
+                                }
+                            }
+
+                            let error = codecs::decoding::Error::FramingError(error.into());
+                            return Err(emit!(SocketReceiveError {
+                                mode: SocketMode::Udp,
+                                error: &error
+                            }));
+                       }
+                    };
 
                     emit!(BytesReceived { byte_size, protocol: "udp" });
 
                     let payload = buf.split_to(byte_size);
+                    let truncated = byte_size == max_length + 1;
 
-                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
+                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
+                        let last = Pin::new(&mut stream).peek().await.is_none();
                         match result {
                             Ok((mut events, _byte_size)) => {
+                                if last && truncated {
+                                    // The last event in this payload was truncated, so we want to drop it.
+                                    let _ = events.pop();
+                                    warn!(
+                                        message = "Discarding frame larger than max_length.",
+                                        max_length = max_length,
+                                        internal_log_rate_secs = 30
+                                    );
+                                }
+
+                                if events.is_empty() {
+                                    continue;
+                                }
+
                                 let count = events.len();
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Udp,
