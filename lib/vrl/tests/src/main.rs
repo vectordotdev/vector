@@ -29,6 +29,7 @@ static AST_ONLY_TESTS: &[&str] = &[
     // Iteration-specific tests, waiting for VM implementation.
     //
     // See: https://github.com/vectordotdev/vector/issues/12366
+    "expressions/function_call/closure scope inheritance",
     "rfcs/8381/check property on variable sized array of objects",
     "rfcs/8381/convert object to specific string format",
     "rfcs/8381/converting a single metric into multiple metrics",
