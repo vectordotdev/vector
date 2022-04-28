@@ -99,6 +99,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
         let mut rt_builder = runtime::Builder::new_multi_thread();
@@ -169,6 +170,7 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
+                #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
                 let mut config =

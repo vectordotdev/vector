@@ -514,13 +514,21 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
+    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+
     use http::StatusCode;
+    use indoc::formatdoc;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
-    use crate::{config::enterprise::default_max_retries, http::HttpClient};
+    use crate::{
+        app::Application,
+        cli::{Color, LogFormat, Opts, RootOpts},
+        config::enterprise::default_max_retries,
+        http::HttpClient,
+    };
 
     use super::{
         report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
@@ -560,6 +568,29 @@ mod test {
             .await;
 
         mock_server
+    }
+
+    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        let _ = writeln!(file, "{}", config.into());
+        file
+    }
+
+    fn get_root_opts(config_path: PathBuf) -> RootOpts {
+        RootOpts {
+            config_paths: vec![config_path],
+            config_dirs: vec![],
+            config_paths_toml: vec![],
+            config_paths_json: vec![],
+            config_paths_yaml: vec![],
+            require_healthy: None,
+            threads: None,
+            verbose: 0,
+            quiet: 3,
+            log_format: LogFormat::from_str("text").unwrap(),
+            color: Color::from_str("auto").unwrap(),
+            watch_config: false,
+        }
     }
 
     #[tokio::test]
@@ -629,5 +660,99 @@ mod test {
         )
         .await
         .is_err());
+    }
+
+    #[tokio::test]
+    async fn vector_continues_on_reporting_error() {
+        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
+        let endpoint = server.uri();
+
+        let vector_config = formatdoc! {r#"
+            [enterprise]
+            application_key = "application_key"
+            api_key = "api_key"
+            configuration_key = "configuration_key"
+            endpoint = "{endpoint}"
+            exit_on_fatal_error = false
+            max_retries = 1
+
+            [sources.in]
+            type = "demo_logs"
+            format = "syslog"
+            count = 1
+            interval = 0.0
+
+            [sinks.out]
+            type = "blackhole"
+            inputs = ["*"]
+        "#, endpoint=endpoint};
+
+        let config_file = get_vector_config_file(vector_config);
+
+        let opts = Opts {
+            root: get_root_opts(config_file.path().to_path_buf()),
+            sub_command: None,
+        };
+
+        // Spawn a separate thread to avoid nested async runtime errors
+        let vector_continued = thread::spawn(|| {
+            // Configuration reporting is guaranteed to fail here. However, the
+            // app should still start up and run since `exit_on_fatal_error =
+            // false`
+            Application::prepare_from_opts(opts).map_or(false, |app| {
+                // Finish running the topology to avoid error logs
+                app.run();
+                true
+            })
+        })
+        .join()
+        .unwrap();
+
+        assert!(vector_continued);
+    }
+
+    #[tokio::test]
+    async fn vector_exits_on_reporting_error_when_configured() {
+        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
+        let endpoint = server.uri();
+
+        let vector_config = formatdoc! {r#"
+            [enterprise]
+            application_key = "application_key"
+            api_key = "api_key"
+            configuration_key = "configuration_key"
+            endpoint = "{endpoint}"
+            exit_on_fatal_error = true
+            max_retries = 1
+
+            [sources.in]
+            type = "demo_logs"
+            format = "syslog"
+            count = 1
+            interval = 0.0
+
+            [sinks.out]
+            type = "blackhole"
+            inputs = ["*"]
+        "#, endpoint=endpoint};
+
+        let config_file = get_vector_config_file(vector_config);
+
+        let opts = Opts {
+            root: get_root_opts(config_file.path().to_path_buf()),
+            sub_command: None,
+        };
+
+        let vector_continued = thread::spawn(|| {
+            // With `exit_on_fatal_error = true`, starting the app should fail
+            Application::prepare_from_opts(opts).map_or(false, |app| {
+                app.run();
+                true
+            })
+        })
+        .join()
+        .unwrap();
+
+        assert!(!vector_continued);
     }
 }
