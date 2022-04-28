@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     task::{Context, Poll},
@@ -8,6 +9,7 @@ use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
@@ -103,6 +105,13 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
     }
 
     fn client_from_conf_conn(

@@ -150,9 +150,11 @@ aws-sdk-elasticsearch = {version = "0.10.1", optional = true }
 aws-sdk-firehose = { version = "0.10.1", optional = true }
 aws-sdk-kinesis = { version = "0.10.1", optional = true }
 aws-sigv4 = { version = "0.10.1", optional = true }
-aws-smithy-types = { version = "0.40.2", optional = true }
+aws-smithy-async = { version = "0.40.2", optional = true }
 aws-smithy-client = { version = "0.40.2", optional = true }
 aws-smithy-http = { version = "0.40.2", optional = true }
+aws-smithy-types = { version = "0.40.2", optional = true }
+
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -397,9 +399,10 @@ api-client = [
 aws-core = [
   "aws-config",
   "aws-types",
-  "aws-smithy-types",
+  "aws-smithy-async",
   "aws-smithy-client",
-  "aws-smithy-http"
+  "aws-smithy-http",
+  "aws-smithy-types"
 ]
 
 # Anything that requires Protocol Buffers.
