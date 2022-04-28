@@ -13,6 +13,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use tracing::Span;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -129,7 +130,7 @@ impl SourceConfig for SplunkConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(services.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),

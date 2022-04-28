@@ -3,6 +3,7 @@ use std::{fmt, net::SocketAddr};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
+use tracing::Span;
 use warp::Filter;
 
 use crate::{
@@ -74,7 +75,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(svc.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
