@@ -18,7 +18,8 @@ pub use decoding::{
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
-    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
-    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
+    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
+    RawMessageSerializerConfig,
 };
