@@ -402,7 +402,7 @@ const fn default_enabled() -> bool {
     true
 }
 
-/// By default, Vector should exit when a fatal reporting error is encountered.
+/// By default, Vector should not exit when a fatal reporting error is encountered.
 const fn default_exit_on_fatal_error() -> bool {
     false
 }
