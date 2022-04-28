@@ -170,11 +170,10 @@ where
     ///         // is empty! Not doing this will result in a spinlock.
     ///         val = map.next_expired(), if !map.is_empty() => match val {
     ///             None => unreachable!(), // we never poll the empty map in the first place!
-    ///             Some(Ok((val, _))) => {
+    ///             Some((val, _)) => {
     ///                 println!("Expired: {}", val);
     ///                 break;
     ///             }
-    ///             Some(Err(error)) => panic!("Timer error: {:?}", error),
     ///         },
     ///         _ = tokio::time::sleep(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),
