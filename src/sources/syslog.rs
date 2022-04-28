@@ -670,8 +670,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(r#"origin."x-pid""#, "8979");
+            expected.insert(r#"origin."x-info""#, "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -702,8 +702,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(r#"origin."x-pid""#, "9043");
+            expected.insert(r#"origin."x-info""#, "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(
