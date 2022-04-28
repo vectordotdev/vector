@@ -1,1 +1,1 @@
-{"metric":{"name":"l","namespace":"n","timestamp":"1969-12-31T22:36:34.000003245Z","kind":"incremental","counter":{"value":627072.0}}}
+{"metric":{"name":"j","timestamp":"1970-01-01T06:36:47.000010681Z","kind":"absolute","distribution":{"samples":[{"value":-21440.0,"rate":4260754348}],"statistic":"histogram"}}}

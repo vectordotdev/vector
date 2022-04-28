@@ -1,1 +1,1 @@
-{"log":{"-~":{" 1":null}}}
+{"metric":{"name":"f","timestamp":"1970-01-01T00:00:37.000000916Z","kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":-447808.0,"count":1807287864},{"upper_limit":-173056.0,"count":163077365},{"upper_limit":560896.0,"count":2968272718},{"upper_limit":320128.0,"count":4262655424}],"count":726866961,"sum":-714624.0}}}

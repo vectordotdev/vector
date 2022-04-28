@@ -231,6 +231,9 @@ mod test {
     };
 
     use codecs::NewlineDelimitedDecoderConfig;
+    #[cfg(unix)]
+    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
+
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -629,7 +632,7 @@ mod test {
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
-        init_udp_inner(sender, source_id, shutdown_signal).await
+        init_udp_inner(sender, source_id, shutdown_signal, None).await
     }
 
     async fn init_udp(sender: SourceSender) -> SocketAddr {
@@ -637,6 +640,18 @@ mod test {
             sender,
             &ComponentKey::from("default"),
             ShutdownSignal::noop(),
+            None,
+        )
+        .await;
+        addr
+    }
+
+    async fn init_udp_with_config(sender: SourceSender, config: UdpConfig) -> SocketAddr {
+        let (addr, _handle) = init_udp_inner(
+            sender,
+            &ComponentKey::from("default"),
+            ShutdownSignal::noop(),
+            Some(config),
         )
         .await;
         addr
@@ -646,10 +661,17 @@ mod test {
         sender: SourceSender,
         source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
+        config: Option<UdpConfig>,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let address = next_addr();
+        let (address, config) = match config {
+            Some(config) => (config.address(), config),
+            None => {
+                let address = next_addr();
+                (address, UdpConfig::from_address(address))
+            }
+        };
 
-        let server = SocketConfig::from(UdpConfig::from_address(address))
+        let server = SocketConfig::from(config)
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
@@ -712,6 +734,67 @@ mod test {
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "test2".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn udp_max_length() {
+        let (tx, rx) = SourceSender::new_test();
+        let address = next_addr();
+        let mut config = UdpConfig::from_address(address);
+        config.max_length = 11;
+        let address = init_udp_with_config(tx, config).await;
+
+        send_lines_udp(
+            address,
+            vec![
+                "short line".to_string(),
+                "test with a long line".to_string(),
+                "a short un".to_string(),
+            ],
+        );
+
+        let events = collect_n(rx, 2).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "short line".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            "a short un".into()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    /// This test only works on Unix.
+    /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
+    /// Windows will drop the entire packet if we exceed the max_length so we are unable to
+    /// extract anything.
+    async fn udp_max_length_delimited() {
+        let (tx, rx) = SourceSender::new_test();
+        let address = next_addr();
+        let mut config = UdpConfig::from_address(address);
+        config.max_length = 10;
+        config.framing = CharacterDelimitedDecoderConfig {
+            character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
+        }
+        .into();
+        let address = init_udp_with_config(tx, config).await;
+
+        send_lines_udp(
+            address,
+            vec!["test with, long line".to_string(), "short one".to_string()],
+        );
+
+        let events = collect_n(rx, 2).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "test with".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            "short one".into()
         );
     }
 

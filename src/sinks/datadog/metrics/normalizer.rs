@@ -9,7 +9,7 @@ use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 pub(crate) struct DatadogMetricsNormalizer;
 
 impl MetricNormalize for DatadogMetricsNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         // We primarily care about making sure that counters are incremental, and that gauges are
         // always absolute.  For other metric kinds, we want them to be incremental.
         match &metric.value() {
@@ -188,7 +188,7 @@ mod tests {
         let mut normalizer = DatadogMetricsNormalizer::default();
 
         for (input, expected) in inputs.into_iter().zip(expected_outputs) {
-            let result = normalizer.apply_state(&mut metric_set, input);
+            let result = normalizer.normalize(&mut metric_set, input);
             assert_eq!(result, expected);
         }
     }
