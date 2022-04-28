@@ -10,8 +10,7 @@ use tokio::sync::oneshot;
 use super::Event;
 use crate::ByteSizeOf;
 
-/// Wrapper type for an array of event finalizers. This is the primary
-/// public interface to event finalization metadata.
+/// A collection of event finalizers.
 #[derive(Clone, Debug, Default)]
 pub struct EventFinalizers(Vec<Arc<EventFinalizer>>);
 
@@ -43,41 +42,44 @@ impl ByteSizeOf for EventFinalizers {
 }
 
 impl EventFinalizers {
-    /// Create a new array of event finalizer with the single event.
+    /// Creates a new `EventFinalizers` based on the given event finalizer.
     pub fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)])
     }
 
-    /// Add a single finalizer to this array.
+    /// Returns `true` if the collection contains no event finalizers.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns the number of event finalizers in the collection.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Adds a new event finalizer to the collection.
     pub fn add(&mut self, finalizer: EventFinalizer) {
         self.0.push(Arc::new(finalizer));
     }
 
-    /// Merge the given list of finalizers into this array.
+    /// Merges the event finalizers from `other` into the collection.
     pub fn merge(&mut self, other: Self) {
         self.0.extend(other.0.into_iter());
     }
 
-    /// Update the status of all finalizers in this set.
+    /// Updates the status of all event finalizers in the collection.
     pub fn update_status(&self, status: EventStatus) {
         for finalizer in &self.0 {
             finalizer.update_status(status);
         }
     }
 
-    /// Update all sources for this finalizer with the current
-    /// status. This *drops* the finalizer array elements so they may
-    /// immediately signal the source batch.
+    /// Consumes all event finalizers and updates their underlying batches immediately.
     pub fn update_sources(&mut self) {
         let finalizers = mem::take(&mut self.0);
         for finalizer in &finalizers {
             finalizer.update_batch();
         }
-    }
-
-    #[cfg(test)]
-    fn count_finalizers(&self) -> usize {
-        self.0.len()
     }
 }
 
@@ -87,9 +89,8 @@ impl Finalizable for EventFinalizers {
     }
 }
 
-/// An event finalizer is the shared data required to handle tracking
-/// the status of an event, and updating the status of a batch with that
-/// when the event is dropped.
+/// An event finalizer is the shared data required to handle tracking the status of an event, and updating the status of
+/// a batch with that when the event is dropped.
 #[derive(Debug)]
 pub struct EventFinalizer {
     status: Atomic<EventStatus>,
@@ -103,13 +104,13 @@ impl ByteSizeOf for EventFinalizer {
 }
 
 impl EventFinalizer {
-    /// Create a new event in a batch.
+    /// Creates a new `EventFinalizer` attached to the given `batch`.
     pub fn new(batch: Arc<BatchNotifier>) -> Self {
         let status = Atomic::new(EventStatus::Dropped);
         Self { status, batch }
     }
 
-    /// Update this finalizer's status in place with the given `EventStatus`.
+    /// Updates the status of the event finalizer to `status`.
     #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_status(&self, status: EventStatus) {
         self.status
@@ -119,8 +120,9 @@ impl EventFinalizer {
             .unwrap_or_else(|_| unreachable!());
     }
 
-    /// Update the batch for this event with this finalizer's
-    /// status, and mark this event as no longer requiring update.
+    /// Updates the underlying batch status with the status of the event finalizer.
+    ///
+    /// In doing so, the event finalizer is marked as "recorded", which prevents any further updates to it.
     #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_batch(&self) {
         let status = self
@@ -151,7 +153,7 @@ impl Future for BatchStatusReceiver {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Ok(status)) => Poll::Ready(status),
             Poll::Ready(Err(error)) => {
-                error!(message = "Batch status receiver dropped before sending.", %error);
+                error!(%error, "Batch status receiver dropped before sending.");
                 Poll::Ready(BatchStatus::Errored)
             }
         }
@@ -180,8 +182,7 @@ pub struct BatchNotifier {
 }
 
 impl BatchNotifier {
-    /// Create a new `BatchNotifier` along with the receiver used to
-    /// await its finalization status.
+    /// Creates a new `BatchNotifier` along with the receiver used to await its finalization status.
     pub fn new_with_receiver() -> (Arc<Self>, BatchStatusReceiver) {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
@@ -191,7 +192,7 @@ impl BatchNotifier {
         (Arc::new(notifier), BatchStatusReceiver(receiver))
     }
 
-    /// Optionally call `new_with_receiver` and wrap the result in `Option`s
+    /// Optionally creates a new `BatchNotifier` along with the receiver used to await its finalization status.
     pub fn maybe_new_with_receiver(
         enabled: bool,
     ) -> (Option<Arc<Self>>, Option<BatchStatusReceiver>) {
@@ -203,7 +204,9 @@ impl BatchNotifier {
         }
     }
 
-    /// Apply a new batch notifier to a batch of events, and return the receiver.
+    /// Optionally creates a new `BatchNotifier` and attaches it to a group of events.
+    ///
+    /// If `enabled`, the receiver used to await the finalization status of the batch is returned. Otherwise, `None` is returned.
     pub fn maybe_apply_to_events(
         enabled: bool,
         events: &mut [Event],
@@ -217,7 +220,7 @@ impl BatchNotifier {
         })
     }
 
-    /// Update this notifier's status from the status of a finalized event.
+    /// Updates the status of the notifier.
     #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     fn update_status(&self, status: EventStatus) {
         // The status starts as Delivered and can only change if the new
@@ -231,7 +234,7 @@ impl BatchNotifier {
         }
     }
 
-    /// Send this notifier's status up to the source.
+    /// Sends the status of the notifier back to the source.
     fn send_status(&mut self) {
         if let Some(notifier) = self.notifier.take() {
             let status = self.status.load(Ordering::Relaxed);
@@ -248,12 +251,14 @@ impl Drop for BatchNotifier {
     }
 }
 
-/// The status of an individual batch as a whole.
+/// The status of an individual batch.
 #[derive(Atom, Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
 #[derivative(Default)]
 #[repr(u8)]
 pub enum BatchStatus {
-    /// All events in the batch were accepted (the default)
+    /// All events in the batch were accepted.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Delivered,
     /// At least one event in the batch had a transient error in delivery.
@@ -263,8 +268,10 @@ pub enum BatchStatus {
 }
 
 impl BatchStatus {
-    /// Update this status with another batch's delivery status, and return the
-    /// result.
+    /// Updates the delivery status based on another batch's delivery status, returning the result.
+    ///
+    /// As not every status has the same priority, some updates may end up being a no-op either due to not being any
+    /// different or due to being lower priority than the current status.
     #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     fn update(self, status: EventStatus) -> Self {
         match (self, status) {
@@ -285,29 +292,30 @@ impl BatchStatus {
 #[derivative(Default)]
 #[repr(u8)]
 pub enum EventStatus {
-    /// All copies of this event were dropped without being finalized (the
-    /// default).
+    /// All copies of this event were dropped without being finalized.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
     /// At least one copy of this event encountered a retriable error.
     Errored,
-    /// At least one copy of this event encountered a permanent failure or
-    /// rejection.
+    /// At least one copy of this event encountered a permanent failure or rejection.
     Rejected,
     /// This status has been recorded and should not be updated.
     Recorded,
 }
 
 impl EventStatus {
-    /// Update this status with another event's finalization status and return
-    /// the result.
+    /// Updates the status based on another event's status, returning the result.
+    ///
+    /// As not every status has the same priority, some updates may end up being a no-op either due to not being any
+    /// different or due to being lower priority than the current status.
     ///
     /// # Panics
     ///
-    /// Passing a new status of `Dropped` is a programming error and
-    /// will panic in debug/test builds.
+    /// Passing a new status of `Dropped` is a programming error and will panic in debug/test builds.
     #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     #[must_use]
     pub fn update(self, status: Self) -> Self {
@@ -335,9 +343,8 @@ impl EventStatus {
 pub trait Finalizable {
     /// Consumes the finalizers of this object.
     ///
-    /// Typically used for coalescing the finalizers of multiple items, such as
-    /// when batching finalizable objects where all finalizations will be
-    /// processed when the batch itself is processed.
+    /// Typically used for coalescing the finalizers of multiple items, such as when batching finalizable objects where
+    /// all finalizations will be processed when the batch itself is processed.
     fn take_finalizers(&mut self) -> EventFinalizers;
 }
 
@@ -360,7 +367,7 @@ mod tests {
     #[test]
     fn defaults() {
         let finalizer = EventFinalizers::default();
-        assert_eq!(finalizer.count_finalizers(), 0);
+        assert_eq!(finalizer.len(), 0);
     }
 
     #[test]
@@ -377,7 +384,7 @@ mod tests {
         fin.update_status(EventStatus::Rejected);
         assert_eq!(receiver.try_recv(), Err(Empty));
         fin.update_sources();
-        assert_eq!(fin.count_finalizers(), 0);
+        assert_eq!(fin.len(), 0);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
@@ -385,8 +392,8 @@ mod tests {
     fn clone_events() {
         let (fin1, mut receiver) = make_finalizer();
         let fin2 = fin1.clone();
-        assert_eq!(fin1.count_finalizers(), 1);
-        assert_eq!(fin2.count_finalizers(), 1);
+        assert_eq!(fin1.len(), 1);
+        assert_eq!(fin2.len(), 1);
         assert_eq!(fin1, fin2);
 
         assert_eq!(receiver.try_recv(), Err(Empty));
@@ -402,11 +409,11 @@ mod tests {
         let (fin1, mut receiver1) = make_finalizer();
         let (fin2, mut receiver2) = make_finalizer();
 
-        assert_eq!(fin0.count_finalizers(), 0);
+        assert_eq!(fin0.len(), 0);
         fin0.merge(fin1);
-        assert_eq!(fin0.count_finalizers(), 1);
+        assert_eq!(fin0.len(), 1);
         fin0.merge(fin2);
-        assert_eq!(fin0.count_finalizers(), 2);
+        assert_eq!(fin0.len(), 2);
 
         assert_eq!(receiver1.try_recv(), Err(Empty));
         assert_eq!(receiver2.try_recv(), Err(Empty));
@@ -421,7 +428,7 @@ mod tests {
         let (mut fin1, mut receiver) = make_finalizer();
         let fin2 = fin1.clone();
         fin1.merge(fin2);
-        assert_eq!(fin1.count_finalizers(), 1);
+        assert_eq!(fin1.len(), 1);
 
         assert_eq!(receiver.try_recv(), Err(Empty));
         drop(fin1);
@@ -437,10 +444,10 @@ mod tests {
         // Also clone one…
         let event4 = event1.clone();
         drop(batch);
-        assert_eq!(event1.count_finalizers(), 1);
-        assert_eq!(event2.count_finalizers(), 1);
-        assert_eq!(event3.count_finalizers(), 1);
-        assert_eq!(event4.count_finalizers(), 1);
+        assert_eq!(event1.len(), 1);
+        assert_eq!(event2.len(), 1);
+        assert_eq!(event3.len(), 1);
+        assert_eq!(event4.len(), 1);
         assert_ne!(event1, event2);
         assert_ne!(event1, event3);
         assert_eq!(event1, event4);
@@ -449,7 +456,7 @@ mod tests {
         assert_ne!(event3, event4);
         // …and merge another
         event2.merge(event3);
-        assert_eq!(event2.count_finalizers(), 2);
+        assert_eq!(event2.len(), 2);
 
         assert_eq!(receiver.try_recv(), Err(Empty));
         drop(event1);
@@ -463,7 +470,7 @@ mod tests {
     fn make_finalizer() -> (EventFinalizers, BatchStatusReceiver) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let finalizer = EventFinalizers::new(EventFinalizer::new(batch));
-        assert_eq!(finalizer.count_finalizers(), 1);
+        assert_eq!(finalizer.len(), 1);
         (finalizer, receiver)
     }
 
