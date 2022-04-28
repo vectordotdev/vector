@@ -62,6 +62,7 @@ static AST_ONLY_TESTS: &[&str] = &[
     "rfcs/8381/nullify empty strings",
     "rfcs/8381/run encode json on all top level object fields",
     "rfcs/8381/run parse json on multiple strings in array and emit as multiple events",
+    "rfcs/8381/map complex dynamic object based on conditionals",
     "functions/map_values (closure)/map object values",
     "functions/map_values/map object values",
     "functions/map_values/recursively map object values",
