@@ -125,6 +125,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 
+        #[allow(clippy::print_stderr)]
         if opts.print_warnings {
             let warnings = Formatter::new(&source, warnings).colored().to_string();
             eprintln!("{warnings}")
