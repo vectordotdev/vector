@@ -9,9 +9,9 @@ use std::{
     sync::Arc,
 };
 
-use atomig::{Atomic, Ordering};
 use bytes::Bytes;
 use chrono::Utc;
+use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
@@ -29,19 +29,19 @@ struct Inner {
     fields: Value,
 
     #[serde(skip)]
-    size_cache: Atomic<Option<NonZeroUsize>>,
+    size_cache: AtomicCell<Option<NonZeroUsize>>,
 }
 
 impl Inner {
     fn invalidate(&self) {
-        self.size_cache.store(None, Ordering::Relaxed);
+        self.size_cache.store(None);
     }
 }
 
 impl ByteSizeOf for Inner {
     fn size_of(&self) -> usize {
         self.size_cache
-            .load(Ordering::Relaxed)
+            .load()
             .unwrap_or_else(|| {
                 let size = size_of::<Self>() + self.allocated_bytes();
                 // The size of self will always be non-zero, and
@@ -49,7 +49,7 @@ impl ByteSizeOf for Inner {
                 // since `usize` has a range the same as pointer
                 // space. Hence, the expect below cannot fail.
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
-                self.size_cache.store(Some(size), Ordering::Relaxed);
+                self.size_cache.store(Some(size));
                 size
             })
             .into()
@@ -77,7 +77,7 @@ impl Default for Inner {
         Self {
             // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Value::Object(Default::default()),
-            size_cache: None.into(),
+            size_cache: Default::default(),
         }
     }
 }
@@ -86,7 +86,7 @@ impl From<BTreeMap<String, Value>> for Inner {
     fn from(fields: BTreeMap<String, Value>) -> Self {
         Self {
             fields: Value::Object(fields),
-            size_cache: None.into(),
+            size_cache: Default::default(),
         }
     }
 }
