@@ -55,6 +55,13 @@ impl TlsEnableableConfig {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct TlsSourceConfig {
+    pub peer_key: Option<String>,
+    #[serde(flatten)]
+    pub tls_config: TlsEnableableConfig,
+}
+
 /// Standard TLS options
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

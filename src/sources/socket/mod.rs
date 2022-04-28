@@ -120,12 +120,19 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
-                let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
+                let tls_config = config.tls()
+                    .as_ref()
+                    .map(|tls| tls.tls_config.clone());
+                let tls_peer_key = config.tls()
+                    .as_ref()
+                    .and_then(|tls| tls.peer_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    tls_peer_key,
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
@@ -277,7 +284,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{self, TlsConfig, TlsEnableableConfig},
+        tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -408,8 +415,11 @@ mod test {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
-            let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig::test_config()));
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_tls(Some(TlsSourceConfig {
+            tls_config: TlsEnableableConfig::test_config(),
+            peer_key: None,
+        }));
 
             let server = SocketConfig::from(config)
                 .build(SourceContext::new_test(tx, None))
@@ -445,15 +455,18 @@ mod test {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
-            let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig {
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_tls(Some(TlsSourceConfig {
+            tls_config: TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
                     crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
                     key_file: Some("tests/data/Crt_from_intermediate.key".into()),
                     ..Default::default()
                 },
-            }));
+            },
+            peer_key: None,
+        }));
 
             let server = SocketConfig::from(config)
                 .build(SourceContext::new_test(tx, None))

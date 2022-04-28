@@ -18,7 +18,7 @@ use crate::{
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -28,7 +28,7 @@ pub(crate) struct VectorConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -40,7 +40,7 @@ impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
                      // our cargo-hack run
-    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsSourceConfig>) {
         self.tls = config;
     }
 
@@ -67,12 +67,20 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls
+            .as_ref()
+            .map(|tls| tls.tls_config.clone());
+        let tls_peer_key = self.tls
+            .as_ref()
+            .and_then(|tls| tls.peer_key.clone());
+
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         vector.run(
             self.address,
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
+            tls_peer_key,
             self.receive_buffer_bytes,
             cx,
             false.into(),
@@ -175,7 +183,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, trace_init, wait_for_tcp,
         },
-        tls::{TlsConfig, TlsEnableableConfig},
+        tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -243,7 +251,10 @@ mod test {
                 addr,
                 {
                     let mut config = VectorConfig::from_address(addr.into());
-                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config.set_tls(Some(TlsSourceConfig {
+                        tls_config: TlsEnableableConfig::test_config(),
+                        peer_key: None,
+                    }));
                     config
                 },
                 {
@@ -257,8 +268,8 @@ mod test {
                     }));
                     config
                 },
-            )
-            .await;
+        )
+        .await;
         })
         .await;
     }

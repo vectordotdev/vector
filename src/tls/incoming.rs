@@ -5,9 +5,11 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use std::collections::HashMap;
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
@@ -355,5 +357,103 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
             }
             StreamState::Closed => Poll::Ready(Ok(())),
         }
+    }
+}
+
+pub struct CertificateMetadata {
+    pub country_name: Option<String>,
+    pub state_or_province_name: Option<String>,
+    pub locality_name: Option<String>,
+    pub organization_name: Option<String>,
+    pub organizational_unit_name: Option<String>,
+    pub common_name: Option<String>,
+}
+
+impl CertificateMetadata {
+    pub(crate) fn from_x509(cert: X509) -> CertificateMetadata {
+        let mut subject_metadata: HashMap<String, String> = HashMap::new();
+        for entry in cert.subject_name().entries() {
+            let data_string = match entry.data().as_utf8() {
+                Ok(data) => data.to_string(),
+                Err(_) => "".to_string(),
+            };
+            subject_metadata.insert(entry.object().to_string(), data_string);
+        }
+        return CertificateMetadata {
+            country_name: subject_metadata.get("countryName").cloned(),
+            state_or_province_name: subject_metadata.get("stateOrProvinceName").cloned(),
+            locality_name: subject_metadata.get("localityName").cloned(),
+            organization_name: subject_metadata.get("organizationName").cloned(),
+            organizational_unit_name: subject_metadata.get("organizationalUnitName").cloned(),
+            common_name: subject_metadata.get("commonName").cloned(),
+        }
+    }
+
+    pub(crate) fn subject(&self) -> String {
+        let mut components = Vec::<String>::with_capacity(6);
+        if let Some(cn) = &self.common_name {
+            components.push(format!("CN={}", cn));
+        }
+        if let Some(ou) = &self.organizational_unit_name {
+            components.push(format!("OU={}", ou));
+        }
+        if let Some(o) = &self.organization_name {
+            components.push(format!("O={}", o));
+        }
+        if let Some(l) = &self.locality_name {
+            components.push(format!("L={}", l));
+        }
+        if let Some(st) = &self.state_or_province_name {
+            components.push(format!("ST={}", st));
+        }
+        if let Some(c) = &self.country_name {
+            components.push(format!("C={}", c));
+        }
+        return components.join(",");
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn certificate_metadata_full() {
+        let example_meta = CertificateMetadata {
+            common_name: Some("common".to_owned()),
+            country_name: Some("country".to_owned()),
+            locality_name: Some("locality".to_owned()),
+            organization_name: Some("organization".to_owned()),
+            organizational_unit_name: Some("org_unit".to_owned()),
+            state_or_province_name: Some("state".to_owned())
+        };
+
+        let expected = format!("CN={},OU={},O={},L={},ST={},C={}", 
+            example_meta.common_name.as_ref().unwrap(),
+            example_meta.organizational_unit_name.as_ref().unwrap(),
+            example_meta.organization_name.as_ref().unwrap(),
+            example_meta.locality_name.as_ref().unwrap(),
+            example_meta.state_or_province_name.as_ref().unwrap(),
+            example_meta.country_name.as_ref().unwrap());
+        assert_eq!(expected, example_meta.subject())
+    }
+
+    #[test]
+    fn certificate_metadata_partial() {
+        let example_meta = CertificateMetadata {
+            common_name: Some("common".to_owned()),
+            country_name: Some("country".to_owned()),
+            locality_name: None,
+            organization_name: Some("organization".to_owned()),
+            organizational_unit_name: Some("org_unit".to_owned()),
+            state_or_province_name: None
+        };
+
+        let expected = format!("CN={},OU={},O={},C={}", 
+            example_meta.common_name.as_ref().unwrap(),
+            example_meta.organizational_unit_name.as_ref().unwrap(),
+            example_meta.organization_name.as_ref().unwrap(),
+            example_meta.country_name.as_ref().unwrap());
+        assert_eq!(expected, example_meta.subject())
     }
 }

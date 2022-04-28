@@ -19,7 +19,7 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 mod message;
@@ -28,7 +28,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
     address: SocketListenAddr,
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -60,12 +60,21 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = match &self.tls {
+            Some(tls) => Some(tls.tls_config.clone()),
+            None => None,
+        };
+        let tls_peer_key = match &self.tls {
+            Some(tls) => tls.peer_key.clone(),
+            None => None,
+        };
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_peer_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
