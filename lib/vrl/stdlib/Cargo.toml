@@ -122,6 +122,7 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
     "match",
     "match_any",
     "match_array",
@@ -254,6 +255,7 @@ is_timestamp = ["chrono"]
 join = []
 length = []
 log = ["tracing"]
+map_keys = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]

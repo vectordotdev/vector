@@ -138,7 +138,7 @@ do
                    --config-path "/etc/lading/lading.yaml" \
                    --global-labels "variant=${VARIANT},target=vector,experiment=${SOAK_NAME}" \
                    --capture-path "/tmp/captures/${VARIANT}.captures" \
-                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_LOG=info" \
+                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS}" \
                    --target-stderr-path /tmp/captures/vector.stderr.log \
                    --target-stdout-path /tmp/captures/vector.stdout.log \
                    --experiment-duration-seconds "${TOTAL_SAMPLES}" \

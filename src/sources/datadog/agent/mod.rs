@@ -17,6 +17,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tracing::Span;
 use value::Kind;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -118,7 +119,7 @@ impl SourceConfig for DatadogAgentConfig {
         )?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let routes = filters
                 .with(warp::trace(move |_info| span.clone()))
                 .recover(|r: Rejection| async move {

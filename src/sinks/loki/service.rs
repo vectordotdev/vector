@@ -5,7 +5,7 @@ use futures::future::BoxFuture;
 use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},

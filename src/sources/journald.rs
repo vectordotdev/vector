@@ -12,7 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{future, future::Shared, stream::BoxStream, FutureExt, StreamExt};
+use futures::{future, stream::BoxStream, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -244,7 +244,6 @@ impl JournaldSource {
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);
-        let shutdown = shutdown.shared();
         let finalizer = Finalizer::new(
             self.acknowledgements,
             checkpointer.clone(),
@@ -621,7 +620,7 @@ impl Finalizer {
     fn new(
         acknowledgements: bool,
         checkpointer: SharedCheckpointer,
-        shutdown: Shared<ShutdownSignal>,
+        shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
             Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
@@ -1064,7 +1063,7 @@ mod tests {
         let RunningJournal(stream, _stop) = FakeJournal::new(&checkpointer.cursor);
         let checkpointer = SharedCheckpointer::new(checkpointer);
         let (_trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
-        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown.shared());
+        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown);
 
         // The source runs to completion without setting the checkpoint
         source.run_stream(stream, &finalizer).await;
