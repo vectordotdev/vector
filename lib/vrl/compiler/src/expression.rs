@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 
 use crate::{
@@ -13,6 +13,7 @@ mod abort;
 mod array;
 mod block;
 mod function_argument;
+mod function_closure;
 mod group;
 mod if_statement;
 mod levenstein;
@@ -38,6 +39,7 @@ pub use container::{Container, Variant};
 pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
+pub use function_closure::FunctionClosure;
 pub use group::Group;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
@@ -394,7 +396,7 @@ pub enum Error {
     Fallible { span: Span },
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 

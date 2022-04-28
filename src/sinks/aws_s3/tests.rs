@@ -32,7 +32,10 @@ mod integration_tests {
         sinks::{
             aws_s3::S3SinkConfig,
             s3_common::config::S3Options,
-            util::{encoding::StandardEncodings, BatchConfig, Compression, TowerRequestConfig},
+            util::{
+                encoding::{EncodingConfig, StandardEncodings},
+                BatchConfig, Compression, TowerRequestConfig,
+            },
         },
         test_util::{random_lines_with_stream, random_string},
     };
@@ -345,7 +348,7 @@ mod integration_tests {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::with_both("minio", s3_address()),
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),

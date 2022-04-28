@@ -3,6 +3,7 @@ use std::{fmt, net::SocketAddr};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
+use tracing::Span;
 use warp::Filter;
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
         SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub mod errors;
@@ -24,7 +25,7 @@ mod models;
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
@@ -74,7 +75,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(svc.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),

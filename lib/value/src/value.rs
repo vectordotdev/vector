@@ -3,6 +3,7 @@
 mod convert;
 mod display;
 mod error;
+mod iter;
 mod path;
 mod regex;
 mod target;
@@ -34,6 +35,7 @@ use std::result::Result as StdResult;
 use tracing::{instrument, trace, trace_span};
 
 pub use crate::value::regex::ValueRegex;
+pub use iter::IterItem;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;

@@ -38,7 +38,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
 
 #[derive(Debug, Snafu)]
@@ -57,7 +57,7 @@ enum TcpError {
 pub struct TcpSinkConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
@@ -65,7 +65,7 @@ impl TcpSinkConfig {
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {

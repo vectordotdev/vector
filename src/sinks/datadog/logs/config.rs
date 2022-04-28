@@ -21,7 +21,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -45,7 +45,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
@@ -60,7 +60,7 @@ pub(crate) struct DatadogLogsConfig {
         default
     )]
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -89,6 +89,23 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
+    /// Creates a default [`DatadogLogsConfig`] with the given API key.
+    #[cfg(feature = "enterprise")]
+    pub fn enterprise<T: Into<String>>(
+        api_key: T,
+        endpoint: Option<String>,
+        site: Option<String>,
+        region: Option<Region>,
+    ) -> Self {
+        Self {
+            default_api_key: api_key.into(),
+            endpoint,
+            site,
+            region,
+            ..Self::default()
+        }
+    }
+
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
@@ -151,7 +168,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)

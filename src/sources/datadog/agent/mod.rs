@@ -17,6 +17,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tracing::Span;
 use value::Kind;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -32,7 +33,7 @@ use crate::{
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self, util::ErrorMessage},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -43,7 +44,7 @@ pub const TRACES: &str = "traces";
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct DatadogAgentConfig {
     address: SocketAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
@@ -118,7 +119,7 @@ impl SourceConfig for DatadogAgentConfig {
         )?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let routes = filters
                 .with(warp::trace(move |_info| span.clone()))
                 .recover(|r: Rejection| async move {

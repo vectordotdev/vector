@@ -105,6 +105,7 @@ impl sort::SortableByField<ComponentsSortFieldName> for Component {
 #[derive(Default)]
 pub struct ComponentsQuery;
 
+#[allow(clippy::too_many_arguments)]
 #[Object]
 impl ComponentsQuery {
     /// Configured components (sources/transforms/sinks)

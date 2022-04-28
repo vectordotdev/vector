@@ -8,7 +8,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures_util::future::Shared;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
@@ -60,12 +59,12 @@ pub struct IndexerAcknowledgement {
     max_pending_acks_per_channel: u64,
     max_number_of_ack_channels: u64,
     channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>>,
-    shutdown: Shared<ShutdownSignal>,
+    shutdown: ShutdownSignal,
     total_pending_acks: AtomicU64,
 }
 
 impl IndexerAcknowledgement {
-    pub fn new(config: HecAcknowledgementsConfig, shutdown: Shared<ShutdownSignal>) -> Self {
+    pub fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
         let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
@@ -168,7 +167,7 @@ pub struct Channel {
 }
 
 impl Channel {
-    fn new(max_pending_acks_per_channel: u64, shutdown: Shared<ShutdownSignal>) -> Self {
+    fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
         let ack_event_finalizer = UnorderedFinalizer::new(shutdown, move |ack_id: u64| {
@@ -248,7 +247,6 @@ pub struct HecAckStatusResponse {
 mod tests {
     use std::num::NonZeroU64;
 
-    use futures_util::FutureExt;
     use tokio::{time, time::sleep};
     use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
 
@@ -266,7 +264,7 @@ mod tests {
     }
 
     async fn channel_get_ack_id_and_status(status: EventStatus, result: bool) {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let expected_ack_ids: Vec<u64> = (0..10).collect();
@@ -286,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_acks_status_repeat() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let expected_ack_ids: Vec<u64> = (0..10).collect();
@@ -310,7 +308,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_ack_id_exceed_max_pending_acks_per_channel() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let dropped_pending_ack_ids: Vec<u64> = (0..10).collect();
@@ -339,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_pending_acks: NonZeroU64::new(10).unwrap(),
@@ -382,7 +380,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_pending_acks: NonZeroU64::new(1).unwrap(),
@@ -406,7 +404,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             ..Default::default()
@@ -435,7 +433,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels_exceed_max_number_of_ack_channels() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
@@ -456,7 +454,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_channel_idle_expiration() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
@@ -479,7 +477,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_channel_active_does_not_expire() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             ack_idle_cleanup: true,

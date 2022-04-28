@@ -23,7 +23,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_client::erase::DynConnector;
@@ -77,7 +77,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]

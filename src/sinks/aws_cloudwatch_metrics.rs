@@ -33,7 +33,7 @@ use crate::{
         retries::RetryLogic,
         Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -205,7 +205,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event.into_metric()).map(|mut metric| {
+                    normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -280,7 +280,7 @@ impl CloudWatchMetricsSvc {
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),

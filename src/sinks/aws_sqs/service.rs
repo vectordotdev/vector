@@ -5,7 +5,7 @@ use aws_sdk_sqs::types::SdkError;
 use aws_sdk_sqs::Client as SqsClient;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::event::EventStatus;
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;

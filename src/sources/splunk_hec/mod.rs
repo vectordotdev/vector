@@ -13,6 +13,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use tracing::Span;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -34,7 +35,7 @@ use crate::{
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -57,7 +58,7 @@ pub struct SplunkConfig {
     token: Option<String>,
     /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     /// Splunk HEC indexer acknowledgement settings
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
@@ -129,7 +130,7 @@ impl SourceConfig for SplunkConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(services.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -169,7 +170,7 @@ struct SplunkSource {
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
         let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
-        let shutdown = cx.shutdown.shared();
+        let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
             .iter()

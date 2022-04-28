@@ -1,8 +1,7 @@
-# SKIP
 # result: true
 
-array =  [{ "a": 3 }, { "a": 2 }, { "a": 4 }]
+arr =  [{ "a": 3 }, { "a": 2 }, { "a": 4 }]
 any_two = false
-for_each(array) -> |_index, value| { if value == 2 { any_two = true } }
+for_each(arr) -> |_index, value| { if value.a == 2 { any_two = true } }
 
 any_two
