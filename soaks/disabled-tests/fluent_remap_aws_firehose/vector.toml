@@ -42,3 +42,6 @@ endpoint = "http://localhost:8080"
 healthcheck.enabled = true
 compression = "none"
 encoding = "json"
+region = "us-east-2"
+auth.access_key_id = "totallyanaccesskeyid"
+auth.secret_access_key = "alsoasecretaccesskey"
