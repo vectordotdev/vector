@@ -242,7 +242,7 @@ impl Application {
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
-        crate::trace::stop_buffering();
+        crate::trace::stop_early_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);

@@ -10,8 +10,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
-use tracing::field;
-use tracing_futures::Instrument;
+use tracing::{field, Instrument};
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt;

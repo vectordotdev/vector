@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
+use tracing::Span;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -56,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
