@@ -1,4 +1,4 @@
-use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
+use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use vrl::prelude::*;
 
 fn sha2(value: Value, variant: &Bytes) -> Resolved {
@@ -8,8 +8,8 @@ fn sha2(value: Value, variant: &Bytes) -> Resolved {
         b"SHA-256" => encode::<Sha256>(&value),
         b"SHA-384" => encode::<Sha384>(&value),
         b"SHA-512" => encode::<Sha512>(&value),
-        b"SHA-512/224" => encode::<Sha512Trunc224>(&value),
-        b"SHA-512/256" => encode::<Sha512Trunc256>(&value),
+        b"SHA-512/224" => encode::<Sha512_224>(&value),
+        b"SHA-512/256" => encode::<Sha512_256>(&value),
         _ => unreachable!("enum invariant"),
     };
     Ok(hash.into())

@@ -10,7 +10,6 @@ use std::{
 };
 
 use futures::StreamExt;
-use tokio::time::error::Error;
 use tokio_util::time::{delay_queue, DelayQueue};
 
 /// An expired item, holding the value and the key with an expiration
@@ -186,12 +185,11 @@ where
     /// }
     /// # });
     /// ```
-    pub async fn next_expired(&mut self) -> Option<Result<ExpiredItem<K, V>, Error>> {
-        let key = self.expiration_queue.next().await?;
-        Some(key.map(|key| {
+    pub async fn next_expired(&mut self) -> Option<ExpiredItem<K, V>> {
+        self.expiration_queue.next().await.map(|key| {
             let (value, _) = self.map.remove(key.get_ref()).unwrap();
             (value, key)
-        }))
+        })
     }
 }
 
@@ -242,10 +240,7 @@ mod tests {
     #[tokio::test]
     async fn next_expired_is_pending_with_a_non_empty_map() {
         let mut map = ExpiringHashMap::<String, String>::default();
-
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-        map.remove("key");
-
         let mut fut = task::spawn(map.next_expired());
         assert_pending!(fut.poll());
     }
@@ -258,16 +253,11 @@ mod tests {
         map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
 
         let mut fut = task::spawn(map.next_expired());
-        assert_eq!(unwrap_ready(fut.poll()).unwrap().unwrap().0, "val");
+        assert_eq!(unwrap_ready(fut.poll()).unwrap().0, "val");
         assert!(!fut.is_woken());
     }
 
-    // TODO: rewrite this test with tokio::time::clock when it's available.
-    // For now we just wait for an actual second. We should just scroll time instead.
-    // In theory, this is only possible when the runtime timer used in the
-    // underlying delay queue and the means by which we freeze/adjust time are
-    // working together.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
@@ -278,17 +268,17 @@ mod tests {
 
         // At first, has to be pending.
         assert_pending!(fut.poll());
-
-        // Sleep twice the ttl, to guarantee we're over the deadline.
         assert!(!fut.is_woken());
-        tokio::time::sleep(ttl * 2).await;
-        assert!(fut.is_woken());
 
         // Then, after deadline, has to be ready.
-        assert_eq!(
-            unwrap_ready(fut.poll()).unwrap().unwrap().0,
-            "val".to_owned()
-        );
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert!(fut.is_woken());
+        let value = assert_ready!(fut.poll());
+        let (key, value) = value
+            .map(|(value, key)| (key.into_inner(), value))
+            .expect("map definitively had entry that should be expired");
+        assert_eq!(key, "key".to_owned());
+        assert_eq!(value, "val".to_owned());
     }
 
     #[tokio::test]
