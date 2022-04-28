@@ -10,6 +10,8 @@ features=$(
     /^\[/,$d;
     /=/!d;
     s/ *=.*$//;
+
+    # Skip over certain features
     /-utils-/d;
     /^default$/d;
     /^all-integration-tests$/d;
