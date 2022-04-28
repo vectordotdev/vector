@@ -9,6 +9,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -118,6 +119,8 @@ pub struct DatadogMetricsResponse {
     body: Bytes,
     batch_size: usize,
     byte_size: usize,
+    raw_byte_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -137,6 +140,13 @@ impl DriverResponse for DatadogMetricsResponse {
             byte_size: self.byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.raw_byte_size,
+            protocol: &self.protocol,
+        })
     }
 }
 
@@ -173,6 +183,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         Box::pin(async move {
             let byte_size = request.payload.len();
             let batch_size = request.batch_size;
+            let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
             let request = request
                 .into_http_request(api_key)
@@ -183,12 +194,13 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 .await
                 .context(CallRequestSnafu)?;
             let body = body.copy_to_bytes(body.remaining());
-
             Ok(DatadogMetricsResponse {
                 status_code: parts.status,
                 body,
                 batch_size,
                 byte_size,
+                raw_byte_size: byte_size,
+                protocol,
             })
         })
     }
