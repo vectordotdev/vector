@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
     config::{

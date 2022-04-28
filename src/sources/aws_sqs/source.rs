@@ -44,7 +44,6 @@ pub struct SqsSource {
 impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
-        let shutdown = shutdown.shared();
         let finalizer = self.acknowledgements.then(|| {
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();

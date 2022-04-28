@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"s","tags":{"z":"t"},"timestamp":"1969-12-31T16:47:03.000009887Z","kind":"absolute","counter":{"value":-57664.0}}}

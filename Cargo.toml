@@ -122,7 +122,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = "0.3.3"
 async-trait = "0.1.53"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.17.0", default-features = false, features = ["full"] }
+tokio = { version = "1.18.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -322,7 +322,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.17.0", features = ["test-util"] }
+tokio = { version = "1.18.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }

@@ -1,1 +1,1 @@
-{"log":{"":null,"脱":"\"'r"}}
+{"metric":{"name":"c","namespace":"i","tags":{"a":"x","d":"g"},"timestamp":"1970-01-01T08:16:58.000029469Z","kind":"absolute","aggregated_summary":{"quantiles":[],"count":2279738475,"sum":-409280.0}}}

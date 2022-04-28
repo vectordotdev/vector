@@ -7,9 +7,8 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 # VECTOR BUILDER
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
-RUN apt-get update && apt-get -y install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
-RUN git clone https://github.com/rui314/mold.git
-RUN cd mold && git checkout v1.1.1 && make -j$(nproc) && make install && rm -rf mold
+RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
+RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.1.1 && make -j"$(nproc)" && make install
 
 WORKDIR /vector
 COPY . .
@@ -25,7 +24,7 @@ RUN --mount=type=cache,target=/vector/target \
 # TARGET
 #
 FROM debian:${DEBIAN_RELEASE}-slim
-RUN apt-get update && apt-get -y install zlib1g
+RUN apt-get update && apt-get -y --no-install-recommends install zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /vector/vector /usr/bin/vector
 RUN mkdir -p /var/lib/vector
 
