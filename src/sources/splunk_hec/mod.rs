@@ -170,7 +170,7 @@ struct SplunkSource {
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
         let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
-        let shutdown = cx.shutdown.shared();
+        let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
             .iter()

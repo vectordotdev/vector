@@ -10,7 +10,7 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -173,7 +173,6 @@ async fn kafka_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let shutdown = shutdown.shared();
     let mut finalizer = acknowledgements.then(|| {
         let consumer = Arc::clone(&consumer);
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
