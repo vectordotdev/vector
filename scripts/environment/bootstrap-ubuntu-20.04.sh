@@ -131,7 +131,7 @@ cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
 
 # Set Cargo to use mold as its linker.
 CARGO_OVERRIDE_DIR="${HOME}/.cargo"
-mkdir "${CARGO_OVERRIDE_DIR}"
+mkdir -p "${CARGO_OVERRIDE_DIR}"
 
 CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 cat <<EOF >"${CARGO_OVERRIDE_CONF}"
