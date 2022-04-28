@@ -33,8 +33,6 @@ fn watchlogs_address() -> String {
     std::env::var("WATCHLOGS_ADDRESS").unwrap_or_else(|_| "http://localhost:6000".into())
 }
 
-const FOO: String = String::from("BROKEN!");
-
 #[tokio::test]
 async fn cloudwatch_insert_log_event() {
     trace_init();
