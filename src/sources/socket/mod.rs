@@ -95,20 +95,29 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                if config.framing().is_some() && config.max_length().is_some() {
-                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                }
-
-                let max_length = config
-                    .max_length()
-                    .unwrap_or_else(crate::serde::default_max_length);
-
-                let framing = match config.framing().as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
+                let (framing, decoding) = match (config.framing(), config.max_length()) {
+                    (Some(_), Some(_)) => {
+                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                    }
+                    (Some(framing), None) => {
+                        let decoding = config.decoding().clone();
+                        let framing = framing.clone();
+                        (framing, decoding)
+                    }
+                    (None, Some(max_length)) => {
+                        let decoding = config.decoding().clone();
+                        let framing =
+                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
+                        (framing, decoding)
+                    }
+                    (None, None) => {
+                        let decoding = config.decoding().clone();
+                        let framing = decoding.default_stream_framing();
+                        (framing, decoding)
+                    }
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding().clone()).build();
+                let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
@@ -157,20 +166,28 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                if config.framing.is_some() && config.max_length.is_some() {
-                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                }
-
-                let max_length = config
-                    .max_length
-                    .unwrap_or_else(crate::serde::default_max_length);
-
-                let framing = match config.framing.as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
+                let (framing, decoding) = match (config.framing, config.max_length) {
+                    (Some(_), Some(_)) => {
+                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                    }
+                    (Some(framing), None) => {
+                        let decoding = config.decoding.clone();
+                        (framing, decoding)
+                    }
+                    (None, Some(max_length)) => {
+                        let decoding = config.decoding.clone();
+                        let framing =
+                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
+                        (framing, decoding)
+                    }
+                    (None, None) => {
+                        let decoding = config.decoding.clone();
+                        let framing = decoding.default_stream_framing();
+                        (framing, decoding)
+                    }
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding.clone()).build();
+                let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let host_key = config
                     .host_key

@@ -33,7 +33,7 @@ use crate::{
         ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
         StreamClosedError,
     },
-    serde::{default_decoding, default_framing_stream_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -52,8 +52,7 @@ pub struct ExecConfig {
     pub include_stderr: bool,
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
-    #[serde(default = "default_framing_stream_based")]
-    framing: FramingConfig,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
@@ -103,7 +102,7 @@ impl Default for ExecConfig {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -190,7 +189,13 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| self.decoding.default_stream_framing());
+        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
@@ -604,7 +609,7 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         };
 
@@ -716,7 +721,7 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
