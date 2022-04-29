@@ -120,7 +120,7 @@ it never makes it to the console).
 
   This includes logical/temporal events such as notifications when components are stopped and started, or other
   high-level events that, crucially, do not represent an event that an operator needs to worry about.
-  
+
   Said another way, **INFO** is primarily there for information that lets them know that an action they just took
   completed successfully, whether that's the server initially starting up successfully, or reloading a configuration
   successfully, or exiting Vector after receiving SIGTERM.
