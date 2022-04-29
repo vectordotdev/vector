@@ -141,16 +141,16 @@ metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
 aws-config = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.10.1", default-features = false, optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-s3 = { version = "0.10.1", default-features = false, optional = true }
-aws-sdk-sqs = { version = "0.10.1", default-features = false, optional = true }
-aws-sdk-cloudwatch = { version = "0.10.1", default-features = false, optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.10.1", default-features = false, optional = true }
-aws-sdk-elasticsearch = {version = "0.10.1", default-features = false, optional = true }
-aws-sdk-firehose = { version = "0.10.1", default-features = false, optional = true }
-aws-sdk-kinesis = { version = "0.10.1", default-features = false, optional = true }
+aws-types = { version = "0.10.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.10.1", default-features = false, features = ["rustls"], optional = true }
 aws-sigv4 = { version = "0.10.1", default-features = false, optional = true }
-aws-smithy-async = { version = "0.40.2", optional = true }
+aws-smithy-async = { version = "0.40.2", default-features = false, optional = true }
 aws-smithy-client = { version = "0.40.2", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.40.2", default-features = false, optional = true }
 aws-smithy-types = { version = "0.40.2", default-features = false, optional = true }
