@@ -141,6 +141,5 @@ EOF
 
 # Install clang if we don't already have it, as we need it for overriding the linker.
 if ! [ -x "$(command -v clang)" ]; then
-then
     apt install --yes clang
 fi
