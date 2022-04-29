@@ -231,13 +231,11 @@ async fn kafka_source(
 
                 let mut headers_map = BTreeMap::new();
                 if let Some(headers) = msg.headers() {
-                    // Using index-based for loop because rdkafka's `Headers` trait
-                    // does not provide Iterator-based API
-                    for i in 0..headers.count() {
-                        if let Some(header) = headers.get(i) {
+                    for header in headers.iter() {
+                        if let Some(value) = header.value {
                             headers_map.insert(
-                                header.0.to_string(),
-                                Bytes::from(header.1.to_owned()).into(),
+                                header.key.to_string(),
+                                Value::from(Bytes::from(value.to_owned())),
                             );
                         }
                     }
@@ -466,7 +464,7 @@ mod integration_test {
         client::DefaultClientContext,
         config::{ClientConfig, FromClientConfig},
         consumer::BaseConsumer,
-        message::OwnedHeaders,
+        message::{Header, OwnedHeaders},
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
         Offset, TopicPartitionList,
@@ -514,7 +512,10 @@ mod integration_test {
                 .payload(&text)
                 .key(&key)
                 .timestamp(timestamp)
-                .headers(OwnedHeaders::new().add(HEADER_KEY, HEADER_VALUE));
+                .headers(OwnedHeaders::new().insert(Header {
+                    key: HEADER_KEY,
+                    value: Some(HEADER_VALUE),
+                }));
 
             if let Err(error) = producer.send(record, Timeout::Never).await {
                 panic!("Cannot send event to Kafka: {:?}", error);
