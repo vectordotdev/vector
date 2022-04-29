@@ -51,11 +51,7 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let expressions = self
-            .compile_root_exprs(ast, external)
-            .into_iter()
-            .map(|expr| Box::new(expr) as _)
-            .collect();
+        let expressions: Vec<_> = self.compile_root_exprs(ast, external);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
@@ -73,9 +69,11 @@ impl<'a> Compiler<'a> {
             target_assignments: self.external_assignments,
         };
 
+        let runner = crate::program::Runner::from(expressions);
+
         Ok((
             Program {
-                expressions,
+                runner,
                 info,
                 local_env: self.local,
             },

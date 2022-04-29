@@ -1,5 +1,5 @@
 use compiler::{
-    state::{ExternalEnv, LocalEnv},
+    state::ExternalEnv,
     vm::{OpCode, Vm},
     ExpressionError, Function,
 };
@@ -100,17 +100,10 @@ impl Runtime {
 
         let mut context = Context::new(target, &mut self.state, timezone);
 
-        let mut values = program
-            .iter()
-            .map(|expr| {
-                expr.resolve(&mut context).map_err(|err| match err {
-                    ExpressionError::Abort { .. } => Terminate::Abort(err),
-                    err @ ExpressionError::Error { .. } => Terminate::Error(err),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(values.pop().unwrap_or(Value::Null))
+        program.resolve(&mut context).map_err(|err| match err {
+            ExpressionError::Abort { .. } => Terminate::Abort(err),
+            err @ ExpressionError::Error { .. } => Terminate::Error(err),
+        })
     }
 
     pub fn compile(
@@ -119,12 +112,9 @@ impl Runtime {
         program: &Program,
         external: &mut ExternalEnv,
     ) -> Result<Vm, String> {
-        let mut local = LocalEnv::default();
         let mut vm = Vm::new(fns);
 
-        for expr in program.iter() {
-            expr.compile_to_vm(&mut vm, (&mut local, external))?;
-        }
+        program.compile_to_vm(&mut vm, external)?;
 
         vm.write_opcode(OpCode::Return);
 

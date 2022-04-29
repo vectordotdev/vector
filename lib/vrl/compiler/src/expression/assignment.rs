@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
-    variant: Variant<Target, Expr>,
+    pub(crate) variant: Variant<Target, Expr>,
 }
 
 impl Assignment {
