@@ -349,7 +349,7 @@ fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> O
     msg.map(Message::text)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-utils-tls"))]
 mod tests {
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
@@ -412,7 +412,6 @@ mod tests {
         send_events_and_assert(addr, config, tls).await;
     }
 
-    #[cfg(feature = "sources-utils-tls")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tls_websocket() {
         trace_init();
