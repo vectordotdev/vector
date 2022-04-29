@@ -10,13 +10,15 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::PipelinesError;
+#[cfg(not(feature = "enterprise-tests"))]
+use crate::metrics;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics,
+    config, generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
