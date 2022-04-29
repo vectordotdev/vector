@@ -40,6 +40,11 @@ impl JsonSerializer {
     pub const fn new() -> Self {
         Self
     }
+
+    /// Encode event as JSON.
+    pub fn encode_json(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+        event.try_into()
+    }
 }
 
 impl Encoder<Event> for JsonSerializer {

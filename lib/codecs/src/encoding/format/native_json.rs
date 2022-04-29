@@ -28,6 +28,13 @@ impl NativeJsonSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct NativeJsonSerializer;
 
+impl NativeJsonSerializer {
+    /// Encode event as native JSON.
+    pub fn encode_json(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+        event.try_into()
+    }
+}
+
 impl Encoder<Event> for NativeJsonSerializer {
     type Error = vector_core::Error;
 

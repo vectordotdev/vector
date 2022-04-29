@@ -5,7 +5,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use vector_core::{sink::StreamSink, transform::Transform};
 
-use super::{host_key, logs::HumioLogsConfig, Encoding};
+use super::{host_key, logs::HumioLogsConfig};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
@@ -13,8 +13,14 @@ use crate::{
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
-        splunk_hec::common::SplunkHecDefaultBatchSettings,
-        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        splunk_hec::{
+            common::SplunkHecDefaultBatchSettings,
+            logs::config::{HecEncoding, HecEncodingMigrator},
+        },
+        util::{
+            encoding::{EncodingConfig, EncodingConfigAdapter},
+            BatchConfig, Compression, TowerRequestConfig,
+        },
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -23,6 +29,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
@@ -31,7 +38,7 @@ struct HumioMetricsConfig {
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
     event_type: Option<Template>,
     #[serde(default = "host_key")]
     host_key: String,

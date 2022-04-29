@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{host_key, Encoding};
+use super::host_key;
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
@@ -10,9 +10,12 @@ use crate::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
             },
-            logs::config::HecLogsSinkConfig,
+            logs::config::{HecEncoding, HecEncodingMigrator, HecLogsSinkConfig},
         },
-        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        util::{
+            encoding::{EncodingConfig, EncodingConfigAdapter},
+            BatchConfig, Compression, TowerRequestConfig,
+        },
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -22,13 +25,14 @@ use crate::{
 const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
     pub(super) token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub(super) endpoint: Option<String>,
     pub(super) source: Option<Template>,
-    pub(super) encoding: EncodingConfig<Encoding>,
+    pub(super) encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
     pub(super) event_type: Option<Template>,
     #[serde(default = "host_key")]
     pub(super) host_key: String,
@@ -67,7 +71,7 @@ impl GenerateConfig for HumioLogsConfig {
             token: "${HUMIO_TOKEN}".to_owned(),
             endpoint: None,
             source: None,
-            encoding: Encoding::Json.into(),
+            encoding: EncodingConfig::from(HecEncoding::Json).into(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -116,7 +120,7 @@ impl HumioLogsConfig {
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            encoding: self.encoding.clone().into_encoding(),
+            encoding: self.encoding.clone(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
@@ -296,7 +300,7 @@ mod integration_tests {
             token: token.to_string(),
             endpoint: Some(humio_address()),
             source: None,
-            encoding: Encoding::Json.into(),
+            encoding: EncodingConfig::from(HecEncoding::Json).into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],
