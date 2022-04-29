@@ -159,7 +159,7 @@ jobs:
             // jobs to run. For example, the first job might have the values:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
-              target: target,  // run each experiment
+              target: target, replica: [1,2,3] // run each experiment
             }
 
             // export this variable to be available to other github steps
@@ -260,7 +260,7 @@ jobs:
           path: /tmp/comparison-image.tar
 
   soak:
-    name: Soak (${{ matrix.target }})
+    name: Soak (${{ matrix.target }}) - ${{ matrix.replica }}
     runs-on: [self-hosted, linux, x64, soak-asg]
     needs: [compute-soak-meta, compute-test-plan, build-image-baseline, build-image-comparison]
     strategy:
@@ -328,7 +328,7 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-${{ matrix.replica }}
           path: /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
       - name: Clean up machine
