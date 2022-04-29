@@ -2,7 +2,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
 use regex::Regex;
 use value::ValueRegex;
@@ -281,7 +281,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

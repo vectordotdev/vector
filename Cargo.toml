@@ -122,7 +122,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = "0.3.3"
 async-trait = "0.1.53"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.17.0", default-features = false, features = ["full"] }
+tokio = { version = "1.18.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -150,9 +150,11 @@ aws-sdk-elasticsearch = {version = "0.10.1", optional = true }
 aws-sdk-firehose = { version = "0.10.1", optional = true }
 aws-sdk-kinesis = { version = "0.10.1", optional = true }
 aws-sigv4 = { version = "0.10.1", optional = true }
-aws-smithy-types = { version = "0.40.2", optional = true }
+aws-smithy-async = { version = "0.40.2", optional = true }
 aws-smithy-client = { version = "0.40.2", optional = true }
 aws-smithy-http = { version = "0.40.2", optional = true }
+aws-smithy-types = { version = "0.40.2", optional = true }
+
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -323,7 +325,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.17.0", features = ["test-util"] }
+tokio = { version = "1.18.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
@@ -398,9 +400,10 @@ api-client = [
 aws-core = [
   "aws-config",
   "aws-types",
-  "aws-smithy-types",
+  "aws-smithy-async",
   "aws-smithy-client",
-  "aws-smithy-http"
+  "aws-smithy-http",
+  "aws-smithy-types"
 ]
 
 # Anything that requires Protocol Buffers.
