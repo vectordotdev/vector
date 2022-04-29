@@ -25,7 +25,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -78,6 +78,10 @@ impl GenerateConfig for DatadogAgentConfig {
         })
         .unwrap()
     }
+}
+
+inventory::submit! {
+    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
 #[async_trait::async_trait]
