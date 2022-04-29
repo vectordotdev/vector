@@ -44,7 +44,7 @@ its own internal telemetry. This telemetry is primarily logging and metrics, but
 
 ## Logging
 
-For logging, we use [`tracing`](https://docs.rs/tracing/latest/tracing), which doubles as both a way to emit
+For logging, we use **[`tracing`](https://docs.rs/tracing/latest/tracing)**, which doubles as both a way to emit
 logs but also a way to use distributed tracing techniques to add nested and contextual metadata by utilizing
 [spans](https://docs.rs/tracing/latest/tracing/#spans).
 
@@ -133,7 +133,7 @@ it never makes it to the console).
 
 ## Metrics
 
-For metrics, we use [`metrics`](https://docs.rs/metrics/latest/metrics/), which like `tracing`, provides macros for
+For metrics, we use **[`metrics`](https://docs.rs/metrics/latest/metrics/)**, which like `tracing`, provides macros for
 emitting counters, gauges, and histograms.
 
 ### Basic Usage
@@ -194,7 +194,7 @@ that the queue size was _currently_ zero but we'd also know that we just process
   fixed in the medium-term ([#11995](https://github.com/vectordotdev/vector/issues/11995)) but is a good rule to follow
   unless there's a competing reason to do so, such as when following the guidelines in the [Component
   Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md).
-- **Don't* emit metrics in tight loops. Each metric emission carries an overhead, and emitting them in tight loops can
+- **Don't** emit metrics in tight loops. Each metric emission carries an overhead, and emitting them in tight loops can
   cause that overhead to become noticable in terms of CPU usage and throughput reduction. Instead of incrementing a
   counter every time a loop iteration occurs, you might consider incrementing a local variable instead, and then
   emitting that sum after the loop is over.
@@ -203,16 +203,60 @@ that the queue size was _currently_ zero but we'd also know that we just process
   a `sum` property that is a sum of the value of all samples the histogram has recorded. This means you can potentially
   get three metrics for the cost of emitting one.
 
-# Disallowed Items
+# Dependencies
 
-While we strive to automate the enforcement of rules around disallowed code patterns, crates, and so on, this section
-serves as a reference for _why_ certain crates are disallowed, or why a code pattern that seems fine can actually
-silently hurt us.
+## Error handling
 
-## Crates
+For error handling, there are two parts: _creating errors_ and _working with errors_.
 
-TODO
+For **creating errors**, we prefer **[`snafu`](https://docs.rs/snafu)**. The `snafu` crate provides a derive for generating the
+boilerplate `std::error::Error` implementation on your custom error struct or enum. It additionally provides helpers for
+defining the `Display` output for your error (potentially on a per-variant basis when working with enums).
 
-## Code patterns
+While there are popular alternatives such as [`failure`](https://docs.rs/failure) and
+[`thiserror`](https://docs.rs/thiserror), they generally lack either the thoroughness in documentation or the
+flexibility of `snafu`.
 
-TODO
+For **working with errors**, we have a more lax approach. At the highest level, we use `Box<dyn std::error::Error + Send
++ Sync + 'static>` for maximum flexibility. This allows developers to avoid needing to _always_ derive custom error
+  types in order to return errors back up the call stack. This does not prevent, and indeed, should not discourage
+  developers from using `snafu` to create rich error types that provide additional context, whether through descriptive
+  error messages, source errors, or backtraces.
+
+## Concurrency and synchronization
+
+### Atomics
+
+In general, we strive to use the atomic types in the [standard
+library](https://doc.rust-lang.org/stable/std/sync/atomic/index.html) when possible, as they are the most portable and
+well-tested. In cases where the standard library atomics cannot be used, such as when using a 64-bit atomic but wanting
+to support a 32-bit platform, or support a platform without atomic instructions at all, we prefer to use
+**[`crossbeam-utils`](https://docs.rs/crossbeam-utils)** and its `AtomicCell` helper. This type will automatically
+handle either using native atomic support or wrapping access in a mutex, and handle it in a transparent way. It uses a
+fixed acquire/release ordering that generally provides the expected behavior when using atomics, but may not be suitable
+for usages which require stronger ordering.
+
+### Global state
+
+When there is a need or desire to share global state, there are a few options depending on the required constraints.
+
+If you're working with data that is lazily initialized but never changes after initialization, we prefer
+**[`once_cell`](https://docs.rs/once_cell)**. It is slightly faster than [`lazy_static`], and additionally provides a
+richer API than both `lazy_static` and the standard library variants, such as `std::sync::Once`. Additionally, there is
+[active work happening](https://github.com/rust-lang/rust/issues/74465) to migrate the types in `once_cell` into
+`std::sync` directly, which will be easier to switch to if we're already using `once_cell`.
+
+If you're working with data that changes over time, but has a very high read-to-write ratio, such as many readers, but
+one writer and infrequent writes, we prefer **[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this crate
+is allowing a piece of data to be atomically updated while being shared concurrently. It does this by wrapping all data
+in `Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the `Arc<T>` itself. As
+it cannot be constructed in a const fashion, `arc-swap` pairs well with `once_cell` for actually storing it in a global
+static variable.
+
+### Concurrent data structures
+
+When there is a need for a concurrent and indexable storage, we prefer **[`sharded-slab`](https://docs.rs/sharded-slab)**.
+This crate provides a means to insert items such that the caller gets back to the index by which it can access the item
+again in the future. Additionally, when an item is removed, its storage can be reused by future inserts, making
+`sharded-slab` a good choice for long-running processes where memory allocation reduction is paramount. There is also a
+pool data structure based on the same underlying design of the slab itself for use cases where pooling is desired.
