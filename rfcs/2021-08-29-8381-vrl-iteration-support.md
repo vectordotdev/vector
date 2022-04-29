@@ -471,6 +471,42 @@ individual use-cases, this list shows one available solution per use-case.
    . = filter(.) -> |key, _| { includes(only_fields, key) }
    ```
 
+20. [map complex dynamic object based on conditionals](https://github.com/vectordotdev/vector/discussions/12387#discussioncomment-2639876)
+
+   ```coffee
+   .input = map_values(.input) -> |input| {
+     input.items = map_values(input.items) -> |item| {
+       item.userAttributes = map_values(item.userAttributes) -> |attribute| {
+         if attribute.key == "Name" {
+           del(attribute.__type)
+
+           key = del(attribute.key)
+           value = del(attribute.value)
+
+           attribute = set!(attribute, [key], value)
+         } else if attribute.key == "Address" {
+           attribute.values = map_values(attribute.values) -> |address| {
+             del(address.city)
+             address
+           }
+         }
+
+         attribute
+       }
+
+       item.userId = map_values(item.userId) -> |id| {
+         del(id.userGroupId)
+
+         id
+       }
+
+       item
+     }
+
+     input
+   }
+   ```
+
 ### In-Depth Example
 
 To explain iteration, let’s look at a more in-depth scenario, including comments
