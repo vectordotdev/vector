@@ -7,10 +7,6 @@ _default_flags: {
 		_short:      "h"
 		description: "Prints help information "
 	}
-	"version": {
-		_short:      "V"
-		description: "Prints version information"
-	}
 }
 
 cli: {
@@ -103,6 +99,10 @@ cli: {
 		"verbose": {
 			_short:      "v"
 			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
+		}
+		"version": {
+			_short:      "V"
+			description: "Prints version information"
 		}
 		"watch-config": {
 			_short:      "w"
