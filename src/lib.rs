@@ -1,11 +1,13 @@
 #![recursion_limit = "256"] // for async-stream
+#![deny(unreachable_pub)]
+#![deny(unused_extern_crates)]
+#![deny(unused_allocation)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
@@ -18,15 +20,13 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-extern crate vector_core;
-#[cfg(feature = "vrl-cli")]
-extern crate vrl_cli;
 
 #[cfg(feature = "tikv-jemallocator")]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
+#[allow(unreachable_pub)]
 pub mod config;
 pub mod cli;
 pub mod conditions;
@@ -36,26 +36,31 @@ pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[macro_use]
+#[allow(unreachable_pub)]
 pub mod internal_events;
 #[cfg(feature = "api")]
+#[allow(unreachable_pub)]
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+#[cfg(feature = "aws-config")]
 pub mod aws;
-#[cfg(feature = "codecs")]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
-pub mod graph;
+pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) mod kafka;
+#[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
+pub(crate) mod nats;
+#[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
 pub mod serde;
@@ -63,22 +68,29 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
-pub mod sink;
+pub(crate) mod sink;
+#[allow(unreachable_pub)]
 pub mod sinks;
 pub mod source_sender;
+#[allow(unreachable_pub)]
 pub mod sources;
-pub(crate) mod stats;
-pub mod stream;
+pub mod stats;
+pub(crate) mod stream;
 #[cfg(feature = "api-client")]
+#[allow(unreachable_pub)]
 mod tap;
-pub mod tcp;
+pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
-pub mod tls;
+#[allow(unreachable_pub)]
+pub(crate) mod tls;
 #[cfg(feature = "api-client")]
-pub mod top;
+#[allow(unreachable_pub)]
+pub(crate) mod top;
+#[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
+#[allow(unreachable_pub)]
 pub mod transforms;
 pub mod trigger;
 pub mod types;
@@ -90,7 +102,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{event, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -129,4 +141,19 @@ pub mod built_info {
 
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
+}
+
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+    _name: &str,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    #[cfg(tokio_unstable)]
+    return tokio::task::Builder::new().name(_name).spawn(task);
+
+    #[cfg(not(tokio_unstable))]
+    tokio::spawn(task)
 }

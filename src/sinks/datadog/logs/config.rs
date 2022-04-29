@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 
 use futures::FutureExt;
 use indoc::indoc;
@@ -11,7 +11,7 @@ use super::{
     sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
 };
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
@@ -21,7 +21,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -34,7 +34,7 @@ use crate::{
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogLogsDefaultBatchSettings;
@@ -42,13 +42,12 @@ pub struct DatadogLogsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
-    const TIMEOUT_SECS: NonZeroU64 =
-        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+    const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct DatadogLogsConfig {
+pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
     region: Option<Region>,
@@ -61,7 +60,7 @@ pub struct DatadogLogsConfig {
         default
     )]
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -71,6 +70,13 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -83,6 +89,23 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
+    /// Creates a default [`DatadogLogsConfig`] with the given API key.
+    #[cfg(feature = "enterprise")]
+    pub fn enterprise<T: Into<String>>(
+        api_key: T,
+        endpoint: Option<String>,
+        site: Option<String>,
+        region: Option<Region>,
+    ) -> Self {
+        Self {
+            default_api_key: api_key.into(),
+            endpoint,
+            site,
+            region,
+            ..Self::default()
+        }
+    }
+
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
@@ -145,7 +168,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
@@ -162,12 +189,16 @@ impl SinkConfig for DatadogLogsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

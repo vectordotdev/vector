@@ -115,9 +115,8 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving
-and (optionally) filtering bytes from the upstream source and before the
-creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving, decompressing
+and filtering bytes from the upstream source and before the creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -167,9 +166,9 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 * Properties
   * `count` - The count of Vector events.
   * `byte_size` - The cumulative in-memory byte size of all events sent.
-  * `output` - For components with multiple outputs, the name of the output that
-    events were sent to. For example, the `remap` transform has an additional
-    `dropped` output.
+  * `output` - For components that can use multiple outputs, the name of the
+    output that events were sent to. For events sent to the default output, this
+    value MUST be `_default`.
 * Metrics
   * MUST increment the `component_sent_events_total` counter by the defined value with the
     defined properties as metric tags.
@@ -219,7 +218,18 @@ This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
 
 * Properties
-  * `error` - The specifics of the error condition, such as system error code, etc.
+  * `message` - A human readable error message.
+  * `error_code` - An error code for the failure, if applicable.
+
+    `error_code` SHOULD only be specified if it adds additional information
+    beyond `error_type`.
+
+    The values for `error_code` for a given error event MUST be a bounded set
+    with relatively low cardinality because it will be used as a metric tag.
+    Examples would be syscall error code. Examples of values that should not be
+    used are raw error messages from `serde` as these are highly variable
+    depending on the input. Instead, these errors should be converted to an
+    error code like `invalid_json`.
   * `error_type` - The type of error condition. This MUST be one of the types
     listed in the `error_type` enum list in the cue docs.
   * `stage` - The stage at which the error occurred. This MUST be one of
@@ -229,10 +239,16 @@ implement since errors are specific to the component.
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
 * Metrics
-  * MUST increment the `component_errors_total` counter by 1 with the defined properties
-    as metric tags.
-  * MUST increment the `component_discarded_events_total` counter by the number of Vector
-    events discarded if the error resulted in discarding (dropping) events.
+  * MUST increment the `component_errors_total` counter by 1 with the defined
+    properties, except `message` as metric tags.
+  * MUST increment the `component_discarded_events_total` counter by the number
+    of Vector events discarded if the error resulted in discarding (dropping)
+    acknowledged events. For sources, only increment this metric if incoming
+    events were consumed (and acknowledged if applicable) and discarded. The
+    metric MUST not include events that will be re-ingested. For sinks, this
+    means only incrementing this metric if the error resulted in the sink
+    dropping the events, and thus acknowledging them. Retried events MUST not be
+    included in the metric.
 * Logs
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
@@ -252,10 +268,10 @@ AWS's status.
 See the [development documentation][health checks] for more context guidance.
 
 [Configuration Specification]: configuration.md
-[high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[Pull request #8383]: https://github.com/timberio/vector/pull/8383/
-[RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
+[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119

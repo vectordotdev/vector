@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, convert::TryInto};
 
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use vector_core::event::Value;
 
@@ -147,8 +148,16 @@ impl From<FluentValue> for Value {
                 // unwrap large numbers to string similar to how
                 // `From<serde_json::Value> for Value` handles it
                 .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
-            rmpv::Value::F32(f) => Value::Float(f.into()),
-            rmpv::Value::F64(f) => Value::Float(f),
+            rmpv::Value::F32(f) => {
+                // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
+                NotNan::new(f as f64)
+                    .map(Value::Float)
+                    .unwrap_or(Value::Null)
+            }
+            rmpv::Value::F64(f) => {
+                // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
+                NotNan::new(f).map(Value::Float).unwrap_or(Value::Null)
+            }
             rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
             rmpv::Value::Array(values) => Value::Array(
@@ -166,7 +175,7 @@ impl From<FluentValue> for Value {
                 // defines 'object' as.
                 //
                 // The current implementation will SILENTLY DROP non-stringy keys.
-                Value::Map(
+                Value::Object(
                     values
                         .into_iter()
                         .filter_map(|(key, value)| {
@@ -183,7 +192,7 @@ impl From<FluentValue> for Value {
                     Value::Integer(code.into()),
                 );
                 fields.insert(String::from("bytes"), Value::Bytes(bytes.into()));
-                Value::Map(fields)
+                Value::Object(fields)
             }
         }
     }
@@ -249,15 +258,10 @@ mod test {
     quickcheck! {
       fn from_f32(input: f32) -> () {
           let val = Value::from(FluentValue(rmpv::Value::F32(input)));
-          match val {
-              Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
-                  } else {
-                      assert_relative_eq!(input as f64, f);
-                  }
-              }
-              _ => unreachable!(),
+          if input.is_nan() {
+              assert_eq!(val, Value::Null);
+          } else {
+              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
           }
         }
     }
@@ -265,15 +269,10 @@ mod test {
     quickcheck! {
       fn from_f64(input: f64) -> () {
           let val = Value::from(FluentValue(rmpv::Value::F64(input)));
-          match val {
-              Value::Float(f) => {
-                  if f.is_nan() {
-                      assert!(input.is_nan());
-                  } else {
-                      assert_relative_eq!(input, f);
-                  }
-              }
-              _ => unreachable!(),
+          if input.is_nan() {
+              assert_eq!(val, Value::Null);
+          } else {
+              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
           }
         }
     }
@@ -311,7 +310,7 @@ mod test {
             for (k,v) in input.into_iter() {
                 expected_inner.insert(k, Value::Integer(v));
             }
-            let expected = Value::Map(expected_inner);
+            let expected = Value::Object(expected_inner);
 
             assert_eq!(Value::from(FluentValue(actual)), expected);
       }
@@ -328,7 +327,7 @@ mod test {
             let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
-            let expected = Value::Map(BTreeMap::new());
+            let expected = Value::Object(BTreeMap::new());
 
             assert_eq!(Value::from(FluentValue(actual)), expected);
       }
@@ -346,7 +345,7 @@ mod test {
             let mut inner = BTreeMap::new();
             inner.insert("msgpack_extension_code".to_string(), Value::Integer(code.into()));
             inner.insert("bytes".to_string(), Value::Bytes(bytes.into()));
-            let expected = Value::Map(inner);
+            let expected = Value::Object(inner);
 
             assert_eq!(Value::from(FluentValue(actual)), expected);
       }

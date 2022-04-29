@@ -23,7 +23,7 @@ pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, String> {
 #[cfg(test)]
 mod tests {
     use lookup::{LookupBuf, SegmentBuf};
-    use vrl_compiler::Value;
+    use value::Value;
 
     use super::*;
     use crate::ast::{Destination, Function, FunctionArgument};
@@ -119,6 +119,24 @@ mod tests {
         assert_eq!(
             parse_grok_pattern(input).expect_err("must be an invalid escape error"),
             "invalid escape literal '\\:'"
+        );
+    }
+
+    #[test]
+    fn escaped_new_line() {
+        let input = r#"%{data::array("\\n")}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(
+            parsed.destination,
+            Some(Destination {
+                path: LookupBuf::root(),
+                filter_fn: Some(Function {
+                    name: "array".to_string(),
+                    args: Some(vec![FunctionArgument::Arg("\n".into())]),
+                })
+            })
         );
     }
 }

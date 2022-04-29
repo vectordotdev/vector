@@ -6,6 +6,10 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -18,19 +22,19 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
-    serde::{default_decoding, default_framing_stream_based},
+    internal_events::{
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        StreamClosedError,
+    },
+    serde::default_decoding,
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -48,10 +52,9 @@ pub struct ExecConfig {
     pub include_stderr: bool,
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
-    #[serde(default = "default_framing_stream_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
@@ -99,7 +102,7 @@ impl Default for ExecConfig {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -186,7 +189,13 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| self.decoding.default_stream_framing());
+        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
@@ -218,11 +227,15 @@ impl SourceConfig for ExecConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         EXEC
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -230,7 +243,7 @@ async fn run_scheduled(
     config: ExecConfig,
     hostname: Option<String>,
     exec_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -250,23 +263,23 @@ async fn run_scheduled(
                 shutdown.clone(),
                 out.clone(),
             ),
-        );
+        )
+        .await;
 
-        let timeout_result = timeout.await;
-
-        match timeout_result {
+        match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailed {
+                    emit!(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
-            Err(_) => {
-                emit!(&ExecTimeout {
+            Err(error) => {
+                emit!(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
+                    error,
                 });
             }
         }
@@ -281,7 +294,7 @@ async fn run_streaming(
     hostname: Option<String>,
     respawn_on_exit: bool,
     respawn_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -301,7 +314,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailed {
+                        emit!(ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -323,7 +336,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailed {
+            emit!(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -336,7 +349,7 @@ async fn run_streaming(
 async fn run_command(
     config: ExecConfig,
     hostname: Option<String>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
@@ -378,26 +391,20 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, byte_size), stream)) = receiver.recv().await {
-        emit!(&ExecEventsReceived {
-            count: events.len(),
+    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+        let count = events.len();
+        emit!(ExecEventsReceived {
+            count,
             command: config.command_line().as_str(),
-            byte_size,
+            byte_size: events.size_of(),
         });
 
-        for mut event in events {
-            handle_event(
-                &config,
-                &hostname,
-                &Some(stream.to_string()),
-                pid,
-                &mut event,
-            );
-
-            if out.send(event).await.is_err() {
-                error!(message = "Failed to forward event; downstream is closed.");
-                break 'send;
-            }
+        for event in &mut events {
+            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
+        }
+        if let Err(error) = out.send_batch(events).await {
+            emit!(StreamClosedError { count, error });
+            break;
         }
     }
 
@@ -426,7 +433,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(&ExecCommandExecuted {
+    emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -501,7 +508,7 @@ fn handle_event(
 
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     origin: &'static str,
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
@@ -602,7 +609,7 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         };
 
@@ -626,7 +633,7 @@ mod tests {
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let decoder = codecs::Decoder::default();
+        let decoder = crate::codecs::Decoder::default();
         let (sender, mut receiver) = channel(1024);
 
         spawn_reader_thread(reader, decoder, STDOUT, sender);
@@ -714,7 +721,7 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }

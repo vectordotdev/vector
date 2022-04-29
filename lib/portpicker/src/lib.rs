@@ -1,4 +1,4 @@
-// Modified by `Vector Contributors <vector@timber.io>`.
+// Modified by `Vector Contributors <vector@datadoghq.com>`.
 // Based on `https://github.com/Dentosal/portpicker-rs` by `Hannes Karppila <hannes.karppila@gmail.com>`.
 // `portpicker-rs` LICENSE:
 // This is free and unencumbered software released into the public domain.

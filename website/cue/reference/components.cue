@@ -165,12 +165,13 @@ components: {
 		let Args = _args
 
 		if Args.kind == "source" {
-			collect?:  #FeaturesCollect
-			generate?: #FeaturesGenerate
-			multiline: #FeaturesMultiline
-			codecs?:   #FeaturesCodecs
-			encoding?: #FeaturesEncoding
-			receive?:  #FeaturesReceive
+			acknowledgements: bool
+			collect?:         #FeaturesCollect
+			generate?:        #FeaturesGenerate
+			multiline:        #FeaturesMultiline
+			codecs?:          #FeaturesCodecs
+			encoding?:        #FeaturesEncoding
+			receive?:         #FeaturesReceive
 		}
 
 		if Args.kind == "transform" {
@@ -188,9 +189,11 @@ components: {
 		}
 
 		if Args.kind == "sink" {
+			acknowledgements: #FeaturesAcknowledgements
+
 			// `buffer` describes how the component buffers data.
 			buffer: {
-				enabled: bool | string
+				enabled: true
 			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.
@@ -204,6 +207,8 @@ components: {
 
 		descriptions: [Name=string]: string
 	}
+
+	#FeaturesAcknowledgements: bool
 
 	#FeaturesAggregate: {
 	}
@@ -328,11 +333,11 @@ components: {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
-				enabled:      bool
-				common:       bool
-				max_bytes?:   uint | null
-				max_events?:  uint | null
-				timeout_secs: uint16 | null
+				enabled:       bool
+				common?:       bool
+				max_bytes?:    uint | null
+				max_events?:   uint | null
+				timeout_secs?: float | null
 			}
 		}
 
@@ -405,7 +410,6 @@ components: {
 		enabled: bool
 
 		if enabled {
-			can_enable:             bool
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
@@ -417,11 +421,17 @@ components: {
 	#Input: {
 		logs:    bool
 		metrics: #MetricInput | null
+		traces:  bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
+		fields:      #Schema
+	}
+
+	#TraceOutput: {
+		description: string
 		fields:      #Schema
 	}
 
@@ -446,6 +456,7 @@ components: {
 	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+		traces?:  #TraceOutput
 	}
 
 	#Output: {
@@ -547,15 +558,15 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
-			_acknowledgements: {
+			_source_acknowledgements: {
 				common:      true
-				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings."
+				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
 				required:    false
 				type: object: options: {
 					enabled: {
 						common:      true
 						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
-						warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+						warnings: ["This setting is deprecated in favor of enabling `acknowledgements` in the destination sink.", "Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
 						required: false
 						type: bool: default: false
 					}
@@ -564,7 +575,6 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					enabled_default:        bool
 				}
@@ -574,13 +584,11 @@ components: {
 				description: "Configures the TLS options for incoming connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      false
-							description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      false
+						description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
@@ -633,7 +641,6 @@ components: {
 
 			_tls_connect: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
@@ -644,13 +651,11 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      true
-							description: "Enable TLS during connections to the remote."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      true
+						description: "Enable TLS during connections to the remote."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {

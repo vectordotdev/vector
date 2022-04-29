@@ -4,12 +4,12 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 
-lazy_static! {
-    static ref SCOREBOARD: HashMap<char, &'static str> = vec![
+static SCOREBOARD: Lazy<HashMap<char, &'static str>> = Lazy::new(|| {
+    vec![
         ('_', "waiting"),
         ('S', "starting"),
         ('R', "reading"),
@@ -23,8 +23,8 @@ lazy_static! {
         ('.', "open"),
     ]
     .into_iter()
-    .collect();
-}
+    .collect()
+});
 
 /// enum of mod_status fields we care about
 enum StatusFieldStatistic<'a> {
@@ -482,7 +482,7 @@ impl error::Error for ParseError {
 mod test {
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use shared::{assert_event_data_eq, btreemap};
+    use vector_common::{assert_event_data_eq, btreemap};
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};

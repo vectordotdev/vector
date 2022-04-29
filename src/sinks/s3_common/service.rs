@@ -1,12 +1,13 @@
 use std::task::{Context, Poll};
 
+use aws_sdk_s3::error::PutObjectError;
+use aws_sdk_s3::types::{ByteStream, SdkError};
+use aws_sdk_s3::{Client as S3Client, Region};
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream};
+use futures::future::BoxFuture;
 use md5::Digest;
-use rusoto_core::{ByteStream, Region, RusotoError};
-use rusoto_s3::{PutObjectError, PutObjectRequest, S3Client, S3};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -15,7 +16,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::{internal_events::AwsBytesSent, serde::to_string};
+use crate::internal_events::AwsBytesSent;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -61,14 +62,15 @@ impl DriverResponse for S3Response {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
 
-/// Wrapper for the Rusoto S3 client.
+/// Wrapper for the AWS SDK S3 client.
 ///
 /// Provides a `tower::Service`-compatible wrapper around the native
-/// `rusoto_s3::S3Client`, allowing it to be composed within a Tower "stack",
+/// AWS SDK S3 Client, allowing it to be composed within a Tower "stack",
 /// such that we can easily and transparently provide retries, concurrency
 /// limits, rate limits, and more.
 #[derive(Clone)]
@@ -89,7 +91,7 @@ impl S3Service {
 
 impl Service<S3Request> for S3Service {
     type Response = S3Response;
-    type Error = RusotoError<PutObjectError>;
+    type Error = SdkError<PutObjectError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -109,61 +111,56 @@ impl Service<S3Request> for S3Service {
 
         let content_md5 = base64::encode(md5::Md5::digest(&request.body));
 
-        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-        if let Some(tags) = options.tags {
+        let tagging = options.tags.map(|tags| {
+            let mut tagging = url::form_urlencoded::Serializer::new(String::new());
             for (p, v) in tags {
                 tagging.append_pair(&p, &v);
             }
-        }
-        let tagging = tagging.finish();
+            tagging.finish()
+        });
         let count = request.metadata.count;
         let events_byte_size = request.metadata.byte_size;
 
         let request_size = request.body.len();
         let client = self.client.clone();
-        let request = PutObjectRequest {
-            body: Some(bytes_to_bytestream(request.body)),
-            bucket: request.bucket,
-            key: request.metadata.partition_key,
-            content_encoding,
-            content_type,
-            acl: options.acl.map(to_string),
-            grant_full_control: options.grant_full_control,
-            grant_read: options.grant_read,
-            grant_read_acp: options.grant_read_acp,
-            grant_write_acp: options.grant_write_acp,
-            server_side_encryption: options.server_side_encryption.map(to_string),
-            ssekms_key_id: options.ssekms_key_id,
-            storage_class: options.storage_class.map(to_string),
-            tagging: Some(tagging),
-            content_md5: Some(content_md5),
-            ..Default::default()
-        };
 
         let region = self.region.clone();
         Box::pin(async move {
-            client
-                .put_object(request)
+            let result = client
+                .put_object()
+                .body(bytes_to_bytestream(request.body))
+                .bucket(request.bucket)
+                .key(request.metadata.partition_key)
+                .set_content_encoding(content_encoding)
+                .set_content_type(content_type)
+                .set_acl(options.acl.map(Into::into))
+                .set_grant_full_control(options.grant_full_control)
+                .set_grant_read(options.grant_read)
+                .set_grant_read_acp(options.grant_read_acp)
+                .set_grant_write_acp(options.grant_write_acp)
+                .set_server_side_encryption(options.server_side_encryption.map(Into::into))
+                .set_ssekms_key_id(options.ssekms_key_id)
+                .set_storage_class(options.storage_class.map(Into::into))
+                .set_tagging(tagging)
+                .content_md5(content_md5)
+                .send()
                 .in_current_span()
-                .await
-                .map(|_inner| {
-                    emit!(&AwsBytesSent {
-                        byte_size: request_size,
-                        region,
-                    });
-                    S3Response {
-                        count,
-                        events_byte_size,
-                    }
-                })
+                .await;
+
+            result.map(|_inner| {
+                emit!(AwsBytesSent {
+                    byte_size: request_size,
+                    region,
+                });
+                S3Response {
+                    count,
+                    events_byte_size,
+                }
+            })
         })
     }
 }
 
 fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
-    // We _have_ to provide the size hint, because without it, Rusoto can't
-    // generate the Content-Length header which is required for the S3 PutObject
-    // API call.
-    let len = buf.len();
-    ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(buf) })), len)
+    ByteStream::from(buf)
 }

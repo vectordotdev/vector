@@ -6,8 +6,8 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
-    internal_events::KubernetesLogsDockerFormatParseFailed,
-    transforms::FunctionTransform,
+    internal_events::KubernetesLogsDockerFormatParseError,
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 pub const TIME: &str = "time";
@@ -23,14 +23,14 @@ pub const LOG: &str = "log";
 pub struct Docker;
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         output.push(event);
@@ -239,7 +239,7 @@ pub mod tests {
 
         for message in cases {
             let input = Event::from(message);
-            let mut output = Vec::new();
+            let mut output = OutputBuffer::default();
             Docker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }

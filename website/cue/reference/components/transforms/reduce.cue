@@ -125,18 +125,14 @@ components: transforms: reduce: {
 				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
 				"""
 			required: false
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-			}
+			type: condition: {}
 		}
 	}
 
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [
@@ -195,7 +191,7 @@ components: transforms: reduce: {
 				merge_strategies: {
 					message: "concat_newline"
 				}
-				starts_when: #"match(.message, /^[^\s]/)"#
+				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
 
 			output: [

@@ -2,11 +2,12 @@ use std::{io::Read, sync::Arc};
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::event::BatchNotifier;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
 use super::{
@@ -15,13 +16,13 @@ use super::{
     Compression,
 };
 use crate::{
-    codecs,
+    codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
+        StreamClosedError,
     },
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -31,7 +32,7 @@ pub async fn firehose(
     source_arn: String,
     request: FirehoseRequest,
     compression: Compression,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     acknowledgements: bool,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
@@ -41,14 +42,18 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
+        emit!(BytesReceived {
+            byte_size: bytes.len(),
+            protocol: "http",
+        });
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {
             match stream.next().await {
-                Some(Ok((events, byte_size))) => {
-                    emit!(&AwsKinesisFirehoseEventsReceived {
+                Some(Ok((mut events, _byte_size))) => {
+                    emit!(EventsReceived {
                         count: events.len(),
-                        byte_size
+                        byte_size: events.size_of(),
                     });
 
                     let (batch, receiver) = acknowledgements
@@ -58,7 +63,7 @@ pub async fn firehose(
                         })
                         .unwrap_or((None, None));
 
-                    for mut event in events {
+                    for event in &mut events {
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(Arc::clone(batch));
                         }
@@ -71,20 +76,19 @@ pub async fn firehose(
                             log.try_insert_flat("request_id", request_id.to_string());
                             log.try_insert_flat("source_arn", source_arn.to_string());
                         }
+                    }
 
-                        out.send(event)
-                            .map_err(|error| {
-                                let error = RequestError::ShuttingDown {
-                                    request_id: request_id.clone(),
-                                    source: error,
-                                };
-                                // can only fail if receiving end disconnected, so we are shutting
-                                // down, probably not gracefully.
-                                error!(message = "Failed to forward events, downstream is closed.");
-                                error!(message = "Tried to send the following event.", %error);
-                                warp::reject::custom(error)
-                            })
-                            .await?;
+                    let count = events.len();
+                    if let Err(error) = out.send_batch(events).await {
+                        emit!(StreamClosedError {
+                            error: error.clone(),
+                            count,
+                        });
+                        let error = RequestError::ShuttingDown {
+                            request_id: request_id.clone(),
+                            source: error,
+                        };
+                        warp::reject::custom(error);
                     }
 
                     drop(batch);
@@ -154,7 +158,7 @@ fn decode_record(
             match infer::get(&buf) {
                 Some(filetype) => match filetype.mime_type() {
                     "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(&AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
                             compression: Compression::Gzip,
                             error
                         });

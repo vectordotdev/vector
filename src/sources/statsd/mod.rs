@@ -6,20 +6,28 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
+    codecs::Decoder,
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{
+        BytesReceived, EventsReceived, StatsdInvalidRecordError, StatsdSocketError,
+        StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
+};
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
 };
 
 pub mod parser;
@@ -59,7 +67,7 @@ struct TcpConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
@@ -120,7 +128,7 @@ impl SourceConfig for StatsdConfig {
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
+            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
         }
     }
 
@@ -140,25 +148,35 @@ impl SourceConfig for StatsdConfig {
             Self::Unix(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsdDeserializer;
+pub(crate) struct StatsdDeserializer;
 
-impl Deserializer for StatsdDeserializer {
+impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        emit!(BytesReceived {
+            protocol: "udp",
+            byte_size: bytes.len(),
+        });
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(&StatsdEventReceived {
-                    byte_size: bytes.len()
+                let event = Event::Metric(metric);
+                emit!(EventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
                 });
-                Ok(smallvec![Event::Metric(metric)])
+                Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecord {
+                emit!(StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -174,7 +192,7 @@ async fn statsd_udp(
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -189,23 +207,21 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+    let codec = Decoder::new(
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer)),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
             Ok(((events, _byte_size), _sock)) => {
-                for metric in events {
-                    if let Err(error) = out.send(metric).await {
-                        error!(message = "Error sending metric.", %error);
-                        break;
-                    }
+                let count = events.len();
+                if let Err(error) = out.send_batch(events).await {
+                    emit!(StreamClosedError { error, count });
                 }
             }
             Err(error) => {
-                emit!(&StatsdSocketError::read(error));
+                emit!(StatsdSocketError::read(error));
             }
         }
     }
@@ -219,13 +235,13 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
-            Box::new(NewlineDelimitedDecoder::new()),
-            Box::new(StatsdDeserializer),
+        Decoder::new(
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(StatsdDeserializer)),
         )
     }
 
@@ -242,10 +258,11 @@ mod test {
         io::AsyncWriteExt,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::config::ComponentKey;
+    use vector_core::{config::ComponentKey, event::EventContainer};
 
     use super::*;
     use crate::test_util::{
+        collect_limited,
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
@@ -357,7 +374,11 @@ mod test {
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
         // cumulative values for incremental metrics, etc.  This will represent the final/cumulative
         // values for each metric sent by the source into the pipeline.
-        let state = rx.collect::<AbsoluteMetricState>().await;
+        let state = collect_limited(rx)
+            .await
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
         assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);

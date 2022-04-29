@@ -12,6 +12,7 @@ use vector_core::event::EventStatus;
 
 use super::service::HttpRequestBuilder;
 use crate::{
+    config::AcknowledgementsConfig,
     http::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
@@ -26,6 +27,13 @@ pub struct HecClientAcknowledgementsConfig {
     pub query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
     pub max_pending_acks: NonZeroU64,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        flatten,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub inner: AcknowledgementsConfig,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
@@ -35,6 +43,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
+            inner: Default::default(),
         }
     }
 }
@@ -82,7 +91,7 @@ impl HecAckClient {
     fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
-        emit!(&SplunkIndexerAcknowledgementAckAdded);
+        emit!(SplunkIndexerAcknowledgementAckAdded);
     }
 
     /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
@@ -93,7 +102,7 @@ impl HecAckClient {
 
             match ack_query_response {
                 Ok(ack_query_response) => {
-                    debug!(message = "Received ack statuses", ?ack_query_response);
+                    debug!(message = "Received ack statuses.", ?ack_query_response);
                     let acked_ack_ids = ack_query_response
                         .acks
                         .iter()
@@ -110,7 +119,7 @@ impl HecAckClient {
                             // request/response format changes in future
                             // versions), log an error and fall back to default
                             // behavior.
-                            emit!(&SplunkIndexerAcknowledgementAPIError {
+                            emit!(SplunkIndexerAcknowledgementAPIError {
                                 message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
                                 error,
                             });
@@ -119,7 +128,7 @@ impl HecAckClient {
                             );
                         }
                         _ => {
-                            emit!(&SplunkIndexerAcknowledgementAPIError {
+                            emit!(SplunkIndexerAcknowledgementAPIError {
                                 message:
                                     "Unable to send acknowledgement query request. Will retry.",
                                 error,
@@ -139,10 +148,10 @@ impl HecAckClient {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
                 let _ = ack_event_status_sender.send(EventStatus::Delivered);
                 removed_count += 1.0;
-                debug!(message = "Finalized ack id", ?ack_id);
+                debug!(message = "Finalized ack id.", ?ack_id);
             }
         }
-        emit!(&SplunkIndexerAcknowledgementAcksRemoved {
+        emit!(SplunkIndexerAcknowledgementAcksRemoved {
             count: removed_count
         });
     }
@@ -176,7 +185,7 @@ impl HecAckClient {
                 removed_count += 1.0;
             }
         }
-        emit!(&SplunkIndexerAcknowledgementAcksRemoved {
+        emit!(SplunkIndexerAcknowledgementAcksRemoved {
             count: removed_count
         });
     }
@@ -187,8 +196,9 @@ impl HecAckClient {
         request_body: &HecAckStatusRequest,
     ) -> Result<HecAckStatusResponse, HecAckApiError> {
         self.decrement_retries();
-        let request_body_bytes =
-            serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let request_body_bytes = crate::serde::json::to_bytes(request_body)
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?
+            .freeze();
         let request = self
             .http_request_builder
             .build_request(request_body_bytes, "/services/collector/ack", None)
@@ -239,7 +249,7 @@ pub async fn run_acknowledgements(
                 match ack_info {
                     Some((ack_id, tx)) => {
                         ack_client.add(ack_id, tx);
-                        debug!(message = "Stored ack id", ?ack_id);
+                        debug!(message = "Stored ack id.", ?ack_id);
                     },
                     None => break,
                 }

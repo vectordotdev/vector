@@ -1,16 +1,15 @@
-use std::{
-    collections::VecDeque,
-    io::{self, Read},
-};
+use std::io::{self, Read};
+use std::net::SocketAddr;
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -20,7 +19,7 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 mod message;
@@ -29,7 +28,7 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
     address: SocketListenAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -85,6 +84,10 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -100,12 +103,12 @@ impl TcpSource for FluentSource {
         FluentDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         for event in events {
             let log = event.as_mut_log();
 
             if !log.contains(log_schema().host_key()) {
-                log.insert(log_schema().host_key(), host.clone());
+                log.insert(log_schema().host_key(), host.ip().to_string());
             }
         }
     }
@@ -162,97 +165,95 @@ impl From<decode::Error> for DecodeError {
 }
 
 #[derive(Debug)]
-struct FluentDecoder {
-    // unread frames from previous fluent message
-    unread_frames: VecDeque<(FluentFrame, usize)>,
-}
+struct FluentDecoder;
 
 impl FluentDecoder {
-    fn new() -> Self {
-        FluentDecoder {
-            unread_frames: VecDeque::new(),
-        }
+    const fn new() -> Self {
+        FluentDecoder
     }
 
     fn handle_message(
         &mut self,
-        message: FluentMessage,
+        message: Result<FluentMessage, DecodeError>,
         byte_size: usize,
-    ) -> Result<(), DecodeError> {
-        match message {
+    ) -> Result<Option<(FluentFrame, usize)>, DecodeError> {
+        match message? {
             FluentMessage::Message(tag, timestamp, record) => {
-                self.unread_frames.push_back((
-                    FluentFrame {
-                        tag,
-                        timestamp,
-                        record,
-                        chunk: None,
-                    },
-                    byte_size,
-                ));
-                Ok(())
+                let event = Event::from(FluentEvent {
+                    tag,
+                    timestamp,
+                    record,
+                });
+                let frame = FluentFrame {
+                    events: smallvec![event],
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
-                self.unread_frames.push_back((
-                    FluentFrame {
-                        tag,
-                        timestamp,
-                        record,
-                        chunk: options.chunk,
-                    },
-                    byte_size,
-                ));
-                Ok(())
+                let event = Event::from(FluentEvent {
+                    tag,
+                    timestamp,
+                    record,
+                });
+                let frame = FluentFrame {
+                    events: smallvec![event],
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::Forward(tag, entries) => {
-                self.unread_frames.extend(entries.into_iter().map(
-                    |FluentEntry(timestamp, record)| {
-                        (
-                            FluentFrame {
-                                tag: tag.clone(),
-                                timestamp,
-                                record,
-                                chunk: None,
-                            },
-                            byte_size,
-                        )
-                    },
-                ));
-                Ok(())
+                let events = entries
+                    .into_iter()
+                    .map(|FluentEntry(timestamp, record)| {
+                        Event::from(FluentEvent {
+                            tag: tag.clone(),
+                            timestamp,
+                            record,
+                        })
+                    })
+                    .collect();
+                let frame = FluentFrame {
+                    events,
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::ForwardWithOptions(tag, entries, options) => {
-                self.unread_frames.extend(entries.into_iter().map(
-                    |FluentEntry(timestamp, record)| {
-                        (
-                            FluentFrame {
-                                tag: tag.clone(),
-                                timestamp,
-                                record,
-                                chunk: options.chunk.clone(),
-                            },
-                            byte_size,
-                        )
-                    },
-                ));
-                Ok(())
+                let events = entries
+                    .into_iter()
+                    .map(|FluentEntry(timestamp, record)| {
+                        Event::from(FluentEvent {
+                            tag: tag.clone(),
+                            timestamp,
+                            record,
+                        })
+                    })
+                    .collect();
+                let frame = FluentFrame {
+                    events,
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::PackedForward(tag, bin) => {
                 let mut buf = BytesMut::from(&bin[..]);
 
-                let mut decoder = FluentEntryStreamDecoder;
-
-                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    self.unread_frames.push_back((
-                        FluentFrame {
-                            tag: tag.clone(),
-                            timestamp,
-                            record,
-                            chunk: None,
-                        },
-                        byte_size,
-                    ));
+                let mut events = smallvec![];
+                while let Some(FluentEntry(timestamp, record)) =
+                    FluentEntryStreamDecoder.decode(&mut buf)?
+                {
+                    events.push(Event::from(FluentEvent {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    }));
                 }
-                Ok(())
+                let frame = FluentFrame {
+                    events,
+                    chunk: None,
+                };
+                Ok(Some((frame, byte_size)))
             }
             FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
                 let buf = match options.compressed.as_deref() {
@@ -269,22 +270,23 @@ impl FluentDecoder {
 
                 let mut buf = BytesMut::from(&buf[..]);
 
-                let mut decoder = FluentEntryStreamDecoder;
-
-                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
-                    self.unread_frames.push_back((
-                        FluentFrame {
-                            tag: tag.clone(),
-                            timestamp,
-                            record,
-                            chunk: options.chunk.clone(),
-                        },
-                        byte_size,
-                    ));
+                let mut events = smallvec![];
+                while let Some(FluentEntry(timestamp, record)) =
+                    FluentEntryStreamDecoder.decode(&mut buf)?
+                {
+                    events.push(Event::from(FluentEvent {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    }));
                 }
-                Ok(())
+                let frame = FluentFrame {
+                    events,
+                    chunk: options.chunk,
+                };
+                Ok(Some((frame, byte_size)))
             }
-            FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(()),
+            FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(None),
             FluentMessage::Heartbeat(value) => Err(DecodeError::UnexpectedValue(value)),
         }
     }
@@ -295,47 +297,44 @@ impl Decoder for FluentDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if let Some(item) = self.unread_frames.pop_front() {
-            return Ok(Some(item));
-        }
-
-        if src.is_empty() {
-            return Ok(None);
-        }
-
-        let (byte_size, res) = {
-            let mut des = Deserializer::new(io::Cursor::new(&src[..]));
-
-            let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
-
-            // check for unexpected EOF to indicate that we need more data
-            if let Err(DecodeError::Decode(
-                decode::Error::InvalidDataRead(ref custom)
-                | decode::Error::InvalidMarkerRead(ref custom),
-            )) = res
-            {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                }
+        loop {
+            if src.is_empty() {
+                return Ok(None);
             }
 
-            (des.position() as usize, res)
-        };
+            let (byte_size, res) = {
+                let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
-        src.advance(byte_size);
+                let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
-        res.and_then(|message| {
-            self.handle_message(message, byte_size)
-                .map(|_| self.unread_frames.pop_front())
-        })
-        .map_err(|error| {
-            let base64_encoded_message = base64::encode(&src);
-            emit!(&FluentMessageDecodeError {
-                error: &error,
-                base64_encoded_message
-            });
-            error
-        })
+                // check for unexpected EOF to indicate that we need more data
+                if let Err(DecodeError::Decode(
+                    decode::Error::InvalidDataRead(ref custom)
+                    | decode::Error::InvalidMarkerRead(ref custom),
+                )) = res
+                {
+                    if custom.kind() == io::ErrorKind::UnexpectedEof {
+                        return Ok(None);
+                    }
+                }
+
+                (des.position() as usize, res)
+            };
+
+            src.advance(byte_size);
+
+            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
+                let base64_encoded_message = base64::encode(&src);
+                emit!(FluentMessageDecodeError {
+                    error: &error,
+                    base64_encoded_message
+                });
+                error
+            })?;
+            if let Some(item) = maybe_item {
+                return Ok(Some(item));
+            }
+        }
     }
 }
 
@@ -365,7 +364,7 @@ impl Decoder for FluentEntryStreamDecoder {
 
             let byte_size = des.position();
 
-            emit!(&FluentMessageReceived { byte_size });
+            emit!(FluentMessageReceived { byte_size });
 
             (byte_size as usize, res)
         };
@@ -408,32 +407,35 @@ impl TcpSourceAcker for FluentAcker {
 
 /// Normalized fluent message.
 #[derive(Debug, PartialEq)]
-struct FluentFrame {
+struct FluentEvent {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
-    chunk: Option<String>,
 }
 
-impl From<FluentFrame> for Event {
-    fn from(frame: FluentFrame) -> Event {
+impl From<FluentEvent> for Event {
+    fn from(frame: FluentEvent) -> Event {
         LogEvent::from(frame).into()
     }
 }
 
+struct FluentFrame {
+    events: SmallVec<[Event; 1]>,
+    chunk: Option<String>,
+}
+
 impl From<FluentFrame> for SmallVec<[Event; 1]> {
     fn from(frame: FluentFrame) -> Self {
-        smallvec![frame.into()]
+        frame.events
     }
 }
 
-impl From<FluentFrame> for LogEvent {
-    fn from(frame: FluentFrame) -> LogEvent {
-        let FluentFrame {
+impl From<FluentEvent> for LogEvent {
+    fn from(frame: FluentEvent) -> LogEvent {
+        let FluentEvent {
             tag,
             timestamp,
             record,
-            chunk: _,
         } = frame;
 
         let mut log = LogEvent::default();
@@ -451,13 +453,13 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
-    use shared::{assert_event_data_eq, btreemap};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_core::event::{LogEvent, Value};
+    use vector_common::{assert_event_data_eq, btreemap};
+    use vector_core::event::Value;
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -489,17 +491,14 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = (
-            LogEvent::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            28,
-        );
-        let got = decode_all(message).unwrap();
-        assert_event_data_eq!(got[0].0, expected.0);
-        assert_eq!(got[0].1, expected.1);
+        let expected = Event::from(btreemap! {
+            "message" => "bar",
+            "tag" => "tag.name",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+        });
+        let got = decode_all(message.clone()).unwrap();
+        assert_event_data_eq!(got.0[0], expected);
+        assert_eq!(got.1, message.len());
     }
 
     #[test]
@@ -515,17 +514,14 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = (
-            LogEvent::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            35,
-        );
-        let got = decode_all(message).unwrap();
-        assert_event_data_eq!(got[0].0, expected.0);
-        assert_eq!(got[0].1, expected.1);
+        let expected = Event::from(btreemap! {
+            "message" => "bar",
+            "tag" => "tag.name",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+        });
+        let got = decode_all(message.clone()).unwrap();
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected);
     }
 
     #[test]
@@ -546,40 +542,29 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                68,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                68,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                68,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     #[test]
@@ -602,40 +587,30 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                75,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                75,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                75,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     #[test]
@@ -658,40 +633,29 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                82,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                82,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                82,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
     //  TODO
@@ -716,52 +680,38 @@ mod tests {
         ];
 
         let expected = vec![
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "foo",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-                }),
-                84,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "bar",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-                }),
-                84,
-            ),
-            (
-                LogEvent::from(btreemap! {
-                    "message" => "baz",
-                    "tag" => "tag.name",
-                    "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-                }),
-                84,
-            ),
+            Event::from(btreemap! {
+                "message" => "foo",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "bar",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
+            }),
+            Event::from(btreemap! {
+                "message" => "baz",
+                "tag" => "tag.name",
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
+            }),
         ];
 
-        let got = decode_all(message).unwrap();
+        let got = decode_all(message.clone()).unwrap();
 
-        assert_event_data_eq!(got[0].0, expected[0].0);
-        assert_eq!(got[0].1, expected[0].1);
-        assert_event_data_eq!(got[1].0, expected[1].0);
-        assert_eq!(got[1].1, expected[1].1);
-        assert_event_data_eq!(got[2].0, expected[2].0);
-        assert_eq!(got[2].1, expected[2].1);
+        assert_eq!(got.1, message.len());
+        assert_event_data_eq!(got.0[0], expected[0]);
+        assert_event_data_eq!(got.0[1], expected[1]);
+        assert_event_data_eq!(got.0[2], expected[2]);
     }
 
-    fn decode_all(message: Vec<u8>) -> Result<Vec<(LogEvent, usize)>, DecodeError> {
+    fn decode_all(message: Vec<u8>) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
         let mut buf = BytesMut::from(&message[..]);
 
         let mut decoder = FluentDecoder::new();
 
-        let mut frames = vec![];
-        while let Some((frame, byte_size)) = decoder.decode(&mut buf)? {
-            frames.push((LogEvent::from(frame), byte_size))
-        }
-        Ok(frames)
+        let (frame, byte_size) = decoder.decode(&mut buf)?.unwrap();
+        Ok((frame.into(), byte_size))
     }
 
     #[tokio::test]
@@ -808,7 +758,7 @@ mod tests {
             acknowledgements: true.into(),
             connection_limit: None,
         }
-        .build(SourceContext::new_test(sender))
+        .build(SourceContext::new_test(sender, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -1053,7 +1003,7 @@ mod integration_tests {
                 acknowledgements: false.into(),
                 connection_limit: None,
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

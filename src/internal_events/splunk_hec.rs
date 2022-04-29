@@ -5,6 +5,7 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
+    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
@@ -20,18 +21,21 @@ mod sink {
     }
 
     impl InternalEvent for SplunkEventEncodeError {
-        fn emit_logs(&self) {
+        fn emit(self) {
             error!(
                 message = "Error encoding Splunk HEC event to JSON.",
                 error = ?self.error,
-                error_type = "encode_failed",
-                stage = "processing",
-                internal_log_rate_secs = 30,
+                error_code = "serializing_json",
+                error_type = error_type::ENCODER_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_secs = 10,
             );
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "serializing_json",
+                "error_type" => error_type::ENCODER_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 
@@ -43,21 +47,26 @@ mod sink {
     }
 
     impl<'a> InternalEvent for SplunkInvalidMetricReceivedError<'a> {
-        fn emit_logs(&self) {
+        fn emit(self) {
             error!(
                 message = "Invalid metric received.",
                 error = ?self.error,
+                error_type = error_type::INVALID_METRIC,
+                stage = error_stage::PROCESSING,
                 value = ?self.value,
                 kind = ?self.kind,
-                error_type = "invalid_metric",
-                stage = "processing",
-                internal_log_rate_secs = 30,
-            )
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "stage" => "processing", "error_type" => "invalid_metric");
-            counter!("component_discarded_events_total", 1);
+                internal_log_rate_secs = 10,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::INVALID_METRIC,
+                "stage" => error_stage::PROCESSING,
+            );
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_type" => error_type::INVALID_METRIC,
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 
@@ -67,11 +76,20 @@ mod sink {
     }
 
     impl InternalEvent for SplunkResponseParseError {
-        fn emit_logs(&self) {
-            warn!(
+        fn emit(self) {
+            error!(
                 message = "Unable to parse Splunk HEC response. Acknowledging based on initial 200 OK.",
                 error = ?self.error,
-                internal_log_rate_secs = 30,
+                error_code = "invalid_response",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::SENDING,
+                internal_log_rate_secs = 10,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "invalid_response",
+                "error_type" => error_type::PARSER_FAILED,
+                "stage" => error_stage::SENDING,
             );
         }
     }
@@ -83,29 +101,44 @@ mod sink {
     }
 
     impl InternalEvent for SplunkIndexerAcknowledgementAPIError {
-        fn emit_logs(&self) {
+        fn emit(self) {
             error!(
                 message = self.message,
                 error = ?self.error,
-                error_type = "acknowledgements_error",
-                stage = "sending",
-                internal_log_rate_secs = 30,
+                error_code = "indexer_ack_failed",
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                stage = error_stage::SENDING,
+                internal_log_rate_secs = 10,
             );
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => "sending");
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "indexer_ack_failed",
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::SENDING,
+            );
         }
     }
 
     #[derive(Debug)]
-    pub struct SplunkIndexerAcknowledgementUnavailableError;
+    pub struct SplunkIndexerAcknowledgementUnavailableError<E> {
+        pub error: E,
+    }
 
-    impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
-        fn emit_logs(&self) {
-            warn!(
+    impl<E: std::fmt::Display> InternalEvent for SplunkIndexerAcknowledgementUnavailableError<E> {
+        fn emit(self) {
+            error!(
                 message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
-                internal_log_rate_secs = 30,
+                error = %self.error,
+                error_code = "indexer_ack_unavailable",
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                stage = error_stage::SENDING,
+                internal_log_rate_secs = 10,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "indexer_ack_unavailable",
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::SENDING,
             );
         }
     }
@@ -113,7 +146,7 @@ mod sink {
     pub struct SplunkIndexerAcknowledgementAckAdded;
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
-        fn emit_metrics(&self) {
+        fn emit(self) {
             increment_gauge!("splunk_pending_acks", 1.0);
         }
     }
@@ -123,7 +156,7 @@ mod sink {
     }
 
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
-        fn emit_metrics(&self) {
+        fn emit(self) {
             decrement_gauge!("splunk_pending_acks", self.count);
         }
     }
@@ -134,6 +167,7 @@ mod source {
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
+    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::sources::splunk_hec::ApiError;
 
     #[derive(Debug)]
@@ -142,15 +176,12 @@ mod source {
     }
 
     impl<'a> InternalEvent for SplunkHecRequestReceived<'a> {
-        fn emit_logs(&self) {
+        fn emit(self) {
             debug!(
                 message = "Received one request.",
                 path = %self.path,
                 internal_log_rate_secs = 10
             );
-        }
-
-        fn emit_metrics(&self) {
             counter!("requests_received_total", 1);
         }
     }
@@ -161,18 +192,21 @@ mod source {
     }
 
     impl InternalEvent for SplunkHecRequestBodyInvalidError {
-        fn emit_logs(&self) {
+        fn emit(self) {
             error!(
                 message = "Invalid request body.",
                 error = ?self.error,
-                error_type = "parse_failed",
-                stage = "processing",
+                error_code = "invalid_request_body",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
                 internal_log_rate_secs = 10
             );
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => "processing")
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "invalid_request_body",
+                "error_type" => error_type::PARSER_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
         }
     }
 
@@ -182,19 +216,21 @@ mod source {
     }
 
     impl InternalEvent for SplunkHecRequestError {
-        fn emit_logs(&self) {
+        fn emit(self) {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
-                error_type = "http_error",
-                stage = "receiving",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
                 internal_log_rate_secs = 10
             );
-        }
-
-        fn emit_metrics(&self) {
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
+            // deprecated
             counter!("http_request_errors_total", 1);
-            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => "receiving")
         }
     }
 }

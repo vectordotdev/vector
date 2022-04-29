@@ -6,31 +6,33 @@
 //! part contains config related items including config traits for
 //! each type of component.
 
+pub(super) use vector_core::fanout;
+
 pub mod builder;
-pub use vector_core::fanout;
 mod running;
+mod schema;
 mod task;
 
 #[cfg(test)]
 mod test;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
 
 use futures::{Future, FutureExt};
-pub use running::RunningTopology;
+pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
-use vector_core::buffers::{
-    topology::channel::{BufferReceiver, BufferSender},
+use vector_buffers::{
+    topology::channel::{BufferReceiverStream, BufferSender},
     Acker,
 };
 
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
-    event::Event,
+    event::EventArray,
     topology::{
         builder::Pieces,
         task::{Task, TaskOutput},
@@ -40,18 +42,38 @@ use crate::{
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
-    BufferSender<Event>,
-    Arc<Mutex<Option<BufferReceiver<Event>>>>,
+    BufferSender<EventArray>,
+    Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>,
     Acker,
 );
 
-type Outputs = HashMap<OutputId, fanout::ControlChannel>;
+/// A tappable output consisting of an output ID and associated metadata
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TapOutput {
+    pub output_id: OutputId,
+    pub component_kind: &'static str,
+    pub component_type: String,
+}
 
-// Watcher types for topology changes. These are currently specific to receiving
-// `Outputs`. This could be expanded in the future to send an enum of types if,
-// for example, this included a new 'Inputs' type.
-type WatchTx = watch::Sender<Outputs>;
-pub type WatchRx = watch::Receiver<Outputs>;
+/// Resources used by the `tap` API to monitor component inputs and outputs,
+/// updated alongside the topology
+#[derive(Debug, Default, Clone)]
+pub struct TapResource {
+    // Outputs and their corresponding Fanout control
+    pub outputs: HashMap<TapOutput, fanout::ControlChannel>,
+    // Components (transforms, sinks) and their corresponding inputs
+    pub inputs: HashMap<ComponentKey, Vec<OutputId>>,
+    // Source component keys used to warn against invalid pattern matches
+    pub source_keys: Vec<String>,
+    // Sink component keys used to warn against invalid pattern amtches
+    pub sink_keys: Vec<String>,
+    // Components removed on a reload (used to drop TapSinks)
+    pub removals: HashSet<ComponentKey>,
+}
+
+// Watcher types for topology changes.
+type WatchTx = watch::Sender<TapResource>;
+pub type WatchRx = watch::Receiver<TapResource>;
 
 pub async fn start_validated(
     config: Config,
@@ -90,7 +112,10 @@ pub async fn build_or_log_errors(
     }
 }
 
-pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(ComponentKey, Task)> {
+pub(super) fn take_healthchecks(
+    diff: &ConfigDiff,
+    pieces: &mut Pieces,
+) -> Vec<(ComponentKey, Task)> {
     (&diff.sinks.to_change | &diff.sinks.to_add)
         .into_iter()
         .filter_map(|id| pieces.healthchecks.remove(&id).map(move |task| (id, task)))
@@ -107,7 +132,7 @@ async fn handle_errors(
         .map_err(|_| ())
         .and_then(|res| res)
         .map_err(|_| {
-            error!("An error occurred that vector couldn't handle.");
+            error!("An error occurred that Vector couldn't handle.");
             let _ = abort_tx.send(());
         })
 }

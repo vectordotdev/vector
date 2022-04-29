@@ -2,6 +2,10 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
@@ -9,17 +13,14 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::DemoLogsEventProcessed,
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -29,15 +30,15 @@ use crate::{
 pub struct DemoLogsConfig {
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
-    interval: f64,
+    pub interval: f64,
     #[derivative(Default(value = "default_count()"))]
-    count: usize,
+    pub count: usize,
     #[serde(flatten)]
-    format: OutputFormat,
+    pub format: OutputFormat,
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    pub framing: FramingConfig,
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 const fn default_interval() -> f64 {
@@ -75,7 +76,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&DemoLogsEventProcessed);
+        emit!(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -136,15 +137,11 @@ async fn demo_logs_source(
     interval: f64,
     count: usize,
     format: OutputFormat,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = if interval != 0.0 {
-        Some(interval)
-    } else {
-        None
-    };
+    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
@@ -156,6 +153,10 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
+        emit!(BytesReceived {
+            byte_size: 0,
+            protocol: "none",
+        });
 
         let line = format.generate_line(n);
 
@@ -163,20 +164,24 @@ async fn demo_logs_source(
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    emit!(EventsReceived {
+                        count,
+                        byte_size: events.size_of()
+                    });
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
 
                         log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
                         log.try_insert(log_schema().timestamp_key(), now);
 
-                        out.send(event)
-                            .await
-                            .map_err(|_: crate::source_sender::ClosedError| {
-                                error!(message = "Failed to forward events; downstream is closed.");
-                            })?;
-                    }
+                        event
+                    });
+                    out.send_batch(events).await.map_err(|error| {
+                        emit!(StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
                     // Error is logged by `crate::codecs::Decoder`, no further
@@ -207,7 +212,7 @@ impl_generate_config_from_default!(DemoLogsConfig);
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -219,11 +224,15 @@ impl SourceConfig for DemoLogsConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         "demo_logs"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -245,31 +254,31 @@ impl SourceConfig for DemoLogsCompatConfig {
     fn source_type(&self) -> &'static str {
         self.0.source_type()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{poll, StreamExt};
+    use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{
-        config::log_schema, event::Event, shutdown::ShutdownSignal, source_sender::ReceiverStream,
-        SourceSender,
-    };
+    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> ReceiverStream<Event> {
+    async fn runit(config: &str) -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())
-            .build()
-            .unwrap();
+        let decoder =
+            DecodingConfig::new(default_framing_message_based(), default_decoding()).build();
         demo_logs_source(
             config.interval,
             config.count,

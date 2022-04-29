@@ -13,25 +13,36 @@ use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
 };
+use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
+use kube::{
+    api::{Api, ListParams},
+    config::{self, KubeConfigOptions},
+    runtime::{
+        reflector::{self},
+        watcher,
+    },
+    Client, Config as ClientConfig,
+};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use vector_common::TimeZone;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, ProxyConfig,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
+        BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
+        KubernetesLogsEventsReceived, KubernetesLogsPodInfo, StreamClosedError,
     },
-    kubernetes as k8s,
-    kubernetes::hash_value::HashKey,
+    kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
     SourceSender,
 };
 
@@ -173,7 +184,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.key).await?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -188,11 +199,15 @@ impl SourceConfig for Config {
     fn source_type(&self) -> &'static str {
         COMPONENT_ID
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
 struct Source {
-    client: k8s::client::Client,
+    client: Client,
     data_dir: PathBuf,
     auto_partial_merge: bool,
     pod_fields_spec: pod_metadata_annotator::FieldsSpec,
@@ -210,20 +225,28 @@ struct Source {
 }
 
 impl Source {
-    fn new(
+    async fn new(
         config: &Config,
         globals: &GlobalOptions,
         key: &ComponentKey,
-        proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
-        let k8s_config = match &config.kube_config_file {
-            Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
-            None => k8s::client::config::Config::in_cluster()?,
+        // If the user passed a custom Kubeconfig use it, otherwise
+        // we attempt to load the local kubec-config, followed by the
+        // in-cluster environment variables
+        let client_config = match &config.kube_config_file {
+            Some(kc) => {
+                ClientConfig::from_custom_kubeconfig(
+                    config::Kubeconfig::read_from(kc)?,
+                    &KubeConfigOptions::default(),
+                )
+                .await?
+            }
+            None => ClientConfig::infer().await?,
         };
-        let client = k8s::client::Client::new(k8s_config, proxy)?;
+        let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
@@ -284,55 +307,33 @@ impl Source {
             delay_deletion,
         } = self;
 
-        let watcher =
-            k8s::api_watcher::ApiWatcher::new(client.clone(), Pod::watch_pod_for_all_namespaces);
-        let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
-        let (state_reader, state_writer) = evmap::new();
-        let state_writer = k8s::state::evmap::Writer::new(
-            state_writer,
-            Some(Duration::from_millis(10)),
-            HashKey::Uid,
+        let pods = Api::<Pod>::all(client.clone());
+        let pod_watcher = watcher(
+            pods,
+            ListParams {
+                field_selector: Some(field_selector),
+                label_selector: Some(label_selector),
+                ..Default::default()
+            },
         );
-        let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
-        let state_writer = k8s::state::delayed_delete::Writer::new(state_writer, delay_deletion);
+        let pod_store_w = reflector::store::Writer::default();
+        let pod_state = pod_store_w.as_reader();
 
-        let mut reflector = k8s::reflector::Reflector::new(
-            watcher,
-            state_writer,
-            Some(field_selector),
-            Some(label_selector),
-            Duration::from_secs(1),
-        );
-        let reflector_process = reflector.run();
+        tokio::spawn(custom_reflector(pod_store_w, pod_watcher, delay_deletion));
 
         // -----------------------------------------------------------------
 
-        let ns_watcher =
-            k8s::api_watcher::ApiWatcher::new(client.clone(), Namespace::watch_namespace);
-        let ns_watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(ns_watcher);
-        let (ns_state_reader, ns_state_writer) = evmap::new();
-        let ns_state_writer = k8s::state::evmap::Writer::new(
-            ns_state_writer,
-            Some(Duration::from_millis(10)),
-            HashKey::Name,
-        );
-        let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
-        let ns_state_writer =
-            k8s::state::delayed_delete::Writer::new(ns_state_writer, delay_deletion);
+        let namespaces = Api::<Namespace>::all(client);
+        let ns_watcher = watcher(namespaces, ListParams::default());
+        let ns_store_w = reflector::store::Writer::default();
+        let ns_state = ns_store_w.as_reader();
 
-        let mut ns_reflector = k8s::reflector::Reflector::new(
-            ns_watcher,
-            ns_state_writer,
-            None,
-            None,
-            Duration::from_secs(1),
-        );
-        let ns_reflector_process = ns_reflector.run();
+        tokio::spawn(custom_reflector(ns_store_w, ns_watcher, delay_deletion));
 
         let paths_provider =
-            K8sPathsProvider::new(state_reader.clone(), ns_state_reader.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(state_reader, pod_fields_spec);
-        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state_reader, namespace_fields_spec);
+            K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec);
+        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec);
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -400,6 +401,11 @@ impl Source {
         let events = events.flatten();
         let events = events.map(move |line| {
             let byte_size = line.text.len();
+            emit!(BytesReceived {
+                byte_size,
+                protocol: "http",
+            });
+
             let mut event = create_event(
                 line.text,
                 &line.filename,
@@ -407,14 +413,17 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(&KubernetesLogsEventReceived {
+            emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size,
-                pod_name: file_info.as_ref().map(|info| info.pod_name),
+                byte_size: event.size_of(),
+                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                    name: info.pod_name.to_owned(),
+                    namespace: info.pod_namespace.to_owned(),
+                }),
             });
 
             if file_info.is_none() {
-                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -422,7 +431,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
                 }
             }
@@ -431,43 +440,25 @@ impl Source {
             event
         });
         let events = events.flat_map(move |event| {
-            let mut buf = Vec::with_capacity(1);
+            let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
-            futures::stream::iter(buf)
+            futures::stream::iter(buf.into_events())
         });
+        let (events_count, _) = events.size_hint();
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
-        let event_processing_loop = out.send_all(&mut stream);
+        let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
-        {
-            let (slot, shutdown) = lifecycle.add();
-            let fut =
-                util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "Reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Reflector process exited with an error.", %error)
-                    }
-                });
-            slot.bind(Box::pin(fut));
-        }
-        {
-            let (slot, shutdown) = lifecycle.add();
-            let fut =
-                util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Namespace reflector process exited with an error.", %error)
-                    }
-                });
-            slot.bind(Box::pin(fut));
-        }
         {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => error!(message = "File server exited with an error.", %error),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        message: "File server exited with an error.",
+                        error,
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -481,14 +472,14 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => error!(
-                        message = "Event processing loop exited with an error.",
-                        %error
-                    ),
-                    Err(error) => error!(
-                        message = "Event processing loop timed out during the shutdown.",
-                        %error
-                    ),
+                    Ok(Err(error)) => emit!(StreamClosedError {
+                        error,
+                        count: events_count
+                    }),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                    }),
                 };
             });
             slot.bind(Box::pin(fut));
@@ -535,7 +526,7 @@ const fn default_max_read_bytes() -> usize {
 
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
+    // https://github.com/vectordotdev/vector/issues/6967
     //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.

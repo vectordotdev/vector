@@ -6,7 +6,7 @@ use crate::{
     Parameter, Span,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionArgument {
     ident: Option<Node<Ident>>,
     parameter: Option<Parameter>,
@@ -32,6 +32,10 @@ impl FunctionArgument {
 
     pub(crate) fn parameter(&self) -> Option<Parameter> {
         self.parameter
+    }
+
+    pub fn expr(&self) -> &Expr {
+        self.expr.inner()
     }
 
     pub(crate) fn into_inner(self) -> Expr {

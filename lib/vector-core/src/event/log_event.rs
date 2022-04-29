@@ -1,50 +1,130 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
+    cmp,
+    collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
     iter::FromIterator,
+    mem::size_of,
+    num::NonZeroUsize,
     sync::Arc,
 };
 
+use atomig::{Atomic, Ordering};
 use bytes::Bytes;
 use chrono::Utc;
-use derivative::Derivative;
-use getset::{Getters, MutGetters};
+use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
-use shared::EventDataEq;
+use vector_common::EventDataEq;
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},
-    legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Value,
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
-pub struct LogEvent {
-    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+#[derive(Debug, Deserialize)]
+struct Inner {
     #[serde(flatten)]
     fields: Value,
 
-    #[getset(get = "pub", get_mut = "pub")]
+    #[serde(skip)]
+    size_cache: Atomic<Option<NonZeroUsize>>,
+}
+
+impl Inner {
+    fn invalidate(&self) {
+        self.size_cache.store(None, Ordering::Relaxed);
+    }
+}
+
+impl ByteSizeOf for Inner {
+    fn size_of(&self) -> usize {
+        self.size_cache
+            .load(Ordering::Relaxed)
+            .unwrap_or_else(|| {
+                let size = size_of::<Self>() + self.allocated_bytes();
+                // The size of self will always be non-zero, and
+                // adding the allocated bytes cannot make it overflow
+                // since `usize` has a range the same as pointer
+                // space. Hence, the expect below cannot fail.
+                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                self.size_cache.store(Some(size), Ordering::Relaxed);
+                size
+            })
+            .into()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.fields.allocated_bytes()
+    }
+}
+
+impl Clone for Inner {
+    fn clone(&self) -> Self {
+        Self {
+            fields: self.fields.clone(),
+            // This clone is only ever used in combination with
+            // `Arc::make_mut`, so don't bother fetching the size
+            // cache to copy it since it will be invalidated anyways.
+            size_cache: None.into(),
+        }
+    }
+}
+
+impl Default for Inner {
+    fn default() -> Self {
+        Self {
+            // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
+            fields: Value::Object(Default::default()),
+            size_cache: None.into(),
+        }
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Inner {
+    fn from(fields: BTreeMap<String, Value>) -> Self {
+        Self {
+            fields: Value::Object(fields),
+            size_cache: None.into(),
+        }
+    }
+}
+
+impl PartialEq for Inner {
+    fn eq(&self, other: &Self) -> bool {
+        self.fields.eq(&other.fields)
+    }
+}
+
+impl PartialOrd for Inner {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.fields.partial_cmp(&other.fields)
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd)]
+pub struct LogEvent {
+    #[serde(flatten)]
+    inner: Arc<Inner>,
+
     #[serde(skip)]
     metadata: EventMetadata,
 }
 
-impl Default for LogEvent {
-    fn default() -> Self {
-        Self {
-            fields: Value::Map(BTreeMap::new()),
-            metadata: EventMetadata::default(),
-        }
+impl LogEvent {
+    pub fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        &mut self.metadata
     }
 }
 
 impl ByteSizeOf for LogEvent {
     fn allocated_bytes(&self) -> usize {
-        self.fields.allocated_bytes() + self.metadata.allocated_bytes()
+        self.inner.size_of() + self.metadata.allocated_bytes()
     }
 }
 
@@ -58,15 +138,23 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Value::Map(Default::default()),
+            inner: Default::default(),
             metadata,
         }
     }
 
     ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let fields = Value::Map(map);
-        Self { fields, metadata }
+        let inner = Arc::new(Inner::from(map));
+        Self { inner, metadata }
+    }
+
+    fn fields_mut(&mut self) -> &mut Value {
+        let result = Arc::make_mut(&mut self.inner);
+        // We MUST invalidate the inner size cache when making a
+        // mutable copy, since the _next_ action will modify the data.
+        result.invalidate();
+        &mut result.fields
     }
 
     /// Convert a `LogEvent` into a tuple of its components
@@ -74,20 +162,25 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+        self.fields_mut();
         (
-            self.fields
-                .into_map()
-                .unwrap_or_else(|| unreachable!("fields must be a map")),
+            Arc::try_unwrap(self.inner)
+                .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
+                .fields
+                .into_object()
+                .unwrap_or_else(|| unreachable!("inner fields must be a map")),
             self.metadata,
         )
     }
 
+    #[must_use]
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
@@ -97,49 +190,45 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(self.as_map(), key.as_ref())
+    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
+        self.inner.fields.get_by_path_v2(key)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.inner.fields.get_by_path(path)
+    }
+
+    pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.inner.fields.get_by_path(path))
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(self.as_map_mut(), key.as_ref())
+    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+        self.fields_mut().get_mut_by_path_v2(path)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.as_map(), key.as_ref())
+    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+        util::log::contains(self.as_map(), path)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn insert(
+    pub fn insert<'a>(
         &mut self,
-        key: impl AsRef<str>,
+        path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), path, value.into())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+        if !self.contains(path.clone()) {
+            self.insert(path, value);
         }
-    }
-
-    #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value> + Debug,
-    {
-        util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
     /// Rename a key in place without reference to pathing
@@ -151,14 +240,18 @@ impl LogEvent {
     /// This function is a no-op if `from_key` and `to_key` are identical. If
     /// `to_key` already exists in the structure its value will be overwritten
     /// silently.
-    #[instrument(level = "trace", skip(self, from_key, to_key), fields(key = %from_key))]
     #[inline]
+    #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
     pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
     where
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
+            if let Some(val) = self
+                .fields_mut()
+                .as_object_mut_unwrap()
+                .remove(from_key.as_ref())
+            {
                 self.insert_flat(to_key, val);
             }
         }
@@ -169,7 +262,6 @@ impl LogEvent {
     /// This function will insert a key in place without reference to any
     /// pathing information in the key. It will insert over the top of any value
     /// that exists in the map already.
-    #[instrument(level = "trace", skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: Into<String> + Display,
@@ -178,7 +270,6 @@ impl LogEvent {
         self.as_map_mut().insert(key.into(), value.into())
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
         if !self.as_map().contains_key(key) {
@@ -186,98 +277,53 @@ impl LogEvent {
         }
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), false)
+    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+        self.remove_prune(path, false)
     }
 
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
+    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+        util::log::remove(self.fields_mut(), path, prune)
     }
 
-    #[instrument(level = "trace", skip(self))]
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        match &self.fields {
-            Value::Map(map) => util::log::keys(map),
+    pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
+        match &self.inner.fields {
+            Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(self.as_map())
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.as_map().is_empty()
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match &self.fields {
-            Value::Map(map) => map,
+        match &self.inner.fields {
+            Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
 
-    #[instrument(level = "trace", skip(self))]
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self.fields {
-            Value::Map(ref mut map) => map,
+        match self.fields_mut() {
+            Value::Object(ref mut map) => map,
             _ => unreachable!(),
         }
-    }
-
-    #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
-    fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
-        let mut walker = lookup.into_iter().enumerate();
-
-        let mut current_pointer = if let Some((_index, Segment::Field(segment))) = walker.next() {
-            self.as_map_mut().entry(segment)
-        } else {
-            // It should be noted that Remap can create a lookup without a contained segment.
-            // This is the root `.` path. That is handled explicitly by the Target implementation
-            // on Value so shouldn't reach here.
-            // However, we should probably handle this better.
-            unreachable!(
-                "It is an invariant to have a `Lookup` without a contained `Segment`.\
-                `Lookup::is_valid` should catch this during `Lookup` creation, maybe it was not \
-                called?."
-            );
-        };
-
-        for (_index, segment) in walker {
-            current_pointer = match (segment, current_pointer) {
-                (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
-                    Value::Map(map) => map.entry(field),
-                    v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
-                },
-                (Segment::Field(field), Entry::Vacant(entry)) => {
-                    return Err(format!(
-                        "Tried to step into `{}` of `{}`, but it did not exist.",
-                        field,
-                        entry.key()
-                    )
-                    .into());
-                }
-                _ => return Err("The entry API cannot yet descend into array indices.".into()),
-            };
-        }
-        Ok(current_pointer)
     }
 
     /// Merge all fields specified at `fields` from `incoming` to `current`.
     pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
         for field in fields {
-            let incoming_val = match incoming.remove(field) {
+            let incoming_val = match incoming.remove(field.as_ref()) {
                 None => continue,
                 Some(val) => val,
             };
-            match self.get_mut(&field) {
+            match self.get_mut(field.as_ref()) {
                 None => {
-                    self.insert(field, incoming_val);
+                    self.insert(field.as_ref(), incoming_val);
                 }
                 Some(current_val) => current_val.merge(incoming_val),
             }
@@ -294,7 +340,7 @@ impl MaybeAsLogMut for LogEvent {
 
 impl EventDataEq for LogEvent {
     fn event_data_eq(&self, other: &Self) -> bool {
-        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+        self.inner.fields == other.inner.fields && self.metadata.event_data_eq(&other.metadata)
     }
 }
 
@@ -324,7 +370,7 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Value::Map(map),
+            inner: Arc::new(Inner::from(map)),
             metadata: EventMetadata::default(),
         }
     }
@@ -332,17 +378,14 @@ impl From<BTreeMap<String, Value>> for LogEvent {
 
 impl From<LogEvent> for BTreeMap<String, Value> {
     fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        match event.fields {
-            Value::Map(map) => map,
-            _ => unreachable!(),
-        }
+        event.into_parts().0
     }
 }
 
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            fields: map.into_iter().collect(),
+            inner: Arc::new(Inner::from(map.into_iter().collect::<BTreeMap<_, _>>())),
             metadata: EventMetadata::default(),
         }
     }
@@ -380,7 +423,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        Ok(serde_json::to_value(self.fields)?)
+        Ok(serde_json::to_value(&self.inner.fields)?)
     }
 }
 
@@ -490,10 +533,6 @@ impl tracing::field::Visit for MakeLogEvent {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use serde_json::json;
-
     use super::*;
     use crate::test_util::open_fixture;
 
@@ -708,65 +747,6 @@ mod test {
             });
     }
 
-    // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
-    #[test]
-    fn entry() {
-        let fixture =
-            open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
-        let mut event = LogEvent::try_from(fixture).unwrap();
-
-        let lookup = Lookup::from_str("non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/non-existing"), Some(&fallback));
-
-        let lookup = Lookup::from_str("nulled").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/nulled"), Some(&serde_json::Value::Null));
-
-        let lookup = Lookup::from_str("map.basic").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/basic"),
-            Some(&serde_json::Value::Bool(true))
-        );
-
-        let lookup = Lookup::from_str("map.map.buddy").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/map/buddy"),
-            Some(&serde_json::Value::Number((-1).into()))
-        );
-
-        let lookup = Lookup::from_str("map.map.non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
-    }
-
     fn assert_merge_value(
         current: impl Into<Value>,
         incoming: impl Into<Value>,
@@ -852,6 +832,6 @@ mod test {
             log
         };
 
-        shared::assert_event_data_eq!(merged, expected);
+        vector_common::assert_event_data_eq!(merged, expected);
     }
 }

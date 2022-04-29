@@ -343,7 +343,7 @@ make test-integration-<name>
 ### Blackbox tests
 
 Vector also offers blackbox testing via
-[Vector's test harness](https://github.com/timberio/vector-test-harness). This
+[Vector's test harness](https://github.com/vectordotdev/vector-test-harness). This
 is a complex testing suite that tests Vector's performance in real-world
 environments. It is typically used for benchmarking, but also correctness
 testing.
@@ -422,7 +422,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make bench` command. In addition, Vector
-maintains a full [test harness](https://github.com/timberio/vector-test-harness)
+maintains a full [test harness](https://github.com/vectordotdev/vector-test-harness)
 for complex end-to-end integration and performance testing.
 
 ## Profiling
@@ -539,11 +539,11 @@ at `lib/k8s-test-framework`, and the actual end-to-end tests using that
 framework are at `lib/k8s-e2e-tests`.
 
 The Kubernetes-related distribution bit that are at `distribution/docker`,
-`distribution/kubernetes` and `distribution/helm`.
-There are also snapshot tests for Helm at `tests/helm-snapshots`.
+`distribution/kubernetes` and our Helm chart can be found at [`vectordotdev/helm-charts`](https://github.com/vectordotdev/helm-charts/).
 
 The development assistance resources are located at `skaffold.yaml`
-and `skaffold` dir.
+and `skaffold` dir. Alternative `tilt` resources are located at `Tiltfile`
+and in the `tilt` dir.
 
 #### Development
 
@@ -560,7 +560,7 @@ Vector:
 
 - `linux` system (create an issue if you want to work with another OS and we'll
   help);
-- [`skaffold`](https://skaffold.dev/)
+- [`skaffold`](https://skaffold.dev/) or [`tilt`](https://tilt.dev/)
 - [`docker`](https://www.docker.com/)
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 - [`kustomize`](https://kustomize.io/)
@@ -623,6 +623,12 @@ You might need to tweak `skaffold`, here are some hints:
 
 - For the rest of the `skaffold` tweaks you might want to apply check out
   [this page](https://skaffold.dev/docs/environment/).
+
+##### Alternative: Tilt
+
+As an alternative to `skaffold` you can use `tilt` to detect changes, rebuild
+your image, and update your Kubernetes resource. Simply start your local Kubernetes
+cluster and run `tilt up` from Vector's root dir.
 
 #### Testing
 

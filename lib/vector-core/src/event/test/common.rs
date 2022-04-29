@@ -3,17 +3,19 @@ use std::{
     iter,
 };
 
-use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
-use crate::event::{
-    metric::{Bucket, MetricData, MetricName, MetricSeries, Quantile, Sample},
-    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value,
+use crate::{
+    event::{
+        metric::{Bucket, MetricData, MetricName, MetricSeries, MetricSketch, Quantile, Sample},
+        Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
+        Value,
+    },
+    metrics::AgentDDSketch,
 };
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
-const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
 const MAX_STR_SIZE: usize = 16;
 const ALPHABET: [&str; 27] = [
@@ -69,6 +71,7 @@ impl Arbitrary for Event {
         match self {
             Event::Log(log_event) => Box::new(log_event.shrink().map(Event::Log)),
             Event::Metric(metric) => Box::new(metric.shrink().map(Event::Metric)),
+            Event::Trace(trace) => Box::new(trace.shrink().map(Event::Trace)),
         }
     }
 }
@@ -88,6 +91,22 @@ impl Arbitrary for LogEvent {
             fields
                 .shrink()
                 .map(move |x| LogEvent::from_parts(x, metadata.clone())),
+        )
+    }
+}
+
+impl Arbitrary for TraceEvent {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Self::from(LogEvent::arbitrary(g))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        let (fields, metadata) = self.clone().into_parts();
+
+        Box::new(
+            fields
+                .shrink()
+                .map(move |x| TraceEvent::from_parts(x, metadata.clone())),
         )
     }
 }
@@ -156,7 +175,7 @@ impl Arbitrary for MetricValue {
         // constant here are the number of fields in `MetricValue`. Because the
         // field total is not a power of two we introduce a bias into choice
         // here toward `MetricValue::Counter` and `MetricValue::Gauge`.
-        match u8::arbitrary(g) % 6 {
+        match u8::arbitrary(g) % 7 {
             0 => MetricValue::Counter {
                 value: f64::arbitrary(g) % MAX_F64_SIZE,
             },
@@ -180,6 +199,28 @@ impl Arbitrary for MetricValue {
                 count: u32::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
+            6 => {
+                let bin_keys = Vec::<i16>::arbitrary(g);
+                let bin_counts = bin_keys
+                    .iter()
+                    .map(|_| u16::arbitrary(g))
+                    .collect::<Vec<_>>();
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(
+                        AgentDDSketch::from_raw(
+                            u32::arbitrary(g),                // count
+                            f64::arbitrary(g) % MAX_F64_SIZE, // min
+                            f64::arbitrary(g) % MAX_F64_SIZE, // max
+                            f64::arbitrary(g) % MAX_F64_SIZE, // sum
+                            f64::arbitrary(g) % MAX_F64_SIZE, // avg
+                            bin_keys.as_slice(),
+                            bin_counts.as_slice(),
+                        )
+                        .unwrap(),
+                    ),
+                }
+            }
+
             _ => unreachable!(),
         }
     }
@@ -546,36 +587,6 @@ impl Arbitrary for MetricData {
                     })
                 }),
         )
-    }
-}
-
-impl Arbitrary for Value {
-    fn arbitrary(g: &mut Gen) -> Self {
-        // Quickcheck can't derive Arbitrary for enums, see
-        // https://github.com/BurntSushi/quickcheck/issues/98.  The magical
-        // constant here are the number of fields in `Value`. Because the field
-        // total is a power of two we, happily, don't introduce a bias into the
-        // field picking.
-        match u8::arbitrary(g) % 8 {
-            0 => {
-                let bytes: Vec<u8> = Vec::arbitrary(g);
-                Value::Bytes(Bytes::from(bytes))
-            }
-            1 => Value::Integer(i64::arbitrary(g)),
-            2 => Value::Float(f64::arbitrary(g) % MAX_F64_SIZE),
-            3 => Value::Boolean(bool::arbitrary(g)),
-            4 => Value::Timestamp(datetime(g)),
-            5 => {
-                let mut gen = Gen::new(MAX_MAP_SIZE);
-                Value::Map(BTreeMap::arbitrary(&mut gen))
-            }
-            6 => {
-                let mut gen = Gen::new(MAX_ARRAY_SIZE);
-                Value::Array(Vec::arbitrary(&mut gen))
-            }
-            7 => Value::Null,
-            _ => unreachable!(),
-        }
     }
 }
 

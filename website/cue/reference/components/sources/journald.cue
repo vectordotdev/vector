@@ -13,6 +13,7 @@ components: sources: journald: {
 	}
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -43,7 +44,7 @@ components: sources: journald: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		batch_size: {
 			common:      false
 			description: "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
@@ -58,6 +59,12 @@ components: sources: journald: {
 			description: "Include only entries from the current boot."
 			required:    false
 			type: bool: default: true
+		}
+		since_now: {
+			common:      true
+			description: "Include only future entries."
+			required:    false
+			type: bool: default: false
 		}
 		exclude_units: {
 			common:      true

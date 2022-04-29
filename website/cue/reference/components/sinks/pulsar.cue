@@ -13,7 +13,7 @@ components: sinks: pulsar: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -98,6 +98,7 @@ components: sinks: pulsar: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

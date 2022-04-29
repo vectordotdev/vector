@@ -5,15 +5,15 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Releases latest version to the timberio homebrew tap
+#   Releases latest version to the vectordotdev homebrew tap
 
 td="$(mktemp -d)"
 pushd "$td"
 
-git config --global user.email "bradybot@timber.io"
-git config --global user.name "bradybot"
+git config --global user.email "vector@datadoghq.com"
+git config --global user.name "vic"
 
-git clone "https://$GITHUB_TOKEN:x-oauth-basic@github.com/timberio/homebrew-brew"
+git clone "https://$GITHUB_TOKEN:x-oauth-basic@github.com/vectordotdev/homebrew-brew"
 cd homebrew-brew
 
 PACKAGE_URL="https://packages.timber.io/vector/$VECTOR_VERSION/vector-$VECTOR_VERSION-x86_64-apple-darwin.tar.gz"

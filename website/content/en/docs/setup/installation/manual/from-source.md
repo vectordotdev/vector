@@ -102,7 +102,7 @@ Start Vector. After these steps, a binary `vector.exe` in `target\release` would
 
 ### Docker
 
-You can build statically linked binaries of Vector for Linux using [`cross`][] in Docker. If you do so, the dependencies listed in the previous section aren't needed, as all of them would be automatically pulled by Docker.
+You can build statically linked binaries of Vector for Linux using [cross][] in Docker. If you do so, the dependencies listed in the previous section aren't needed, as all of them would be automatically pulled by Docker.
 
 First, download Vector's source:
 
@@ -120,7 +120,7 @@ mkdir -p vector && \
 
 Second, [install cross][cross].
 
-And then build Vector using [`cross`][]:
+And then build Vector using [cross]:
 
 ```shell
 # Linux (x86_64)

@@ -13,7 +13,7 @@ components: sinks: papertrail: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -29,7 +29,6 @@ components: sinks: papertrail: {
 			request: enabled:           false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
@@ -81,6 +80,7 @@ components: sinks: papertrail: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn boolean(value: Value) -> Resolved {
+    match value {
+        v @ Value::Boolean(_) => Ok(v),
+        v => Err(format!("expected boolean, got {}", v.kind()).into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Boolean;
 
@@ -27,7 +34,7 @@ impl Function for Boolean {
                 title: "invalid",
                 source: "bool!(42)",
                 result: Err(
-                    r#"function call error for "bool" at (0:9): expected "boolean", got "integer""#,
+                    r#"function call error for "bool" at (0:9): expected boolean, got integer"#,
                 ),
             },
         ]
@@ -35,13 +42,18 @@ impl Function for Boolean {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(BooleanFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        boolean(value)
     }
 }
 
@@ -52,16 +64,12 @@ struct BooleanFn {
 
 impl Expression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Boolean(_) => Ok(v),
-            v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
-        }
+        boolean(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Boolean)
-            .boolean()
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let non_boolean = !self.value.type_def(state).is_boolean();
+
+        TypeDef::boolean().with_fallibility(non_boolean)
     }
 }

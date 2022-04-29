@@ -1,3 +1,8 @@
+#[cfg(feature = "fuzz")]
+use arbitrary::Arbitrary;
+use diagnostic::Span;
+use lookup::LookupBuf;
+use ordered_float::NotNan;
 use std::{
     collections::BTreeMap,
     fmt,
@@ -7,11 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use diagnostic::Span;
-use lookup::LookupBuf;
-use ordered_float::NotNan;
-
-use crate::lex::Error;
+use crate::{template_string::TemplateString, Error};
 
 // -----------------------------------------------------------------------------
 // node
@@ -75,6 +76,13 @@ impl<T> Node<T> {
         let Self { span, node } = self;
 
         (span.start(), node, span.end())
+    }
+
+    pub fn as_deref(&self) -> &T::Target
+    where
+        T: Deref,
+    {
+        self.as_ref().deref()
     }
 }
 
@@ -215,7 +223,7 @@ pub enum Expr {
     FunctionCall(Node<FunctionCall>),
     Variable(Node<Ident>),
     Unary(Node<Unary>),
-    Abort(Node<()>),
+    Abort(Node<Abort>),
 }
 
 impl fmt::Debug for Expr {
@@ -232,7 +240,7 @@ impl fmt::Debug for Expr {
             FunctionCall(v) => format!("{:?}", v),
             Variable(v) => format!("{:?}", v),
             Unary(v) => format!("{:?}", v),
-            Abort(_) => "abort".to_owned(),
+            Abort(v) => format!("{:?}", v),
         };
 
         write!(f, "Expr({})", value)
@@ -253,7 +261,7 @@ impl fmt::Display for Expr {
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
-            Abort(_) => f.write_str("abort"),
+            Abort(v) => v.fmt(f),
         }
     }
 }
@@ -301,13 +309,20 @@ impl fmt::Debug for Ident {
     }
 }
 
+impl From<String> for Ident {
+    fn from(ident: String) -> Self {
+        Ident(ident)
+    }
+}
+
 // -----------------------------------------------------------------------------
 // literals
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
 pub enum Literal {
-    String(String),
+    String(TemplateString),
+    RawString(String),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -322,6 +337,7 @@ impl fmt::Display for Literal {
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
+            RawString(v) => write!(f, r#"s'{}'"#, v),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
@@ -652,6 +668,7 @@ impl fmt::Debug for Op {
     }
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Opcode {
     Mul,
@@ -744,6 +761,7 @@ impl FromStr for Opcode {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Assignment {
     Single {
         target: Node<AssignmentTarget>,
@@ -764,6 +782,7 @@ pub enum Assignment {
     // }
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[derive(Clone, PartialEq)]
 pub enum AssignmentOp {
     Assign,
@@ -949,6 +968,7 @@ pub struct FunctionCall {
     pub ident: Node<Ident>,
     pub abort_on_error: bool,
     pub arguments: Vec<Node<FunctionArgument>>,
+    pub closure: Option<Node<FunctionClosure>>,
 }
 
 impl fmt::Display for FunctionCall {
@@ -965,7 +985,14 @@ impl fmt::Display for FunctionCall {
             }
         }
 
-        f.write_str(")")
+        f.write_str(")")?;
+
+        if let Some(closure) = &self.closure {
+            f.write_str(" ")?;
+            closure.fmt(f)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -985,7 +1012,14 @@ impl fmt::Debug for FunctionCall {
             }
         }
 
-        f.write_str("))")
+        f.write_str(")")?;
+
+        if let Some(closure) = &self.closure {
+            f.write_str(" ")?;
+            closure.fmt(f)?;
+        }
+
+        f.write_str(")")
     }
 }
 
@@ -1018,6 +1052,47 @@ impl fmt::Debug for FunctionArgument {
         } else {
             write!(f, "Argument({:?})", self.expr)
         }
+    }
+}
+
+/// A closure attached to a function.
+#[derive(Clone, PartialEq)]
+pub struct FunctionClosure {
+    pub variables: Vec<Node<Ident>>,
+    pub block: Node<Block>,
+}
+
+impl fmt::Display for FunctionClosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("-> |")?;
+
+        let mut iter = self.variables.iter().peekable();
+        while let Some(var) = iter.next() {
+            var.fmt(f)?;
+
+            if iter.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("| {\n")?;
+
+        let mut iter = self.block.0.iter().peekable();
+        while let Some(expr) = iter.next() {
+            f.write_str("\t")?;
+            expr.fmt(f)?;
+            if iter.peek().is_some() {
+                f.write_str("\n")?;
+            }
+        }
+
+        f.write_str("\n}")
+    }
+}
+
+impl fmt::Debug for FunctionClosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Closure(...)")
     }
 }
 
@@ -1074,6 +1149,33 @@ impl fmt::Display for Not {
 impl fmt::Debug for Not {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Not({:?})", self.1)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// abort
+// -----------------------------------------------------------------------------
+
+#[derive(Clone, PartialEq)]
+pub struct Abort {
+    pub message: Option<Box<Node<Expr>>>,
+}
+
+impl fmt::Display for Abort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(
+            &self
+                .message
+                .as_ref()
+                .map(|m| format!("abort: {}", m))
+                .unwrap_or_else(|| "abort".to_owned()),
+        )
+    }
+}
+
+impl fmt::Debug for Abort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Abort({:?})", self.message)
     }
 }
 

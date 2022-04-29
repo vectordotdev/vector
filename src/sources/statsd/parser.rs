@@ -5,15 +5,13 @@ use std::{
     str::Utf8Error,
 };
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
-lazy_static! {
-    static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
-    static ref NONALPHANUM: Regex = Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap();
-}
+static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
+static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
 
 pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     // https://docs.datadoghq.com/developers/dogstatsd/datagram_shell/#datagram-format
@@ -167,7 +165,7 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
 }
 
 fn sanitize_key(key: &str) -> String {
-    let s = key.replace("/", "-");
+    let s = key.replace('/', "'-");
     let s = WHITESPACE.replace_all(&s, "_");
     let s = NONALPHANUM.replace_all(&s, "");
     s.into()
@@ -210,7 +208,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-shared::impl_event_data_eq!(ParseError);
+vector_common::impl_event_data_eq!(ParseError);
 
 impl error::Error for ParseError {}
 
@@ -228,7 +226,7 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use shared::assert_event_data_eq;
+    use vector_common::assert_event_data_eq;
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};

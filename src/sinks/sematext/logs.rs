@@ -6,10 +6,12 @@ use serde::{Deserialize, Serialize};
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::EventArray,
     sinks::{
-        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        elasticsearch::{ElasticsearchConfig, ElasticsearchEncoder},
         util::{
             encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
             RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
@@ -30,13 +32,20 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
 
     #[serde(default)]
     request: TowerRequestConfig,
 
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -67,7 +76,7 @@ impl SinkConfig for SematextLogsConfig {
             }
         };
 
-        let (sink, healthcheck) = ElasticSearchConfig {
+        let (sink, healthcheck) = ElasticsearchConfig {
             endpoint,
             compression: Compression::None,
             doc_type: Some(
@@ -96,12 +105,16 @@ impl SinkConfig for SematextLogsConfig {
         Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "sematext_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

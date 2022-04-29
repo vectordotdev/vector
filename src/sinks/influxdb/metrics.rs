@@ -1,11 +1,10 @@
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
-    num::NonZeroU64,
     task::Poll,
 };
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
@@ -15,7 +14,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -30,20 +29,19 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            sink,
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone)]
 struct InfluxDbSvc {
     config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
+    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -52,7 +50,7 @@ pub struct InfluxDbDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -70,9 +68,15 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 pub fn default_summary_quantiles() -> Vec<f64> {
@@ -108,12 +112,16 @@ impl SinkConfig for InfluxDbConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "influxdb_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -156,13 +164,12 @@ impl InfluxDbSvc {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event.into_metric())
+                        .normalize(event.into_metric())
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
@@ -189,7 +196,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
             self.config.tags.as_ref(),
             &self.config.quantiles,
         );
-        let body: Vec<u8> = input.into_bytes();
+        let body = input.freeze();
 
         self.inner.call(body)
     }
@@ -198,7 +205,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 fn create_build_request(
     uri: http::Uri,
     token: String,
-) -> impl Fn(Vec<u8>) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send + 'static
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
     move |body| {
@@ -236,7 +243,7 @@ fn merge_tags(
 pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
@@ -255,8 +262,8 @@ fn encode_events(
     default_namespace: Option<&str>,
     tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
-) -> String {
-    let mut output = String::new();
+) -> BytesMut {
+    let mut output = BytesMut::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
@@ -278,7 +285,9 @@ fn encode_events(
     }
 
     // remove last '\n'
-    output.pop();
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
     output
 }
 
@@ -347,7 +356,10 @@ fn get_type_and_fields(
                             quantile: *q,
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
-                        (quantile.as_percentile(), Field::Float(quantile.value))
+                        (
+                            quantile.to_percentile_string(),
+                            Field::Float(quantile.value),
+                        )
                     })
                     .collect::<HashMap<_, _>>();
                 fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
@@ -513,6 +525,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -552,6 +566,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -591,6 +607,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -630,6 +648,8 @@ mod tests {
         .with_timestamp(Some(ts()))];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -700,6 +720,8 @@ mod tests {
         ];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -818,6 +840,8 @@ mod tests {
             None,
             &default_summary_quantiles(),
         );
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -880,6 +904,8 @@ mod tests {
             Some(tags).as_ref(),
             &[],
         );
+        let line_protocols =
+            String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 2);
         assert_eq!(
@@ -897,7 +923,6 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
-    use futures::stream;
     use pretty_assertions::assert_eq;
 
     use crate::{
@@ -915,14 +940,14 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
         insert_metrics_v1(
             address_v1(true).as_str(),
-            Some(TlsOptions {
+            Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -935,7 +960,7 @@ mod integration_tests {
         insert_metrics_v1(address_v1(false).as_str(), None).await
     }
 
-    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
@@ -957,11 +982,12 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
+            acknowledgements: Default::default(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1049,6 +1075,7 @@ mod integration_tests {
             tags: None,
             tls: None,
             default_namespace: None,
+            acknowledgements: Default::default(),
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
@@ -1075,7 +1102,7 @@ mod integration_tests {
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

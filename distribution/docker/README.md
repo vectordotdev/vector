@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/timberio/vector">Github<a/>
+    <a href="https://vector.dev">Website<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://github.com/vectordotdev/vector">Github<a/>
   </strong>
 </p>
 
@@ -128,11 +128,11 @@ Vector's Docker source files are located
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
-[urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
+[urls.default_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/
-[urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
+[urls.vector_docker_source_files]: https://github.com/vectordotdev/vector/tree/master/distribution/docker
 [urls.vector_releases]: https://vector.dev/releases/latest/
-[urls.vector_repo]: https://github.com/timberio/vector
+[urls.vector_repo]: https://github.com/vectordotdev/vector
 [urls.distroless]: https://github.com/GoogleContainerTools/distroless

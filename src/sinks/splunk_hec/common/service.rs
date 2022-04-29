@@ -129,8 +129,10 @@ where
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
-                                    Err(_) => {
-                                        emit!(&SplunkIndexerAcknowledgementUnavailableError);
+                                    Err(error) => {
+                                        emit!(SplunkIndexerAcknowledgementUnavailableError {
+                                            error
+                                        });
                                         EventStatus::Delivered
                                     }
                                 }
@@ -141,7 +143,7 @@ where
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            emit!(&SplunkResponseParseError { error });
+                            emit!(SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }
@@ -196,10 +198,10 @@ impl HttpRequestBuilder {
 
     pub fn build_request(
         &self,
-        body: Vec<u8>,
+        body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
-    ) -> Result<Request<Vec<u8>>, crate::Error> {
+    ) -> Result<Request<Bytes>, crate::Error> {
         let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
 
         let mut builder = Request::post(uri)
@@ -284,7 +286,7 @@ mod tests {
     }
 
     fn get_hec_request() -> HecRequest {
-        let body = String::from("test-message").into_bytes();
+        let body = Bytes::from("test-message");
         let events_byte_size = body.len();
         HecRequest {
             body,

@@ -1,11 +1,14 @@
 use bytes::Bytes;
-use getset::Setters;
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    LengthDelimitedDecoder,
+};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
 use crate::{
-    codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
+    codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -14,18 +17,17 @@ use crate::{
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfig {
+pub(crate) struct VectorConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    #[set = "pub"]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -34,6 +36,13 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
+    #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our cargo-hack run
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+        self.tls = config;
+    }
+
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -71,7 +80,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -86,16 +95,16 @@ impl VectorConfig {
 #[derive(Debug, Clone)]
 struct VectorDeserializer;
 
-impl Deserializer for VectorDeserializer {
+impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(&VectorEventReceived { byte_size });
+                emit!(VectorEventReceived { byte_size });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&VectorProtoDecodeError { error: &error });
+                emit!(VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
             }
         }
@@ -106,15 +115,15 @@ impl Deserializer for VectorDeserializer {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = codecs::decoding::Error;
+    type Error = decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
-            Box::new(LengthDelimitedDecoder::new()),
-            Box::new(VectorDeserializer),
+        Decoder::new(
+            Framer::LengthDelimited(LengthDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(VectorDeserializer)),
         )
     }
 
@@ -126,15 +135,14 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
-    use futures::stream;
-    use shared::assert_event_data_eq;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
         time::{sleep, Duration},
     };
+    use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
         crate::event::proto,
@@ -154,7 +162,7 @@ mod test {
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
         test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -166,7 +174,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -189,7 +200,7 @@ mod test {
             )),
         ];
 
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         sleep(Duration::from_millis(50)).await;
 
@@ -215,14 +226,14 @@ mod test {
             addr,
             {
                 let mut config = VectorConfig::from_address(addr.into());
-                config.set_tls(Some(TlsConfig::test_config()));
+                config.set_tls(Some(TlsEnableableConfig::test_config()));
                 config
             },
             {
                 let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
-                config.set_tls(Some(TlsConfig {
+                config.set_tls(Some(TlsEnableableConfig {
                     enabled: Some(true),
-                    options: TlsOptions {
+                    options: TlsConfig {
                         verify_certificate: Some(false),
                         ..Default::default()
                     },
@@ -250,6 +261,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -287,6 +300,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();

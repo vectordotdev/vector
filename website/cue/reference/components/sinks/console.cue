@@ -13,7 +13,7 @@ components: sinks: console: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: false
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
@@ -64,6 +64,7 @@ components: sinks: console: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	telemetry: metrics: {

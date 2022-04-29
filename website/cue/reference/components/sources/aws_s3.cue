@@ -4,9 +4,15 @@ components: sources: aws_s3: components._aws & {
 	title: "AWS S3"
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: true
 		collect: {
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_s3
@@ -38,7 +44,7 @@ components: sources: aws_s3: components._aws & {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		strategy: {
 			common:      false
 			description: "The strategy to use to consume objects from AWS S3."
@@ -261,7 +267,11 @@ components: sources: aws_s3: components._aws & {
 	telemetry: metrics: {
 		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total
 		sqs_message_processing_failed_total:    components.sources.internal_metrics.output.metrics.sqs_message_processing_failed_total

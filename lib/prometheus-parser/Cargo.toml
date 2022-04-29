@@ -1,7 +1,7 @@
 [package]
 name = "prometheus-parser"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>", "Duy Do <juchiast@gmail.com>"]
+authors = ["Vector Contributors <vector@datadoghq.com>", "Duy Do <juchiast@gmail.com>"]
 edition = "2021"
 publish = false
 license = "MPL-2.0"
@@ -9,13 +9,13 @@ license = "MPL-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-indexmap = "~1.8.0"
-nom = "7.1.0"
-num_enum = "0.5.6"
-prost = "0.9"
-prost-types = "0.9"
-shared = { path = "../shared", features = ["btreemap"] }
+indexmap = "~1.8.1"
+nom = "7.1.1"
+num_enum = "0.5.7"
+prost = "0.10.1"
+prost-types = "0.10.1"
 snafu = { version = "0.7" }
+vector_common = { path = "../vector-common", features = ["btreemap"] }
 
 [build-dependencies]
-prost-build = "0.9"
+prost-build = "0.10.1"

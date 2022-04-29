@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSourceConfig {
+struct MockSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
 }
@@ -60,6 +60,10 @@ impl SourceConfig for MockSourceConfig {
     fn source_type(&self) -> &'static str {
         "mock"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[tokio::test]
@@ -81,6 +85,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -89,6 +94,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -109,6 +115,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -144,6 +151,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -152,6 +160,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -171,6 +180,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -209,6 +219,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -217,6 +228,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -236,6 +248,61 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
+        },
+    );
+
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    assert!(topology
+        .reload_config_and_respawn(new_config.build().unwrap())
+        .await
+        .unwrap());
+}
+
+#[tokio::test]
+async fn replace_transform() {
+    trace_init();
+
+    // Create a simple source/transform/sink topology:
+    let mut old_config = Config::builder();
+    old_config.add_source("in", StdinConfig::default());
+    old_config.add_transform(
+        "trans1",
+        &["in"],
+        JsonParserConfig {
+            drop_field: true,
+            ..JsonParserConfig::default()
+        },
+    );
+    old_config.add_sink(
+        "out1",
+        &["trans1"],
+        BlackholeConfig {
+            print_interval_secs: 10,
+            rate: None,
+            acknowledgements: Default::default(),
+        },
+    );
+
+    // Now create the same simple source/transform/sink topology, but change the transform so it has
+    // to be rebuilt:
+    let mut new_config = Config::builder();
+    new_config.add_source("in", StdinConfig::default());
+    new_config.add_transform(
+        "trans1",
+        &["in"],
+        JsonParserConfig {
+            drop_field: false,
+            ..JsonParserConfig::default()
+        },
+    );
+    new_config.add_sink(
+        "out1",
+        &["trans1"],
+        BlackholeConfig {
+            print_interval_secs: 10,
+            rate: None,
+            acknowledgements: Default::default(),
         },
     );
 

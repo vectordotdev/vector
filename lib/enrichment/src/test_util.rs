@@ -3,8 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use shared::btreemap;
-use vrl_core::Value;
+use vector_common::btreemap;
+use vrl::Value;
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 

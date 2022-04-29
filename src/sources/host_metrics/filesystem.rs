@@ -4,7 +4,7 @@ use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
 use serde::{Deserialize, Serialize};
-use shared::btreemap;
+use vector_common::btreemap;
 
 use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;

@@ -15,7 +15,7 @@ pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 pub struct AbsoluteMetricNormalizer;
 
 impl MetricNormalize for AbsoluteMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -24,7 +24,7 @@ impl MetricNormalize for AbsoluteMetricNormalizer {
 pub struct IncrementalMetricNormalizer;
 
 impl MetricNormalize for IncrementalMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_incremental(metric)
     }
 }
@@ -37,7 +37,7 @@ pub struct MetricState<N> {
 
 impl<N: MetricNormalize> MetricState<N> {
     pub fn merge(&mut self, metric: Metric) {
-        if let Some(output) = self.normalizer.apply_state(&mut self.intermediate, metric) {
+        if let Some(output) = self.normalizer.normalize(&mut self.intermediate, metric) {
             let (series, data, metadata) = output.into_parts();
             self.latest.insert(series, (data, metadata));
         }
@@ -69,6 +69,16 @@ impl<N: MetricNormalize> Extend<Event> for MetricState<N> {
     }
 }
 
+impl<N: MetricNormalize + Default> FromIterator<Event> for MetricState<N> {
+    fn from_iter<T: IntoIterator<Item = Event>>(iter: T) -> Self {
+        let mut state = MetricState::default();
+        for event in iter.into_iter() {
+            state.merge(event.into_metric());
+        }
+        state
+    }
+}
+
 impl<N> From<N> for MetricState<N> {
     fn from(normalizer: N) -> Self {
         Self {
@@ -92,21 +102,19 @@ impl<N: Default> Default for MetricState<N> {
 pub fn read_counter_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Counter { value } => Some(*value),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Gauge { value } => Some(*value),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_distribution_samples(
@@ -115,21 +123,19 @@ pub fn read_distribution_samples(
 ) -> Option<Vec<Sample>> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Distribution { samples, .. } => Some(samples.clone()),
             _ => None,
         })
-        .flatten()
 }
 
 pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<HashSet<String>> {
     metrics
         .get(&series)
-        .map(|(data, _)| match data.value() {
+        .and_then(|(data, _)| match data.value() {
             MetricValue::Set { values } => Some(values.iter().cloned().collect()),
             _ => None,
         })
-        .flatten()
 }
 
 #[macro_export]

@@ -9,8 +9,8 @@ use std::{
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
-use shared::{conversion::Conversion, datetime::TimeZone};
 use tracing::trace;
+use vector_common::{conversion::Conversion, datetime::TimeZone};
 use vrl::Value;
 
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
@@ -521,7 +521,7 @@ impl std::fmt::Debug for File {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 

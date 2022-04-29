@@ -3,11 +3,11 @@ use std::{
     mem,
 };
 
-use core_common::byte_size_of::ByteSizeOf;
 use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -831,7 +831,7 @@ pub(self) mod bin_serialization {
 
     use super::{Bin, BinMap};
 
-    pub fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
+    pub(crate) fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -843,7 +843,7 @@ pub(self) mod bin_serialization {
         bin_map.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
     where
         D: Deserializer<'de>,
     {

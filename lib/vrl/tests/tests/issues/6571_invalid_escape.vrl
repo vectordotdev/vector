@@ -1,4 +1,4 @@
-# issue: https://github.com/timberio/vector/issues/6571
+# issue: https://github.com/vectordotdev/vector/issues/6571
 # object: "foo\/bar"
 # result: error[E202]: syntax error
 #   ┌─ :1:1

@@ -1,19 +1,20 @@
 use std::iter;
 
 use serde::{Deserialize, Serialize};
-use shared::aws_cloudwatch_logs_subscription::{
+use vector_common::aws_cloudwatch_logs_subscription::{
     AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
 };
 
 use super::Transform;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
-    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
-    transforms::FunctionTransform,
+    internal_events::AwsCloudwatchLogsSubscriptionParserError,
+    schema,
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -36,11 +37,11 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -60,7 +61,7 @@ impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct AwsCloudwatchLogsSubscriptionParser {
+pub(super) struct AwsCloudwatchLogsSubscriptionParser {
     field: String,
 }
 
@@ -77,17 +78,15 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
 }
 
 impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let log = event.as_log();
 
         let message = log
-            .get(&self.field)
-            .map(|s| s.as_bytes())
+            .get(self.field.as_str())
+            .map(|s| s.coerce_to_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
-                    .map_err(|error| {
-                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
-                    })
+                    .map_err(|error| emit!(AwsCloudwatchLogsSubscriptionParserError { error }))
                     .ok()
             });
 
@@ -180,11 +179,11 @@ mod test {
         log.insert("keep", "field");
         let orig_metadata = event.metadata().clone();
 
-        let mut output: Vec<Event> = Vec::new();
+        let mut output = OutputBuffer::default();
 
         parser.transform(&mut output, event);
 
-        shared::assert_event_data_eq!(
+        vector_common::assert_event_data_eq!(
             output,
             vec![
                 log_event! {
@@ -209,8 +208,9 @@ mod test {
                 },
             ]
         );
-        assert_eq!(output[0].metadata(), &orig_metadata);
-        assert_eq!(output[1].metadata(), &orig_metadata);
+        let mut output = output.into_events();
+        assert_eq!(output.next().unwrap().metadata(), &orig_metadata);
+        assert_eq!(output.next().unwrap().metadata(), &orig_metadata);
     }
 
     #[test]
@@ -239,10 +239,10 @@ mod test {
 "#,
         );
 
-        let mut output: Vec<Event> = Vec::new();
+        let mut output = OutputBuffer::default();
 
         parser.transform(&mut output, event);
 
-        assert_eq!(output, vec![]);
+        assert!(output.is_empty());
     }
 }

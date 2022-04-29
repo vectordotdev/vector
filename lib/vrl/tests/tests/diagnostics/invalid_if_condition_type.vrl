@@ -7,7 +7,7 @@
 #   │    ^^^^^^
 #   │    │
 #   │    this predicate must resolve to a boolean
-#   │    instead it resolves to "string"
+#   │    instead it resolves to string
 #   │
 #   = hint: coerce the value to the required type using a coercion function
 #   = see documentation about if expressions at https://vrl.dev/expressions/#if

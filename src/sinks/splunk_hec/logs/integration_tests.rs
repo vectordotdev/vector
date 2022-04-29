@@ -1,6 +1,5 @@
-use std::{convert::TryFrom, future::ready, num::NonZeroU8, sync::Arc};
+use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
 
-use futures::stream;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -155,7 +154,7 @@ async fn splunk_insert_broken_token() {
         .with_batch_notifier(&batch)
         .into();
     drop(batch);
-    sink.run(stream::once(ready(event))).await.unwrap();
+    sink.run_events(iter::once(event)).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 

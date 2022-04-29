@@ -1,7 +1,6 @@
-// ## skip check-events ##
-
 use std::time::Duration;
 
+use super::prelude::{error_stage, error_type};
 use http::{
     header::{self, HeaderMap, HeaderValue},
     Request, Response,
@@ -31,7 +30,7 @@ fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> 
 }
 
 impl<'a, T: HttpBody> InternalEvent for AboutToSendHttpRequest<'a, T> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(
             message = "Sending HTTP request.",
             uri = %self.request.uri(),
@@ -40,9 +39,6 @@ impl<'a, T: HttpBody> InternalEvent for AboutToSendHttpRequest<'a, T> {
             headers = ?remove_sensitive(self.request.headers()),
             body = %FormatBody(self.request.body()),
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("http_client_requests_sent_total", 1, "method" => self.request.method().to_string());
     }
 }
@@ -54,7 +50,7 @@ pub struct GotHttpResponse<'a, T> {
 }
 
 impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(
             message = "HTTP response.",
             status = %self.response.status(),
@@ -62,9 +58,6 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
             headers = ?remove_sensitive(self.response.headers()),
             body = %FormatBody(self.response.body()),
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("http_client_responses_total", 1, "status" => self.response.status().as_u16().to_string());
         histogram!("http_client_rtt_seconds", self.roundtrip);
         histogram!("http_client_response_rtt_seconds", self.roundtrip, "status" => self.response.status().as_u16().to_string());
@@ -78,14 +71,18 @@ pub struct GotHttpError<'a> {
 }
 
 impl<'a> InternalEvent for GotHttpError<'a> {
-    fn emit_logs(&self) {
-        debug!(
+    fn emit(self) {
+        error!(
             message = "HTTP error.",
             error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
         counter!("http_client_errors_total", 1, "error_kind" => self.error.to_string());
         histogram!("http_client_rtt_seconds", self.roundtrip);
         histogram!("http_client_error_rtt_seconds", self.roundtrip, "error_kind" => self.error.to_string());

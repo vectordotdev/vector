@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn parse_json(value: Value) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let value = serde_json::from_slice::<'_, Value>(&bytes)
+        .map_err(|e| format!("unable to parse json: {}", e))?;
+    Ok(value)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseJson;
 
@@ -73,13 +80,18 @@ impl Function for ParseJson {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ParseJsonFn { value }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_json(value)
     }
 }
 
@@ -90,38 +102,34 @@ struct ParseJsonFn {
 
 impl Expression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let value = serde_json::from_slice::<'_, Value>(&bytes)
-            .map_err(|e| format!("unable to parse json: {}", e))?;
-
-        Ok(value)
+        let value = self.value.resolve(ctx)?;
+        parse_json(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
 
 fn inner_kind() -> Kind {
-    Kind::Null
-        | Kind::Bytes
-        | Kind::Integer
-        | Kind::Float
-        | Kind::Boolean
-        | Kind::Array
-        | Kind::Object
+    Kind::null()
+        | Kind::bytes()
+        | Kind::integer()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 fn type_def() -> TypeDef {
-    TypeDef::new()
+    TypeDef::bytes()
         .fallible()
-        .bytes()
         .add_boolean()
         .add_integer()
         .add_float()
         .add_null()
-        .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
-        .add_object::<(), Kind>(map! { (): inner_kind() })
+        .add_array(Collection::from_unknown(inner_kind()))
+        .add_object(Collection::from_unknown(inner_kind()))
 }
 
 #[cfg(test)]
@@ -146,15 +154,13 @@ mod tests {
         invalid_json_errors {
             args: func_args![ value: r#"{"field": "value"# ],
             want: Err("unable to parse json: EOF while parsing a string at line 1 column 16"),
-            tdef: TypeDef::new()
-                .fallible()
-                .bytes()
+            tdef: TypeDef::bytes().fallible()
                 .add_boolean()
                 .add_integer()
                 .add_float()
                 .add_null()
-                .add_array_mapped::<(), Kind>(map! { (): inner_kind() })
-                .add_object::<(), Kind>(map! { (): inner_kind() }),
+                .add_array(Collection::from_unknown(inner_kind()))
+                .add_object(Collection::from_unknown(inner_kind())),
         }
     ];
 }

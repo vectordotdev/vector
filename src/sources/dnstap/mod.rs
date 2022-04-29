@@ -2,12 +2,13 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapEventReceived, DnstapParseDataError},
+    internal_events::{BytesReceived, DnstapEventsReceived, DnstapParseError},
     Result,
 };
 
@@ -24,10 +25,10 @@ pub struct DnstapConfig {
     pub max_frame_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
-    pub raw_data_only: Option<bool>,
+    raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<u32>,
-    pub socket_file_mode: Option<u32>,
+    pub(self) socket_file_mode: Option<u32>,
     pub socket_receive_buffer_size: Option<usize>,
     pub socket_send_buffer_size: Option<usize>,
 }
@@ -76,24 +77,7 @@ impl_generate_config_from_default!(DnstapConfig);
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
-        let host_key = self
-            .host_key
-            .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
-
-        let frame_handler = DnstapFrameHandler::new(
-            self.max_frame_length,
-            self.socket_path.clone(),
-            self.content_type(),
-            self.raw_data_only.unwrap_or(false),
-            self.multithreaded.unwrap_or(false),
-            self.max_frame_handling_tasks.unwrap_or(1000),
-            self.socket_file_mode,
-            self.socket_receive_buffer_size,
-            self.socket_send_buffer_size,
-            host_key,
-            log_schema().timestamp_key(),
-        );
+        let frame_handler = DnstapFrameHandler::new(self);
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
@@ -103,6 +87,10 @@ impl SourceConfig for DnstapConfig {
 
     fn source_type(&self) -> &'static str {
         "dnstap"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -123,35 +111,30 @@ pub struct DnstapFrameHandler {
 }
 
 impl DnstapFrameHandler {
-    pub fn new(
-        max_frame_length: usize,
-        socket_path: PathBuf,
-        content_type: String,
-        raw_data_only: bool,
-        multithreaded: bool,
-        max_frame_handling_tasks: u32,
-        socket_file_mode: Option<u32>,
-        socket_receive_buffer_size: Option<usize>,
-        socket_send_buffer_size: Option<usize>,
-        host_key: String,
-        timestamp_key: &'static str,
-    ) -> Self {
+    pub fn new(config: &DnstapConfig) -> Self {
+        let timestamp_key = log_schema().timestamp_key();
+
         let mut schema = DnstapEventSchema::new();
         schema
             .dnstap_root_data_schema_mut()
             .set_timestamp(timestamp_key);
 
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
+
         Self {
-            max_frame_length,
-            socket_path,
-            content_type,
+            max_frame_length: config.max_frame_length,
+            socket_path: config.socket_path.clone(),
+            content_type: config.content_type(),
             schema,
-            raw_data_only,
-            multithreaded,
-            max_frame_handling_tasks,
-            socket_file_mode,
-            socket_receive_buffer_size,
-            socket_send_buffer_size,
+            raw_data_only: config.raw_data_only.unwrap_or(false),
+            multithreaded: config.multithreaded.unwrap_or(false),
+            max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
+            socket_file_mode: config.socket_file_mode,
+            socket_receive_buffer_size: config.socket_receive_buffer_size,
+            socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
         }
@@ -172,36 +155,38 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        emit!(BytesReceived {
+            byte_size: frame.len(),
+            protocol: "protobuf",
+        });
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
 
-        let frame_size = frame.len();
-
         if let Some(host) = received_from {
-            log_event.insert(self.host_key(), host);
+            log_event.insert(self.host_key().as_str(), host);
         }
 
         if self.raw_data_only {
             log_event.insert(
-                &self.schema.dnstap_root_data_schema().raw_data(),
+                self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventReceived {
-                byte_size: frame_size
+            emit!(DnstapEventsReceived {
+                byte_size: event.size_of(),
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseDataError {
+                    emit!(DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventReceived {
-                        byte_size: frame_size
+                    emit!(DnstapEventsReceived {
+                        byte_size: event.size_of(),
                     });
                     Some(event)
                 }
@@ -275,7 +260,7 @@ mod integration_tests {
                 socket_receive_buffer_size: Some(10485760),
                 socket_send_buffer_size: Some(10485760),
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

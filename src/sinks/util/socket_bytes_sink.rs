@@ -10,7 +10,7 @@ use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::internal_events::{SocketEventsSent, SocketMode};
 
@@ -67,7 +67,7 @@ where
         if self.events_total > 0 {
             self.acker.ack(self.events_total);
 
-            emit!(&SocketEventsSent {
+            emit!(SocketEventsSent {
                 mode: self.socket_mode,
                 count: self.events_total as u64,
                 byte_size: self.bytes_total,

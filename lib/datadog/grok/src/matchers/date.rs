@@ -1,12 +1,11 @@
-use std::fmt::Formatter;
-
+use crate::parse_grok::Error as GrokRuntimeError;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
 use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
 use regex::Regex;
-use vrl_compiler::Value;
-
-use crate::parse_grok::Error as GrokRuntimeError;
+use std::fmt::Formatter;
+use tracing::warn;
+use value::Value;
 
 /// converts Joda time format to strptime format
 pub fn convert_time_format(format: &str) -> std::result::Result<String, String> {
@@ -25,8 +24,16 @@ pub fn convert_time_format(format: &str) -> std::result::Result<String, String> 
                 // second of minute
                 's' => time_format.push_str("%S"),
                 // fraction of second
-                'S' => time_format.push_str("%3f"),
+                'S' => {
+                    if time_format.ends_with('.') {
+                        time_format.pop(); // drop .
+                        time_format.push_str("%.f");
+                    } else {
+                        time_format.push_str("%f");
+                    }
+                }
                 // year
+                'y' | 'Y' if token.len() == 2 => time_format.push_str("%y"),
                 'y' | 'Y' => time_format.push_str("%Y"),
                 // weekyear
                 'x' => time_format.push_str("%D"),
@@ -109,22 +116,17 @@ fn parse_tz_id_or_name(tz: &str) -> Result<FixedOffset, String> {
 }
 
 fn parse_offset(tz: &str) -> Result<FixedOffset, String> {
-    let offset_format;
     if tz.len() <= 3 {
         // +5, -12
         let hours_diff = tz.parse::<i32>().map_err(|e| e.to_string())?;
         return Ok(FixedOffset::east(hours_diff * 3600));
     }
-    if tz.contains(':') {
-        offset_format = "%:z";
-    } else {
-        offset_format = "%z";
-    }
+    let offset_format = if tz.contains(':') { "%:z" } else { "%z" };
     // apparently the easiest way to parse tz offset is parsing the complete datetime
     let date_str = format!("2020-04-12 22:10:57 {}", tz);
     let datetime =
         DateTime::parse_from_str(&date_str, &format!("%Y-%m-%d %H:%M:%S {}", offset_format))
-            .map_err(|e| format!("{}", e))?;
+            .map_err(|e| e.to_string())?;
     Ok(datetime.timezone())
 }
 
@@ -140,8 +142,15 @@ pub fn time_format_to_regex(
         if ('A'..='Z').contains(&c) || ('a'..='z').contains(&c) {
             let token: String = chars.by_ref().peeking_take_while(|&cn| cn == c).collect();
             match token.chars().next().unwrap() {
-                'h' | 'H' | 'm' | 's' | 'S' | 'y' | 'Y' | 'x' | 'c' | 'C' | 'd' | 'e' | 'D'
-                | 'w' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                'h' | 'H' | 'm' | 's' | 'S' | 'Y' | 'x' | 'c' | 'C' | 'e' | 'D' | 'w' => {
+                    regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str())
+                }
+                // days
+                'd' if token.len() == 1 => regex.push_str("[\\d]{2}"), // expand d to dd
+                'd' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
+                // years
+                'y' if token.len() == 1 => regex.push_str("[\\d]{4}"), // expand y to yyyy
+                'y' => regex.push_str(format!("[\\d]{{{}}}", token.len()).as_str()),
                 'M' if token.len() == 2 =>
                 // Month number
                 {
@@ -218,7 +227,13 @@ pub fn time_format_to_regex(
 pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, GrokRuntimeError> {
     match value {
         Value::Bytes(bytes) => {
-            let value = String::from_utf8_lossy(bytes);
+            let mut value = String::from_utf8_lossy(bytes).into_owned();
+            // Ideally this Z should be quoted in the pattern, but DataDog supports this as a special case:
+            // yyyy-MM-dd'T'HH:mm:ss.SSSZ - e.g. 2016-09-02T15:02:29.648Z
+            if value.ends_with('Z') && filter.original_format.ends_with('Z') {
+                value.pop(); // drop Z
+                value.push_str("+0000");
+            }
             match &filter.regex_with_tz {
                 Some(re) => {
                     let tz = re
@@ -233,12 +248,12 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         .expect("this regex should always contain tz group")
                         .as_str();
                     let tz: Tz = tz.parse().map_err(|error| {
-                        error!(message = "Error parsing tz", tz = %tz, % error);
+                        warn!(message = "Error parsing tz", tz = %tz, % error);
                         GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
                     })?;
                     let naive_date = NaiveDateTime::parse_from_str(&value, &filter.strp_format).map_err(|error|
                         {
-                            error!(message = "Error parsing date", value = %value, format = %filter.strp_format, % error);
+                            warn!(message = "Error parsing date", value = %value, format = %filter.strp_format, % error);
                             GrokRuntimeError::FailedToApplyFilter(
                                 filter.to_string(),
                                 value.to_string(),
@@ -263,7 +278,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // parse as a tz-aware complete date/time
                         Ok(DateTime::parse_from_str(&value, &filter.strp_format)
                             .map_err(|error| {
-                                error!(message = "Error parsing date", date = %value, % error);
+                                warn!(message = "Error parsing date", date = %value, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),
@@ -277,7 +292,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // try parsing as a naive datetime
                         if let Some(tz) = &filter.target_tz {
                             let tzs = parse_timezone(tz).map_err(|error| {
-                                error!(message = "Error parsing tz", tz = %tz, % error);
+                                warn!(message = "Error parsing tz", tz = %tz, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),
@@ -305,7 +320,7 @@ pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, Gr
                         // try parsing as a naive date
                         let nd = NaiveDate::parse_from_str(&value, &filter.strp_format).map_err(
                             |error| {
-                                error!(message = "Error parsing date", date = %value, % error);
+                                warn!(message = "Error parsing date", date = %value, % error);
                                 GrokRuntimeError::FailedToApplyFilter(
                                     filter.to_string(),
                                     value.to_string(),

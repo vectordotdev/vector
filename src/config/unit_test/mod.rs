@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
+#[cfg(all(test, feature = "vector-unit-test-tests"))]
 mod tests;
 mod unit_test_components;
 
@@ -9,6 +9,8 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, Value},
+    schema,
+    serde::OneOrMany,
     topology::{
         self,
         builder::{self, Pieces},
@@ -16,6 +18,7 @@ use crate::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+use ordered_float::NotNan;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -77,7 +80,9 @@ pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>
     build_unit_tests(config_builder).await
 }
 
-async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests(
+    mut config_builder: ConfigBuilder,
+) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
     config_builder.sources = Default::default();
     config_builder.sinks = Default::default();
@@ -99,7 +104,7 @@ async fn build_unit_tests(mut config_builder: ConfigBuilder) -> Result<Vec<UnitT
             Err(errors) => {
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
-                test_error = test_error.replace("\n", "\n  ");
+                test_error = test_error.replace('\n', "\n  ");
                 test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
                 build_errors.push(test_error);
             }
@@ -163,7 +168,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs()
+                    .outputs(&schema::Definition::empty())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -179,7 +184,7 @@ impl UnitTestBuildMetadata {
                     key.clone(),
                     format!(
                         "{}-{}-{}",
-                        key.to_string().replace(".", "-"),
+                        key.to_string().replace('.', "-"),
                         "sink",
                         random_id
                     ),
@@ -249,17 +254,18 @@ impl UnitTestBuildMetadata {
         let mut template_sinks = IndexMap::new();
         let mut test_result_rxs = Vec::new();
         // Add sinks with checks
-        for (id, checks) in outputs {
+        for (ids, checks) in outputs {
             let (tx, rx) = oneshot::channel();
+            let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_id: id.to_string(),
+                transform_ids: ids.stringify().into_vec(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks(checks),
             };
 
             test_result_rxs.push(rx);
-            template_sinks.insert(id.clone(), sink_config);
+            template_sinks.insert(sink_ids, sink_config);
         }
 
         // Add sinks with no outputs check
@@ -267,26 +273,33 @@ impl UnitTestBuildMetadata {
             let (tx, rx) = oneshot::channel();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_id: id.to_string(),
+                transform_ids: vec![id.to_string()],
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::NoOutputs,
             };
 
             test_result_rxs.push(rx);
-            template_sinks.insert(id.clone(), sink_config);
+            template_sinks.insert(id.clone().into(), sink_config);
         }
 
         let sinks = template_sinks
             .into_iter()
-            .map(|(transform_id, sink_config)| {
-                let sink_id = self
-                    .sink_ids
-                    .get(&transform_id)
-                    .expect("Sink does not exist")
-                    .as_ref();
+            .map(|(transform_ids, sink_config)| {
+                let transform_ids_str = transform_ids.stringify().into_vec();
+                let sink_ids = transform_ids
+                    .into_vec()
+                    .iter()
+                    .map(|transform_id| {
+                        self.sink_ids
+                            .get(transform_id)
+                            .expect("Sink does not exist")
+                            .as_str()
+                    })
+                    .collect::<Vec<_>>();
+                let sink_id = sink_ids.join(",");
                 (
                     ComponentKey::from(sink_id),
-                    SinkOuter::new(vec![transform_id.to_string()], Box::new(sink_config)),
+                    SinkOuter::new(transform_ids_str, Box::new(sink_config)),
                 )
             })
             .collect::<IndexMap<_, _>>();
@@ -334,13 +347,15 @@ async fn build_unit_test(
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
     let mut transform_only_config = config_builder.clone();
-    let _ = expand_macros(&mut transform_only_config);
+    let expansions = expand_macros(&mut transform_only_config)?;
+    let expansions = crate::config::compiler::to_string_expansions(&expansions);
     let transform_only_graph = Graph::new_unchecked(
         &transform_only_config.sources,
         &transform_only_config.transforms,
         &transform_only_config.sinks,
+        &expansions,
     );
-    let test = test.resolve_outputs(&transform_only_graph);
+    let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -353,12 +368,14 @@ async fn build_unit_test(
     // To properly identify all components relevant to the test, expand relevant
     // transforms
     let mut expanded_config = config_builder.clone();
-    let _ = expand_macros(&mut expanded_config);
+    let expansions = expand_macros(&mut expanded_config)?;
+    let expansions = crate::config::compiler::to_string_expansions(&expansions);
 
     let graph = Graph::new_unchecked(
         &expanded_config.sources,
         &expanded_config.transforms,
         &expanded_config.sinks,
+        &expansions,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -371,7 +388,7 @@ async fn build_unit_test(
         .iter()
         .filter_map(|component| {
             component
-                .split_once(".")
+                .split_once('.')
                 .map(|(original_name, _)| original_name.to_string())
         })
         .collect::<Vec<_>>();
@@ -389,6 +406,7 @@ async fn build_unit_test(
         &config_builder.sources,
         &config_builder.transforms,
         &config_builder.sinks,
+        &expansions,
     );
     let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
@@ -399,6 +417,11 @@ async fn build_unit_test(
             .collect::<Vec<_>>();
     }
 
+    if let Some(sink) = get_loose_end_outputs_sink(&config_builder) {
+        config_builder
+            .sinks
+            .insert(ComponentKey::from(Uuid::new_v4().to_string()), sink);
+    }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
     let pieces = builder::build_pieces(&config, &diff, HashMap::new()).await?;
@@ -409,6 +432,58 @@ async fn build_unit_test(
         pieces,
         test_result_rxs,
     })
+}
+
+/// Near the end of building a unit test, it's possible that we've included a
+/// transform(s) with multiple outputs where at least one of its output is
+/// consumed but its other outputs are left unconsumed.
+///
+/// To avoid warning logs that occur when building such topologies, we construct
+/// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
+fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
+    let mut config = config.clone();
+    let _ = expand_macros(&mut config);
+    let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
+        transform
+            .inner
+            .outputs(&schema::Definition::empty())
+            .iter()
+            .map(|output| {
+                if let Some(port) = &output.port {
+                    OutputId::from((key, port.clone())).to_string()
+                } else {
+                    key.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let mut loose_end_outputs = Vec::new();
+    for id in transform_ids {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&id))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&id))
+        {
+            loose_end_outputs.push(id);
+        }
+    }
+
+    if loose_end_outputs.is_empty() {
+        None
+    } else {
+        let noop_sink = UnitTestSinkConfig {
+            test_name: "".to_string(),
+            transform_ids: vec![],
+            result_tx: Arc::new(Mutex::new(None)),
+            check: UnitTestSinkCheck::NoOp,
+        };
+        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+    }
 }
 
 fn build_and_validate_inputs(
@@ -452,8 +527,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>>, Vec<String>> {
-    let mut outputs: IndexMap<OutputId, Vec<Vec<Box<dyn Condition>>>> = IndexMap::new();
+) -> Result<IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
+    let mut outputs: IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -477,7 +552,7 @@ fn build_outputs(
         outputs
             .entry(output.extract_from.clone())
             .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
-            .or_insert(vec![conditions]);
+            .or_insert(vec![conditions.clone()]);
     }
 
     if errors.is_empty() {
@@ -501,9 +576,11 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
                         TestInputValue::Boolean(b) => Value::from(*b),
                         TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(*f),
+                        TestInputValue::Float(f) => Value::from(
+                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
+                        ),
                     };
-                    event.as_mut_log().insert(path.to_owned(), value);
+                    event.as_mut_log().insert(path.as_str(), value);
                 }
                 Ok(event)
             } else {

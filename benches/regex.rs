@@ -36,7 +36,7 @@ fn benchmark_regex(c: &mut Criterion) {
 
         b.iter_batched(
             || {
-                (input.clone(), Vec::with_capacity(input.len()))
+                (input.clone(), transforms::OutputBuffer::with_capacity(input.len()))
             },
             |(events, mut output)| {
                 let event_count = events.len();
@@ -80,7 +80,7 @@ fn http_access_log_lines() -> impl Iterator<Item = String> {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.07);
     targets = benchmark_regex
 );

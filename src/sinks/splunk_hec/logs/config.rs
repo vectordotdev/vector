@@ -7,7 +7,7 @@ use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -23,7 +23,7 @@ use crate::{
         Healthcheck,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -47,7 +47,7 @@ pub struct HecLogsSinkConfig {
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
@@ -92,12 +92,16 @@ impl SinkConfig for HecLogsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements.inner)
     }
 }
 
@@ -172,12 +176,16 @@ impl SinkConfig for HecSinkCompatConfig {
         self.config.build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.config.input_type()
+    fn input(&self) -> Input {
+        self.config.input()
     }
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        self.config.acknowledgements()
     }
 }
 

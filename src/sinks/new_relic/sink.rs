@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use tower::Service;
@@ -72,7 +73,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
     type Events = Result<NewRelicApiModel, Self::Error>;
     type Encoder = EncodingConfigFixed<Encoding>;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = NewRelicApiRequest;
     type Error = NewRelicSinkError;
 

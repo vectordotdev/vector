@@ -130,6 +130,66 @@ async fn parse_no_outputs() {
 }
 
 #[tokio::test]
+async fn parse_invalid_output_targets() {
+    let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.bar]
+          inputs = ["foo"]
+          type = "add_fields"
+          [transforms.bar.fields]
+            my_string_field = "string value"
+
+          [[tests]]
+            name = "broken test"
+
+          [tests.input]
+            insert_at = "bar"
+            value = "any value"
+
+          [[tests.outputs]]
+            extract_from = "non-existent"
+            [[tests.outputs.conditions]]
+              type = "vrl"
+              source = ""
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert_eq!(
+        errs,
+        vec![indoc! {r#"
+            Failed to build test 'broken test':
+              Invalid extract_from target in test 'broken test': 'non-existent' does not exist"#}
+        .to_owned(),]
+    );
+
+    let config: ConfigBuilder = toml::from_str(indoc! {r#"
+        [transforms.bar]
+          inputs = ["foo"]
+          type = "add_fields"
+          [transforms.bar.fields]
+            my_string_field = "string value"
+
+          [[tests]]
+            name = "broken test"
+            no_outputs_from = [ "non-existent" ]
+
+          [[tests.inputs]]
+            insert_at = "bar"
+            value = "any value"
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+    assert_eq!(
+        errs,
+        vec![indoc! {r#"
+            Failed to build test 'broken test':
+              Invalid no_outputs_from target in test 'broken test': 'non-existent' does not exist"#}
+        .to_owned(),]
+    );
+}
+
+#[tokio::test]
 async fn parse_broken_topology() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
@@ -931,96 +991,6 @@ async fn test_fails() {
     let mut tests = build_unit_tests(config).await.unwrap();
     assert!(!tests.remove(0).run().await.errors.is_empty());
     assert!(!tests.remove(0).run().await.errors.is_empty());
-}
-
-#[tokio::test]
-async fn type_inconsistency_while_expanding_transform() {
-    let config: ConfigBuilder = toml::from_str(indoc! {r#"
-          [sources.input]
-            type = "demo_logs"
-            format = "shuffle"
-            lines = ["one", "two"]
-            count = 5
-
-          [transforms.foo]
-            inputs = ["input"]
-            type = "compound"
-            [[transforms.foo.steps]]
-              id = "step1"
-              type = "log_to_metric"
-              [[transforms.foo.steps.metrics]]
-                type = "counter"
-                field = "c"
-                name = "sum"
-                namespace = "ns"
-            [[transforms.foo.steps]]
-              id = "step2"
-              type = "log_to_metric"
-              [[transforms.foo.steps.metrics]]
-                type = "counter"
-                field = "c"
-                name = "sum"
-                namespace = "ns"
-
-          [sinks.output]
-            type = "console"
-            inputs = [ "foo.step2" ]
-            encoding = "json"
-            target = "stdout"
-      "#})
-    .unwrap();
-
-    let err = crate::config::compiler::compile(config).err().unwrap();
-    assert_eq!(
-        err,
-        vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]
-    );
-}
-
-#[tokio::test]
-async fn invalid_name_in_expanded_transform() {
-    let config: ConfigBuilder = toml::from_str(indoc! {r#"
-          [sources.input]
-            type = "demo_logs"
-            format = "shuffle"
-            lines = ["one", "two"]
-            count = 5
-
-          [transforms.foo]
-            inputs = ["input"]
-            type = "compound"
-            [[transforms.foo.steps]]
-              type = "log_to_metric"
-              [[transforms.foo.steps.metrics]]
-                type = "counter"
-                field = "c"
-                name = "sum"
-                namespace = "ns"
-            [[transforms.foo.steps]]
-              id = "0"
-              type = "log_to_metric"
-              [[transforms.foo.steps.metrics]]
-                type = "counter"
-                field = "c"
-                name = "sum"
-                namespace = "ns"
-
-          [sinks.output]
-            type = "console"
-            inputs = [ "foo.0" ]
-            encoding = "json"
-            target = "stdout"
-      "#})
-    .unwrap();
-
-    let err = crate::config::compiler::compile(config).err().unwrap();
-    assert_eq!(
-        err,
-        vec![
-            "failed to expand transform 'foo': conflicting id found while expanding transform"
-                .to_owned()
-        ]
-    );
 }
 
 #[tokio::test]

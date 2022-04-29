@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, path::Path};
 
 use chrono::{DateTime, Utc};
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
@@ -10,18 +10,16 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-#[cfg(unix)]
-use shared::btreemap;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+#[cfg(unix)]
+use vector_common::btreemap;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
-    internal_events::HostMetricsEventReceived,
+    event::metric::{Metric, MetricKind, MetricValue},
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -67,7 +65,7 @@ impl Default for Namespace {
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
-    scrape_interval_secs: u64,
+    scrape_interval_secs: f64,
 
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
@@ -88,8 +86,8 @@ pub struct HostMetricsConfig {
     network: network::NetworkConfig,
 }
 
-const fn default_scrape_interval() -> u64 {
-    15
+const fn default_scrape_interval() -> f64 {
+    15.0
 }
 
 inventory::submit! {
@@ -117,6 +115,10 @@ impl SourceConfig for HostMetricsConfig {
     fn source_type(&self) -> &'static str {
         "host_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl HostMetricsConfig {
@@ -131,19 +133,28 @@ impl HostMetricsConfig {
     }
 
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 
     async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
+            emit!(BytesReceived {
+                byte_size: 0,
+                protocol: "none"
+            });
             let metrics = generator.capture_metrics().await;
-            if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
+            let count = metrics.len();
+            if let Err(error) = out.send_batch(metrics).await {
+                emit!(StreamClosedError {
+                    count,
+                    error: error.clone()
+                });
                 error!(message = "Error sending host metrics.", %error);
                 return Err(());
             }
@@ -181,7 +192,7 @@ impl HostMetrics {
         }
     }
 
-    async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
+    async fn capture_metrics(&self) -> Vec<Metric> {
         let hostname = crate::get_hostname();
         let version = self.config.version.clone();
         let configuration_key = self.config.configuration_key.clone();
@@ -228,10 +239,11 @@ impl HostMetrics {
                 metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
-        emit!(&HostMetricsEventReceived {
-            count: metrics.len()
+        emit!(EventsReceived {
+            count: metrics.len(),
+            byte_size: metrics.size_of(),
         });
-        metrics.into_iter().map(Into::into)
+        metrics
     }
 
     pub async fn loadavg_metrics(&self) -> Vec<Metric> {
@@ -550,7 +562,7 @@ pub(self) mod tests {
         let all_metrics_count = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await
-            .count();
+            .len();
 
         for collector in &[
             #[cfg(target_os = "linux")]
@@ -571,7 +583,7 @@ pub(self) mod tests {
             .await;
 
             assert!(
-                all_metrics_count > some_metrics.count(),
+                all_metrics_count > some_metrics.len(),
                 "collector={:?}",
                 collector
             );
@@ -580,12 +592,11 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn are_tagged_with_hostname() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.any(|event| event
-            .into_metric()
+        assert!(!metrics.into_iter().any(|event| event
             .tags()
             .expect("Missing tags")
             .get("host")
@@ -595,23 +606,27 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig {
+        let metrics = HostMetrics::new(HostMetricsConfig {
             namespace: Namespace(Some("other".into())),
             ..Default::default()
         })
         .capture_metrics()
         .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace() == Some("other")));
+        assert!(metrics
+            .into_iter()
+            .all(|event| event.namespace() == Some("other")));
     }
 
     #[tokio::test]
     async fn uses_default_namespace() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace() == Some("host")));
+        assert!(metrics
+            .iter()
+            .all(|event| event.namespace() == Some("host")));
     }
 
     // Windows does not produce load average metrics.

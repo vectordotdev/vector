@@ -4,7 +4,7 @@
 #   ┌─ :2:2
 #   │
 # 2 │ !!"true"
-#   │  ^------ this expression resolves to "string"
+#   │  ^------ this expression resolves to string
 #   │  │
 #   │  negation only works on boolean values
 #   │

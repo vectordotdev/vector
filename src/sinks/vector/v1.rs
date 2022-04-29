@@ -1,32 +1,35 @@
-use bytes::{BufMut, Bytes, BytesMut};
-use getset::Setters;
+use bytes::{BufMut, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio_util::codec::Encoder;
 use vector_core::event::{proto, Event};
 
 use crate::{
     config::{GenerateConfig, SinkContext},
     sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    #[set = "pub"]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
 impl VectorConfig {
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+        self.tls = config;
+    }
+
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
@@ -64,8 +67,29 @@ impl VectorConfig {
             self.tls.clone(),
             self.send_buffer_bytes,
         );
+        sink_config.build(cx, Default::default(), VectorEncoder)
+    }
+}
 
-        sink_config.build(cx, |event| Some(encode_event(event)))
+#[derive(Debug, Clone)]
+struct VectorEncoder;
+
+impl Encoder<Event> for VectorEncoder {
+    type Error = codecs::encoding::Error;
+
+    fn encode(&mut self, event: Event, out: &mut BytesMut) -> Result<(), Self::Error> {
+        let data = proto::EventWrapper::from(event);
+        let event_len = data.encoded_len();
+        let full_len = event_len + 4;
+
+        let capacity = out.capacity();
+        if capacity < full_len {
+            out.reserve(full_len - capacity);
+        }
+        out.put_u32(event_len as u32);
+        data.encode(out).unwrap();
+
+        Ok(())
     }
 }
 
@@ -73,18 +97,6 @@ impl VectorConfig {
 enum HealthcheckError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: std::io::Error },
-}
-
-fn encode_event(event: Event) -> Bytes {
-    let data = proto::EventWrapper::from(event);
-    let event_len = data.encoded_len();
-    let full_len = event_len + 4;
-
-    let mut out = BytesMut::with_capacity(full_len);
-    out.put_u32(event_len as u32);
-    data.encode(&mut out).unwrap();
-
-    out.into()
 }
 
 #[cfg(test)]

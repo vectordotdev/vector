@@ -1,8 +1,11 @@
 use std::fmt;
 
-use futures::channel::mpsc;
+use tokio::sync::mpsc;
+use vector_buffers::topology::channel::SendError;
 
-#[derive(Debug)]
+use crate::event::{Event, EventArray};
+
+#[derive(Clone, Debug)]
 pub struct ClosedError;
 
 impl fmt::Display for ClosedError {
@@ -13,8 +16,20 @@ impl fmt::Display for ClosedError {
 
 impl std::error::Error for ClosedError {}
 
-impl From<mpsc::SendError> for ClosedError {
-    fn from(_: mpsc::SendError) -> Self {
+impl From<mpsc::error::SendError<Event>> for ClosedError {
+    fn from(_: mpsc::error::SendError<Event>) -> Self {
+        Self
+    }
+}
+
+impl From<mpsc::error::SendError<EventArray>> for ClosedError {
+    fn from(_: mpsc::error::SendError<EventArray>) -> Self {
+        Self
+    }
+}
+
+impl<T> From<SendError<T>> for ClosedError {
+    fn from(_: SendError<T>) -> Self {
         Self
     }
 }

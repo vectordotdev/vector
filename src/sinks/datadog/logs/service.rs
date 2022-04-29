@@ -3,6 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
@@ -36,7 +37,12 @@ impl RetryLogic for LogApiRetry {
             LogApiError::HttpError { .. }
             | LogApiError::BadRequest
             | LogApiError::PayloadTooLarge => false,
-            LogApiError::ServerError => true,
+            // This retry logic will be expanded further, but specifically retrying unauthorized
+            // requests for now. I verified using `curl` that `403` is the respose code for this.
+            //
+            // https://github.com/vectordotdev/vector/issues/10870
+            // https://github.com/vectordotdev/vector/issues/12220
+            LogApiError::ServerError | LogApiError::Forbidden => true,
         }
     }
 }
@@ -46,7 +52,7 @@ pub struct LogApiRequest {
     pub batch_size: usize,
     pub api_key: Arc<str>,
     pub compression: Compression,
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
 }
@@ -73,6 +79,8 @@ pub enum LogApiError {
     PayloadTooLarge,
     #[snafu(display("Client request was not valid for unknown reasons."))]
     BadRequest,
+    #[snafu(display("Client request was forbidden."))]
+    Forbidden,
 }
 
 #[derive(Debug)]
@@ -91,6 +99,7 @@ impl DriverResponse for LogApiResponse {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -171,11 +180,7 @@ impl Service<LogApiRequest> for LogApiService {
                     //      time
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Ok(LogApiResponse {
-                            event_status: EventStatus::Errored,
-                            count,
-                            events_byte_size,
-                        }),
+                        StatusCode::FORBIDDEN => Err(LogApiError::Forbidden),
                         StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse {
                             event_status: EventStatus::Delivered,
                             count,

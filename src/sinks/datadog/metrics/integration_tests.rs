@@ -146,11 +146,11 @@ async fn smoke() {
 #[tokio::test]
 async fn real_endpoint() {
     let config = indoc! {r#"
-        default_api_key = "${CI_TEST_DATADOG_API_KEY}"
+        default_api_key = "${TEST_DATADOG_API_KEY}"
         default_namespace = "fake.test.integration"
     "#};
-    let api_key = std::env::var("CI_TEST_DATADOG_API_KEY").unwrap();
-    let config = config.replace("${CI_TEST_DATADOG_API_KEY}", &api_key);
+    let api_key = std::env::var("TEST_DATADOG_API_KEY").unwrap();
+    let config = config.replace("${TEST_DATADOG_API_KEY}", &api_key);
     let (config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();

@@ -19,7 +19,7 @@ use crate::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
@@ -28,7 +28,7 @@ const SOURCE_NAME: &str = "prometheus_remote_write";
 struct PrometheusRemoteWriteConfig {
     address: SocketAddr,
 
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
 
@@ -75,6 +75,10 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
     fn source_type(&self) -> &'static str {
         SOURCE_NAME
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone)]
@@ -83,7 +87,7 @@ struct RemoteWriteSource;
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(&PrometheusRemoteWriteParseError {
+            emit!(PrometheusRemoteWriteParseError {
                 error: error.clone()
             });
             ErrorMessage::new(
@@ -125,7 +129,6 @@ impl HttpSource for RemoteWriteSource {
 #[cfg(test)]
 mod test {
     use chrono::{SubsecRound as _, Utc};
-    use futures::stream;
     use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     use super::*;
@@ -149,10 +152,10 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_over_https() {
-        receives_metrics(Some(TlsConfig::test_config())).await;
+        receives_metrics(Some(TlsEnableableConfig::test_config())).await;
     }
 
-    async fn receives_metrics(tls: Option<TlsConfig>) {
+    async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
         components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
@@ -166,7 +169,10 @@ mod test {
             tls: tls.clone(),
             acknowledgements: AcknowledgementsConfig::default(),
         };
-        let source = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
         let sink = RemoteWriteConfig {
@@ -183,7 +189,7 @@ mod test {
         let events_copy = events.clone();
         let mut output = test_util::spawn_collect_ready(
             async move {
-                sink.run(stream::iter(events_copy)).await.unwrap();
+                sink.run_events(events_copy).await.unwrap();
             },
             rx,
             1,
@@ -195,7 +201,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        shared::assert_event_data_eq!(events, output);
+        vector_common::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -243,7 +249,9 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use futures_util::StreamExt;
     use tokio::time::Duration;
+    use vector_core::event::into_event_stream;
 
     use super::*;
     use crate::{test_util, test_util::components, SourceSender};
@@ -270,10 +278,15 @@ mod integration_tests {
         };
 
         let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+        let source = config
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(source);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let rx = rx.into_stream().flat_map(into_event_stream);
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 

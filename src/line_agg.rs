@@ -157,7 +157,7 @@ where
 {
     /// `K` - file name, or other line source,
     /// `Bytes` - the line data,
-    /// `C` - the context related the the line data.
+    /// `C` - the context related to the line data.
     type Item = (K, Bytes, C);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -562,7 +562,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    /// https://github.com/timberio/vector/issues/3237
+    /// https://github.com/vectordotdev/vector/issues/3237
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![

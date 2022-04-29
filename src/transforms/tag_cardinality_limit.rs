@@ -12,13 +12,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -93,14 +95,16 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
+        Ok(Transform::event_task(TagCardinalityLimit::new(
+            self.clone(),
+        )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -210,7 +214,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                emit!(&TagCardinalityValueLimitReached { key });
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -227,7 +231,7 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingEvent {
+                            emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -239,7 +243,7 @@ impl TagCardinalityLimit {
                     let mut to_delete = Vec::new();
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingTag {
+                            emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -256,7 +260,7 @@ impl TagCardinalityLimit {
     }
 }
 
-impl TaskTransform for TagCardinalityLimit {
+impl TaskTransform<Event> for TagCardinalityLimit {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,

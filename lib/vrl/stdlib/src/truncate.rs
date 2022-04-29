@@ -1,5 +1,28 @@
 use vrl::prelude::*;
 
+fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {
+    let mut value = value.try_bytes_utf8_lossy()?.into_owned();
+    let limit = limit.try_integer()?;
+    let limit = if limit < 0 { 0 } else { limit as usize };
+    let ellipsis = ellipsis.try_boolean()?;
+    let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
+        // char_indices gives us the starting position of the character at limit,
+        // we want the end position.
+        pos + chr.len_utf8()
+    } else {
+        // We have an empty string
+        0
+    };
+    if value.len() > pos {
+        value.truncate(pos);
+
+        if ellipsis {
+            value.push_str("...");
+        }
+    }
+    Ok(value.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Truncate;
 
@@ -50,8 +73,8 @@ impl Function for Truncate {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -63,6 +86,14 @@ impl Function for Truncate {
             limit,
             ellipsis,
         }))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let limit = args.required("limit");
+        let ellipsis = args.optional("ellipsis").unwrap_or_else(|| value!(false));
+
+        truncate(value, limit, ellipsis)
     }
 }
 
@@ -76,35 +107,14 @@ struct TruncateFn {
 impl Expression for TruncateFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let mut value = value.try_bytes_utf8_lossy()?.into_owned();
+        let limit = self.limit.resolve(ctx)?;
+        let ellipsis = self.ellipsis.resolve(ctx)?;
 
-        let limit = self.limit.resolve(ctx)?.try_integer()?;
-        let limit = if limit < 0 { 0 } else { limit as usize };
-
-        let ellipsis = self.ellipsis.resolve(ctx)?.try_boolean()?;
-
-        let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
-            // char_indices gives us the starting position of the character at limit,
-            // we want the end position.
-            pos + chr.len_utf8()
-        } else {
-            // We have an empty string
-            0
-        };
-
-        if value.len() > pos {
-            value.truncate(pos);
-
-            if ellipsis {
-                value.push_str("...");
-            }
-        }
-
-        Ok(value.into())
+        truncate(value, limit, ellipsis)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -120,7 +130,7 @@ mod tests {
                               limit: 0,
              ],
              want: Ok(""),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
 
         ellipsis {
@@ -129,7 +139,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         complete {
@@ -137,7 +147,7 @@ mod tests {
                              limit: 10
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         exact {
@@ -146,7 +156,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         big {
@@ -154,7 +164,7 @@ mod tests {
                              limit: 5
             ],
             want: Ok("Super"),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         big_ellipsis {
@@ -163,7 +173,7 @@ mod tests {
                              ellipsis: true,
             ],
             want: Ok("Super..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         unicode {
@@ -172,7 +182,7 @@ mod tests {
                              ellipsis: true
             ],
             want: Ok("♔♕♖♗♘♙..."),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

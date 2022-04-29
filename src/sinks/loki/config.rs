@@ -1,11 +1,12 @@
-use std::{collections::HashMap, num::NonZeroU64};
+use std::collections::HashMap;
 
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
+use crate::sinks::util::Compression;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
@@ -14,7 +15,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -31,6 +32,8 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
     #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
     pub auth: Option<Auth>,
@@ -41,7 +44,14 @@ pub struct LokiConfig {
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -50,16 +60,17 @@ pub struct LokiDefaultBatchSettings;
 impl SinkBatchSettings for LokiDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutOfOrderAction {
     #[derivative(Default)]
     Drop,
     RewriteTimestamp,
+    Accept,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -120,12 +131,16 @@ impl SinkConfig for LokiConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "loki"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -136,7 +151,14 @@ pub fn valid_label_name(label: &Template) -> bool {
         // The closest mention is in section about Parser Expression https://grafana.com/docs/loki/latest/logql/
         //
         // [a-zA-Z_][a-zA-Z0-9_]*
-        let label_trim = label.get_ref().trim();
+        //
+        // '*' symbol at the end of the label name will be treated as a prefix for
+        // underlying object keys.
+        let mut label_trim = label.get_ref().trim();
+        if let Some(without_opening_end) = label_trim.strip_suffix('*') {
+            label_trim = without_opening_end
+        }
+
         let mut label_chars = label_trim.chars();
         if let Some(ch) = label_chars.next() {
             (ch.is_ascii_alphabetic() || ch == '_')
@@ -159,6 +181,8 @@ mod tests {
         assert!(valid_label_name(&" name ".try_into().unwrap()));
         assert!(valid_label_name(&"bee_bop".try_into().unwrap()));
         assert!(valid_label_name(&"a09b".try_into().unwrap()));
+        assert!(valid_label_name(&"abc_*".try_into().unwrap()));
+        assert!(valid_label_name(&"_*".try_into().unwrap()));
 
         assert!(!valid_label_name(&"0ab".try_into().unwrap()));
         assert!(!valid_label_name(&"*".try_into().unwrap()));

@@ -1,10 +1,12 @@
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -14,8 +16,8 @@ use crate::{
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[derivative(Default(value = "2"))]
-    scrape_interval_secs: u64,
+    #[derivative(Default(value = "2.0"))]
+    scrape_interval_secs: f64,
     tags: TagsConfig,
     namespace: Option<String>,
     #[serde(skip)]
@@ -36,7 +38,7 @@ impl InternalMetricsConfig {
     }
 
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 }
@@ -59,39 +61,40 @@ impl_generate_config_from_default!(InternalMetricsConfig);
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        if self.scrape_interval_secs == 0 {
+        if self.scrape_interval_secs == 0.0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
-        let interval = time::Duration::from_secs(self.scrape_interval_secs);
+        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
         let version = self.version.clone();
         let configuration_key = self.configuration_key.clone();
 
-        let host_key = self.tags.host_key.as_deref().and_then(|tag| {
-            if tag.is_empty() {
-                None
-            } else {
-                Some(log_schema().host_key())
+        let host_key = self
+            .tags
+            .host_key
+            .as_deref()
+            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+        let pid_key = self
+            .tags
+            .pid_key
+            .as_deref()
+            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+        Ok(Box::pin(
+            InternalMetrics {
+                namespace,
+                version,
+                configuration_key,
+                host_key,
+                pid_key,
+                controller: Controller::get()?,
+                interval,
+                out: cx.out,
+                shutdown: cx.shutdown,
             }
-        });
-        let pid_key =
-            self.tags
-                .pid_key
-                .as_deref()
-                .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
-        Ok(Box::pin(run(
-            namespace,
-            version,
-            configuration_key,
-            host_key,
-            pid_key,
-            Controller::get()?,
-            interval,
-            cx.out,
-            cx.shutdown,
-        )))
+            .run(),
+        ))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -101,59 +104,71 @@ impl SourceConfig for InternalMetricsConfig {
     fn source_type(&self) -> &'static str {
         "internal_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
-async fn run(
+struct InternalMetrics<'a> {
     namespace: Option<String>,
     version: Option<String>,
     configuration_key: Option<String>,
-    host_key: Option<&str>,
-    pid_key: Option<&str>,
-    controller: &Controller,
+    host_key: Option<String>,
+    pid_key: Option<String>,
+    controller: &'a Controller,
     interval: time::Duration,
-    mut out: SourceSender,
+    out: SourceSender,
     shutdown: ShutdownSignal,
-) -> Result<(), ()> {
-    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
-    while interval.next().await.is_some() {
-        let hostname = crate::get_hostname();
-        let pid = std::process::id().to_string();
+}
 
-        let metrics = controller.capture_metrics();
+impl<'a> InternalMetrics<'a> {
+    async fn run(mut self) -> Result<(), ()> {
+        let mut interval =
+            IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
+        while interval.next().await.is_some() {
+            let hostname = crate::get_hostname();
+            let pid = std::process::id().to_string();
 
-        let mut stream = stream::iter(metrics).map(|mut metric| {
-            // A metric starts out with a default "vector" namespace, but will be overridden
-            // if an explicit namespace is provided to this source.
-            if namespace.is_some() {
-                metric = metric.with_namespace(namespace.as_ref());
-            }
+            let metrics = self.controller.capture_metrics();
+            let count = metrics.len();
+            let byte_size = metrics.size_of();
+            emit!(EventsReceived { count, byte_size });
 
-            // Version and configuration key are reported in enterprise.
-            if let Some(version) = &version {
-                metric.insert_tag("version".to_owned(), version.clone());
-            }
-            if let Some(configuration_key) = &configuration_key {
-                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-            }
-
-            if let Some(host_key) = host_key {
-                if let Ok(hostname) = &hostname {
-                    metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+            let batch = metrics.into_iter().map(|mut metric| {
+                // A metric starts out with a default "vector" namespace, but will be overridden
+                // if an explicit namespace is provided to this source.
+                if let Some(namespace) = &self.namespace {
+                    metric = metric.with_namespace(Some(namespace));
                 }
-            }
-            if let Some(pid_key) = pid_key {
-                metric.insert_tag(pid_key.to_owned(), pid.clone());
-            }
-            metric.into()
-        });
 
-        if let Err(error) = out.send_all(&mut stream).await {
-            error!(message = "Error sending internal metrics.", %error);
-            return Err(());
+                // Version and configuration key are reported in enterprise.
+                if let Some(version) = &self.version {
+                    metric.insert_tag("version".to_owned(), version.clone());
+                }
+                if let Some(configuration_key) = &self.configuration_key {
+                    metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
+                }
+
+                if let Some(host_key) = &self.host_key {
+                    if let Ok(hostname) = &hostname {
+                        metric.insert_tag(host_key.to_owned(), hostname.to_owned());
+                    }
+                }
+                if let Some(pid_key) = &self.pid_key {
+                    metric.insert_tag(pid_key.to_owned(), pid.clone());
+                }
+                metric
+            });
+
+            if let Err(error) = self.out.send_batch(batch).await {
+                emit!(StreamClosedError { error, count });
+                return Err(());
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -200,6 +215,7 @@ mod tests {
 
         let output = controller
             .capture_metrics()
+            .into_iter()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
@@ -253,7 +269,7 @@ mod tests {
 
         tokio::spawn(async move {
             config
-                .build(SourceContext::new_test(sender))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap()
                 .await
@@ -271,6 +287,33 @@ mod tests {
         let event = event_from_config(InternalMetricsConfig::default()).await;
 
         assert_eq!(event.as_metric().namespace(), Some("vector"));
+    }
+
+    #[tokio::test]
+    async fn sets_tags() {
+        let event = event_from_config(InternalMetricsConfig {
+            tags: TagsConfig {
+                host_key: Some(String::from("my_host_key")),
+                pid_key: Some(String::from("my_pid_key")),
+            },
+            ..Default::default()
+        })
+        .await;
+
+        let metric = event.as_metric();
+
+        assert!(metric.tag_value("my_host_key").is_some());
+        assert!(metric.tag_value("my_pid_key").is_some());
+    }
+
+    #[tokio::test]
+    async fn no_tags_by_default() {
+        let event = event_from_config(InternalMetricsConfig::default()).await;
+
+        let metric = event.as_metric();
+
+        assert!(metric.tag_value("my_host_key").is_none());
+        assert!(metric.tag_value("my_pid_key").is_none());
     }
 
     #[tokio::test]

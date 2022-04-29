@@ -1,5 +1,4 @@
-use std::num::NonZeroU64;
-
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -9,19 +8,19 @@ use snafu::{ResultExt, Snafu};
 
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -39,7 +38,7 @@ pub struct PubsubDefaultBatchSettings;
 impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -63,7 +62,14 @@ pub struct PubsubConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_skip_authentication() -> bool {
@@ -113,12 +119,16 @@ impl SinkConfig for PubsubConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -166,12 +176,12 @@ impl PubsubSink {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for PubsubSink {
-    type Input = Value;
-    type Output = Vec<BoxedRawValue>;
+struct PubSubSinkEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<Value> {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
@@ -179,10 +189,23 @@ impl HttpSink for PubsubSink {
         let json = serde_json::to_string(&log).unwrap();
         Some(json!({ "data": base64::encode(&json) }))
     }
+}
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+#[async_trait::async_trait]
+impl HttpSink for PubsubSink {
+    type Input = Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = PubSubSinkEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        PubSubSinkEventEncoder {
+            encoding: self.encoding.clone(),
+        }
+    }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let body = json!({ "messages": events });
-        let body = serde_json::to_vec(&body).unwrap();
+        let body = crate::serde::json::to_bytes(&body).unwrap().freeze();
 
         let uri = self.uri(":publish").unwrap();
         let builder = Request::post(uri).header("Content-Type", "application/json");

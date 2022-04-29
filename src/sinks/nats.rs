@@ -4,23 +4,31 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use vector_core::buffers::Acker;
+use vector_buffers::Acker;
 
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
-    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
+    internal_events::{NatsEventSendError, NatsEventSendSuccess, TemplateRenderingError},
+    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::{Template, TemplateParseError},
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("invalid subject template: {}", source))]
     SubjectTemplate { source: TemplateParseError },
+    #[snafu(display("NATS Config Error: {}", source))]
+    Config { source: NatsConfigError },
+    #[snafu(display("NATS Connect Error: {}", source))]
+    Connect { source: std::io::Error },
 }
 
 /**
@@ -28,12 +36,15 @@ enum BuildError {
  */
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
     encoding: EncodingConfig<Encoding>,
     #[serde(default = "default_name", alias = "name")]
     connection_name: String,
     subject: String,
     url: String,
+    tls: Option<TlsEnableableConfig>,
+    auth: Option<NatsAuthConfig>,
 }
 
 fn default_name() -> String {
@@ -71,98 +82,72 @@ impl SinkConfig for NatsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = NatsSink::new(self.clone(), cx.acker())?;
+        let sink = NatsSink::new(self.clone(), cx.acker()).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "nats"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
+}
+
+impl std::convert::TryFrom<&NatsSinkConfig> for nats::asynk::Options {
+    type Error = NatsConfigError;
+
+    fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
+        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+    }
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
-        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
-        // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
-            .with_name(&self.connection_name)
-            .reconnect_buffer_size(0)
-    }
+    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
+        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
 
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
-        self.to_nats_options()
-            .connect(&self.url)
-            .map_err(|e| e.into())
-            .await
+        options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
 async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
-    config.connect().map_ok(|_| ()).await
-}
-
-/**
- * Code dealing with the Sink struct.
- */
-
-#[derive(Clone)]
-struct NatsOptions {
-    connection_name: String,
+    config.connect().map_ok(|_| ()).map_err(|e| e.into()).await
 }
 
 pub struct NatsSink {
     encoding: EncodingConfig<Encoding>,
-    options: NatsOptions,
+    connection: nats::asynk::Connection,
     subject: Template,
-    url: String,
     acker: Acker,
 }
 
 impl NatsSink {
-    fn new(config: NatsSinkConfig, acker: Acker) -> crate::Result<Self> {
+    async fn new(config: NatsSinkConfig, acker: Acker) -> Result<Self, BuildError> {
+        let connection = config.connect().await?;
+
         Ok(NatsSink {
-            options: (&config).into(),
+            connection,
             encoding: config.encoding,
             subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
-            url: config.url,
             acker,
         })
-    }
-}
-
-impl From<NatsOptions> for async_nats::Options {
-    fn from(options: NatsOptions) -> Self {
-        async_nats::Options::new()
-            .with_name(&options.connection_name)
-            .reconnect_buffer_size(0)
-    }
-}
-
-impl From<&NatsSinkConfig> for NatsOptions {
-    fn from(options: &NatsSinkConfig) -> Self {
-        Self {
-            connection_name: options.connection_name.clone(),
-        }
     }
 }
 
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.into();
-
-        let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
-
         while let Some(event) = input.next().await {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("subject"),
                         drop_event: true,
@@ -175,14 +160,14 @@ impl StreamSink<Event> for NatsSink {
             let log = encode_event(event, &self.encoding);
             let message_len = log.len();
 
-            match nc.publish(&subject, log).await {
+            match self.connection.publish(&subject, log).await {
                 Ok(_) => {
-                    emit!(&NatsEventSendSuccess {
+                    emit!(NatsEventSendSuccess {
                         byte_size: message_len,
                     });
                 }
                 Err(error) => {
-                    emit!(&NatsEventSendFail { error });
+                    emit!(NatsEventSendError { error });
                 }
             }
 
@@ -245,37 +230,39 @@ mod integration_tests {
     use std::{thread, time::Duration};
 
     use super::*;
+    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
+    use crate::sinks::VectorSink;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::tls::TlsConfig;
 
-    #[tokio::test]
-    async fn nats_happy() {
+    async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), BuildError> {
         // Publish `N` messages to NATS.
         //
         // Verify with a separate subscriber that the messages were
         // successfully published.
 
-        trace_init();
-
-        let subject = format!("test-{}", random_string(10));
-
-        let cnf = NatsSinkConfig {
-            encoding: EncodingConfig::from(Encoding::Text),
-            connection_name: "".to_owned(),
-            subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
-        };
+        // Create Sink
+        let (acker, ack_counter) = Acker::basic();
+        let sink = NatsSink::new(conf.clone(), acker).await?;
+        let sink = VectorSink::from_event_streamsink(sink);
 
         // Establish the consumer subscription.
-        let consumer = cnf.clone().connect().await.unwrap();
-        let sub = consumer.subscribe(&subject).await.unwrap();
+        let subject = conf.subject.clone();
+        let consumer = conf
+            .clone()
+            .connect()
+            .await
+            .expect("failed to connect with test consumer");
+        let sub = consumer
+            .subscribe(&subject)
+            .await
+            .expect("failed to subscribe with test consumer");
 
         // Publish events.
-        let (acker, ack_counter) = Acker::basic();
-        let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 
-        let _ = sink.run(Box::pin(events)).await.unwrap();
+        let _ = sink.run(events).await.unwrap();
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));
@@ -292,6 +279,372 @@ mod integration_tests {
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
             num_events
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn nats_no_auth() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4222".to_owned(),
+            tls: None,
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_userpass_auth_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4223".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "natspass".into(),
+                },
+            }),
+        };
+
+        publish_and_check(conf)
+            .await
+            .expect("publish_and_check failed");
+    }
+
+    #[tokio::test]
+    async fn nats_userpass_auth_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4224".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "wrongpass".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_token_auth_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4224".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
+                    value: "secret".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_token_auth_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4224".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
+                    value: "wrongsecret".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_nkey_auth_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4225".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
+                    nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
+                    seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_nkey_auth_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://127.0.0.1:4225".to_owned(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
+                    nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
+                    seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Config { .. })),
+            "publish_and_check failed, expected BuildError::Config, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4227".to_owned(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4227".to_owned(),
+            tls: None,
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_client_cert_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4228".to_owned(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    crt_file: Some("tests/data/nats_client_cert.pem".into()),
+                    key_file: Some("tests/data/nats_client_key.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_client_cert_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4228".to_owned(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_jwt_auth_valid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4229".to_owned(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
+                    path: "tests/data/nats.creds".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_jwt_auth_invalid() {
+        trace_init();
+
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSinkConfig {
+            encoding: EncodingConfig::from(Encoding::Text),
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://localhost:4229".to_owned(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
+                    path: "tests/data/nats-bad.creds".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
         );
     }
 }

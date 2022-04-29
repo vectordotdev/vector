@@ -1,7 +1,7 @@
 [package]
 name = "vector-api-client"
 version = "0.1.2"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 license = "MPL-2.0"
@@ -9,24 +9,24 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.133", features = ["derive"] }
-serde_json = { version = "1.0.74", features = ["raw_value"] }
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = { version = "1.0.79", features = ["raw_value"] }
 
 # Error handling
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 
 # Tokio / Futures
-async-stream = "0.3.2"
+async-stream = "0.3.3"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.15.0", features = ["full"] }
+tokio = { version = "1.18.0", features = ["full"] }
 tokio-stream = { version = "0.1.8", features = ["sync"] }
 
 # GraphQL
 graphql_client = "0.10.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.9", features = ["json"] }
+reqwest = { version = "0.11.10", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs
@@ -34,4 +34,4 @@ chrono = { version = "0.4.6", features = ["serde"] }
 url = "2.2.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 weak-table = "0.3.2"
-indoc = "1.0.3"
+indoc = "1.0.4"

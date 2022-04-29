@@ -19,11 +19,20 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use vector_core::{buffers::Acker, event::metric::MetricSeries};
+use tracing::{Instrument, Span};
+use vector_core::{
+    buffers::Acker,
+    event::metric::MetricSeries,
+    internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
+};
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{
         metric::{Metric, MetricData, MetricKind, MetricValue},
         Event,
@@ -37,7 +46,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
@@ -56,7 +65,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<TlsEnableableConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -128,8 +137,8 @@ impl SinkConfig for PrometheusExporterConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -138,6 +147,10 @@ impl SinkConfig for PrometheusExporterConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -156,8 +169,8 @@ impl SinkConfig for PrometheusCompatConfig {
         self.config.build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.config.input_type()
+    fn input(&self) -> Input {
+        self.config.input()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -166,6 +179,10 @@ impl SinkConfig for PrometheusCompatConfig {
 
     fn resources(&self) -> Vec<Resource> {
         self.config.resources()
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -271,7 +288,7 @@ struct PrometheusExporterMetricNormalizer {
 }
 
 impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         let new_metric = match metric.value() {
             MetricValue::Distribution { .. } => {
                 // Convert the distribution as-is, and then let the normalizer absolute-ify it.
@@ -319,12 +336,20 @@ fn handle(
                 collector.encode_metric(default_namespace, buckets, quantiles, metric);
             }
 
-            *response.body_mut() = collector.finish().into();
+            let body = collector.finish();
+            let body_size = body.size_of();
+
+            *response.body_mut() = body.into();
 
             response.headers_mut().insert(
                 "Content-Type",
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
+
+            emit!(BytesSent {
+                byte_size: body_size,
+                protocol: "http",
+            });
         }
         _ => {
             *response.status_mut() = StatusCode::NOT_FOUND;
@@ -349,12 +374,14 @@ impl PrometheusExporter {
             return;
         }
 
+        let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
 
         let new_service = make_service_fn(move |_| {
+            let span = Span::current();
             let metrics = Arc::clone(&metrics);
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
@@ -362,28 +389,35 @@ impl PrometheusExporter {
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
-                    let metrics = metrics.read().unwrap();
+                    span.in_scope(|| {
+                        let metrics = metrics.read().unwrap();
 
-                    let response = info_span!(
-                        "prometheus_server",
-                        method = ?req.method(),
-                        path = ?req.uri().path(),
-                    )
-                    .in_scope(|| {
-                        handle(
+                        let count = metrics.len();
+                        let byte_size = metrics
+                            .iter()
+                            .map(|(_, (metric, _))| metric.size_of())
+                            .sum();
+
+                        let response = handle(
                             req,
                             default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
                             &metrics,
-                        )
-                    });
+                        );
 
-                    emit!(&PrometheusServerRequestComplete {
-                        status_code: response.status(),
-                    });
+                        emit!(EventsSent {
+                            count,
+                            byte_size,
+                            output: None
+                        });
 
-                    future::ok::<_, Infallible>(response)
+                        emit!(PrometheusServerRequestComplete {
+                            status_code: response.status(),
+                        });
+
+                        future::ok::<_, Infallible>(response)
+                    })
                 }))
             }
         });
@@ -407,6 +441,7 @@ impl PrometheusExporter {
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .instrument(span)
                 .await
                 .map_err(|error| eprintln!("Server error: {}", error))?;
 
@@ -431,7 +466,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
-            // tracking and remove any which have exceeded the the flush interval in terms of not
+            // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
             //
             // TODO: Can we be smarter about this? As is, we might wait up to 2x the flush period to
@@ -457,7 +492,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
             // Now process the metric we got.
             let metric = event.into_metric();
-            if let Some(normalized) = normalizer.apply(metric) {
+            if let Some(normalized) = normalizer.normalize(metric) {
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
@@ -512,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_tls() {
-        let mut tls_config = TlsConfig::test_config();
+        let mut tls_config = TlsEnableableConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
         export_and_fetch_simple(Some(tls_config)).await;
     }
@@ -543,7 +578,10 @@ mod tests {
         );
     }
 
-    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
+    async fn export_and_fetch(
+        tls_config: Option<TlsEnableableConfig>,
+        events: Vec<Event>,
+    ) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -560,7 +598,7 @@ mod tests {
         tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         for event in events {
-            tx.send(event).expect("Failed to send event.");
+            tx.send(event.into()).expect("Failed to send event.");
         }
 
         time::sleep(time::Duration::from_millis(100)).await;
@@ -584,7 +622,7 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
-    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
+    async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
@@ -622,7 +660,7 @@ mod tests {
         )
     }
 
-    pub fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+    pub(self) fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
         let event = Metric::new(name.clone(), MetricKind::Incremental, value)
             .with_tags(Some(
@@ -1003,7 +1041,7 @@ mod integration_tests {
         tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1037,9 +1075,9 @@ mod integration_tests {
 
         // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
 
         // Wait for the Prometheus server to scrape them, and then query it to ensure both metrics
         // have their correct set size value.
@@ -1063,7 +1101,7 @@ mod integration_tests {
         time::sleep(time::Duration::from_secs(3)).await;
 
         let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
 
         // Again, wait for the Prometheus server to scrape the metrics, and then query it again.
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1088,9 +1126,9 @@ mod integration_tests {
 
         // metrics that will not be updated for a full flush period and therefore should expire
         let (name1, event) = tests::create_metric_set(None, vec!["42"]);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
         let (name2, event) = tests::create_metric_gauge(None, 100.0);
-        tx.send(event).expect("Failed to send.");
+        tx.send(event.into()).expect("Failed to send.");
 
         // Wait a bit for the sink to process the events
         time::sleep(time::Duration::from_secs(1)).await;
@@ -1104,7 +1142,7 @@ mod integration_tests {
         for _ in 0..7 {
             // Update the first metric, ensuring it doesn't expire
             let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
-            tx.send(event).expect("Failed to send.");
+            tx.send(event.into()).expect("Failed to send.");
 
             // Wait a bit for time to pass
             time::sleep(time::Duration::from_secs(1)).await;

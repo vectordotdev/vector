@@ -37,26 +37,26 @@ codecs to allow just that.
 - Forward/backwards compatibility guarantees for anything except for Protocol Buffers.
 - Handling arbitrary native formats in differing sources/sinks i.e. letting a statsd source parse the
   Prometheus exposition format, or having the Kafka sink spit out metrics in the Influx line
-  protocol, etc
-- Versioned schemas for formats that are not already implicitly versionable (i.e. no versioned JSON schema)
+  protocol, etc.
+- Versioned schemas for formats that are not already implicitly versionable. (i.e. no versioned JSON schema)
 
 ## Pain
 
 Users routinely use Vector as a unifying step in their observability pipeline: taking disparate
 sources and transforming, filtering, and cleaning up that data before sending it off to downstream
 systems.  This means that often times, Vector may not support the type of data they want to send,
-and there's a required step and adapting their data to Vector.  This isn't a problem that can be
-entirely solved, but one that is currently harder for users to solve than it should be.
+and there's a required step of adapting their data to use with Vector.  This isn't a problem that
+can be entirely solved, but one that is currently harder for users to solve than it should be.
 
 Sources like [`exec`](https://github.com/vectordotdev/vector/issues/992) were borne out of a desire
-to let users arbitrarily feed data into Vector from a simple shell script, which itself could
-trivially pull and generate whatever data was desired.  However, there are still limitations due to
-the fact that users must do subsequent transformation steps to extract metrics from log lines, and
-so on.
+to let users arbitrarily feed data into Vector from a simple shell script or process, which itself
+could trivially pull and generate whatever data was desired.  However, there are still limitations
+due to the fact that users must do subsequent transformation steps to extract metrics from log lines,
+and so on.
 
 As well, users are constrained when they want to send data from one Vector instance to another by
-Vector only setting the native gRPC-based `vector` source and sink.  If users already had a blessed
-solution for service-to-service data flow, such as Kafka, they would be stuck using the
+Vector only supporting this via the native gRPC-based `vector` source and sink.  If users already
+had a blessed solution for service-to-service data flow, such as Kafka, they would be stuck using the
 aforementioned transformation steps to go back and forth between available encoded formats and back
 into the desired metric types within Vector.
 
@@ -97,14 +97,14 @@ running the same version.
 - The existing framing/codec work happening for both sources and sinks would gain two new
   implementations for `vector_native` and `vector_json`, respectively.
 - We would use `serde-reflection` to generate a basic schema of `Event`, which could be stored in
-  the source code itself (similar in principle to Cargo.lock).  This would serve as the minimum
-  viable schema for JSON use cases, whichout any commitment to versioning or backwards/forwards-compatibility.
+  the source code itself, similar in principle to `Cargo.lock`.  This would serve as the minimum
+  viable schema for JSON use cases, without any commitment to versioning or backwards/forwards-compatibility.
 
 ## Rationale
 
 Adding encodings for natively representing events would provide an additional avenue for users to
 both ingest data into Vector, as well as constructing more complex Vector deployment topologies.  As
-Vector development can often be bottlenecked when it comes to add new sources and sink, this work
+Vector development can often be bottlenecked when it comes to adding new sources and sink, this work
 would act as a force multiplier for letting users invest a small amount of time converting their
 data to the native format, and then being able to universally ingest it.
 
@@ -114,9 +114,6 @@ who wish to use Vector with systems we don't already support.  This could hurt t
 _success_ of Vector.
 
 ## Drawbacks
-
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
 
 Encoding `Event` natively via Protocol Buffers should be a feature we can accomplish with no
 additional burden on the Vector team, as we already perform the necessary due diligence and spend

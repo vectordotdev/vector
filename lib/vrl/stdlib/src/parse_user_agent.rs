@@ -1,16 +1,14 @@
 use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use uaparser::UserAgentParser as UAParser;
-use vrl::prelude::*;
+use vrl::{function::Error, prelude::*};
 use woothee::parser::Parser as WootheeParser;
 
-lazy_static! {
-    static ref UA_PARSER: UAParser = {
-        let regexes = include_bytes!("./../data/user_agent_regexes.yaml");
-        UAParser::from_bytes(regexes).expect("Regex file is not valid.")
-    };
-}
+static UA_PARSER: Lazy<UAParser> = Lazy::new(|| {
+    let regexes = include_bytes!("./../data/user_agent_regexes.yaml");
+    UAParser::from_bytes(regexes).expect("Regex file is not valid.")
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUserAgent;
@@ -83,8 +81,8 @@ impl Function for ParseUserAgent {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -136,6 +134,90 @@ impl Function for ParseUserAgent {
             parser,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match name {
+            "mode" => {
+                let mode = expr
+                    .and_then(|expr| {
+                        expr.as_value().map(|value| {
+                            let s = value.try_bytes_utf8_lossy().expect("mode not bytes");
+                            Mode::from_str(&s).map_err(|_| Error::InvalidEnumVariant {
+                                keyword: "mode",
+                                value,
+                                variants: Mode::all_value(),
+                            })
+                        })
+                    })
+                    .transpose()?
+                    .unwrap_or_default();
+
+                let parser = match mode {
+                    Mode::Fast => {
+                        let parser = WootheeParser::new();
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                parser.parse_user_agent(s).partial_schema()
+                            }),
+                        }
+                    }
+                    Mode::Reliable => {
+                        let fast = WootheeParser::new();
+                        let slow = &UA_PARSER;
+
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                let ua = fast.parse_user_agent(s);
+                                let ua = if ua.browser.family.is_none() || ua.os.family.is_none() {
+                                    let better_ua = slow.parse_user_agent(s);
+                                    better_ua.or(ua)
+                                } else {
+                                    ua
+                                };
+                                ua.partial_schema()
+                            }),
+                        }
+                    }
+                    Mode::Enriched => {
+                        let fast = WootheeParser::new();
+                        let slow = &UA_PARSER;
+
+                        ParserMode {
+                            fun: Box::new(move |s: &str| {
+                                slow.parse_user_agent(s)
+                                    .or(fast.parse_user_agent(s))
+                                    .full_schema()
+                            }),
+                        }
+                    }
+                };
+
+                Ok(Some(Box::new(parser) as _))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let string = value.try_bytes_utf8_lossy()?;
+        let parser = args
+            .required_any("mode")
+            .downcast_ref::<ParserMode>()
+            .ok_or("no parser mode")?;
+
+        Ok((parser.fun)(&string))
+    }
+}
+
+struct ParserMode {
+    fun: Box<dyn Fn(&str) -> Value + Send + Sync>,
 }
 
 #[derive(Clone)]
@@ -153,7 +235,7 @@ impl Expression for ParseUserAgentFn {
         Ok((self.parser)(&string))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.mode.type_def()
     }
 }
@@ -169,7 +251,7 @@ impl fmt::Debug for ParseUserAgentFn {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
+pub(crate) enum Mode {
     Fast,
     Reliable,
     Enriched,
@@ -197,46 +279,61 @@ impl Mode {
 
     fn type_def(self) -> TypeDef {
         match self {
-            Mode::Fast | Mode::Reliable => TypeDef::new()
-                .infallible()
-                .object::<&'static str, TypeDef>(map! {
-                    "browser": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "family": Kind::Bytes | Kind::Null,
-                        "version": Kind::Bytes | Kind::Null,
-                    }),
-                    "os": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "family": Kind::Bytes | Kind::Null,
-                        "version": Kind::Bytes | Kind::Null,
-                    }),
-                    "device": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "category": Kind::Bytes | Kind::Null,
-                    }),
-                }),
-            Mode::Enriched => TypeDef::new()
-                .infallible()
-                .object::<&'static str, TypeDef>(map! {
-                    "browser": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "family": Kind::Bytes | Kind::Null,
-                        "version": Kind::Bytes | Kind::Null,
-                        "major": Kind::Bytes | Kind::Null,
-                        "minor": Kind::Bytes | Kind::Null,
-                        "patch": Kind::Bytes | Kind::Null,
-                    }),
-                    "os": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "family": Kind::Bytes | Kind::Null,
-                        "version": Kind::Bytes | Kind::Null,
-                        "major": Kind::Bytes | Kind::Null,
-                        "minor": Kind::Bytes | Kind::Null,
-                        "patch": Kind::Bytes | Kind::Null,
-                        "patch_minor":  Kind::Bytes | Kind::Null,
-                    }),
-                    "device": TypeDef::new().infallible().object::<&'static str,Kind>(map!{
-                        "family": Kind::Bytes | Kind::Null,
-                        "category": Kind::Bytes | Kind::Null,
-                        "brand": Kind::Bytes | Kind::Null,
-                        "model": Kind::Bytes | Kind::Null,
-                    }),
-                }),
+            Mode::Fast | Mode::Reliable => TypeDef::object(BTreeMap::from([
+                (
+                    "browser".into(),
+                    Kind::object(BTreeMap::from([
+                        ("family".into(), Kind::bytes().or_null()),
+                        ("version".into(), Kind::bytes().or_null()),
+                    ])),
+                ),
+                (
+                    "os".into(),
+                    Kind::object(BTreeMap::from([
+                        ("family".into(), Kind::bytes().or_null()),
+                        ("version".into(), Kind::bytes().or_null()),
+                    ])),
+                ),
+                (
+                    "device".into(),
+                    Kind::object(BTreeMap::from([(
+                        "category".into(),
+                        Kind::bytes().or_null(),
+                    )])),
+                ),
+            ])),
+            Mode::Enriched => TypeDef::object(BTreeMap::from([
+                (
+                    "browser".into(),
+                    Kind::object(BTreeMap::from([
+                        ("family".into(), Kind::bytes().or_null()),
+                        ("version".into(), Kind::bytes().or_null()),
+                        ("major".into(), Kind::bytes().or_null()),
+                        ("minor".into(), Kind::bytes().or_null()),
+                        ("patch".into(), Kind::bytes().or_null()),
+                    ])),
+                ),
+                (
+                    "os".into(),
+                    Kind::object(BTreeMap::from([
+                        ("family".into(), Kind::bytes().or_null()),
+                        ("version".into(), Kind::bytes().or_null()),
+                        ("major".into(), Kind::bytes().or_null()),
+                        ("minor".into(), Kind::bytes().or_null()),
+                        ("patch".into(), Kind::bytes().or_null()),
+                        ("patch_minor".into(), Kind::bytes().or_null()),
+                    ])),
+                ),
+                (
+                    "device".into(),
+                    Kind::object(BTreeMap::from([
+                        ("family".into(), Kind::bytes().or_null()),
+                        ("category".into(), Kind::bytes().or_null()),
+                        ("brand".into(), Kind::bytes().or_null()),
+                        ("model".into(), Kind::bytes().or_null()),
+                    ])),
+                ),
+            ])),
         }
     }
 }

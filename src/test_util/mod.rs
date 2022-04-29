@@ -35,7 +35,8 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_core::event::{BatchNotifier, Event, LogEvent};
+use vector_buffers::topology::channel::LimitedReceiver;
+use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
 
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
@@ -124,7 +125,7 @@ pub fn trace_init() {
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
@@ -132,8 +133,11 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
     lines: impl IntoIterator<Item = I>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
+
     let mut sink = FramedWrite::new(stream, encoder);
 
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
@@ -142,7 +146,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     let stream = sink.get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub async fn send_lines_tls(
@@ -150,8 +154,10 @@ pub async fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
     ca: impl Into<Option<&Path>>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
     if let Some(ca) = ca.into() {
@@ -177,7 +183,7 @@ pub async fn send_lines_tls(
     let stream = sink.get_mut().get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub fn temp_file() -> PathBuf {
@@ -195,23 +201,23 @@ pub fn temp_dir() -> PathBuf {
 pub fn map_event_batch_stream(
     stream: impl Stream<Item = Event>,
     batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |event| event.with_batch_notifier_option(&batch))
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |event| event.with_batch_notifier_option(&batch).into())
 }
 
 // TODO refactor to have a single implementation for `Event`, `LogEvent` and `Metric`.
 fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
-) -> impl Stream<Item = Event> {
-    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
+) -> impl Stream<Item = EventArray> {
+    stream.map(move |log| vec![log.with_batch_notifier_option(&batch)].into())
 }
 
 pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
     generator: Gen,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let lines = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
     (lines, stream)
@@ -221,7 +227,7 @@ pub fn random_lines_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item = Event>) {
+) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let generator = move |_| random_string(len);
     generate_lines_with_stream(generator, count, batch)
 }
@@ -230,7 +236,7 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
     generator: Gen,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -243,7 +249,7 @@ pub fn random_events_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<Event>, impl Stream<Item = Event>) {
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
         .map(|_| Event::from(random_string(len)))
         .collect::<Vec<_>>();
@@ -259,7 +265,7 @@ pub fn random_updated_events_with_stream<F>(
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
     update_fn: F,
-) -> (Vec<Event>, impl Stream<Item = Event>)
+) -> (Vec<Event>, impl Stream<Item = EventArray>)
 where
     F: Fn((usize, Event)) -> Event,
 {
@@ -335,6 +341,25 @@ where
     }
 }
 
+pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> Vec<T> {
+    let mut items = Vec::new();
+    while let Some(item) = rx.next().await {
+        items.push(item);
+    }
+    items
+}
+
+pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
+    let mut items = Vec::new();
+    while items.len() < n {
+        match rx.next().await {
+            Some(item) => items.push(item),
+            None => break,
+        }
+    }
+    items
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -350,20 +375,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
     MultiGzDecoder::new(&gzip_bytes[..])
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
-}
-
-#[cfg(feature = "sources-aws_s3")]
-pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!(message = "Reading zst file.", path = %path.as_ref().display());
-    let mut file = File::open(path).unwrap();
-    let mut zst_bytes = Vec::new();
-    file.read_to_end(&mut zst_bytes).unwrap();
-    let mut output = String::new();
-    zstd::stream::Decoder::new(&zst_bytes[..])
-        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()

@@ -13,7 +13,7 @@ components: sinks: kafka: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -37,13 +37,7 @@ components: sinks: kafka: {
 				}
 			}
 			request: enabled: false
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled:     false
 			to: components._kafka.features.send.to
 		}
 	}
@@ -145,6 +139,7 @@ components: sinks: kafka: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	how_it_works: components._kafka.how_it_works

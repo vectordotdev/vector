@@ -8,7 +8,7 @@ use std::{
     time::Instant,
 };
 
-use bytes::BufMut;
+use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use prost::Message;
 use snafu::{ResultExt, Snafu};
@@ -347,7 +347,7 @@ impl DatadogMetricsEncoder {
         }
     }
 
-    pub fn finish(&mut self) -> Result<(Vec<u8>, Vec<Metric>), FinishError> {
+    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>), FinishError> {
         // Try to encode any pending metrics we had stored up.
         let _ = self.try_encode_pending()?;
 
@@ -358,7 +358,11 @@ impl DatadogMetricsEncoder {
 
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
-        let payload = state.writer.finish().context(CompressionFailedSnafu)?;
+        let payload = state
+            .writer
+            .finish()
+            .context(CompressionFailedSnafu)?
+            .freeze();
         let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
@@ -461,48 +465,6 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::AggregatedSummary {
-            quantiles,
-            count,
-            sum,
-        } => {
-            let mut results = vec![
-                DatadogSeriesMetric {
-                    metric: format!("{}.count", &name),
-                    r#type: DatadogMetricType::Rate,
-                    interval,
-                    points: vec![DatadogPoint(ts, f64::from(*count))],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-                DatadogSeriesMetric {
-                    metric: format!("{}.sum", &name),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, *sum)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-            ];
-
-            for quantile in quantiles {
-                results.push(DatadogSeriesMetric {
-                    metric: format!("{}.{}percentile", &name, quantile.as_percentile()),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, quantile.value)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                })
-            }
-            results
-        }
         value => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
@@ -694,6 +656,7 @@ mod tests {
         io::{self, copy},
     };
 
+    use bytes::{BufMut, Bytes, BytesMut};
     use chrono::{DateTime, TimeZone, Utc};
     use flate2::read::ZlibDecoder;
     use proptest::{
@@ -723,7 +686,7 @@ mod tests {
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
     }
 
-    fn get_compressed_empty_series_payload() -> Vec<u8> {
+    fn get_compressed_empty_series_payload() -> Bytes {
         let mut compressor = get_compressor();
 
         let _ = write_payload_header(DatadogMetricsEndpoint::Series, &mut compressor)
@@ -731,14 +694,14 @@ mod tests {
         let _ = write_payload_footer(DatadogMetricsEndpoint::Series, &mut compressor)
             .expect("should not fail");
 
-        compressor.finish().expect("should not fail")
+        compressor.finish().expect("should not fail").freeze()
     }
 
-    fn decompress_payload(payload: Vec<u8>) -> io::Result<Vec<u8>> {
+    fn decompress_payload(payload: Bytes) -> io::Result<Bytes> {
         let mut decompressor = ZlibDecoder::new(&payload[..]);
-        let mut decompressed = Vec::new();
+        let mut decompressed = BytesMut::new().writer();
         let result = copy(&mut decompressor, &mut decompressed);
-        result.map(|_| decompressed)
+        result.map(|_| decompressed.into_inner().freeze())
     }
 
     fn ts() -> DateTime<Utc> {

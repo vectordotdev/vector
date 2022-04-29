@@ -2,6 +2,26 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
+fn ceil(value: Value, precision: Option<Value>) -> Resolved {
+    let precision = match precision {
+        Some(expr) => expr.try_integer()?,
+        None => 0,
+    };
+    match value {
+        Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+            *f,
+            precision,
+            f64::ceil,
+        ))),
+        value @ Value::Integer(_) => Ok(value),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float() | Kind::integer(),
+        }
+        .into()),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Ceil;
 
@@ -27,8 +47,8 @@ impl Function for Ceil {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -44,6 +64,13 @@ impl Function for Ceil {
             result: Ok("6.0"),
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        let precision = args.optional("precision");
+
+        ceil(value, precision)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -54,27 +81,21 @@ struct CeilFn {
 
 impl Expression for CeilFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = match &self.precision {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 0,
-        };
+        let precision = self
+            .precision
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let value = self.value.resolve(ctx)?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::ceil).into()),
-            value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Float | Kind::Integer,
-            }
-            .into()),
-        }
+        ceil(value, precision)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        TypeDef::new().scalar(match self.value.type_def(state).kind() {
-            v if v.is_float() || v.is_integer() => v,
-            _ => Kind::Integer | Kind::Float,
-        })
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        match Kind::from(self.value.type_def(state)) {
+            v if v.is_float() || v.is_integer() => v.into(),
+            _ => Kind::integer().or_float().into(),
+        }
     }
 }
 
@@ -88,19 +109,19 @@ mod tests {
         lower {
             args: func_args![value: value!(1234.2)],
             want: Ok(value!(1235.0)),
-            tdef: TypeDef::new().float(),
+            tdef: TypeDef::float(),
         }
 
         higher {
             args: func_args![value: value!(1234.8)],
             want: Ok(value!(1235.0)),
-            tdef: TypeDef::new().float(),
+            tdef: TypeDef::float(),
         }
 
         integer {
             args: func_args![value: value!(1234)],
             want: Ok(value!(1234)),
-            tdef: TypeDef::new().integer(),
+            tdef: TypeDef::integer(),
         }
 
         precision {
@@ -108,7 +129,7 @@ mod tests {
                              precision: value!(1)
             ],
             want: Ok(value!(1234.4)),
-            tdef: TypeDef::new().float(),
+            tdef: TypeDef::float(),
         }
 
         bigger_precision {
@@ -116,7 +137,7 @@ mod tests {
                              precision: value!(4)
             ],
             want: Ok(value!(1234.5673)),
-            tdef: TypeDef::new().float(),
+            tdef: TypeDef::float(),
         }
 
         huge_number {
@@ -124,7 +145,7 @@ mod tests {
                              precision: value!(5)
             ],
             want: Ok(value!(9876543210123456789098765432101234567890987654321.98766)),
-            tdef: TypeDef::new().float(),
+            tdef: TypeDef::float(),
         }
     ];
 }

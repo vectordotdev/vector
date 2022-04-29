@@ -8,7 +8,7 @@ pub struct RequestPrepared<R> {
 }
 
 impl<R: Debug> InternalEvent for RequestPrepared<R> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Request prepared.", request = ?self.request);
     }
 }
@@ -19,7 +19,7 @@ pub struct ResponseReceived<R> {
 }
 
 impl<R: Debug> InternalEvent for ResponseReceived<R> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Got response.", response = ?self.response);
     }
 }

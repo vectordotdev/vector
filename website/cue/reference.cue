@@ -52,7 +52,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "ndjson" | "text"
+#EncodingCodec: "json" | "logfmt" | "ndjson" | "text" | "native" | "native_json"
 
 #Endpoint: {
 	description: string
@@ -383,6 +383,13 @@ _values: {
 		example:     !=""
 	}
 
+	#ConditionExample: {
+		title:    !=""
+		name:     "vrl" | "datadog_search"
+		example:  !=""
+		vrl_only: bool | *false
+	}
+
 	syntaxes: [#Syntax, ...#Syntax] & [
 			{
 			name:        "vrl"
@@ -426,6 +433,25 @@ _values: {
 			[JSON](\(urls.json)) | `"condition": ".status == 200"`
 			"""
 	}
+
+	condition_examples: [#ConditionExample, ...#ConditionExample] & [
+				{
+			title:   "Standard VRL"
+			name:    "vrl"
+			example: ".status == 500"
+		},
+		{
+			title:   "Datadog Search"
+			name:    "datadog_search"
+			example: "*stack"
+		},
+		{
+			title:    "VRL shorthand"
+			name:     "vrl"
+			example:  ".status == 500"
+			vrl_only: true
+		},
+	]
 }
 
 #TypePrimitive: {
@@ -490,6 +516,10 @@ _values: {
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
 	examples?: [float, ...float]
+
+	// `unit` clarifies the value's unit. While this should be included
+	// as the suffix in the name, this helps to explicitly clarify that.
+	unit: #Unit | *null
 }
 
 #TypeObject: {

@@ -17,7 +17,6 @@ mod source_finished;
     feature = "sinks-prometheus",
     feature = "transforms-log_to_metric",
     feature = "sinks-socket",
-    feature = "leveldb"
 ))]
 mod reload;
 

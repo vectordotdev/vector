@@ -4,7 +4,7 @@ description: Parse structured application logs in CSV format using Lua transform
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 6
+weight: 4
 tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 ---
 

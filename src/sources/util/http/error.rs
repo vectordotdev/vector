@@ -10,10 +10,12 @@ pub struct ErrorMessage {
 
 #[cfg(any(
     feature = "sources-utils-http-prelude",
+    feature = "sources-utils-http-auth",
     feature = "sources-utils-http-encoding",
     feature = "sources-datadog_agent"
 ))]
 impl ErrorMessage {
+    #[allow(unused)] // triggered by cargo-hack
     pub fn new(code: http::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
@@ -21,6 +23,7 @@ impl ErrorMessage {
         }
     }
 
+    #[allow(unused)] // triggered by cargo-hack
     pub fn status_code(&self) -> http::StatusCode {
         http::StatusCode::from_u16(self.code).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
     }

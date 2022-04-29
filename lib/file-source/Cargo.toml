@@ -1,7 +1,7 @@
 [package]
 name = "file-source"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>", "Mark Story <mark@mark-story.com>"]
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
 edition = "2021"
 publish = false
 license = "MIT"
@@ -11,7 +11,7 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "2.0.0"
+crc = "3.0.0"
 glob = "0.3.0"
 scan_fmt = "0.2.6"
 
@@ -31,12 +31,12 @@ default-features = false
 features = ["clock", "serde"]
 
 [dependencies.dashmap]
-version = "5.0"
+version = "5.2"
 default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "~1.8.0"
+version = "~1.8.1"
 default-features = false
 features = ["serde"]
 
@@ -66,17 +66,16 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.15.0"
+version = "1.18.0"
 default-features = false
 features = ["full"]
 
 [dev-dependencies]
 criterion = "0.3"
 quickcheck = "1"
-tempfile = "3.1.0"
-pretty_assertions = "1.0.0"
+tempfile = "3.3.0"
+pretty_assertions = "1.2.1"
 
 [[bench]]
 name = "buffer"
 harness = false
-test = true

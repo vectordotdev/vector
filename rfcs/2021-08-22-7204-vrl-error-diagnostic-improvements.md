@@ -42,7 +42,7 @@ solve the problem.
 
 * [RFC 4862 - 2020-11-02 - Remap Language Compile-Time Type Checking v1][#4862]
 
-[#4862]: https://github.com/timberio/vector/blob/ab9ff57ddccaa561b84eb3d0139bd764ad655fa6/rfcs/2020-11-02-remap-language-compile-time-type-checking-v1.md
+[#4862]: https://github.com/vectordotdev/vector/blob/ab9ff57ddccaa561b84eb3d0139bd764ad655fa6/rfcs/2020-11-02-remap-language-compile-time-type-checking-v1.md
 
 ## Cross cutting concerns
 
@@ -50,9 +50,9 @@ solve the problem.
 * [Improve VRL type checking][#8380]
 * [VRL compiler improvements][#8221]
 
-[#3910]: https://github.com/timberio/vector/issues/3910
-[#8380]: https://github.com/timberio/vector/issues/8380
-[#8221]: https://github.com/timberio/vector/issues/8221
+[#3910]: https://github.com/vectordotdev/vector/issues/3910
+[#8380]: https://github.com/vectordotdev/vector/issues/8380
+[#8221]: https://github.com/vectordotdev/vector/issues/8221
 
 ## Scope
 
@@ -641,7 +641,7 @@ We need to come up with a solution that prevents the issues we had before with u
 type checking code, but the diagnostic still informs operators on why their
 function call fails.
 
-[#6507]: https://github.com/timberio/vector/issues/6507
+[#6507]: https://github.com/vectordotdev/vector/issues/6507
 
 #### User Experience
 
@@ -731,7 +731,7 @@ error[E100]: argument type might be invalid at runtime
   = see language documentation at https://vrl.dev
 ```
 
-[track]: https://github.com/timberio/vector/blob/ab9ff57ddccaa561b84eb3d0139bd764ad655fa6/lib/vrl/compiler/src/expression/function_call.rs#L241-L299
+[track]: https://github.com/vectordotdev/vector/blob/ab9ff57ddccaa561b84eb3d0139bd764ad655fa6/lib/vrl/compiler/src/expression/function_call.rs#L241-L299
 
 ### Update VRL Error Codes
 

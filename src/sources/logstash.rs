@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
@@ -5,13 +6,14 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
+use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -20,7 +22,7 @@ use crate::{
     event::{Event, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     types,
 };
 
@@ -28,7 +30,7 @@ use crate::{
 pub struct LogstashConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
@@ -85,6 +87,10 @@ impl SourceConfig for LogstashConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -102,7 +108,7 @@ impl TcpSource for LogstashSource {
         LogstashDecoder::new()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         let now = Value::from(chrono::Utc::now());
         for event in events {
             let log = event.as_mut_log();
@@ -113,13 +119,13 @@ impl TcpSource for LogstashSource {
                     .get_flat("@timestamp")
                     .and_then(|timestamp| {
                         self.timestamp_converter
-                            .convert::<Value>(timestamp.as_bytes())
+                            .convert::<Value>(timestamp.coerce_to_bytes())
                             .ok()
                     })
                     .unwrap_or_else(|| now.clone());
                 log.insert(log_schema().timestamp_key(), timestamp);
             }
-            log.try_insert(log_schema().host_key(), host.clone());
+            log.try_insert(log_schema().host_key(), host.ip().to_string());
         }
     }
 
@@ -596,7 +602,7 @@ mod test {
             acknowledgements: true.into(),
             connection_limit: None,
         }
-        .build(SourceContext::new_test(sender))
+        .build(SourceContext::new_test(sender, None))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -669,7 +675,7 @@ mod integration_tests {
         config::SourceContext,
         event::EventStatus,
         test_util::{collect_n, trace_init, wait_for_tcp},
-        tls::TlsOptions,
+        tls::TlsConfig,
         SourceSender,
     };
 
@@ -709,9 +715,9 @@ mod integration_tests {
 
         let out = source(
             logstash_address(),
-            Some(TlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     crt_file: Some("tests/data/host.docker.internal.crt".into()),
                     key_file: Some("tests/data/host.docker.internal.key".into()),
                     ..Default::default()
@@ -735,7 +741,10 @@ mod integration_tests {
         assert!(log.get("host").is_some());
     }
 
-    async fn source(address: String, tls: Option<TlsConfig>) -> impl Stream<Item = Event> {
+    async fn source(
+        address: String,
+        tls: Option<TlsEnableableConfig>,
+    ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
         tokio::spawn(async move {
@@ -747,7 +756,7 @@ mod integration_tests {
                 acknowledgements: false.into(),
                 connection_limit: None,
             }
-            .build(SourceContext::new_test(sender))
+            .build(SourceContext::new_test(sender, None))
             .await
             .unwrap()
             .await

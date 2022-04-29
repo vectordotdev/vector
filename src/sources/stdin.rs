@@ -3,19 +3,21 @@ use std::{io, thread};
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    config::{
-        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-    },
-    internal_events::StdinEventsReceived,
-    serde::{default_decoding, default_framing_stream_based},
+    codecs::DecodingConfig,
+    config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -25,10 +27,9 @@ pub struct StdinConfig {
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-    #[serde(default = "default_framing_stream_based")]
-    pub framing: Box<dyn FramingConfig>,
+    pub framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn DeserializerConfig>,
+    pub decoding: DeserializerConfig,
 }
 
 impl Default for StdinConfig {
@@ -36,7 +37,7 @@ impl Default for StdinConfig {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
             host_key: Default::default(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -61,7 +62,7 @@ impl SourceConfig for StdinConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -70,6 +71,10 @@ impl SourceConfig for StdinConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::Stdin]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -86,7 +91,11 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding.clone()).build()?;
+
+    let framing = config
+        .framing
+        .unwrap_or_else(|| config.decoding.default_stream_framing());
+    let decoder = DecodingConfig::new(framing, config.decoding).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -108,6 +117,10 @@ where
 
             stdin.consume(len);
 
+            emit!(BytesReceived {
+                byte_size: len,
+                protocol: "none"
+            });
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
                 break;
@@ -119,11 +132,11 @@ where
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
         let mut stream = stream! {
-            loop {
-                match stream.next().await {
-                    Some(Ok((events, byte_size))) => {
-                        emit!(&StdinEventsReceived {
-                            byte_size,
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok((events, _byte_size)) => {
+                        emit!(StdinEventsReceived {
+                            byte_size: events.size_of(),
                             count: events.len()
                         });
 
@@ -136,32 +149,32 @@ where
                             log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.try_insert(&host_key, hostname.clone());
+                                log.try_insert(host_key.as_str(), hostname.clone());
                             }
 
                             yield event;
                         }
                     }
-                    Some(Err(error)) => {
+                    Err(error) => {
                         // Error is logged by `crate::codecs::Decoder`, no
                         // further handling is needed here.
                         if !error.can_continue() {
                             break;
                         }
                     }
-                    None => break,
                 }
             }
         }
         .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Unable to send event to out.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }

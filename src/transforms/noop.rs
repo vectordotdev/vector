@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::Event,
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -16,12 +17,12 @@ impl TransformConfig for Noop {
         Ok(Transform::function(self.clone()))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -30,7 +31,7 @@ impl TransformConfig for Noop {
 }
 
 impl FunctionTransform for Noop {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         output.push(event);
     }
 }

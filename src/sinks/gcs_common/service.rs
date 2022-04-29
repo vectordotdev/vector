@@ -92,6 +92,7 @@ impl DriverResponse for GcsResponse {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -116,7 +117,7 @@ impl Service<GcsRequest> for GcsService {
         headers.insert("content-type", settings.content_type);
         headers.insert(
             "content-length",
-            HeaderValue::from_str(&format!("{}", request.body.len())).unwrap(),
+            HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
         settings
             .content_encoding

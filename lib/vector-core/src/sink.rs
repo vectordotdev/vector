@@ -1,9 +1,9 @@
-use std::{fmt, pin::Pin};
+use std::{fmt, iter::IntoIterator, pin::Pin};
 
 use async_trait::async_trait;
 use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
 
-use crate::event::{Event, EventArray, EventContainer};
+use crate::event::{into_event_stream, Event, EventArray, EventContainer};
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),
@@ -16,15 +16,24 @@ impl VectorSink {
     /// # Errors
     ///
     /// It is unclear under what conditions this function will error.
-    pub async fn run<S>(self, input: S) -> Result<(), ()>
-    where
-        S: Stream<Item = Event> + Send,
-    {
-        let input = input.map(Into::into);
+    pub async fn run(self, input: impl Stream<Item = EventArray> + Send) -> Result<(), ()> {
         match self {
             Self::Sink(sink) => input.map(Ok).forward(sink).await,
             Self::Stream(s) => s.run(Box::pin(input)).await,
         }
+    }
+
+    /// Run the `VectorSink` with a one-time `Vec` of `Event`s, for use in tests
+    ///
+    /// # Errors
+    ///
+    /// See `VectorSink::run` for errors.
+    pub async fn run_events<I>(self, input: I) -> Result<(), ()>
+    where
+        I: IntoIterator<Item = Event> + Send,
+        I::IntoIter: Send,
+    {
+        self.run(stream::iter(input).map(Into::into)).await
     }
 
     /// Converts `VectorSink` into a `futures::Sink`
@@ -161,7 +170,7 @@ struct EventStream<T> {
 #[async_trait]
 impl<T: StreamSink<Event> + Send> StreamSink<EventArray> for EventStream<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), ()> {
-        let input = Box::pin(input.flat_map(|events| stream::iter(events.into_events())));
+        let input = Box::pin(input.flat_map(into_event_stream));
         self.sink.run(input).await
     }
 }

@@ -1,6 +1,6 @@
 // These tests have been (inconsistently) hanging after the Tokio 1.x upgrade, most likely due to
 // some interaction between the Tokio runtime and the rusty_fork library.
-// For an attempt to fix these tests, see https://github.com/timberio/vector/pull/6926, which has
+// For an attempt to fix these tests, see https://github.com/vectordotdev/vector/pull/6926, which has
 // been blocked on several changes that would be required to upstream crates.
 /*
 
