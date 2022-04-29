@@ -241,6 +241,32 @@ pub enum Serializer {
     RawMessage(RawMessageSerializer),
 }
 
+impl Serializer {
+    /// Check if the serializer supports encoding to JSON via `Serializer::encode_json`.
+    pub fn supports_json(&self) -> bool {
+        match self {
+            Serializer::Json(_) | Serializer::NativeJson(_) => true,
+            Serializer::Native(_) | Serializer::RawMessage(_) => false,
+        }
+    }
+
+    /// Encode event as JSON.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
+    /// if you need to determine the capability to encode to JSON at runtime.
+    pub fn encode_json(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+        match self {
+            Serializer::Json(serializer) => serializer.encode_json(event),
+            Serializer::NativeJson(serializer) => serializer.encode_json(event),
+            Serializer::Native(_) | Serializer::RawMessage(_) => {
+                panic!("Serializer does not support JSON")
+            }
+        }
+    }
+}
+
 impl From<JsonSerializer> for Serializer {
     fn from(serializer: JsonSerializer) -> Self {
         Self::Json(serializer)
