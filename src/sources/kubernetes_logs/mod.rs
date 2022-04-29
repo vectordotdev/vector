@@ -237,8 +237,9 @@ impl Source {
         key: &ComponentKey,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
-        let label_selector = prepare_label_selector(config);
-        let namespace_label_selector = prepare_namespace_label_selector(config);
+        let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
+        let namespace_label_selector =
+            prepare_label_selector(config.extra_namespace_label_selector.as_ref());
 
         // If the user passed a custom Kubeconfig use it, otherwise
         // we attempt to load the local kubec-config, followed by the
@@ -621,28 +622,16 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     ))
 }
 
-// This function constructs the effective pod label selector to use, based on
+// This function constructs the effective label selector to use, based on
 // the specified configuration.
-fn prepare_label_selector(config: &Config) -> String {
+fn prepare_label_selector(selector: &str) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
-    if config.extra_label_selector.is_empty() {
+    if selector.is_empty() {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, config.extra_label_selector)
-}
-
-// This function constructs the effective namespace label selector to use, based on
-// the specified configuration.
-fn prepare_namespace_label_selector(config: &Config) -> String {
-    const BUILT_IN: &str = "vector.dev/exclude!=true";
-
-    if config.extra_namespace_label_selector.is_empty() {
-        return BUILT_IN.to_string();
-    }
-
-    format!("{},{}", BUILT_IN, config.extra_namespace_label_selector)
+    format!("{},{}", BUILT_IN, selector.to_string())
 }
 
 #[cfg(test)]
@@ -735,51 +724,50 @@ mod tests {
     #[test]
     fn prepare_label_selector() {
         let cases = vec![
-            (Config::default(), "vector.dev/exclude!=true"),
+            (
+                Config::default().extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config::default().extra_namespace_label_selector,
+                "vector.dev/exclude!=true",
+            ),
             (
                 Config {
                     extra_label_selector: "".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true",
             ),
             (
                 Config {
                     extra_label_selector: "qwe".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true,qwe",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "qwe".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true,qwe",
             ),
         ];
 
         for (input, expected) in cases {
             let output = super::prepare_label_selector(&input);
-            assert_eq!(expected, output, "expected left, actual right");
-        }
-    }
-
-    #[test]
-    fn prepare_namespace_label_selector() {
-        let cases = vec![
-            (Config::default(), "vector.dev/exclude!=true"),
-            (
-                Config {
-                    extra_namespace_label_selector: "".to_owned(),
-                    ..Default::default()
-                },
-                "vector.dev/exclude!=true",
-            ),
-            (
-                Config {
-                    extra_namespace_label_selector: "qwe".to_owned(),
-                    ..Default::default()
-                },
-                "vector.dev/exclude!=true,qwe",
-            ),
-        ];
-
-        for (input, expected) in cases {
-            let output = super::prepare_namespace_label_selector(&input);
             assert_eq!(expected, output, "expected left, actual right");
         }
     }
