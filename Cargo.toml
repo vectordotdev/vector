@@ -125,7 +125,7 @@ futures = { version = "0.3.21", default-features = false, features = ["compat", 
 tokio = { version = "1.18.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
-tokio-util = { version = "0.7", default-features = false, features = ["time"] }
+tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.1.4", default-features = false, optional = true }
 
 # Tracing
@@ -452,7 +452,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls"]
-sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "async-compression", "sources-aws_sqs"]
+sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "value"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
