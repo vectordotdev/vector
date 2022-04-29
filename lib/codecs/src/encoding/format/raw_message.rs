@@ -48,7 +48,7 @@ impl Encoder<Event> for RawMessageSerializer {
                 .get_by_meaning(message_key)
                 .or_else(|| log.get(message_key)) // backward compatibility
                 .map(|value| value.coerce_to_bytes()),
-            Event::Metric(_) => None,
+            Event::Metric(metric) => Some(metric.to_string().into()),
             Event::Trace(_) => None,
         };
 
@@ -64,9 +64,10 @@ impl Encoder<Event> for RawMessageSerializer {
 mod tests {
     use super::*;
     use bytes::{Bytes, BytesMut};
+    use vector_core::event::{Metric, MetricKind, MetricValue};
 
     #[test]
-    fn serialize_bytes() {
+    fn serialize_log() {
         let input = Event::from("foo");
         let mut serializer = RawMessageSerializer;
 
@@ -74,5 +75,22 @@ mod tests {
         serializer.encode(input, &mut buffer).unwrap();
 
         assert_eq!(buffer.freeze(), Bytes::from("foo"));
+    }
+
+    #[test]
+    fn serialize_metric() {
+        let input = Event::Metric(Metric::new(
+            "users",
+            MetricKind::Incremental,
+            MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        ));
+        let mut serializer = RawMessageSerializer;
+
+        let mut buffer = BytesMut::new();
+        serializer.encode(input, &mut buffer).unwrap();
+
+        assert_eq!(buffer.freeze(), Bytes::from("users{} + bob"));
     }
 }
