@@ -412,9 +412,14 @@ const fn default_reporting_interval_secs() -> f64 {
     5.0
 }
 
-/// By default, keep retrying (recoverable) failed reporting (infinitely, for practical purposes.)
+/// By default, keep retrying (recoverable) failed reporting
+///
+/// This is set to 8 attempts which, with the exponential backoff strategy and
+/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
+/// roughly 3 minutes of retrying before giving up and allowing the rest of
+/// Vector start.
 const fn default_max_retries() -> u32 {
-    u32::MAX
+    8
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
