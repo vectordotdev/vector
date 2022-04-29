@@ -455,13 +455,6 @@ fn build_request<'a>(
         })
 }
 
-/// Checks if an HTTP error response is retriable based on status code
-fn is_retriable_error(status: StatusCode) -> bool {
-    status.is_server_error()
-        || status == StatusCode::TOO_MANY_REQUESTS
-        || status == StatusCode::REQUEST_TIMEOUT
-}
-
 /// Reports a JSON serialized Vector config to Datadog, for use with Observability Pipelines.
 async fn report_serialized_config_to_datadog<'a>(
     client: &'a HttpClient,
@@ -512,7 +505,7 @@ async fn report_serialized_config_to_datadog<'a>(
             continue;
         } else if status.is_redirection() && redirected {
             return Err(ReportingError::TooManyRedirects);
-        } else if is_retriable_error(status) {
+        } else if status.is_client_error() || status.is_server_error() {
             info!(message = "Encountered retriable error.", status = %status);
             backoff.wait().await;
             continue;
