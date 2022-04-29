@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticError, Label, Note, Span};
+use diagnostic::{DiagnosticMessage, Label, Note, Span};
 use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
@@ -28,7 +28,7 @@ impl std::error::Error for ExpressionError {
     }
 }
 
-impl DiagnosticError for ExpressionError {
+impl DiagnosticMessage for ExpressionError {
     fn code(&self) -> usize {
         0
     }

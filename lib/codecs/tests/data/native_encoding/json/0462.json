@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"b","kind":"absolute","distribution":{"samples":[{"value":917504.0,"rate":515000231},{"value":-184625.2495,"rate":3127393603},{"value":-589760.0,"rate":2277355200},{"value":259008.0,"rate":4294967295},{"value":800640.0,"rate":1357869007}],"statistic":"histogram"}}}

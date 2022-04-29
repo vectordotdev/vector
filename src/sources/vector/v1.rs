@@ -17,7 +17,7 @@ use crate::{
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -27,7 +27,7 @@ pub(crate) struct VectorConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -39,7 +39,7 @@ impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
                      // our cargo-hack run
-    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
         self.tls = config;
     }
 
@@ -162,7 +162,7 @@ mod test {
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
         test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -226,14 +226,14 @@ mod test {
             addr,
             {
                 let mut config = VectorConfig::from_address(addr.into());
-                config.set_tls(Some(TlsConfig::test_config()));
+                config.set_tls(Some(TlsEnableableConfig::test_config()));
                 config
             },
             {
                 let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
-                config.set_tls(Some(TlsConfig {
+                config.set_tls(Some(TlsEnableableConfig {
                     enabled: Some(true),
-                    options: TlsOptions {
+                    options: TlsConfig {
                         verify_certificate: Some(false),
                         ..Default::default()
                     },

@@ -52,7 +52,7 @@ async fn firehose_put_records() {
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
         region: region.clone(),
-        encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
+        encoding: EncodingConfig::from(StandardEncodings::Json).into(), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -78,7 +78,9 @@ async fn firehose_put_records() {
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+        })),
         endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),

@@ -28,7 +28,8 @@ pub fn compile_with_state(
     fns: &[Box<dyn Function>],
     state: &mut state::ExternalEnv,
 ) -> compiler::Result {
-    let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;
+    let ast = parser::parse(source)
+        .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
     compiler::compile_with_state(ast, fns, state)
 }
@@ -38,8 +39,9 @@ pub fn compile_for_repl(
     fns: &[Box<dyn Function>],
     external: &mut state::ExternalEnv,
     local: state::LocalEnv,
-) -> compiler::Result<(Program, state::LocalEnv)> {
-    let ast = parser::parse(source).map_err(|err| vec![Box::new(err) as _])?;
+) -> compiler::Result<Program> {
+    let ast = parser::parse(source)
+        .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
     compiler::compile_for_repl(ast, fns, local, external)
 }

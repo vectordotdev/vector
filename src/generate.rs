@@ -465,9 +465,6 @@ mod tests {
                 [sources.source0.decoding]
                 codec = "bytes"
 
-                [sources.source0.framing]
-                method = "newline_delimited"
-
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -504,9 +501,6 @@ mod tests {
                 [sources.source0.decoding]
                 codec = "bytes"
 
-                [sources.source0.framing]
-                method = "newline_delimited"
-
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -542,9 +536,6 @@ mod tests {
 
                 [sources.source0.decoding]
                 codec = "bytes"
-
-                [sources.source0.framing]
-                method = "newline_delimited"
 
                 [sinks.sink0]
                 inputs = ["source0"]

@@ -17,7 +17,10 @@ use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
         azure_common,
-        util::{encoding::StandardEncodings, Compression, TowerRequestConfig},
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            Compression, TowerRequestConfig,
+        },
         VectorSink,
     },
     test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
@@ -83,7 +86,7 @@ async fn azure_blob_insert_json_into_blob() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
-        encoding: StandardEncodings::Ndjson.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Ndjson).into(),
         ..config
     };
     let sink = config.to_sink();
@@ -140,7 +143,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
-        encoding: StandardEncodings::Ndjson.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Ndjson).into(),
         compression: Compression::gzip_default(),
         ..config
     };
@@ -208,7 +211,7 @@ impl AzureBlobSinkConfig {
                 blob_prefix: None,
                 blob_time_format: None,
                 blob_append_uuid: None,
-                encoding: StandardEncodings::Text.into(),
+                encoding: EncodingConfig::from(StandardEncodings::Text).into(),
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),

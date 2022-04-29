@@ -19,11 +19,11 @@ use crate::{
         SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
-    serde::{bool_or_struct, default_decoding, default_framing_stream_based},
+    serde::{bool_or_struct, default_decoding},
     sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -35,7 +35,7 @@ pub(super) struct SimpleHttpConfig {
     headers: Vec<String>,
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     auth: Option<HttpSourceAuthConfig>,
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
@@ -65,7 +65,7 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
-            framing: Some(default_framing_stream_based()),
+            framing: None,
             decoding: Some(default_decoding()),
             acknowledgements: AcknowledgementsConfig::default(),
         })
@@ -161,16 +161,12 @@ impl SourceConfig for SimpleHttpConfig {
                 ),
             }
         } else {
-            (
-                match self.framing.as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => default_framing_stream_based(),
-                },
-                match self.decoding.as_ref() {
-                    Some(decoding) => decoding.clone(),
-                    None => default_decoding(),
-                },
-            )
+            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
+            let framing = self
+                .framing
+                .clone()
+                .unwrap_or_else(|| decoding.default_stream_framing());
+            (framing, decoding)
         };
 
         let decoder = DecodingConfig::new(framing, decoding).build();
@@ -192,7 +188,12 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(
+            self.decoding
+                .as_ref()
+                .map(|d| d.output_type())
+                .unwrap_or(DataType::Log),
+        )]
     }
 
     fn source_type(&self) -> &'static str {
@@ -258,6 +259,7 @@ mod tests {
         crate::test_util::test_generate_config::<SimpleHttpConfig>();
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
         query_parameters: Vec<String>,

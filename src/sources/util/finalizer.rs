@@ -2,7 +2,7 @@ use std::marker::{PhantomData, Unpin};
 use std::{future::Future, pin::Pin, task::Poll};
 
 use futures::stream::{FuturesOrdered, FuturesUnordered};
-use futures::{future::Shared, FutureExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc;
 
 use crate::event::{BatchStatus, BatchStatusReceiver};
@@ -38,7 +38,7 @@ where
     T: Send + 'static,
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
-    pub(crate) fn new<F, Fut>(shutdown: Shared<ShutdownSignal>, apply_done: F) -> Self
+    pub(crate) fn new<F, Fut>(shutdown: ShutdownSignal, apply_done: F) -> Self
     where
         F: Fn(T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
@@ -61,7 +61,7 @@ where
 }
 
 async fn run_finalizer<T, F: Future<Output = ()>>(
-    shutdown: Shared<ShutdownSignal>,
+    shutdown: ShutdownSignal,
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: impl Fn(T) -> F,
     mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,

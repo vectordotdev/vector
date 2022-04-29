@@ -15,7 +15,7 @@ pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 pub struct AbsoluteMetricNormalizer;
 
 impl MetricNormalize for AbsoluteMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -24,7 +24,7 @@ impl MetricNormalize for AbsoluteMetricNormalizer {
 pub struct IncrementalMetricNormalizer;
 
 impl MetricNormalize for IncrementalMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_incremental(metric)
     }
 }
@@ -37,7 +37,7 @@ pub struct MetricState<N> {
 
 impl<N: MetricNormalize> MetricState<N> {
     pub fn merge(&mut self, metric: Metric) {
-        if let Some(output) = self.normalizer.apply_state(&mut self.intermediate, metric) {
+        if let Some(output) = self.normalizer.normalize(&mut self.intermediate, metric) {
             let (series, data, metadata) = output.into_parts();
             self.latest.insert(series, (data, metadata));
         }

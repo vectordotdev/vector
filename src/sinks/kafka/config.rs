@@ -11,7 +11,9 @@ use crate::{
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
             BatchConfig, NoDefaultsBatchSettings,
         },
         Healthcheck, VectorSink,
@@ -25,7 +27,9 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub(crate) encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub(crate) encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -163,7 +167,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),
