@@ -1,7 +1,7 @@
 ---
 date: "2022-04-29"
 title: "Vector Config Subcommand"
-description: "A new subcommand to output configuration(s) as a single, standard JSON object"
+description: "A new subcommand to output configuration(s) as a standard JSON object"
 authors: ["001wwang"]
 pr_numbers: []
 release: "0.22.0"
