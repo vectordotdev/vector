@@ -631,7 +631,7 @@ fn prepare_label_selector(selector: &str) -> String {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, selector.to_string())
+    format!("{},{}", BUILT_IN, selector)
 }
 
 #[cfg(test)]
