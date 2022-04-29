@@ -5,12 +5,14 @@
 
 mod bytes;
 mod character_delimited;
+mod length_delimited;
 mod newline_delimited;
 
 pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
 pub use character_delimited::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions,
 };
+pub use length_delimited::{LengthDelimitedEncoder, LengthDelimitedEncoderConfig};
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
 
 use dyn_clone::DynClone;

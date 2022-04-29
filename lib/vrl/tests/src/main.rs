@@ -55,6 +55,16 @@ static AST_ONLY_TESTS: &[&str] = &[
     "functions/map_keys/map object keys",
     "functions/map_keys/recursively map object keys",
     "functions/map_keys/map nested object keys",
+    // `map_values`
+    "rfcs/8381/add fields to objects in array",
+    "rfcs/8381/call parse timestamp on array of cloudtrail records",
+    "rfcs/8381/delete a field from all objects in an array",
+    "rfcs/8381/nullify empty strings",
+    "rfcs/8381/run encode json on all top level object fields",
+    "rfcs/8381/run parse json on multiple strings in array and emit as multiple events",
+    "functions/map_values (closure)/map object values",
+    "functions/map_values/map object values",
+    "functions/map_values/recursively map object values",
 ];
 
 #[derive(Parser, Debug)]

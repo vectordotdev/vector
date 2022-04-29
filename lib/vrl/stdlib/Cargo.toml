@@ -123,6 +123,7 @@ default = [
     "length",
     "log",
     "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -256,6 +257,7 @@ join = []
 length = []
 log = ["tracing"]
 map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
