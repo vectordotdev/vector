@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, fmt};
 
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
 
 use crate::{
@@ -520,7 +520,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

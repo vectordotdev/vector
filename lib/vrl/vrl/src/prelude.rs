@@ -4,7 +4,9 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    value::{Collection, Field, Index, Kind},
+    expression::FunctionClosure,
+    function::closure,
+    value::{Collection, Field, Index, IterItem, Kind},
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
@@ -29,7 +31,7 @@ pub use compiler::{
     bench_function, expr, expression::FunctionArgument, func_args, map, test_function,
     test_type_def, type_def, value, vm::VmArgumentList,
 };
-pub use diagnostic::DiagnosticError;
+pub use diagnostic::DiagnosticMessage;
 pub use indoc::indoc;
 pub use ordered_float::NotNan;
 

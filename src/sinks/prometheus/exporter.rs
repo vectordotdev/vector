@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
-use tracing_futures::Instrument;
+use tracing::{Instrument, Span};
 use vector_core::{
     buffers::Acker,
     event::metric::MetricSeries,
@@ -46,7 +46,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
@@ -65,7 +65,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<TlsEnableableConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -288,7 +288,7 @@ struct PrometheusExporterMetricNormalizer {
 }
 
 impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         let new_metric = match metric.value() {
             MetricValue::Distribution { .. } => {
                 // Convert the distribution as-is, and then let the normalizer absolute-ify it.
@@ -374,14 +374,14 @@ impl PrometheusExporter {
             return;
         }
 
-        let span = crate::trace::current_span();
+        let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
 
         let new_service = make_service_fn(move |_| {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let metrics = Arc::clone(&metrics);
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
@@ -492,7 +492,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
             // Now process the metric we got.
             let metric = event.into_metric();
-            if let Some(normalized) = normalizer.apply(metric) {
+            if let Some(normalized) = normalizer.normalize(metric) {
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
@@ -547,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_tls() {
-        let mut tls_config = TlsConfig::test_config();
+        let mut tls_config = TlsEnableableConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
         export_and_fetch_simple(Some(tls_config)).await;
     }
@@ -578,7 +578,10 @@ mod tests {
         );
     }
 
-    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
+    async fn export_and_fetch(
+        tls_config: Option<TlsEnableableConfig>,
+        events: Vec<Event>,
+    ) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -619,7 +622,7 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
-    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
+    async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];

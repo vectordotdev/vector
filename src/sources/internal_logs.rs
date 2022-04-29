@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future, stream, StreamExt};
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use vector_core::ByteSizeOf;
 
@@ -9,7 +9,8 @@ use crate::{
     event::Event,
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    trace, SourceSender,
+    trace::TraceSubscription,
+    SourceSender,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -17,6 +18,10 @@ use crate::{
 pub struct InternalLogsConfig {
     host_key: Option<String>,
     pid_key: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
 }
 
 inventory::submit! {
@@ -24,6 +29,17 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
+
+impl InternalLogsConfig {
+    /// Return an internal logs config with enterprise reporting defaults.
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
+        Self {
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
+            ..Self::default()
+        }
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_logs")]
@@ -36,7 +52,17 @@ impl SourceConfig for InternalLogsConfig {
             .to_owned();
         let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
 
-        Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
+        let subscription = TraceSubscription::subscribe();
+
+        Ok(Box::pin(run(
+            host_key,
+            pid_key,
+            subscription,
+            cx.out,
+            cx.shutdown,
+            self.configuration_key.to_owned(),
+            self.version.to_owned(),
+        )))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -55,21 +81,20 @@ impl SourceConfig for InternalLogsConfig {
 async fn run(
     host_key: String,
     pid_key: String,
+    mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
+    configuration_key: Option<String>,
+    version: Option<String>,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
-    let subscription = trace::subscribe();
-
-    // chain the logs emitted before the source started first
-    let mut rx = stream::iter(subscription.buffer)
-        .map(Ok)
-        .chain(tokio_stream::wrappers::BroadcastStream::new(
-            subscription.receiver,
-        ))
-        .filter_map(|log| future::ready(log.ok()))
+    // Chain any log events that were captured during early buffering to the front,
+    // and then continue with the normal stream of internal log events.
+    let buffered_events = subscription.buffered_events().await;
+    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+        .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
@@ -89,6 +114,12 @@ async fn run(
         log.insert(pid_key.as_str(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
+        if let Some(ref config_key) = configuration_key {
+            log.try_insert("configuration_key", Bytes::from(config_key.clone()));
+        }
+        if let Some(ref version) = version {
+            log.try_insert("version", Bytes::from(version.clone()));
+        }
         if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { error, count: 1 });
@@ -164,7 +195,7 @@ mod tests {
             .unwrap();
         tokio::spawn(source);
         sleep(Duration::from_millis(1)).await;
-        trace::stop_buffering();
+        trace::stop_early_buffering();
         rx
     }
 }

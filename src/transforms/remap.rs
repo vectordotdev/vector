@@ -12,7 +12,7 @@ use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::{Formatter, Note},
-    prelude::{DiagnosticError, ExpressionError},
+    prelude::{DiagnosticMessage, ExpressionError},
     Program, Runtime, Terminate, Vm, VrlRuntime,
 };
 
@@ -53,6 +53,7 @@ impl RemapConfig {
         merged_schema_definition: schema::Definition,
     ) -> Result<(
         vrl::Program,
+        String,
         Vec<Box<dyn vrl::Function>>,
         vrl::state::ExternalEnv,
     )> {
@@ -85,7 +86,14 @@ impl RemapConfig {
                     .to_string()
                     .into()
             })
-            .map(|program| (program, functions, state))
+            .map(|(program, diagnostics)| {
+                (
+                    program,
+                    Formatter::new(&source, diagnostics).to_string(),
+                    functions,
+                    state,
+                )
+            })
     }
 }
 
@@ -99,16 +107,26 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        match self.runtime {
+        let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
-                let remap = Remap::new_ast(self.clone(), context)?;
-                Ok(Transform::synchronous(remap))
+                let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
             }
             VrlRuntime::Vm => {
-                let remap = Remap::new_vm(self.clone(), context)?;
-                Ok(Transform::synchronous(remap))
+                let (remap, warnings) = Remap::new_vm(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
             }
+        };
+
+        // TODO: We could improve on this by adding support for non-fatal error
+        // messages in the topology. This would make the topology responsible
+        // for printing warnings (including potentially emiting metrics),
+        // instead of individual transforms.
+        if !warnings.is_empty() {
+            warn!(message = "VRL compilation warning.", %warnings);
         }
+
+        Ok(transform)
     }
 
     fn input(&self) -> Input {
@@ -127,7 +145,7 @@ impl TransformConfig for RemapConfig {
                 merged_definition.clone(),
             )
             .ok()
-            .and_then(|(_, _, state)| state.target_kind().cloned())
+            .and_then(|(_, _, _, state)| state.target_kind().cloned())
             .and_then(Kind::into_object)
             .map(Into::into)
             .unwrap_or_else(schema::Definition::empty);
@@ -246,8 +264,11 @@ impl VrlRunner for AstRunner {
 }
 
 impl Remap<VmRunner> {
-    pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, mut state) = config.compile_vrl_program(
+    pub fn new_vm(
+        config: RemapConfig,
+        context: &TransformContext,
+    ) -> crate::Result<(Self, String)> {
+        let (program, warnings, functions, mut state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
@@ -259,13 +280,16 @@ impl Remap<VmRunner> {
             vm: Arc::new(vm),
         };
 
-        Self::new(config, context, program, runner)
+        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
 }
 
 impl Remap<AstRunner> {
-    pub fn new_ast(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, _, _) = config.compile_vrl_program(
+    pub fn new_ast(
+        config: RemapConfig,
+        context: &TransformContext,
+    ) -> crate::Result<(Self, String)> {
+        let (program, warnings, _, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
@@ -273,7 +297,7 @@ impl Remap<AstRunner> {
         let runtime = Runtime::default();
         let runner = AstRunner { runtime };
 
-        Self::new(config, context, program, runner)
+        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
 }
 
@@ -520,6 +544,7 @@ mod tests {
         ]);
 
         Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
+            .map(|(remap, _)| remap)
     }
 
     #[test]
@@ -935,7 +960,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -1068,7 +1093,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output =
             transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
@@ -1127,7 +1152,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
@@ -1194,7 +1219,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();

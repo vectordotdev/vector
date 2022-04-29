@@ -215,8 +215,18 @@ impl Encoder<Event> for StatsdEncoder {
                     StatisticKind::Histogram => "h",
                     StatisticKind::Summary => "d",
                 };
-                let samples = compress_distribution(samples.clone());
-                for sample in samples {
+
+                // TODO: This would actually be good to potentially add a helper combinator for, in the same vein as
+                // `SinkBuilderExt::normalized`, that provides a metric "optimizer" for doing these sorts of things. We
+                // don't actually compress distributions as-is in other metrics sinks unless they use the old-style
+                // approach coupled with `MetricBuffer`. While not every sink would benefit from this -- the
+                // `datadog_metrics` sink always converts distributions to sketches anyways, for example -- a lot of
+                // them could.
+                //
+                // This would also imply rewriting this sink in the new style to take advantage of it.
+                let mut samples = samples.clone();
+                let compressed_samples = compress_distribution(&mut samples);
+                for sample in compressed_samples {
                     push_event(
                         &mut buf,
                         metric,

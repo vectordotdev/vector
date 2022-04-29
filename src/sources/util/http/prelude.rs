@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
+use tracing::Span;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -25,7 +26,7 @@ use super::{
 use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -39,12 +40,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         address: SocketAddr,
         path: &str,
         strict_path: bool,
-        tls: &Option<TlsConfig>,
+        tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
@@ -55,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()

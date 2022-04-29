@@ -13,7 +13,7 @@ use super::service::{S3Response, S3Service};
 use crate::aws::{create_client, is_retriable_error};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::s3::S3ClientBuilder;
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     config::ProxyConfig,
     sinks::{util::retries::RetryLogic, Healthcheck},
@@ -162,7 +162,7 @@ pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsOptions>,
+    tls_options: &Option<TlsConfig>,
 ) -> crate::Result<S3Service> {
     let endpoint = region.endpoint()?;
     let region = region.region();

@@ -62,7 +62,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
@@ -131,7 +132,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
@@ -206,7 +208,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 drop_on_abort: true,
                     ..Default::default()
             }, &Default::default())
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let mut event = Event::from("coerce me");

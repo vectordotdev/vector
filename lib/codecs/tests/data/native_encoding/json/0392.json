@@ -1,1 +1,1 @@
-{"metric":{"name":"b","namespace":"k","kind":"incremental","counter":{"value":858368.0}}}
+{"metric":{"name":"u","tags":{"a":"a","k":"m","u":"m"},"kind":"incremental","gauge":{"value":-9920.0}}}

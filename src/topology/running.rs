@@ -644,8 +644,8 @@ impl RunningTopology {
         let old_inputs = self
             .config
             .inputs_for_node(key)
-            .expect("node exists")
-            .iter()
+            .into_iter()
+            .flatten()
             .cloned()
             .collect::<HashSet<_>>();
 

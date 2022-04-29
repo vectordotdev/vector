@@ -20,14 +20,19 @@ use crate::{
     common::datadog::{get_api_base_endpoint, Region},
     http::{HttpClient, HttpError},
     signal::{SignalRx, SignalTo},
-    sinks::datadog::metrics::DatadogMetricsConfig,
-    sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
+    sinks::datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+    sources::{
+        host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
+        internal_metrics::InternalMetricsConfig,
+    },
 };
 use vector_core::config::proxy::ProxyConfig;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
+static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
+static DATADOG_LOGS_KEY: &str = "#datadog_logs";
 
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
@@ -302,7 +307,9 @@ pub async fn try_attach(
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
+    let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
+    let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
@@ -310,6 +317,7 @@ pub async fn try_attach(
         HostMetricsConfig::enterprise(config_version, &datadog.configuration_key);
     let mut internal_metrics =
         InternalMetricsConfig::enterprise(config_version, &datadog.configuration_key);
+    let internal_logs = InternalLogsConfig::enterprise(config_version, &datadog.configuration_key);
 
     // Override default scrape intervals.
     host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
@@ -323,10 +331,14 @@ pub async fn try_attach(
         internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
     );
+    config.sources.insert(
+        internal_logs_id.component.clone(),
+        SourceOuter::new(internal_logs),
+    );
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig::enterprise(
-        api_key,
+        api_key.clone(),
         datadog.endpoint.clone(),
         datadog.site.clone(),
         datadog.region,
@@ -338,6 +350,19 @@ pub async fn try_attach(
             vec![host_metrics_id, internal_metrics_id],
             Box::new(datadog_metrics),
         ),
+    );
+
+    // Create a Datadog logs sink to consume and emit internal logs.
+    let datadog_logs = DatadogLogsConfig::enterprise(
+        api_key,
+        datadog.endpoint.clone(),
+        datadog.site.clone(),
+        datadog.region,
+    );
+
+    config.sinks.insert(
+        datadog_logs_id,
+        SinkOuter::new(vec![internal_logs_id], Box::new(datadog_logs)),
     );
 
     Ok(())

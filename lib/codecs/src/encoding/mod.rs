@@ -10,8 +10,8 @@ pub use format::{
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
-    CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder,
-    NewlineDelimitedEncoderConfig,
+    CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
+    LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
 
 use bytes::BytesMut;
@@ -59,8 +59,16 @@ pub enum FramingConfig {
         /// Options for the character delimited encoder.
         character_delimited: CharacterDelimitedEncoderOptions,
     },
+    /// Configures the `LengthDelimitedEncoder`.
+    LengthDelimited,
     /// Configures the `NewlineDelimitedEncoder`.
     NewlineDelimited,
+}
+
+impl From<BytesEncoderConfig> for FramingConfig {
+    fn from(_: BytesEncoderConfig) -> Self {
+        Self::Bytes
+    }
 }
 
 impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
@@ -68,6 +76,12 @@ impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
         Self::CharacterDelimited {
             character_delimited: config.character_delimited,
         }
+    }
+}
+
+impl From<LengthDelimitedEncoderConfig> for FramingConfig {
+    fn from(_: LengthDelimitedEncoderConfig) -> Self {
+        Self::LengthDelimited
     }
 }
 
@@ -79,7 +93,7 @@ impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub const fn build(self) -> Framer {
+    pub fn build(self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited {
@@ -90,6 +104,9 @@ impl FramingConfig {
                 }
                 .build(),
             ),
+            FramingConfig::LengthDelimited => {
+                Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
+            }
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
@@ -104,6 +121,8 @@ pub enum Framer {
     Bytes(BytesEncoder),
     /// Uses a `CharacterDelimitedEncoder` for framing.
     CharacterDelimited(CharacterDelimitedEncoder),
+    /// Uses a `LengthDelimitedEncoder` for framing.
+    LengthDelimited(LengthDelimitedEncoder),
     /// Uses a `NewlineDelimitedEncoder` for framing.
     NewlineDelimited(NewlineDelimitedEncoder),
     /// Uses an opaque `Encoder` implementation for framing.
@@ -122,6 +141,12 @@ impl From<CharacterDelimitedEncoder> for Framer {
     }
 }
 
+impl From<LengthDelimitedEncoder> for Framer {
+    fn from(encoder: LengthDelimitedEncoder) -> Self {
+        Self::LengthDelimited(encoder)
+    }
+}
+
 impl From<NewlineDelimitedEncoder> for Framer {
     fn from(encoder: NewlineDelimitedEncoder) -> Self {
         Self::NewlineDelimited(encoder)
@@ -137,12 +162,13 @@ impl From<BoxedFramer> for Framer {
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
-            Framer::Bytes(framer) => framer.encode((), dst),
-            Framer::CharacterDelimited(framer) => framer.encode((), dst),
-            Framer::NewlineDelimited(framer) => framer.encode((), dst),
-            Framer::Boxed(framer) => framer.encode((), dst),
+            Framer::Bytes(framer) => framer.encode((), buffer),
+            Framer::CharacterDelimited(framer) => framer.encode((), buffer),
+            Framer::LengthDelimited(framer) => framer.encode((), buffer),
+            Framer::NewlineDelimited(framer) => framer.encode((), buffer),
+            Framer::Boxed(framer) => framer.encode((), buffer),
         }
     }
 }
