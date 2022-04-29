@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# Extract all feature names from Cargo.toml
+features=$(
+  sed -e '
+    1,/^\[features\]$/d;
+    /^\[/,$d;
+    /=/!d;
+    s/ *=.*$//;
+
+    # Skip over certain features
+    /-utils-/d;
+    /^default$/d;
+    /^all-integration-tests$/d;
+  ' < Cargo.toml | sort
+)
+
+procs=$( nproc )
+
+# Prime the pump to build most of the artifacts
+cargo check --workspace --all-targets --no-default-features
+cargo check --workspace --all-targets --no-default-features --features default
+cargo check --workspace --all-targets --no-default-features --features all-integration-tests
+
+# The feature builds already run in parallel below, don't overload
+export CARGO_BUILD_JOBS=1
+
+exec xargs --max-procs=$procs --max-lines=1 scripts/check-one-feature <<< $features
