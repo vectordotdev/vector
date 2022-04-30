@@ -84,20 +84,16 @@ components: sinks: pulsar: {
 							examples: []
 							options: {
 								issuer_url: {
-									common:      false
 									description: "The issuer url."
 									required:    true
 									type: string: {
-										default: null
 										examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 									}
 								}
 								credentials_url: {
-									common:      false
 									description: "The url for credentials. The data url is also supported."
 									required:    true
 									type: string: {
-										default: null
 										examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
 									}
 								}
