@@ -18,7 +18,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
     transforms::{metric_to_log::MetricToLogConfig, OutputBuffer},
 };
 
@@ -45,7 +45,7 @@ struct HumioMetricsConfig {
     request: TowerRequestConfig,
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

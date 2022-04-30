@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -22,7 +20,7 @@ use crate::{
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -40,7 +38,7 @@ pub struct PubsubDefaultBatchSettings;
 impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -64,7 +62,7 @@ pub struct PubsubConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,

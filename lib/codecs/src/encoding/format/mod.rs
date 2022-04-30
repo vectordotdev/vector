@@ -32,6 +32,3 @@ impl<Encoder> Serializer for Encoder where
 }
 
 dyn_clone::clone_trait_object!(Serializer);
-
-/// A `Box` containing a `Serializer`.
-pub type BoxedSerializer = Box<dyn Serializer>;

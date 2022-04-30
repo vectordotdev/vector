@@ -8,11 +8,13 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../vrl" }
-lookup_lib = {package = "lookup", path = "../../lookup" }
-datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+value = { path = "../../value", default-features = false }
+
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
-value = { path = "../../value"}
+datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
+vector_common = { path = "../../vector-common", default-features = false, optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -23,11 +25,12 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.8.0", default-features = false, optional = true}
+indexmap = { version = "~1.8.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
 once_cell = { version = "1.10", optional = true }
+rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -43,13 +46,23 @@ roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.5.1", optional = true }
 utf8-width = { version = "0.1.6", optional = true }
-vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
+
+# Cryptography
+aes = { version = "0.8.1", optional = true }
+
+# Cryptography - Block Modes
+ctr = { version = "0.9.1", optional = true }
+cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
+cfb-mode = { version = "0.8.1", optional = true }
+ofb = { version = "0.6.1", optional = true }
+
 
 [dev-dependencies]
 anyhow = "1"
-criterion = "0.3"
 chrono-tz = "0.6"
+criterion = "0.3"
 value = { path = "../../value", features = ["test"]}
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [features]
 default = [
@@ -63,6 +76,7 @@ default = [
     "contains",
     "decode_base64",
     "decode_percent",
+    "decrypt",
     "del",
     "downcase",
     "encode_base64",
@@ -70,12 +84,14 @@ default = [
     "encode_key_value",
     "encode_logfmt",
     "encode_percent",
+    "encrypt",
     "ends_with",
     "exists",
     "find",
     "flatten",
     "float",
     "floor",
+    "for_each",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -106,6 +122,8 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -142,6 +160,7 @@ default = [
     "parse_user_agent",
     "parse_xml",
     "push",
+    "random_bytes",
     "redact",
     "remove",
     "replace",
@@ -182,13 +201,15 @@ default = [
 append = []
 array = []
 assert = []
-assert_eq = []
+assert_eq = ["vector_common/conversion"]
 boolean = []
 ceil = []
 compact = []
 contains = []
+cryptography = ["aes", "ctr", "cbc", "cfb-mode", "ofb"]
 decode_base64 = ["base64"]
 decode_percent = ["percent-encoding"]
+decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
 encode_base64 = ["base64"]
@@ -196,6 +217,7 @@ encode_json = ["serde_json", "value/json", "chrono", "regex"]
 encode_key_value = ["vector_common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
+encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []
 find = ["regex"]
@@ -203,10 +225,11 @@ find_table_row = []
 flatten = []
 float = []
 floor = []
+for_each = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
-get = []
+get = ["lookup_lib"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
@@ -233,17 +256,19 @@ is_timestamp = ["chrono"]
 join = []
 length = []
 log = ["tracing"]
+map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex", "lookup_lib"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 object = []
 parse_apache_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_aws_alb_log = ["nom"]
-parse_aws_cloudwatch_log_subscription_message = ["serde_json", "vector_common/aws_cloudwatch_logs_subscription", "vector_common/btreemap", "chrono"]
+parse_aws_cloudwatch_log_subscription_message = ["serde_json", "vector_common/aws_cloudwatch_logs_subscription", "chrono"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_csv = ["csv"]
@@ -269,12 +294,13 @@ parse_url = ["url"]
 parse_user_agent = ["woothee","uaparser","once_cell"]
 parse_xml = ["roxmltree", "once_cell", "regex"]
 push = []
+random_bytes = ["rand"]
 redact = ["once_cell", "regex"]
-remove = ["vector_common/btreemap"]
+remove = ["lookup_lib"]
 replace = ["regex"]
 reverse_dns = ["dns-lookup"]
 round = []
-set = ["vector_common/btreemap"]
+set = ["lookup_lib"]
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
@@ -285,7 +311,7 @@ string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
 strlen = []
-tag_types_externally = ["vector_common/btreemap", "chrono", "regex"]
+tag_types_externally = ["chrono", "regex"]
 tally = []
 tally_value = []
 timestamp = []
@@ -301,7 +327,7 @@ to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
 unique = ["indexmap"]
-unnest = []
+unnest = ["lookup_lib"]
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 

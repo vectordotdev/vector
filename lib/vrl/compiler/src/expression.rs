@@ -1,15 +1,19 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 
-use crate::{vm, Context, Span, State, TypeDef, Value};
+use crate::{
+    state::{ExternalEnv, LocalEnv},
+    vm, Context, Span, TypeDef, Value,
+};
 
 mod abort;
 mod array;
 mod block;
 mod function_argument;
+mod function_closure;
 mod group;
 mod if_statement;
 mod levenstein;
@@ -35,6 +39,7 @@ pub use container::{Container, Variant};
 pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
+pub use function_closure::FunctionClosure;
 pub use group::Group;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
@@ -59,7 +64,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     fn compile_to_vm(
         &self,
         _vm: &mut vm::Vm,
-        _state: &mut crate::state::Compiler,
+        _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         Ok(())
     }
@@ -74,11 +79,15 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to its [`TypeDef`] type definition.
     ///
     /// This method is executed at compile-time.
-    fn type_def(&self, state: &crate::State) -> TypeDef;
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef;
 
     /// Updates the state if necessary.
     /// By default it does nothing.
-    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
+    fn update_state(
+        &mut self,
+        _local: &mut LocalEnv,
+        _external: &mut ExternalEnv,
+    ) -> Result<(), ExpressionError> {
         Ok(())
     }
 
@@ -217,7 +226,7 @@ impl Expression for Expr {
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Expr::*;
 
         match self {
@@ -238,7 +247,7 @@ impl Expression for Expr {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         use Expr::*;
 
@@ -387,7 +396,7 @@ pub enum Error {
     Fallible { span: Span },
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 

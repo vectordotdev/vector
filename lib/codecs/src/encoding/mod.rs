@@ -5,13 +5,13 @@ pub mod format;
 pub mod framing;
 
 pub use format::{
-    BoxedSerializer, JsonSerializer, JsonSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
+    NativeSerializer, NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
 };
 pub use framing::{
-    BoxedFramer, BoxedFramingError, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    CharacterDelimitedEncoderOptions, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
+    CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
+    LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
 
 use bytes::BytesMut;
@@ -52,13 +52,23 @@ impl From<std::io::Error> for Error {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
+    /// Configures the `BytesEncoder`.
+    Bytes,
     /// Configures the `CharacterDelimitedEncoder`.
     CharacterDelimited {
         /// Options for the character delimited encoder.
         character_delimited: CharacterDelimitedEncoderOptions,
     },
+    /// Configures the `LengthDelimitedEncoder`.
+    LengthDelimited,
     /// Configures the `NewlineDelimitedEncoder`.
     NewlineDelimited,
+}
+
+impl From<BytesEncoderConfig> for FramingConfig {
+    fn from(_: BytesEncoderConfig) -> Self {
+        Self::Bytes
+    }
 }
 
 impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
@@ -66,6 +76,12 @@ impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
         Self::CharacterDelimited {
             character_delimited: config.character_delimited,
         }
+    }
+}
+
+impl From<LengthDelimitedEncoderConfig> for FramingConfig {
+    fn from(_: LengthDelimitedEncoderConfig) -> Self {
+        Self::LengthDelimited
     }
 }
 
@@ -77,8 +93,9 @@ impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub const fn build(self) -> Framer {
+    pub fn build(self) -> Framer {
         match self {
+            FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
@@ -87,6 +104,9 @@ impl FramingConfig {
                 }
                 .build(),
             ),
+            FramingConfig::LengthDelimited => {
+                Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
+            }
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
@@ -97,17 +117,33 @@ impl FramingConfig {
 /// Produce a byte stream from byte frames.
 #[derive(Debug, Clone)]
 pub enum Framer {
+    /// Uses a `BytesEncoder` for framing.
+    Bytes(BytesEncoder),
     /// Uses a `CharacterDelimitedEncoder` for framing.
     CharacterDelimited(CharacterDelimitedEncoder),
+    /// Uses a `LengthDelimitedEncoder` for framing.
+    LengthDelimited(LengthDelimitedEncoder),
     /// Uses a `NewlineDelimitedEncoder` for framing.
     NewlineDelimited(NewlineDelimitedEncoder),
     /// Uses an opaque `Encoder` implementation for framing.
     Boxed(BoxedFramer),
 }
 
+impl From<BytesEncoder> for Framer {
+    fn from(encoder: BytesEncoder) -> Self {
+        Self::Bytes(encoder)
+    }
+}
+
 impl From<CharacterDelimitedEncoder> for Framer {
     fn from(encoder: CharacterDelimitedEncoder) -> Self {
         Self::CharacterDelimited(encoder)
+    }
+}
+
+impl From<LengthDelimitedEncoder> for Framer {
+    fn from(encoder: LengthDelimitedEncoder) -> Self {
+        Self::LengthDelimited(encoder)
     }
 }
 
@@ -126,11 +162,13 @@ impl From<BoxedFramer> for Framer {
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
-            Framer::CharacterDelimited(framer) => framer.encode((), dst),
-            Framer::NewlineDelimited(framer) => framer.encode((), dst),
-            Framer::Boxed(framer) => framer.encode((), dst),
+            Framer::Bytes(framer) => framer.encode((), buffer),
+            Framer::CharacterDelimited(framer) => framer.encode((), buffer),
+            Framer::LengthDelimited(framer) => framer.encode((), buffer),
+            Framer::NewlineDelimited(framer) => framer.encode((), buffer),
+            Framer::Boxed(framer) => framer.encode((), buffer),
         }
     }
 }
@@ -144,6 +182,10 @@ impl tokio_util::codec::Encoder<()> for Framer {
 pub enum SerializerConfig {
     /// Configures the `JsonSerializer`.
     Json,
+    /// Configures the `NativeSerializer`.
+    Native,
+    /// Configures the `NativeJsonSerializer`.
+    NativeJson,
     /// Configures the `RawMessageSerializer`.
     RawMessage,
 }
@@ -165,6 +207,10 @@ impl SerializerConfig {
     pub const fn build(&self) -> Serializer {
         match self {
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
+            SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),
+            SerializerConfig::NativeJson => {
+                Serializer::NativeJson(NativeJsonSerializerConfig.build())
+            }
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
@@ -175,6 +221,8 @@ impl SerializerConfig {
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
+            SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
         }
     }
@@ -183,19 +231,37 @@ impl SerializerConfig {
 /// Serialize structured events as bytes.
 #[derive(Debug, Clone)]
 pub enum Serializer {
-    /// Uses a `JsonSerializer` for deserialization.
+    /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
-    /// Uses a `RawMessageSerializer` for deserialization.
+    /// Uses a `NativeSerializer` for serialization.
+    Native(NativeSerializer),
+    /// Uses a `NativeJsonSerializer` for serialization.
+    NativeJson(NativeJsonSerializer),
+    /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
+}
+
+impl From<JsonSerializer> for Serializer {
+    fn from(serializer: JsonSerializer) -> Self {
+        Self::Json(serializer)
+    }
+}
+
+impl From<RawMessageSerializer> for Serializer {
+    fn from(serializer: RawMessageSerializer) -> Self {
+        Self::RawMessage(serializer)
+    }
 }
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_core::Error;
 
-    fn encode(&mut self, item: Event, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
-            Serializer::Json(serializer) => serializer.encode(item, dst),
-            Serializer::RawMessage(serializer) => serializer.encode(item, dst),
+            Serializer::Json(serializer) => serializer.encode(event, buffer),
+            Serializer::Native(serializer) => serializer.encode(event, buffer),
+            Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
+            Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
         }
     }
 }

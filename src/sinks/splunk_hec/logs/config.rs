@@ -23,7 +23,7 @@ use crate::{
         Healthcheck,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -47,7 +47,7 @@ pub struct HecLogsSinkConfig {
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else

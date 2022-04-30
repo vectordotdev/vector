@@ -65,7 +65,7 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
 #[cfg(feature = "aws-core")]
 pub struct AwsBytesSent {
     pub byte_size: usize,
-    pub region: Option<aws_types::region::Region>,
+    pub region: aws_types::region::Region,
 }
 
 #[cfg(feature = "aws-core")]
@@ -77,11 +77,7 @@ impl InternalEvent for AwsBytesSent {
             byte_size = %self.byte_size,
             region = ?self.region,
         );
-        let region = self
-            .region
-            .as_ref()
-            .map(|r| r.as_ref().to_string())
-            .unwrap_or_default();
+        let region = self.region.to_string();
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",

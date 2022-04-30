@@ -6,19 +6,17 @@ use bytes::Bytes;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     event::{Event, EventFinalizers, Finalizable},
     sinks::{
         aws_kinesis_streams::sink::KinesisProcessedEvent,
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            Compression, RequestBuilder,
-        },
+        util::{encoding::Transformer, Compression, RequestBuilder},
     },
 };
 
 pub struct KinesisRequestBuilder {
     pub compression: Compression,
-    pub encoder: EncodingConfig<StandardEncodings>,
+    pub encoder: (Transformer, Encoder<()>),
 }
 
 pub struct Metadata {
@@ -90,7 +88,7 @@ impl ByteSizeOf for KinesisRequest {
 impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
     type Events = Event;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
     type Request = KinesisRequest;
     type Error = io::Error;

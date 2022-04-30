@@ -25,7 +25,7 @@ async fn serial_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + SOURCE_SENDER_BUFFER_SIZE
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -63,7 +63,7 @@ async fn default_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + SOURCE_SENDER_BUFFER_SIZE
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -110,7 +110,7 @@ async fn buffer_drop_fan_out() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + SOURCE_SENDER_BUFFER_SIZE
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -162,7 +162,7 @@ async fn multiple_inputs_backpressure() {
 
     let expected_sourced_events = events_to_sink
         + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
-        + SOURCE_SENDER_BUFFER_SIZE * 2
+        + *SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
     let source_counter = Arc::new(AtomicUsize::new(0));

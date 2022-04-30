@@ -4,6 +4,7 @@
 mod test_enrichment;
 
 use std::str::FromStr;
+use std::time::Instant;
 
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -19,6 +20,53 @@ use vrl_tests::{docs, Test};
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+/// A list of tests currently only working on the "AST" runtime.
+///
+/// This list should ideally be zero, but might not be if specific features
+/// haven't been released on the "VM" runtime yet.
+static AST_ONLY_TESTS: &[&str] = &[
+    // Iteration-specific tests, waiting for VM implementation.
+    //
+    // See: https://github.com/vectordotdev/vector/issues/12366
+    "expressions/function_call/closure scope inheritance",
+    // `for_each
+    "rfcs/8381/check property on variable sized array of objects",
+    "rfcs/8381/convert object to specific string format",
+    "rfcs/8381/converting a single metric into multiple metrics",
+    "rfcs/8381/find match against list of regular expressions",
+    "rfcs/8381/map key value pairs to object with key and value fields",
+    "rfcs/8381/re introduce previous only fields functionality using iteration",
+    "rfcs/8381/unzip object into separate key value arrays",
+    "rfcs/8381/zip an array of objects with fields key and value into one object",
+    "functions/for_each/iterate object",
+    "functions/for_each/recursively iterate object",
+    "functions/for_each/iterate array",
+    "functions/for_each/recursively iterate array",
+    "functions/for_each (closure)/iterate array",
+    // `map_keys`
+    "rfcs/8381/add prefix to all keys",
+    "rfcs/8381/de dot keys for elasticsearch",
+    "rfcs/8381/add prefix to all keys",
+    "rfcs/8381/de dot keys for elasticsearch",
+    "rfcs/8381/remove prefix from keys",
+    "rfcs/8381/trim a character from all keys",
+    "functions/map_keys (closure)/map object keys",
+    "functions/map_keys/map object keys",
+    "functions/map_keys/recursively map object keys",
+    "functions/map_keys/map nested object keys",
+    // `map_values`
+    "rfcs/8381/add fields to objects in array",
+    "rfcs/8381/call parse timestamp on array of cloudtrail records",
+    "rfcs/8381/delete a field from all objects in an array",
+    "rfcs/8381/nullify empty strings",
+    "rfcs/8381/run encode json on all top level object fields",
+    "rfcs/8381/run parse json on multiple strings in array and emit as multiple events",
+    "rfcs/8381/map complex dynamic object based on conditionals",
+    "functions/map_values (closure)/map object values",
+    "functions/map_values/map object values",
+    "functions/map_values/recursively map object values",
+];
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -40,12 +88,20 @@ pub struct Cmd {
     #[clap(short, long)]
     logging: bool,
 
+    /// When enabled, show run duration for each individual test.
+    #[clap(short, long)]
+    timings: bool,
+
     #[clap(short = 'z', long)]
     timezone: Option<String>,
 
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    /// Ignore the Cue tests (to speed up run)
+    #[clap(long)]
+    ignore_cue: bool,
 }
 
 impl Cmd {
@@ -58,7 +114,11 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>) -> bool {
+fn should_run(name: &str, pat: &Option<String>, runtime: VrlRuntime) -> bool {
+    if matches!(runtime, VrlRuntime::Vm) && AST_ONLY_TESTS.contains(&name) {
+        return false;
+    }
+
     if name == "tests/example.vrl" {
         return false;
     }
@@ -95,6 +155,23 @@ fn main() {
                 .into_iter()
                 .chain(enrichment::vrl_functions())
                 .for_each(|function| {
+                    if let Some(closure) = function.closure() {
+                        closure.inputs.iter().for_each(|input| {
+                            let test = Test::from_example(
+                                format!("{} (closure)", function.identifier()),
+                                &input.example,
+                            );
+
+                            if let Some(pat) = &cmd.pattern {
+                                if !format!("{}/{}", test.category, test.name).contains(pat) {
+                                    return;
+                                }
+                            }
+
+                            tests.push(test);
+                        });
+                    }
+
                     function.examples().iter().for_each(|example| {
                         let test = Test::from_example(function.identifier(), example);
 
@@ -110,8 +187,14 @@ fn main() {
 
             tests.into_iter()
         })
-        .chain(docs::tests().into_iter())
-        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
+        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .filter(|test| {
+            should_run(
+                &format!("{}/{}", test.category, test.name),
+                &cmd.pattern,
+                cmd.runtime,
+            )
+        })
         .collect::<Vec<_>>();
 
     for mut test in tests {
@@ -127,16 +210,12 @@ fn main() {
             continue;
         }
 
-        let dots = if test.name.len() >= 60 {
-            0
-        } else {
-            60 - test.name.len()
-        };
-        print!(
-            "  {}{}",
-            test.name,
-            Colour::Fixed(240).paint(".".repeat(dots))
-        );
+        let mut name = test.name.clone();
+        name.truncate(58);
+
+        let dots = if name.len() >= 60 { 0 } else { 60 - name.len() };
+
+        print!("  {}{}", name, Colour::Fixed(240).paint(".".repeat(dots)));
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
@@ -148,16 +227,24 @@ fn main() {
         functions.append(&mut enrichment::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
-        let mut state = vrl::state::Compiler::new();
+        let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(test_enrichment.clone());
 
+        let compile_start = Instant::now();
         let program = vrl::compile_with_state(&test.source, &functions, &mut state);
+        let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();
         let timezone = cmd.timezone();
 
+        let compile_timing_fmt = cmd
+            .timings
+            .then(|| format!("comp: {:>9.3?}", compile_end))
+            .unwrap_or_default();
+
         match program {
-            Ok(program) => {
+            Ok((program, warnings)) if warnings.is_empty() => {
+                let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
                     functions,
@@ -168,6 +255,15 @@ fn main() {
                     state,
                     test_enrichment,
                 );
+                let run_end = run_start.elapsed();
+
+                let timings_fmt = cmd
+                    .timings
+                    .then(|| format!(" ({}, run: {:>9.3?})", compile_timing_fmt, run_end))
+                    .unwrap_or_default();
+
+                let timings_color = if run_end.as_millis() > 10 { 1 } else { 245 };
+                let timings = Colour::Fixed(timings_color).paint(timings_fmt);
 
                 match result {
                     Ok(got) => {
@@ -202,9 +298,9 @@ fn main() {
                             };
 
                             if got == want {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                print!("{}{}", Colour::Green.bold().paint("OK"), timings,);
                             } else {
-                                println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                                print!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;
 
                                 if !cmd.no_diff {
@@ -217,6 +313,8 @@ fn main() {
 
                                 failed = true;
                             }
+
+                            println!();
                         }
 
                         if cmd.verbose {
@@ -236,7 +334,7 @@ fn main() {
                             if (test.result_approx && compare_partial_diagnostic(&got, &want))
                                 || got == want
                             {
-                                println!("{}", Colour::Green.bold().paint("OK"));
+                                println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                             } else if matches!(err, Terminate::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
@@ -249,7 +347,7 @@ fn main() {
 
                                 let got = vrl_value_to_json_value(test.object.clone());
                                 if got == want {
-                                    println!("{} (abort)", Colour::Green.bold().paint("OK"));
+                                    println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                                 } else {
                                     println!("{} (abort)", Colour::Red.bold().paint("FAILED"));
                                     failed_count += 1;
@@ -286,7 +384,7 @@ fn main() {
                     }
                 }
             }
-            Err(diagnostics) => {
+            Ok((_, diagnostics)) | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {
@@ -296,7 +394,13 @@ fn main() {
                     if (test.result_approx && compare_partial_diagnostic(&got, &want))
                         || got == want
                     {
-                        println!("{}", Colour::Green.bold().paint("OK"));
+                        let timings_fmt = cmd
+                            .timings
+                            .then(|| format!(" ({})", compile_timing_fmt))
+                            .unwrap_or_default();
+                        let timings = Colour::Fixed(245).paint(timings_fmt);
+
+                        println!("{}{}", Colour::Green.bold().paint("OK"), timings);
                     } else {
                         println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
                         failed_count += 1;
@@ -333,12 +437,12 @@ fn run_vrl(
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-    state: vrl::state::Compiler,
+    mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
     match vrl_runtime {
         VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, &program, state).unwrap();
+            let vm = runtime.compile(functions, &program, &mut state).unwrap();
             test_enrichment.finish_load();
             runtime.run_vm(&vm, &mut test.object, &timezone)
         }

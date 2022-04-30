@@ -11,7 +11,7 @@ use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
+pub use vector_core::transform::{TransformConfig, TransformContext};
 
 use crate::{conditions, event::Metric, serde::OneOrMany};
 
@@ -101,9 +101,9 @@ pub struct Config {
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<ComponentKey, SourceOuter>,
-    pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
-    pub transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
+    sources: IndexMap<ComponentKey, SourceOuter>,
+    sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
+    transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
@@ -114,10 +114,41 @@ impl Config {
         Default::default()
     }
 
+    pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
+        self.sources.iter()
+    }
+
+    pub fn source(&self, id: &ComponentKey) -> Option<&SourceOuter> {
+        self.sources.get(id)
+    }
+
+    pub fn transforms(&self) -> impl Iterator<Item = (&ComponentKey, &TransformOuter<OutputId>)> {
+        self.transforms.iter()
+    }
+
+    pub fn transform(&self, id: &ComponentKey) -> Option<&TransformOuter<OutputId>> {
+        self.transforms.get(id)
+    }
+
+    pub fn sinks(&self) -> impl Iterator<Item = (&ComponentKey, &SinkOuter<OutputId>)> {
+        self.sinks.iter()
+    }
+
+    pub fn sink(&self, id: &ComponentKey) -> Option<&SinkOuter<OutputId>> {
+        self.sinks.get(id)
+    }
+
+    pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
+        self.transforms
+            .get(id)
+            .map(|t| t.inputs.as_slice())
+            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
+    }
+
     /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
+    pub fn expand_input(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
         self.expansions
             .get(identifier)
             .cloned()
@@ -1074,16 +1105,16 @@ mod pipelines_tests {
                   inputs = ["in"]
                   type = "pipelines"
 
-                  [transforms.processing.logs.pipelines.foo]
+                  [[transforms.processing.logs]]
                     name = "foo"
 
-                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                    [[transforms.processing.logs.transforms]]
                       type = "pipelines"
 
-                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                      [[transforms.processing.logs.transforms.logs]]
                         name = "bar"
 
-                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                          [[transforms.processing.logs.transforms.logs.transforms]]
                             type = "filter"
                             condition = ""
 

@@ -1,8 +1,9 @@
 use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
 use aws_sdk_kinesis::types::SdkError;
-use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
@@ -11,22 +12,24 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 
 use super::service::KinesisResponse;
-use crate::aws::{create_client, is_retriable_error, ClientBuilder};
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
+    aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::{
             request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
             retries::RetryLogic,
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -68,6 +71,13 @@ impl ClientBuilder for KinesisClientBuilder {
         builder.region(region)
     }
 
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
     fn client_from_conf_conn(
         builder: Self::ConfigBuilder,
         connector: DynConnector,
@@ -82,24 +92,25 @@ pub struct KinesisDefaultBatchSettings;
 impl SinkBatchSettings for KinesisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(500);
     const MAX_BYTES: Option<usize> = Some(5_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -170,9 +181,13 @@ impl SinkConfig for KinesisSinkConfig {
                 region,
             });
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.clone().encoding();
+        let encoder = Encoder::<()>::new(serializer);
+
         let request_builder = KinesisRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding.clone(),
+            encoder: (transformer, encoder),
         };
 
         let sink = KinesisSink {

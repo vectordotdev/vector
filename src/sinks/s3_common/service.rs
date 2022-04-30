@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -76,11 +76,11 @@ impl DriverResponse for S3Response {
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
-    region: Option<Region>,
+    region: Region,
 }
 
 impl S3Service {
-    pub const fn new(client: S3Client, region: Option<Region>) -> S3Service {
+    pub const fn new(client: S3Client, region: Region) -> S3Service {
         S3Service { client, region }
     }
 
@@ -111,13 +111,13 @@ impl Service<S3Request> for S3Service {
 
         let content_md5 = base64::encode(md5::Md5::digest(&request.body));
 
-        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-        if let Some(tags) = options.tags {
+        let tagging = options.tags.map(|tags| {
+            let mut tagging = url::form_urlencoded::Serializer::new(String::new());
             for (p, v) in tags {
                 tagging.append_pair(&p, &v);
             }
-        }
-        let tagging = tagging.finish();
+            tagging.finish()
+        });
         let count = request.metadata.count;
         let events_byte_size = request.metadata.byte_size;
 
@@ -141,7 +141,7 @@ impl Service<S3Request> for S3Service {
                 .set_server_side_encryption(options.server_side_encryption.map(Into::into))
                 .set_ssekms_key_id(options.ssekms_key_id)
                 .set_storage_class(options.storage_class.map(Into::into))
-                .tagging(tagging)
+                .set_tagging(tagging)
                 .content_md5(content_md5)
                 .send()
                 .in_current_span()

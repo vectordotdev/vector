@@ -26,6 +26,10 @@ impl<'a> Formatter<'a> {
     pub fn enable_colors(&mut self, color: bool) {
         self.color = color
     }
+
+    pub fn diagnostics(&self) -> &DiagnosticList {
+        &self.diagnostics
+    }
 }
 
 impl<'a> fmt::Display for Formatter<'a> {

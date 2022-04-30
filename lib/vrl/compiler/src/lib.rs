@@ -21,16 +21,17 @@ pub use crate::value::Value;
 use ::serde::{Deserialize, Serialize};
 pub use context::Context;
 pub use core::{value, ExpressionError, Resolved, Target};
+use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::Program;
-pub(crate) use state::Compiler as State;
+use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
-pub type Result = std::result::Result<Program, compiler::Errors>;
+pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
@@ -73,8 +74,19 @@ impl Display for VrlRuntime {
 
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
 pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
-    let mut state = State::default();
-    compile_with_state(ast, fns, &mut state)
+    let mut external = ExternalEnv::default();
+    compile_with_state(ast, fns, &mut external)
+}
+
+pub fn compile_for_repl(
+    ast: parser::Program,
+    fns: &[Box<dyn Function>],
+    local: state::LocalEnv,
+    external: &mut ExternalEnv,
+) -> Result<Program> {
+    compiler::Compiler::new_with_local_state(fns, local)
+        .compile(ast, external)
+        .map(|(program, _)| program)
 }
 
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]
@@ -87,9 +99,9 @@ pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
 pub fn compile_with_state(
     ast: parser::Program,
     fns: &[Box<dyn Function>],
-    state: &mut State,
+    state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns, state).compile(ast)
+    compiler::Compiler::new(fns).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.

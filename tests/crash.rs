@@ -159,6 +159,7 @@ impl Sink<Event> for ErrorSink {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_sink_error() {
     let num_lines: usize = 10;
 

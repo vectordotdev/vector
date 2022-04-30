@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
+use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -44,7 +44,7 @@ pub(crate) struct SematextMetricsDefaultBatchSettings;
 impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -179,7 +179,7 @@ impl SematextMetricsService {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event.into_metric())
+                        .normalize(event.into_metric())
                         .map(|item| Ok(EncodedEvent::new(item, byte_size)))
                 })
             })
@@ -213,7 +213,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),

@@ -80,13 +80,13 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -141,9 +141,10 @@ impl Function for GetEnrichmentTableRecord {
     ) -> CompiledArgument {
         match (name, expr) {
             ("table", Some(expr)) => {
-                let registry = ctx
-                    .get_external_context_mut::<TableRegistry>()
-                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
 
                 let tables = registry
                     .table_ids()
@@ -234,7 +235,7 @@ impl Expression for GetEnrichmentTableRecordFn {
         )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

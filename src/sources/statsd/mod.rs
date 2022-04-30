@@ -22,7 +22,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
 };
 use codecs::{
@@ -67,7 +67,7 @@ struct TcpConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
@@ -128,7 +128,7 @@ impl SourceConfig for StatsdConfig {
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
+            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
         }
     }
 

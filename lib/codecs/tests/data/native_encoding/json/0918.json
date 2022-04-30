@@ -1,1 +1,1 @@
-{"log":{"{?":null}}
+{"metric":{"name":"w","namespace":"r","kind":"incremental","counter":{"value":68672.0}}}

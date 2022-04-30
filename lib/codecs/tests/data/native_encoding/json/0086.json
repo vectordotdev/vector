@@ -1,1 +1,1 @@
-{"log":{"S9𑂽":"‏"}}
+{"metric":{"name":"v","kind":"incremental","distribution":{"samples":[{"value":-858368.0,"rate":0},{"value":-313920.0,"rate":2414646222},{"value":769216.0,"rate":3868600915},{"value":74368.0,"rate":152747830},{"value":-522368.0,"rate":1608830959},{"value":-709696.0,"rate":134716963},{"value":-504512.0,"rate":463762502},{"value":840640.0,"rate":1004381266},{"value":-461312.0,"rate":4263139170},{"value":777536.0,"rate":4177494319},{"value":476800.0,"rate":3855232464}],"statistic":"summary"}}}
