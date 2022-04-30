@@ -253,13 +253,11 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let event_time = match &item {
-            Event::Log(log) => log
-                .get(log_schema().timestamp_key())
-                .map(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
-                .unwrap_or(None),
-            _ => None,
-        };
+        let event_time = item
+            .maybe_as_log()
+            .then(|log| log.get(log_schema().timestamp_key()))
+            .then(|v| v.as_timestamp())
+            .map(|dt| dt.timestamp_millis());
 
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
