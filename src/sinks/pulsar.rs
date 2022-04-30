@@ -14,6 +14,7 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
+use vector_core::event::MaybeAsLogMut;
 
 use crate::{
     config::{
@@ -143,8 +144,8 @@ impl PulsarSinkConfig {
         if let Some(auth) = &self.auth {
             builder = match (auth.name.as_ref(), auth.token.as_ref(), auth.oauth2.as_ref()) {
                 (Some(name), Some(token), None) => builder.with_auth(Authentication {
-                    name: name.unwrap().clone(),
-                    data: token.unwrap().as_bytes().to_vec(),
+                    name: name.clone(),
+                    data: token.as_bytes().to_vec(),
                 }),
                 (None, None, Some(oauth2)) => builder.with_auth_provider(OAuth2Authentication::client_credentials(
                     OAuth2Params {
@@ -247,17 +248,18 @@ impl Sink<Event> for PulsarSink {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, mut item: Event) -> Result<(), Self::Error> {
         assert!(
             matches!(self.state, PulsarSinkState::Ready(_)),
             "Expected `poll_ready` to be called first."
         );
 
         let event_time = item
-            .maybe_as_log()
-            .then(|log| log.get(log_schema().timestamp_key()))
-            .then(|v| v.as_timestamp())
-            .map(|dt| dt.timestamp_millis());
+            .maybe_as_log_mut()
+            .map(|log| log.get(log_schema().timestamp_key())
+                .map(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
+                .unwrap_or(None))
+            .unwrap_or(None);
 
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
