@@ -148,8 +148,6 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
 
       - uses: actions/checkout@v3
         with:
@@ -195,8 +193,6 @@ jobs:
       - uses: colpal/actions-clean@v1
 
       - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
 
       - uses: actions/checkout@v3
         with:
@@ -245,8 +241,6 @@ jobs:
 
       - name: Check out the repo
         uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-soak-meta.outputs.comparison-sha }}
 
       - name: Download baseline image
         uses: actions/download-artifact@v3
@@ -254,15 +248,15 @@ jobs:
           name: baseline-image
           path: /tmp
 
-      - name: Load baseline image
-        run: |
-          docker load --input /tmp/baseline-image.tar
-
       - name: Download comparison image
         uses: actions/download-artifact@v3
         with:
           name: comparison-image
           path: /tmp
+
+      - name: Load baseline image
+        run: |
+          docker load --input /tmp/baseline-image.tar
 
       - name: Load comparison image
         run: |
@@ -353,4 +347,4 @@ jobs:
                                          --coefficient-of-variation-limit ${{ needs.compute-soak-meta.outputs.coefficient-of-variation }} \
                                          --erratic-soaks ${{ needs.compute-soak-meta.outputs.erratic-soaks }} \
                                          --mean-drift-percentage ${{ needs.compute-soak-meta.outputs.mean-drift-percentage }} \
-                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }} > /tmp/${{ github.run_id}}-${{ github.run_attempt }}-analysis
+                                         --p-value ${{ needs.compute-soak-meta.outputs.p-value }}
