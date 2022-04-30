@@ -141,25 +141,23 @@ impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
-            if auth.name.is_some() && auth.token.is_some() {
-                builder = builder.with_auth(Authentication {
-                    name: auth.name.as_ref().unwrap().clone(),
-                    data: auth.token.as_ref().unwrap().as_bytes().to_vec(),
-                });
-            } else if let Some(oauth2) = &auth.oauth2 {
-                builder = builder.with_auth_provider(OAuth2Authentication::client_credentials(
+            builder = match (auth.name.as_ref(), auth.token.as_ref(), auth.oauth2.as_ref()) {
+                (Some(name), Some(token), None) => builder.with_auth(Authentication {
+                    name: name.unwrap().clone(),
+                    data: token.unwrap().as_bytes().to_vec(),
+                }),
+                (None, None, Some(oauth2)) => builder.with_auth_provider(OAuth2Authentication::client_credentials(
                     OAuth2Params {
                         issuer_url: oauth2.issuer_url.clone(),
                         credentials_url: oauth2.credentials_url.clone(),
                         audience: oauth2.audience.clone(),
                         scope: oauth2.scope.clone(),
                     },
-                ));
-            } else {
-                return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                )),
+                _ => return Err(PulsarError::Authentication(AuthenticationError::Custom(
                     "Invalid auth config".to_string(),
-                )));
-            }
+                ))),
+            };
         }
 
         if let Some(avro_schema) = &self.encoding.schema() {
