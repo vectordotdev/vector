@@ -55,13 +55,16 @@ where
         let (trigger, tripwire) = SOE
             .then(Tripwire::new)
             .map_or((None, None), |(trig, trip)| (Some(trig), Some(trip)));
-        tokio::spawn(run_finalizer::<T, S, F, Fut, SOE>(
-            shutdown,
-            receiver,
-            apply_done,
-            S::default(),
-            trigger,
-        ));
+        tokio::spawn(
+            Runner {
+                shutdown,
+                new_entries: receiver,
+                apply_done,
+                status_receivers: S::default(),
+                failure: trigger,
+            }
+            .run::<SOE>(),
+        );
         Self {
             sender: Some(sender),
             failed: tripwire,
@@ -100,54 +103,59 @@ impl<T> Future for OrderedFinalizer<T> {
     }
 }
 
-async fn run_finalizer<T, S, F, Fut, const SOE: bool>(
+struct Runner<T, S, F> {
     shutdown: ShutdownSignal,
-    mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
+    new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: F,
-    mut status_receivers: S,
+    status_receivers: S,
     failure: Option<Trigger>,
-) where
+}
+
+impl<T, S, F, Fut> Runner<T, S, F>
+where
     S: FuturesSet<FinalizerFuture<T>> + Unpin,
     F: Fn(T) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    loop {
-        tokio::select! {
-            _ = shutdown.clone() => break,
-            new_entry = new_entries.recv() => match new_entry {
-                Some((receiver, entry)) => {
-                    status_receivers.push(FinalizerFuture {
-                        receiver,
-                        entry: Some(entry),
-                    });
-                }
-                None => break,
-            },
-            finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                Some((status, entry)) => if status == BatchStatus::Delivered {
-                    apply_done(entry).await
-                } else if SOE {
-                    return
-                }
-                // The is_empty guard above prevents this from being reachable.
-                None => unreachable!(),
-            },
+    async fn run<const SOE: bool>(mut self) {
+        loop {
+            tokio::select! {
+                _ = self.shutdown.clone() => break,
+                new_entry = self.new_entries.recv() => match new_entry {
+                    Some((receiver, entry)) => {
+                        self.status_receivers.push(FinalizerFuture {
+                            receiver,
+                            entry: Some(entry),
+                        });
+                    }
+                    None => break,
+                },
+                finished = self.status_receivers.next(), if !self.status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => if status == BatchStatus::Delivered {
+                        (self.apply_done)(entry).await
+                    } else if SOE {
+                        return
+                    }
+                    // The is_empty guard above prevents this from being reachable.
+                    None => unreachable!(),
+                },
+            }
         }
-    }
-    // We've either seen a shutdown signal or the new entry sender was
-    // closed. Wait for the last statuses to come in before indicating
-    // we are done.
-    while let Some((status, entry)) = status_receivers.next().await {
-        if status == BatchStatus::Delivered {
-            apply_done(entry).await;
-        } else if SOE {
-            return;
+        // We've either seen a shutdown signal or the new entry sender was
+        // closed. Wait for the last statuses to come in before indicating
+        // we are done.
+        while let Some((status, entry)) = self.status_receivers.next().await {
+            if status == BatchStatus::Delivered {
+                (self.apply_done)(entry).await;
+            } else if SOE {
+                return;
+            }
         }
-    }
-    // Note: `shutdown` is automatically dropped on return from this
-    // function, signalling this component is completed.
-    if let Some(failure) = failure {
-        failure.cancel();
+        // Note: `shutdown` is automatically dropped on return from this
+        // function, signalling this component is completed.
+        if let Some(failure) = self.failure {
+            failure.cancel();
+        }
     }
 }
 
