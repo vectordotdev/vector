@@ -197,8 +197,6 @@ Vector supports many feature flags to customize which features are included in a
 all sources, transforms, and sinks are enabled. To view a complete list of features, they are listed
 under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
 
-{{< /details >}}
-
 [buffer]: /docs/reference/glossary/#buffer
 [configuration]: /docs/reference/configuration
 [cross]: https://github.com/rust-embedded/cross
