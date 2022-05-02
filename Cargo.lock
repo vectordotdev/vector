@@ -2188,7 +2188,7 @@ dependencies = [
  "nom 7.1.1",
  "once_cell",
  "onig",
- "ordered-float",
+ "ordered-float 3.0.0",
  "peeking_take_while 1.0.0",
  "regex",
  "serde_json",
@@ -2207,7 +2207,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "once_cell",
- "ordered-float",
+ "ordered-float 3.0.0",
  "pest",
  "pest_derive",
  "regex",
@@ -4495,7 +4495,7 @@ dependencies = [
  "indexmap",
  "metrics 0.17.1",
  "num_cpus",
- "ordered-float",
+ "ordered-float 2.10.0",
  "parking_lot 0.11.2",
  "quanta",
  "radix_trie",
@@ -5276,6 +5276,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96bcbab4bfea7a59c2c0fe47211a1ac4e3e96bea6eb446d704f310bc5c732ae2"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "os_info"
 version = "3.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5903,7 +5912,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "proptest",
  "vrl-diagnostic",
  "vrl-parser",
@@ -6933,7 +6942,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
- "ordered-float",
+ "ordered-float 2.10.0",
  "serde",
 ]
 
@@ -8648,7 +8657,7 @@ dependencies = [
  "indoc",
  "lookup",
  "mlua",
- "ordered-float",
+ "ordered-float 3.0.0",
  "quickcheck",
  "regex",
  "serde",
@@ -8772,7 +8781,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "ordered-float",
+ "ordered-float 3.0.0",
  "percent-encoding",
  "pin-project 1.0.10",
  "portpicker",
@@ -8963,7 +8972,7 @@ dependencies = [
  "derivative",
  "metrics 0.17.1",
  "nom 7.1.1",
- "ordered-float",
+ "ordered-float 3.0.0",
  "serde",
  "serde_json",
  "smallvec",
@@ -9020,7 +9029,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "once_cell",
- "ordered-float",
+ "ordered-float 3.0.0",
  "pin-project 1.0.10",
  "pretty_assertions",
  "proptest",
@@ -9073,7 +9082,7 @@ dependencies = [
  "criterion",
  "indoc",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
@@ -9113,7 +9122,7 @@ dependencies = [
  "indoc",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "paste",
  "regex",
  "serde",
@@ -9150,7 +9159,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "paste",
  "test-case",
  "thiserror",
