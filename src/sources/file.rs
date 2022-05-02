@@ -6,10 +6,7 @@ use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
-use futures::{
-    future::TryFutureExt,
-    stream::{Stream, StreamExt},
-};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -326,13 +323,19 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let finalizer = acknowledgements.then(|| {
+    let mut finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
             let checkpoints = Arc::clone(&checkpoints);
             async move { checkpoints.update(entry.file_id, entry.offset) }
         })
     });
+    let shutdown = match finalizer.as_mut().and_then(|f| f.failure_future()) {
+        None => shutdown.map(|_| ()).boxed(),
+        Some(failure) => futures::future::select(shutdown, failure)
+            .map(|_| ())
+            .boxed(),
+    };
 
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
@@ -493,7 +496,7 @@ mod tests {
         collections::HashSet,
         fs::{self, File},
         future::Future,
-        io::{Seek, Write},
+        io::{Read, Seek, Write},
     };
 
     use encoding_rs::UTF_16LE;
@@ -703,6 +706,45 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
+    #[tokio::test]
+    async fn negative_acknowledgements() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+        let data_dir = config.data_dir.clone().unwrap();
+
+        let path = dir.path().join("file");
+
+        let received = run_file_source(&config, false, ErrorAt(1), async {
+            let mut file = File::create(&path).unwrap();
+            for i in 0..3 {
+                writeln!(&mut file, "line {}", i).unwrap();
+                sleep_500_millis().await;
+            }
+        })
+        .await;
+
+        let key = log_schema().message_key();
+        assert_eq!(received[0].as_log()[key].to_string_lossy(), "line 0");
+
+        // Load the checkpoints and ensure it was not set beyond the first line.
+        let checkpoints: PathBuf = [data_dir.to_str().unwrap(), "checkpoints.json"]
+            .into_iter()
+            .collect();
+        let mut buf = String::new();
+        File::open(checkpoints)
+            .unwrap()
+            .read_to_string(&mut buf)
+            .unwrap();
+        let checkpoints: Value = serde_json::from_str(&buf).unwrap();
+        let checkpoints = checkpoints.get("checkpoints").unwrap().unwrap();
+        let checkpoint = checkpoints.get(0).unwrap().unwrap();
+        let position = checkpoint.get("position").unwrap().unwrap();
+        assert_eq!(position, &Value::Integer(7));
+    }
+
     // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
@@ -904,16 +946,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key_acknowledged() {
-        file_file_key(Acks).await
+    async fn file_key_acknowledged() {
+        file_key(Acks).await
     }
 
     #[tokio::test]
-    async fn file_file_key_nonacknowledged() {
-        file_file_key(NoAcks).await
+    async fn file_key_nonacknowledged() {
+        file_key(NoAcks).await
     }
 
-    async fn file_file_key(acks: AckingMode) {
+    async fn file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();
@@ -1651,11 +1693,35 @@ mod tests {
 
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AckingMode {
-        NoAcks,      // No acknowledgement handling and no finalization
-        Unfinalized, // Acknowledgement handling but no finalization
-        Acks,        // Full acknowledgements and proper finalization
+        NoAcks,         // No acknowledgement handling and no finalization
+        Unfinalized,    // Acknowledgement handling but no finalization
+        Acks,           // Full acknowledgements and proper finalization
+        ErrorAt(usize), // Acknowledge but fail after N batches
     }
     use AckingMode::*;
+
+    impl AckingMode {
+        fn source_sender(&self) -> (SourceSender, impl Stream<Item = Event> + Send) {
+            match self {
+                Acks => {
+                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                    (tx, rx.boxed())
+                }
+                ErrorAt(n) => {
+                    let (tx, rx) = SourceSender::new_test_error_after(*n);
+                    (tx, rx.boxed())
+                }
+                _ => {
+                    let (tx, rx) = SourceSender::new_test();
+                    (tx, rx.boxed())
+                }
+            }
+        }
+
+        fn acknowledgements(&self) -> bool {
+            !matches!(self, NoAcks)
+        }
+    }
 
     async fn run_file_source(
         config: &FileConfig,
@@ -1665,17 +1731,11 @@ mod tests {
     ) -> Vec<Event> {
         components::init_test();
 
-        let (tx, rx) = if acking_mode == Acks {
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-            (tx, rx.boxed())
-        } else {
-            let (tx, rx) = SourceSender::new_test();
-            (tx, rx.boxed())
-        };
+        let (tx, rx) = acking_mode.source_sender();
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let data_dir = config.data_dir.clone().unwrap();
-        let acks = !matches!(acking_mode, NoAcks);
+        let acks = acking_mode.acknowledgements();
 
         tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 

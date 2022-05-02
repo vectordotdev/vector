@@ -43,7 +43,7 @@ pub(crate) struct FinalizerSet<T, S, const SOE: bool> {
 
 impl<T, S, const SOE: bool> FinalizerSet<T, S, SOE>
 where
-    T: Send + 'static,
+    T: std::fmt::Debug + Send + 'static,
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
     pub(crate) fn new<F, Fut>(shutdown: ShutdownSignal, apply_done: F) -> Self
@@ -85,24 +85,6 @@ where
     }
 }
 
-impl<T> Future for OrderedFinalizer<T> {
-    type Output = ();
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        match this.failed {
-            None => Poll::Pending, // Never returns if there is no failure trigger
-            Some(failed) => match failed.poll_unpin(ctx) {
-                Poll::Ready(true) => Poll::Ready(()),
-                Poll::Ready(false) => {
-                    this.failed.take();
-                    Poll::Pending
-                }
-                Poll::Pending => Poll::Pending,
-            },
-        }
-    }
-}
-
 struct Runner<T, S, F> {
     shutdown: ShutdownSignal,
     new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
@@ -113,11 +95,13 @@ struct Runner<T, S, F> {
 
 impl<T, S, F, Fut> Runner<T, S, F>
 where
+    T: std::fmt::Debug,
     S: FuturesSet<FinalizerFuture<T>> + Unpin,
     F: Fn(T) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     async fn run<const SOE: bool>(mut self) {
+        assert!(self.failure.is_some());
         loop {
             tokio::select! {
                 _ = self.shutdown.clone() => break,
@@ -132,9 +116,10 @@ where
                 },
                 finished = self.status_receivers.next(), if !self.status_receivers.is_empty() => match finished {
                     Some((status, entry)) => if status == BatchStatus::Delivered {
-                        (self.apply_done)(entry).await
+                        (self.apply_done)(entry).await;
                     } else if SOE {
-                        return
+                        warn!(message = "Event acknowledgement reported error, shutting down source.", ?status);
+                        return;
                     }
                     // The is_empty guard above prevents this from being reachable.
                     None => unreachable!(),
@@ -148,13 +133,14 @@ where
             if status == BatchStatus::Delivered {
                 (self.apply_done)(entry).await;
             } else if SOE {
+                warn!(message = "Event acknowledgement reported error.", ?status);
                 return;
             }
         }
         // Note: `shutdown` is automatically dropped on return from this
         // function, signalling this component is completed.
         if let Some(failure) = self.failure {
-            failure.cancel();
+            failure.disable();
         }
     }
 }
