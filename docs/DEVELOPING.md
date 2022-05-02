@@ -170,7 +170,6 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 - [`/proto`](/proto) - Protobuf definitions.
 - [`/rfcs`](/rfcs) - Previous Vector proposals, a great place to build context on previous decisions.
 - [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
-- [`/skaffold`](/skaffold) - Resources for Kubernetes local development.
 - [`/src`](/src) - Vector source.
 - [`/tests`](/tests) - Various high-level test cases.
 - [`/website`](/website) - Vector's website and external documentation for Vector users.
@@ -541,8 +540,7 @@ framework are at `lib/k8s-e2e-tests`.
 The Kubernetes-related distribution bit that are at `distribution/docker`,
 `distribution/kubernetes` and our Helm chart can be found at [`vectordotdev/helm-charts`](https://github.com/vectordotdev/helm-charts/).
 
-The development assistance resources are located at `skaffold.yaml`
-and `skaffold` dir. Alternative `tilt` resources are located at `Tiltfile`
+The development assistance resources are located at `Tiltfile`
 and in the `tilt` dir.
 
 #### Development
@@ -558,77 +556,16 @@ This flow facilitates building Vector and deploying it into a cluster.
 There are some extra requirements besides what you'd normally need to work on
 Vector:
 
-- `linux` system (create an issue if you want to work with another OS and we'll
-  help);
-- [`skaffold`](https://skaffold.dev/) or [`tilt`](https://tilt.dev/)
+- [`tilt`](https://tilt.dev/)
 - [`docker`](https://www.docker.com/)
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-- [`kustomize`](https://kustomize.io/)
 - [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
-- [`cargo watch`](https://github.com/passcod/cargo-watch)
 
 ##### Automatic
 
-Once you have the requirements, use the `scripts/skaffold.sh dev` command.
-
-That's it, just one command should take care of everything!
-
-It will:
-
-1. build the `vector` binary in development mode,
-2. build a docker image from this binary via `skaffold/docker/Dockerfile`,
-3. deploy `vector` into the Kubernetes cluster at your current kubectl context
-   using the built docker image and a mix of our production deployment
-   configuration from the `distribution/kubernetes/*.yaml` and the special
-   dev-flow configuration at `skaffold/manifests/*.yaml`; see
-   `kustomization.yaml` for the exact specification.
-
-As the result of invoking the `scripts/skaffold.sh dev`, you should see
-a `skaffold` process running on your local machine, printing the logs from the
-deployed `vector` instance.
-
-To stop the process, press `Ctrl+C`, and wait for `skaffold` to clean up
-the cluster state and exit.
-
-`scripts/skaffold.sh` wraps `skaffold`, you can use other `skaffold` subcommands
-if it fits you better.
-
-##### Manual
-
-Is some cases `skaffold` may not work. It's possible to go through the dev flow
-manually, without `skaffold`.
-
-One of the important thing `skaffold` does is it patches the configuration to
-tie things together. If you want to go without it, you'll have to take care of
-that yourself, thus some additional knowledge of Kubernetes inner workings is
-required.
-
-Essentially, the steps you have to take to deploy manually are the same that
-`skaffold` will perform, and they're outlined at the previous section.
-
-##### Troubleshooting
-
-You might need to tweak `skaffold`, here are some hints:
-
-- `skaffold` will try to detect whether a local cluster is used; if a local
-  cluster is used, `skaffold` won't push the docker images it builds to a
-  registry.
-  See [this page](https://skaffold.dev/docs/environment/local-cluster/)
-  for how you can troubleshoot and tweak this behavior.
-
-- `skaffold` can rewrite the image name so that you don't try to push a docker
-  image to a repo that you don't have access to.
-  See [this page](https://skaffold.dev/docs/environment/image-registries/)
-  for more info.
-
-- For the rest of the `skaffold` tweaks you might want to apply check out
-  [this page](https://skaffold.dev/docs/environment/).
-
-##### Alternative: Tilt
-
-As an alternative to `skaffold` you can use `tilt` to detect changes, rebuild
-your image, and update your Kubernetes resource. Simply start your local Kubernetes
-cluster and run `tilt up` from Vector's root dir.
+You can use `tilt` to detect changes, rebuild your image, and update your
+Kubernetes resource. Simply start your local Kubernetes cluster and run
+`tilt up` from Vector's root dir.
 
 #### Testing
 
@@ -680,7 +617,7 @@ after the `:`. Replace `<your name>` with your Docker Hub username.
 
 You can also pass additional parameters to adjust the behavior of the test:
 
-- `QUICK_BUILD=true` - use development build and a skaffold image from the dev
+- `QUICK_BUILD=true` - use development build and a image from the dev
   flow instead of a production docker image. Significantly speeds up the
   preparation process, but doesn't guarantee the correctness in the release
   build. Useful for development of the tests or Vector code to speed up the
