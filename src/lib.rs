@@ -49,6 +49,8 @@ pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
+#[cfg(feature = "gcp")]
+pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
