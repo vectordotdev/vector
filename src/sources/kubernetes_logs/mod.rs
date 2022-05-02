@@ -138,10 +138,6 @@ pub struct Config {
     /// How long to delay removing entries from our map when we receive a deletion
     /// event from the watched stream.
     delay_deletion_ms: usize,
-
-    /// If event must be properly ordered when sending downstream
-    /// By default all events is unordered
-    ordered: bool,
 }
 
 inventory::submit! {
@@ -178,7 +174,6 @@ impl Default for Config {
             timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
-            ordered: false,
         }
     }
 }
@@ -227,7 +222,6 @@ struct Source {
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
     delay_deletion: Duration,
-    ordered: bool,
 }
 
 impl Source {
@@ -270,7 +264,6 @@ impl Source {
                 .try_into()
                 .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
         );
-        let ordered = config.ordered;
 
         Ok(Self {
             client,
@@ -288,7 +281,6 @@ impl Source {
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
             delay_deletion,
-            ordered,
         })
     }
 
@@ -313,7 +305,6 @@ impl Source {
             ingestion_timestamp_field,
             timezone,
             delay_deletion,
-            ordered,
         } = self;
 
         let pods = Api::<Pod>::all(client.clone());
@@ -454,9 +445,10 @@ impl Source {
 
         let mut stream = partial_events_merger.transform(Box::pin(events));
         let event_processing_loop = out.send_event_stream(&mut stream);
-        let mut lc = Lifecycle::new(ordered);
+
+        let mut lifecycle = Lifecycle::new();
         {
-            let (slot, shutdown) = lc.add();
+            let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
@@ -468,7 +460,7 @@ impl Source {
             slot.bind(Box::pin(fut));
         }
         {
-            let (slot, shutdown) = lc.add();
+            let (slot, shutdown) = lifecycle.add();
             let fut = util::complete_with_deadline_on_signal(
                 event_processing_loop,
                 shutdown,
@@ -490,7 +482,7 @@ impl Source {
             slot.bind(Box::pin(fut));
         }
 
-        lc.run(global_shutdown).await;
+        lifecycle.run(global_shutdown).await;
         info!(message = "Done.");
         Ok(())
     }

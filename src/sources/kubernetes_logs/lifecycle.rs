@@ -8,7 +8,7 @@ use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
     pin_mut, ready,
-    stream::{FuturesUnordered, FuturesOrdered},
+    stream::FuturesOrdered,
     FutureExt, StreamExt,
 };
 
@@ -22,10 +22,8 @@ use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 /// completing their work.
 #[derive(Debug)]
 pub struct Lifecycle<'bound> {
-    futs_ordered: FuturesOrdered<BoxFuture<'bound, ()>>,
-    futs_unordered: FuturesUnordered<BoxFuture<'bound, ()>>,
+    futs: FuturesOrdered<BoxFuture<'bound, ()>>,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
-    ordered: bool,
 }
 
 /// Holds a "global" shutdown signal or shutdown signal token.
@@ -43,12 +41,10 @@ pub enum GlobalShutdownToken {
 
 impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
-    pub fn new(ordered: bool) -> Self {
-        return Self {
-            futs_ordered: FuturesOrdered::new(),
-            futs_unordered: FuturesUnordered::new(),
+    pub fn new() -> Self {
+        Self {
+            futs: FuturesOrdered::new(),
             fut_shutdowns: Vec::new(),
-            ordered,
         }
     }
 
@@ -69,49 +65,23 @@ impl<'bound> Lifecycle<'bound> {
 
     /// Run the managed futures and keep track of the shutdown process.
     pub async fn run(mut self, mut global_shutdown: ShutdownSignal) -> GlobalShutdownToken {
-        let token;
-        match self.ordered {
-            true => {
-                let first_task_fut = self.futs_ordered.next();
+        let first_task_fut = self.futs.next();
+        pin_mut!(first_task_fut);
 
-                pin_mut!(first_task_fut);
-
-                token = match select(first_task_fut, &mut global_shutdown).await {
-                    Either::Left((None, _)) => {
-                        trace!(message = "Lifecycle had no tasks upon run, we're done.");
-                        GlobalShutdownToken::Unused(global_shutdown)
-                    }
-                    Either::Left((Some(()), _)) => {
-                        trace!(message = "Lifecycle had the first task completed.");
-                        GlobalShutdownToken::Unused(global_shutdown)
-                    }
-                    Either::Right((shutdown_signal_token, _)) => {
-                        trace!(message = "Lifecycle got a global shutdown request.");
-                        GlobalShutdownToken::Token(shutdown_signal_token)
-                    }
-                };
-            },
-            false => {
-                let first_task_fut = self.futs_unordered.next();
-
-                pin_mut!(first_task_fut);
-
-                token = match select(first_task_fut, &mut global_shutdown).await {
-                    Either::Left((None, _)) => {
-                        trace!(message = "Lifecycle had no tasks upon run, we're done.");
-                        GlobalShutdownToken::Unused(global_shutdown)
-                    }
-                    Either::Left((Some(()), _)) => {
-                        trace!(message = "Lifecycle had the first task completed.");
-                        GlobalShutdownToken::Unused(global_shutdown)
-                    }
-                    Either::Right((shutdown_signal_token, _)) => {
-                        trace!(message = "Lifecycle got a global shutdown request.");
-                        GlobalShutdownToken::Token(shutdown_signal_token)
-                    }
-                };
+        let token = match select(first_task_fut, &mut global_shutdown).await {
+            Either::Left((None, _)) => {
+                trace!(message = "Lifecycle had no tasks upon run, we're done.");
+                GlobalShutdownToken::Unused(global_shutdown)
             }
-        }
+            Either::Left((Some(()), _)) => {
+                trace!(message = "Lifecycle had the first task completed.");
+                GlobalShutdownToken::Unused(global_shutdown)
+            }
+            Either::Right((shutdown_signal_token, _)) => {
+                trace!(message = "Lifecycle got a global shutdown request.");
+                GlobalShutdownToken::Token(shutdown_signal_token)
+            }
+        };
 
         // Send the shutdowns to all managed futures.
         for fut_shutdown in self.fut_shutdowns {
@@ -124,19 +94,9 @@ impl<'bound> Lifecycle<'bound> {
             }
         }
 
-        match self.ordered {
-            true => {
-             // Wait for all the futures to complete.
-                while let Some(()) = self.futs_ordered.next().await {
-                    trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
-                }
-            },
-            false => {
-                // Wait for all the futures to complete.
-                while let Some(()) = self.futs_unordered.next().await {
-                    trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
-                }
-            }
+        // Wait for all the futures to complete.
+        while let Some(()) = self.futs.next().await {
+            trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
         }
 
         // Return the global shutdown token so that caller can perform it's
@@ -158,10 +118,7 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        match self.lifecycle.ordered {
-            true => self.lifecycle.futs_ordered.push(future),
-            false => self.lifecycle.futs_unordered.push(future),
-        }
+        self.lifecycle.futs.push(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }

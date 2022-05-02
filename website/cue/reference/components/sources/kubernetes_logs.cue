@@ -288,14 +288,6 @@ components: sources: kubernetes_logs: {
 				unit:    "milliseconds"
 			}
 		}
-		order: {
-			common: false
-			description: """
-				Specifies if the events are processed in order.
-                                """
-			required: false
-			type: bool: default: false
-		}
 		timezone: configuration._timezone
 	}
 
