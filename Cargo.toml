@@ -143,20 +143,20 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.10.1", optional = true }
-aws-types = { version = "0.10.1", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-s3 = { version = "0.10.1", optional = true }
-aws-sdk-sqs = { version = "0.10.1", optional = true }
-aws-sdk-cloudwatch = { version = "0.10.1", optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.10.1", optional = true }
-aws-sdk-elasticsearch = {version = "0.10.1", optional = true }
-aws-sdk-firehose = { version = "0.10.1", optional = true }
-aws-sdk-kinesis = { version = "0.10.1", optional = true }
-aws-sigv4 = { version = "0.10.1", optional = true }
-aws-smithy-async = { version = "0.40.2", optional = true }
-aws-smithy-client = { version = "0.40.2", optional = true }
-aws-smithy-http = { version = "0.40.2", optional = true }
-aws-smithy-types = { version = "0.40.2", optional = true }
+aws-config = { version = "0.11.0", optional = true }
+aws-types = { version = "0.11.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-s3 = { version = "0.11.0", optional = true }
+aws-sdk-sqs = { version = "0.11.0", optional = true }
+aws-sdk-cloudwatch = { version = "0.11.0", optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.11.0", optional = true }
+aws-sdk-elasticsearch = {version = "0.11.0", optional = true }
+aws-sdk-firehose = { version = "0.11.0", optional = true }
+aws-sdk-kinesis = { version = "0.11.0", optional = true }
+aws-sigv4 = { version = "0.11.0", optional = true }
+aws-smithy-async = { version = "0.41.0", optional = true }
+aws-smithy-client = { version = "0.41.0", optional = true }
+aws-smithy-http = { version = "0.41.0", optional = true }
+aws-smithy-types = { version = "0.41.0", optional = true }
 
 
 # Azure
@@ -235,7 +235,7 @@ grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2.7", default-features = false }
+http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.18", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
@@ -251,7 +251,7 @@ lru = { version = "0.7.5", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", optional = true }
 mongodb = { version = "2.2.1", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.19.1", default-features = false, optional = true }
+nats = { version = "0.19.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
