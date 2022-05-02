@@ -6,6 +6,7 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use serde::{Deserialize, Serialize};
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
@@ -26,10 +27,11 @@ mod dd_proto {
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     multiple_outputs: bool,
+    proto: TraceProto,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(acknowledgements, multiple_outputs, out, source)
+    build_trace_filter(acknowledgements, multiple_outputs, proto, out, source)
         .or(build_stats_filter())
         .unify()
         .boxed()
@@ -38,6 +40,7 @@ pub(crate) fn build_warp_filter(
 fn build_trace_filter(
     acknowledgements: bool,
     multiple_outputs: bool,
+    proto: TraceProto,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -61,22 +64,23 @@ fn build_trace_filter(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
-                        handle_dd_trace_payload(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            reported_language.as_ref(),
-                            &source,
-                        )
-                        .map_err(|error| {
-                            ErrorMessage::new(
-                                StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {:?}", error),
+                        proto
+                            .handle_dd_trace_payload(
+                                body,
+                                source.api_key_extractor.extract(
+                                    path.as_str(),
+                                    api_token,
+                                    query_params.dd_api_key,
+                                ),
+                                reported_language.as_ref(),
+                                &source,
                             )
-                        })
+                            .map_err(|error| {
+                                ErrorMessage::new(
+                                    StatusCode::UNPROCESSABLE_ENTITY,
+                                    format!("Error decoding Datadog traces: {:?}", error),
+                                )
+                            })
                     });
                 if multiple_outputs {
                     handle_request(events, acknowledgements, out.clone(), Some(agent::TRACES))
@@ -102,7 +106,123 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
         .boxed()
 }
 
-fn handle_dd_trace_payload(
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+pub enum TraceProto {
+    V1,
+    V2,
+    Both,
+}
+
+impl TraceProto {
+    fn handle_dd_trace_payload(
+        &self,
+        frame: Bytes,
+        api_key: Option<Arc<str>>,
+        lang: Option<&String>,
+        source: &DatadogAgentSource,
+    ) -> crate::Result<Vec<Event>> {
+        match self {
+            TraceProto::V1 => handle_dd_trace_payload_v1(frame, api_key, lang, source),
+            TraceProto::V2 => handle_dd_trace_payload_v2(frame, api_key, lang, source),
+            TraceProto::Both => handle_dd_trace_payload_v2(frame, api_key, lang, source),
+        }
+    }
+}
+
+// Decode Datadog newer protobuf schema
+fn handle_dd_trace_payload_v2(
+    frame: Bytes,
+    api_key: Option<Arc<str>>,
+    _: Option<&String>,
+    source: &DatadogAgentSource,
+) -> crate::Result<Vec<Event>> {
+    let decoded_payload = dd_proto::AgentPayload::decode(frame)?;
+    warn!("{:?}", decoded_payload);
+
+    let env = decoded_payload.env;
+    let hostname = decoded_payload.host_name;
+    let agent_version = decoded_payload.agent_version;
+    let target_tps = decoded_payload.target_tps;
+    let error_tps = decoded_payload.error_tps;
+    let tags = convert_tags(&decoded_payload.tags);
+
+    let trace_events: Vec<TraceEvent> = decoded_payload
+        .tracer_payloads
+        .iter()
+        .flat_map(convert_dd_tracer_payload)
+        .collect();
+
+    emit!(EventsReceived {
+        byte_size: trace_events.size_of(),
+        count: trace_events.len(),
+    });
+
+    let enriched_events = trace_events
+        .into_iter()
+        .map(|mut trace_event| {
+            if let Some(k) = &api_key {
+                trace_event
+                    .metadata_mut()
+                    .set_datadog_api_key(Some(Arc::clone(k)));
+            }
+            trace_event.insert(
+                source.log_schema_source_type_key,
+                Bytes::from("datadog_agent"),
+            );
+            trace_event.insert("payload_version", "v2".to_string());
+            trace_event.insert(source.log_schema_host_key, hostname.clone());
+            trace_event.insert("env", env.clone());
+            trace_event.insert("agent_version", agent_version.clone());
+            trace_event.insert("target_tps", target_tps as i64);
+            trace_event.insert("error_tps", error_tps as i64);
+            if let Some(Value::Object(span_tags)) = trace_event.get_mut("tags") {
+                span_tags.extend(tags.clone());
+            } else {
+                trace_event.insert("tags", Value::from(tags.clone()));
+            }
+            Event::Trace(trace_event)
+        })
+        .collect();
+    Ok(enriched_events)
+}
+
+fn convert_dd_tracer_payload(payload: &dd_proto::TracerPayload) -> Vec<TraceEvent> {
+    payload
+        .chunks
+        .iter()
+        .map(|t| {
+            let mut trace_event = convert_dd_trace_chunk(t);
+            trace_event.insert("container_id", payload.container_id.clone());
+            trace_event.insert("language_name", payload.language_name.clone());
+            trace_event.insert("language_version", payload.language_version.clone());
+            trace_event.insert("tracer_version", payload.tracer_version.clone());
+            trace_event.insert("runtime_id", payload.runtime_id.clone());
+            trace_event.insert("app_version", payload.app_version.clone());
+            trace_event
+        })
+        .collect()
+}
+
+fn convert_dd_trace_chunk(dd_chunk: &dd_proto::TraceChunk) -> TraceEvent {
+    let mut trace_event = TraceEvent::default();
+    trace_event.insert("priority", dd_chunk.priority as i64);
+    trace_event.insert("origin", dd_chunk.origin.clone());
+    trace_event.insert("dropped", dd_chunk.dropped_trace);
+    trace_event.insert("tags", Value::from(convert_tags(&dd_chunk.tags)));
+    trace_event.insert(
+        "spans",
+        dd_chunk
+            .spans
+            .iter()
+            .map(|s| Value::from(convert_span(s)))
+            .collect::<Vec<Value>>(),
+    );
+    trace_event
+}
+
+// Decode Datadog older protobuf schema
+// TODO: rework to get an output compatible with the new format
+fn handle_dd_trace_payload_v1(
     frame: Bytes,
     api_key: Option<Arc<str>>,
     lang: Option<&String>,
@@ -118,7 +238,7 @@ fn handle_dd_trace_payload(
     decoded_payload
         .traces
         .iter()
-        .map(convert_dd_trace)
+        .map(convert_dd_api_trace)
         //... and each APM event is also mapped into its own event
         .chain(decoded_payload.transactions.iter().map(|s| {
             TraceEvent::from(convert_span(s))
@@ -154,7 +274,7 @@ fn handle_dd_trace_payload(
     Ok(enriched_events)
 }
 
-fn convert_dd_trace(dd_trace: &dd_proto::ApiTrace) -> TraceEvent {
+fn convert_dd_api_trace(dd_trace: &dd_proto::ApiTrace) -> TraceEvent {
     let mut trace_event = TraceEvent::default();
     trace_event.insert("trace_id", dd_trace.trace_id as i64);
     trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
@@ -203,6 +323,8 @@ fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {
         ),
     );
     span.insert("type".into(), Value::from(dd_span.r#type.clone()));
+    // TODO
+    // span.inser("meta_stri")
     span
 }
 

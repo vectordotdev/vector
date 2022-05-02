@@ -32,7 +32,7 @@ use crate::{
     sources::datadog::agent::{
         logs::{decode_log_body, LogMsg},
         metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+        traces, DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
@@ -1311,6 +1311,7 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            trace_proto: traces::TraceProto::V1,
         };
 
         let mut outputs = config
