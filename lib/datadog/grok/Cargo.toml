@@ -14,7 +14,7 @@ lalrpop-util = { version = "0.19", default-features = false }
 nom = { version = "7.1.1", default-features = false, features = ["std"] }
 once_cell = { version = "1.10", default-features = false, features = ["std", "parking_lot"] }
 onig = { version = "6.3", default-features = false }
-ordered-float = { version = "2", default-features = false }
+ordered-float = { version = "3", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
 regex = { version = "1.5", default-features = false, features = ["perf"] }
 serde_json = { version = "1.0.79", default-features = false }
