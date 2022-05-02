@@ -1,0 +1,15 @@
+[package]
+name = "vector-config-macros"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = { version = "0.14", default-features = false, features = ["suggestions"] }
+proc-macro2 = { version = "1.0", default-features = false }
+quote = { version = "1.0", default-features = false }
+serde_derive_internals = "0.26"
+syn = { version = "1.0", default-features = false }
+vector-config-common = { path = "../vector-config-common" }
