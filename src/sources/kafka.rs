@@ -186,7 +186,12 @@ async fn kafka_source(
             }
         })
     });
-    let mut stream = consumer.stream().take_until(shutdown);
+
+    let stream = consumer.stream().take_until(shutdown);
+    let mut stream = match finalizer.as_mut().and_then(|f| f.failure_future()) {
+        None => stream.boxed(),
+        Some(failure) => stream.take_until(failure).boxed(),
+    };
     let schema = log_schema();
 
     while let Some(message) = stream.next().await {
