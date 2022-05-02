@@ -12,7 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -21,6 +21,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
+use stream_cancel::Tripwire;
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
@@ -244,11 +245,15 @@ impl JournaldSource {
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);
-        let finalizer = Finalizer::new(
+        let mut finalizer = Finalizer::new(
             self.acknowledgements,
             checkpointer.clone(),
             shutdown.clone(),
         );
+        let shutdown = match finalizer.failure_future() {
+            None => shutdown.map(|_| ()).boxed(),
+            Some(failure) => future::select(shutdown, failure).map(|_| ()).boxed(),
+        };
 
         let run = Box::pin(self.run(checkpointer, finalizer, start_journalctl));
         future::select(run, shutdown).await;
@@ -641,6 +646,13 @@ impl Finalizer {
             _ => {
                 unreachable!("Cannot have async finalization without a receiver in journald source")
             }
+        }
+    }
+
+    fn failure_future(&mut self) -> Option<Tripwire> {
+        match self {
+            Self::Sync(_) => None,
+            Self::Async(f) => f.failure_future(),
         }
     }
 }

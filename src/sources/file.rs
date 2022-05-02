@@ -497,10 +497,12 @@ mod tests {
         fs::{self, File},
         future::Future,
         io::{Read, Seek, Write},
+        path::Path,
     };
 
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
+    use serde_json::Value as JsonValue;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
@@ -730,19 +732,23 @@ mod tests {
         assert_eq!(received[0].as_log()[key].to_string_lossy(), "line 0");
 
         // Load the checkpoints and ensure it was not set beyond the first line.
+        let position = read_checkpoints_position(&data_dir, 0);
+        assert_eq!(position, JsonValue::from(7));
+    }
+
+    fn read_checkpoints_position(data_dir: &Path, index: usize) -> JsonValue {
         let checkpoints: PathBuf = [data_dir.to_str().unwrap(), "checkpoints.json"]
             .into_iter()
             .collect();
         let mut buf = String::new();
         File::open(checkpoints)
-            .unwrap()
+            .expect("Could not open the checkpoints file")
             .read_to_string(&mut buf)
-            .unwrap();
-        let checkpoints: Value = serde_json::from_str(&buf).unwrap();
-        let checkpoints = checkpoints.get("checkpoints").unwrap().unwrap();
-        let checkpoint = checkpoints.get(0).unwrap().unwrap();
-        let position = checkpoint.get("position").unwrap().unwrap();
-        assert_eq!(position, &Value::Integer(7));
+            .expect("Could not read the checkpoints file");
+        let checkpoints: JsonValue = serde_json::from_str(&buf).unwrap();
+        let checkpoints = checkpoints.get("checkpoints").unwrap();
+        let checkpoint = checkpoints.get(index).unwrap();
+        checkpoint.get("position").unwrap().clone()
     }
 
     // https://github.com/vectordotdev/vector/issues/8363
