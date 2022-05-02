@@ -96,10 +96,8 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v0.2" / "stats" / ..))
         .and_then(|| {
-            warn!(
-                message = "The route /api/v0.2/stats is yet not supported.",
-                internal_log_rate_secs = 60
-            );
+            // APM stats are discarded on purpose, they will be computed in the `datadog_traces` sink
+            // thus we simply reply with a 200/OK response.
             let response: Result<Response, Rejection> = Ok(warp::reply().into_response());
             future::ready(response)
         })
@@ -118,7 +116,7 @@ pub enum TraceProto {
 
 impl TraceProto {
     fn handle_dd_trace_payload(
-        &self,
+        self,
         frame: Bytes,
         api_key: Option<Arc<str>>,
         lang: Option<&String>,
@@ -145,11 +143,11 @@ fn handle_dd_trace_payload_v2(
     let agent_version = decoded_payload.agent_version;
     let target_tps = decoded_payload.target_tps;
     let error_tps = decoded_payload.error_tps;
-    let tags = convert_tags(&decoded_payload.tags);
+    let tags = convert_tags(decoded_payload.tags);
 
     let trace_events: Vec<TraceEvent> = decoded_payload
         .tracer_payloads
-        .iter()
+        .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
 
@@ -187,10 +185,10 @@ fn handle_dd_trace_payload_v2(
     Ok(enriched_events)
 }
 
-fn convert_dd_tracer_payload(payload: &dd_proto::TracerPayload) -> Vec<TraceEvent> {
+fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent> {
     payload
         .chunks
-        .iter()
+        .into_iter()
         .map(|t| {
             let mut trace_event = convert_dd_trace_chunk(t);
             trace_event.insert("container_id", payload.container_id.clone());
@@ -204,17 +202,17 @@ fn convert_dd_tracer_payload(payload: &dd_proto::TracerPayload) -> Vec<TraceEven
         .collect()
 }
 
-fn convert_dd_trace_chunk(dd_chunk: &dd_proto::TraceChunk) -> TraceEvent {
+fn convert_dd_trace_chunk(dd_chunk: dd_proto::TraceChunk) -> TraceEvent {
     let mut trace_event = TraceEvent::default();
     trace_event.insert("priority", dd_chunk.priority as i64);
-    trace_event.insert("origin", dd_chunk.origin.clone());
+    trace_event.insert("origin", dd_chunk.origin);
     trace_event.insert("dropped", dd_chunk.dropped_trace);
-    trace_event.insert("tags", Value::from(convert_tags(&dd_chunk.tags)));
+    trace_event.insert("tags", Value::from(convert_tags(dd_chunk.tags)));
     trace_event.insert(
         "spans",
         dd_chunk
             .spans
-            .iter()
+            .into_iter()
             .map(|s| Value::from(convert_span(s)))
             .collect::<Vec<Value>>(),
     );
@@ -238,10 +236,10 @@ fn handle_dd_trace_payload_v1(
     // Each traces is mapped to one event...
     decoded_payload
         .traces
-        .iter()
+        .into_iter()
         .map(convert_dd_api_trace)
         //... and each APM event is also mapped into its own event
-        .chain(decoded_payload.transactions.iter().map(|s| {
+        .chain(decoded_payload.transactions.into_iter().map(|s| {
             TraceEvent::from(convert_span(s))
         })).collect();
 
@@ -275,7 +273,7 @@ fn handle_dd_trace_payload_v1(
     Ok(enriched_events)
 }
 
-fn convert_dd_api_trace(dd_trace: &dd_proto::ApiTrace) -> TraceEvent {
+fn convert_dd_api_trace(dd_trace: dd_proto::ApiTrace) -> TraceEvent {
     let mut trace_event = TraceEvent::default();
     trace_event.insert("trace_id", dd_trace.trace_id as i64);
     trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
@@ -284,18 +282,18 @@ fn convert_dd_api_trace(dd_trace: &dd_proto::ApiTrace) -> TraceEvent {
         "spans",
         dd_trace
             .spans
-            .iter()
+            .into_iter()
             .map(|s| Value::from(convert_span(s)))
             .collect::<Vec<Value>>(),
     );
     trace_event
 }
 
-fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {
+fn convert_span(dd_span: dd_proto::Span) -> BTreeMap<String, Value> {
     let mut span = BTreeMap::<String, Value>::new();
-    span.insert("service".into(), dd_span.service.clone().into());
-    span.insert("name".into(), Value::from(dd_span.name.clone()));
-    span.insert("resource".into(), Value::from(dd_span.resource.clone()));
+    span.insert("service".into(), Value::from(dd_span.service));
+    span.insert("name".into(), Value::from(dd_span.name));
+    span.insert("resource".into(), Value::from(dd_span.resource));
     span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
     span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
     span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
@@ -305,17 +303,17 @@ fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {
     );
     span.insert("duration".into(), Value::from(dd_span.duration as i64));
     span.insert("error".into(), Value::from(dd_span.error as i64));
-    span.insert("meta".into(), Value::from(convert_tags(&dd_span.meta)));
+    span.insert("meta".into(), Value::from(convert_tags(dd_span.meta)));
     span.insert(
         "metrics".into(),
         Value::from(
             dd_span
                 .metrics
-                .iter()
+                .into_iter()
                 .map(|(k, v)| {
                     (
-                        k.clone(),
-                        NotNan::new(*v as f64)
+                        k,
+                        NotNan::new(v as f64)
                             .map(Value::Float)
                             .unwrap_or(Value::Null),
                     )
@@ -323,15 +321,23 @@ fn convert_span(dd_span: &dd_proto::Span) -> BTreeMap<String, Value> {
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );
-    span.insert("type".into(), Value::from(dd_span.r#type.clone()));
-    // TODO
-    // span.inser("meta_stri")
+    span.insert("type".into(), Value::from(dd_span.r#type));
+    span.insert(
+        "meta_struct".into(),
+        Value::from(
+            dd_span
+                .meta_struct
+                .into_iter()
+                .map(|(k, v)| (k, Value::from(bytes::Bytes::from(v))))
+                .collect::<BTreeMap<String, Value>>(),
+        ),
+    );
     span
 }
 
-fn convert_tags(original_map: &BTreeMap<String, String>) -> BTreeMap<String, Value> {
+fn convert_tags(original_map: BTreeMap<String, String>) -> BTreeMap<String, Value> {
     original_map
-        .iter()
-        .map(|(k, v)| (k.clone(), Value::from(v.clone())))
+        .into_iter()
+        .map(|(k, v)| (k, Value::from(v)))
         .collect::<BTreeMap<String, Value>>()
 }
