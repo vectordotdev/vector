@@ -1756,9 +1756,9 @@ dependencies = [
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8bd6b23feb4180ccf20cefca9357262818443aafb7159b5e503d170d442a872"
+checksum = "8f21a16ee925aa9d2bad2e296beffd6c5b1bfaad50af509d305b8e7f23af20fb"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -2079,12 +2079,12 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1a5d2e8b5a94b2261efb20e99a01255b9c5293797d69bbf04600567b2f9b8d7"
+checksum = "4529658bdda7fd6769b8614be250cdcfc3aeb0ee72fe66f9e41e5e5eb73eac02"
 dependencies = [
- "darling_core 0.14.0",
- "darling_macro 0.14.0",
+ "darling_core 0.14.1",
+ "darling_macro 0.14.1",
 ]
 
 [[package]]
@@ -2103,9 +2103,9 @@ dependencies = [
 
 [[package]]
 name = "darling_core"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f1c7d56716be82d9c6adb967cfe700955179ea88806e898483dad6987330a54"
+checksum = "649c91bc01e8b1eac09fb91e8dbc7d517684ca6be8ebc75bb9cafc894f9fdb6f"
 dependencies = [
  "fnv",
  "ident_case",
@@ -2128,11 +2128,11 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64dd7e5a75a00cb6799ae9fbbfc3bba0134def6579a9e27564e72c839c837bed"
+checksum = "ddfc69c5bfcbd2fc09a0f38451d2daf0e372e367986a83906d1b0dbc88134fb5"
 dependencies = [
- "darling_core 0.14.0",
+ "darling_core 0.14.1",
  "quote 1.0.18",
  "syn 1.0.91",
 ]
@@ -2188,7 +2188,7 @@ dependencies = [
  "nom 7.1.1",
  "once_cell",
  "onig",
- "ordered-float",
+ "ordered-float 3.0.0",
  "peeking_take_while 1.0.0",
  "regex",
  "serde_json",
@@ -2207,7 +2207,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "once_cell",
- "ordered-float",
+ "ordered-float 3.0.0",
  "pest",
  "pest_derive",
  "regex",
@@ -4378,9 +4378,9 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
+checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"
@@ -4495,7 +4495,7 @@ dependencies = [
  "indexmap",
  "metrics 0.17.1",
  "num_cpus",
- "ordered-float",
+ "ordered-float 2.10.0",
  "parking_lot 0.11.2",
  "quanta",
  "radix_trie",
@@ -5276,6 +5276,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96bcbab4bfea7a59c2c0fe47211a1ac4e3e96bea6eb446d704f310bc5c732ae2"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "os_info"
 version = "3.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5903,7 +5912,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "proptest",
  "vrl-diagnostic",
  "vrl-parser",
@@ -6933,7 +6942,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
- "ordered-float",
+ "ordered-float 2.10.0",
  "serde",
 ]
 
@@ -8648,7 +8657,7 @@ dependencies = [
  "indoc",
  "lookup",
  "mlua",
- "ordered-float",
+ "ordered-float 3.0.0",
  "quickcheck",
  "regex",
  "serde",
@@ -8772,7 +8781,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "ordered-float",
+ "ordered-float 3.0.0",
  "percent-encoding",
  "pin-project 1.0.10",
  "portpicker",
@@ -8879,7 +8888,7 @@ dependencies = [
 name = "vector-config-common"
 version = "0.1.0"
 dependencies = [
- "darling 0.14.0",
+ "darling 0.14.1",
  "proc-macro2 1.0.37",
  "quote 1.0.18",
  "schemars",
@@ -8890,7 +8899,7 @@ dependencies = [
 name = "vector-config-macros"
 version = "0.1.0"
 dependencies = [
- "darling 0.14.0",
+ "darling 0.14.1",
  "proc-macro2 1.0.37",
  "quote 1.0.18",
  "serde_derive_internals 0.26.0",
@@ -8963,7 +8972,7 @@ dependencies = [
  "derivative",
  "metrics 0.17.1",
  "nom 7.1.1",
- "ordered-float",
+ "ordered-float 3.0.0",
  "serde",
  "serde_json",
  "smallvec",
@@ -9020,7 +9029,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "once_cell",
- "ordered-float",
+ "ordered-float 3.0.0",
  "pin-project 1.0.10",
  "pretty_assertions",
  "proptest",
@@ -9073,7 +9082,7 @@ dependencies = [
  "criterion",
  "indoc",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
@@ -9113,7 +9122,7 @@ dependencies = [
  "indoc",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "paste",
  "regex",
  "serde",
@@ -9150,7 +9159,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
- "ordered-float",
+ "ordered-float 3.0.0",
  "paste",
  "test-case",
  "thiserror",
