@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 
 use crate::{
@@ -396,7 +396,7 @@ pub enum Error {
     Fallible { span: Span },
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 

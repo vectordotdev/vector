@@ -1,1 +1,1 @@
-{"log":{"":[{},{"":null},{"[￰%":"","\\­":{"6‪":null,"Z(":"","":"澹"}}],"2":true,"񽸵s봚":-9223372036854775808}}
+{"metric":{"name":"s","namespace":"p","tags":{"e":"q","m":"c","t":"m"},"kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":-391104.0,"count":2620170858},{"upper_limit":465088.0,"count":2989016999},{"upper_limit":-689728.0,"count":1}],"count":1009554319,"sum":-950080.0}}}

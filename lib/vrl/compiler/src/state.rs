@@ -24,6 +24,10 @@ impl LocalEnv {
         self.bindings.insert(ident, details);
     }
 
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<assignment::Details> {
+        self.bindings.remove(ident)
+    }
+
     /// Merge state present in both `self` and `other`.
     pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
         for (ident, other_details) in other.bindings.into_iter() {

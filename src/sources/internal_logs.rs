@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future, stream, StreamExt};
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use vector_core::ByteSizeOf;
 
@@ -9,7 +9,8 @@ use crate::{
     event::Event,
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    trace, SourceSender,
+    trace::TraceSubscription,
+    SourceSender,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -51,9 +52,12 @@ impl SourceConfig for InternalLogsConfig {
             .to_owned();
         let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
 
+        let subscription = TraceSubscription::subscribe();
+
         Ok(Box::pin(run(
             host_key,
             pid_key,
+            subscription,
             cx.out,
             cx.shutdown,
             self.configuration_key.to_owned(),
@@ -77,6 +81,7 @@ impl SourceConfig for InternalLogsConfig {
 async fn run(
     host_key: String,
     pid_key: String,
+    mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     configuration_key: Option<String>,
@@ -85,15 +90,11 @@ async fn run(
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
-    let subscription = trace::subscribe();
-
-    // chain the logs emitted before the source started first
-    let mut rx = stream::iter(subscription.buffer)
-        .map(Ok)
-        .chain(tokio_stream::wrappers::BroadcastStream::new(
-            subscription.receiver,
-        ))
-        .filter_map(|log| future::ready(log.ok()))
+    // Chain any log events that were captured during early buffering to the front,
+    // and then continue with the normal stream of internal log events.
+    let buffered_events = subscription.buffered_events().await;
+    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+        .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
@@ -194,7 +195,7 @@ mod tests {
             .unwrap();
         tokio::spawn(source);
         sleep(Duration::from_millis(1)).await;
-        trace::stop_buffering();
+        trace::stop_early_buffering();
         rx
     }
 }

@@ -17,6 +17,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tracing::Span;
 use value::Kind;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -25,7 +26,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -80,6 +81,10 @@ impl GenerateConfig for DatadogAgentConfig {
     }
 }
 
+inventory::submit! {
+    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
@@ -118,7 +123,7 @@ impl SourceConfig for DatadogAgentConfig {
         )?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let routes = filters
                 .with(warp::trace(move |_info| span.clone()))
                 .recover(|r: Rejection| async move {

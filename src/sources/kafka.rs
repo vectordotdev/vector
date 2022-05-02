@@ -10,7 +10,7 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -142,12 +142,8 @@ impl SourceConfig for KafkaSourceConfig {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
+            self.clone(),
             consumer,
-            self.key_field.clone(),
-            self.topic_key.clone(),
-            self.partition_key.clone(),
-            self.offset_key.clone(),
-            self.headers_key.clone(),
             decoder,
             cx.shutdown,
             cx.out,
@@ -169,19 +165,14 @@ impl SourceConfig for KafkaSourceConfig {
 }
 
 async fn kafka_source(
+    config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaStatisticsContext>,
-    key_field: String,
-    topic_key: String,
-    partition_key: String,
-    offset_key: String,
-    headers_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let shutdown = shutdown.shared();
     let mut finalizer = acknowledgements.then(|| {
         let consumer = Arc::clone(&consumer);
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
@@ -244,11 +235,11 @@ async fn kafka_source(
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
-                let key_field = &key_field;
-                let topic_key = &topic_key;
-                let partition_key = &partition_key;
-                let offset_key = &offset_key;
-                let headers_key = &headers_key;
+                let key_field = config.key_field.as_str();
+                let topic_key = config.topic_key.as_str();
+                let partition_key = config.partition_key.as_str();
+                let offset_key = config.offset_key.as_str();
+                let headers_key = config.headers_key.as_str();
 
                 let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
@@ -266,11 +257,11 @@ async fn kafka_source(
                                     if let Event::Log(ref mut log) = event {
                                         log.insert(schema.source_type_key(), Bytes::from("kafka"));
                                         log.insert(schema.timestamp_key(), timestamp);
-                                        log.insert(key_field.as_str(), msg_key.clone());
-                                        log.insert(topic_key.as_str(), Value::from(msg_topic.clone()));
-                                        log.insert(partition_key.as_str(), Value::from(msg_partition));
-                                        log.insert(offset_key.as_str(), Value::from(msg_offset));
-                                        log.insert(headers_key.as_str(), Value::from(headers_map.clone()));
+                                        log.insert(key_field, msg_key.clone());
+                                        log.insert(topic_key, Value::from(msg_topic.clone()));
+                                        log.insert(partition_key, Value::from(msg_partition));
+                                        log.insert(offset_key, Value::from(msg_offset));
+                                        log.insert(headers_key, Value::from(headers_map.clone()));
                                     }
 
                                     yield event;
@@ -521,13 +512,10 @@ mod integration_test {
 
         let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let consumer = create_consumer(&config).unwrap();
         tokio::spawn(kafka_source(
-            create_consumer(&config).unwrap(),
-            config.key_field,
-            config.topic_key,
-            config.partition_key,
-            config.offset_key,
-            config.headers_key,
+            config,
+            consumer,
             crate::codecs::Decoder::default(),
             shutdown,
             tx,

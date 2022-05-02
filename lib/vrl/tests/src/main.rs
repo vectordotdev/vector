@@ -21,6 +21,53 @@ use vrl_tests::{docs, Test};
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+/// A list of tests currently only working on the "AST" runtime.
+///
+/// This list should ideally be zero, but might not be if specific features
+/// haven't been released on the "VM" runtime yet.
+static AST_ONLY_TESTS: &[&str] = &[
+    // Iteration-specific tests, waiting for VM implementation.
+    //
+    // See: https://github.com/vectordotdev/vector/issues/12366
+    "expressions/function_call/closure scope inheritance",
+    // `for_each
+    "rfcs/8381/check property on variable sized array of objects",
+    "rfcs/8381/convert object to specific string format",
+    "rfcs/8381/converting a single metric into multiple metrics",
+    "rfcs/8381/find match against list of regular expressions",
+    "rfcs/8381/map key value pairs to object with key and value fields",
+    "rfcs/8381/re introduce previous only fields functionality using iteration",
+    "rfcs/8381/unzip object into separate key value arrays",
+    "rfcs/8381/zip an array of objects with fields key and value into one object",
+    "functions/for_each/iterate object",
+    "functions/for_each/recursively iterate object",
+    "functions/for_each/iterate array",
+    "functions/for_each/recursively iterate array",
+    "functions/for_each (closure)/iterate array",
+    // `map_keys`
+    "rfcs/8381/add prefix to all keys",
+    "rfcs/8381/de dot keys for elasticsearch",
+    "rfcs/8381/add prefix to all keys",
+    "rfcs/8381/de dot keys for elasticsearch",
+    "rfcs/8381/remove prefix from keys",
+    "rfcs/8381/trim a character from all keys",
+    "functions/map_keys (closure)/map object keys",
+    "functions/map_keys/map object keys",
+    "functions/map_keys/recursively map object keys",
+    "functions/map_keys/map nested object keys",
+    // `map_values`
+    "rfcs/8381/add fields to objects in array",
+    "rfcs/8381/call parse timestamp on array of cloudtrail records",
+    "rfcs/8381/delete a field from all objects in an array",
+    "rfcs/8381/nullify empty strings",
+    "rfcs/8381/run encode json on all top level object fields",
+    "rfcs/8381/run parse json on multiple strings in array and emit as multiple events",
+    "rfcs/8381/map complex dynamic object based on conditionals",
+    "functions/map_values (closure)/map object values",
+    "functions/map_values/map object values",
+    "functions/map_values/recursively map object values",
+];
+
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
@@ -67,7 +114,11 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>) -> bool {
+fn should_run(name: &str, pat: &Option<String>, runtime: VrlRuntime) -> bool {
+    if matches!(runtime, VrlRuntime::Vm) && AST_ONLY_TESTS.contains(&name) {
+        return false;
+    }
+
     if name == "tests/example.vrl" {
         return false;
     }
@@ -137,7 +188,13 @@ fn main() {
             tests.into_iter()
         })
         .chain(docs::tests(cmd.ignore_cue).into_iter())
-        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
+        .filter(|test| {
+            should_run(
+                &format!("{}/{}", test.category, test.name),
+                &cmd.pattern,
+                cmd.runtime,
+            )
+        })
         .collect::<Vec<_>>();
 
     for mut test in tests {
@@ -186,7 +243,7 @@ fn main() {
             .unwrap_or_default();
 
         match program {
-            Ok(program) => {
+            Ok((program, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
@@ -327,7 +384,7 @@ fn main() {
                     }
                 }
             }
-            Err(diagnostics) => {
+            Ok((_, diagnostics)) | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {
