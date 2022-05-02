@@ -55,9 +55,11 @@ impl Program {
                 .map(|v| v.to_owned())
                 .unwrap_or(Value::Null)),
             Comparison(lhs, op, rhs) => {
+                const NULL: Value = Value::Null;
+
                 let target = ctx.target();
-                let lhs = lhs.as_value(target);
-                let rhs = rhs.as_value(target);
+                let lhs = lhs.as_value(target).unwrap_or(&NULL);
+                let rhs = rhs.as_value(target).unwrap_or(&NULL);
 
                 let cmp = match op {
                     Op::Eq => lhs == rhs,
