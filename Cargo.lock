@@ -2079,12 +2079,12 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1a5d2e8b5a94b2261efb20e99a01255b9c5293797d69bbf04600567b2f9b8d7"
+checksum = "4529658bdda7fd6769b8614be250cdcfc3aeb0ee72fe66f9e41e5e5eb73eac02"
 dependencies = [
- "darling_core 0.14.0",
- "darling_macro 0.14.0",
+ "darling_core 0.14.1",
+ "darling_macro 0.14.1",
 ]
 
 [[package]]
@@ -2103,9 +2103,9 @@ dependencies = [
 
 [[package]]
 name = "darling_core"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f1c7d56716be82d9c6adb967cfe700955179ea88806e898483dad6987330a54"
+checksum = "649c91bc01e8b1eac09fb91e8dbc7d517684ca6be8ebc75bb9cafc894f9fdb6f"
 dependencies = [
  "fnv",
  "ident_case",
@@ -2128,11 +2128,11 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64dd7e5a75a00cb6799ae9fbbfc3bba0134def6579a9e27564e72c839c837bed"
+checksum = "ddfc69c5bfcbd2fc09a0f38451d2daf0e372e367986a83906d1b0dbc88134fb5"
 dependencies = [
- "darling_core 0.14.0",
+ "darling_core 0.14.1",
  "quote 1.0.18",
  "syn 1.0.91",
 ]
@@ -8888,7 +8888,7 @@ dependencies = [
 name = "vector-config-common"
 version = "0.1.0"
 dependencies = [
- "darling 0.14.0",
+ "darling 0.14.1",
  "proc-macro2 1.0.37",
  "quote 1.0.18",
  "schemars",
@@ -8899,7 +8899,7 @@ dependencies = [
 name = "vector-config-macros"
 version = "0.1.0"
 dependencies = [
- "darling 0.14.0",
+ "darling 0.14.1",
  "proc-macro2 1.0.37",
  "quote 1.0.18",
  "serde_derive_internals 0.26.0",
