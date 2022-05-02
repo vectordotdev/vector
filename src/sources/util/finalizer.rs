@@ -28,7 +28,7 @@ pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<Finaliz
 /// events from a source as done in a single background task. The type
 /// `T` is the source-specific data associated with each entry to be
 /// used to complete the finalization.
-pub(crate) struct FinalizerSet<T, S> {
+pub struct FinalizerSet<T, S> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
     flush: Option<Arc<Notify>>,
     _phantom: PhantomData<S>,
@@ -118,7 +118,7 @@ async fn run_finalizer<T, F: Future<Output = ()>>(
     drop(shutdown); // redundant, just here for visibility
 }
 
-pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
+pub trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
     fn is_empty(&self) -> bool;
     fn push(&mut self, future: Fut);
 }
@@ -144,7 +144,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesUnordered<Fut> {
 }
 
 #[pin_project::pin_project]
-pub(crate) struct FinalizerFuture<T> {
+pub struct FinalizerFuture<T> {
     receiver: BatchStatusReceiver,
     entry: Option<T>,
 }
