@@ -9,7 +9,7 @@ type = "internal_metrics"
 
 [sources.datadog_agent]
 type = "datadog_agent"
-acknowledgements = false
+acknowledgements = true
 address = "0.0.0.0:8282"
 
 ##
@@ -45,4 +45,5 @@ address = "0.0.0.0:9090"
 
 [sinks.blackhole]
 type = "blackhole"
+print_interval_secs = 0
 inputs = ["remap"]
