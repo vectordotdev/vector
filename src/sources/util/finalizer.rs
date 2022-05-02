@@ -1,8 +1,9 @@
 use std::marker::{PhantomData, Unpin};
-use std::{future::Future, pin::Pin, task::Poll};
+use std::{future::Future, pin::Pin, task::Context, task::Poll};
 
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
+use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
 use crate::event::{BatchStatus, BatchStatusReceiver};
@@ -33,8 +34,10 @@ pub(crate) type UnorderedFinalizer<T> =
 /// events from a source as done in a single background task. The type
 /// `T` is the source-specific data associated with each entry to be
 /// used to complete the finalization.
+#[pin_project::pin_project]
 pub(crate) struct FinalizerSet<T, S, const SOE: bool> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
+    failed: Option<Tripwire>,
     _phantom: PhantomData<S>,
 }
 
@@ -49,14 +52,19 @@ where
         Fut: Future<Output = ()> + Send + 'static,
     {
         let (sender, receiver) = mpsc::unbounded_channel();
+        let (trigger, tripwire) = SOE
+            .then(Tripwire::new)
+            .map_or((None, None), |(trig, trip)| (Some(trig), Some(trip)));
         tokio::spawn(run_finalizer::<T, S, F, Fut, SOE>(
             shutdown,
             receiver,
             apply_done,
             S::default(),
+            trigger,
         ));
         Self {
             sender: Some(sender),
+            failed: tripwire,
             _phantom: Default::default(),
         }
     }
@@ -68,6 +76,28 @@ where
             }
         }
     }
+
+    pub fn failure_future(&mut self) -> Option<Tripwire> {
+        self.failed.take()
+    }
+}
+
+impl<T> Future for OrderedFinalizer<T> {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        match this.failed {
+            None => Poll::Pending, // Never returns if there is no failure trigger
+            Some(failed) => match failed.poll_unpin(ctx) {
+                Poll::Ready(true) => Poll::Ready(()),
+                Poll::Ready(false) => {
+                    this.failed.take();
+                    Poll::Pending
+                }
+                Poll::Pending => Poll::Pending,
+            },
+        }
+    }
 }
 
 async fn run_finalizer<T, S, F, Fut, const SOE: bool>(
@@ -75,6 +105,7 @@ async fn run_finalizer<T, S, F, Fut, const SOE: bool>(
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: F,
     mut status_receivers: S,
+    failure: Option<Trigger>,
 ) where
     S: FuturesSet<FinalizerFuture<T>> + Unpin,
     F: Fn(T) -> Fut + Send + Sync + 'static,
@@ -115,6 +146,9 @@ async fn run_finalizer<T, S, F, Fut, const SOE: bool>(
     }
     // Note: `shutdown` is automatically dropped on return from this
     // function, signalling this component is completed.
+    if let Some(failure) = failure {
+        failure.cancel();
+    }
 }
 
 pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
@@ -150,9 +184,9 @@ pub(crate) struct FinalizerFuture<T> {
 
 impl<T> Future for FinalizerFuture<T> {
     type Output = (<BatchStatusReceiver as Future>::Output, T);
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let status = futures::ready!(self.receiver.poll_unpin(ctx));
-        // The use of this above in a `Futures{Ordered|Unordered|`
+        // The use of this above in a `Futures{Ordered|Unordered}`
         // will only take this once before dropping the future.
         Poll::Ready((status, self.entry.take().unwrap_or_else(|| unreachable!())))
     }
