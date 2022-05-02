@@ -1280,7 +1280,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
@@ -1307,7 +1307,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
