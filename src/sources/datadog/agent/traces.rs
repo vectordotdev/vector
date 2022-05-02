@@ -108,8 +108,11 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub enum TraceProto {
+    #[serde(rename = "v1")]
     V1,
+    #[serde(rename = "v2")]
     V2,
+    #[serde(rename = "both")]
     Both,
 }
 
@@ -137,8 +140,6 @@ fn handle_dd_trace_payload_v2(
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = dd_proto::AgentPayload::decode(frame)?;
-    warn!("{:?}", decoded_payload);
-
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
     let agent_version = decoded_payload.agent_version;
