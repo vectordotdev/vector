@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
-use futures::{future::Shared, stream, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -154,7 +154,7 @@ impl SourceConfig for PubsubConfig {
             decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
             tls: TlsSettings::from_options(&self.tls)?,
-            shutdown: cx.shutdown.shared(),
+            shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             ack_ids: Default::default(),
@@ -188,7 +188,7 @@ struct PubsubSource {
     acknowledgements: bool,
     tls: TlsSettings,
     ack_deadline_seconds: i32,
-    shutdown: Shared<ShutdownSignal>,
+    shutdown: ShutdownSignal,
     out: SourceSender,
     // The acknowledgement IDs are pulled out of the response message
     // and then inserted into the request. However, the request is
