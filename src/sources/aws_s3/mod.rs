@@ -387,7 +387,11 @@ mod integration_tests {
         event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
+        test_util::{
+            collect_n,
+            components::{assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            lines_from_gzip_file, random_lines, trace_init,
+        },
         SourceSender,
     };
 
@@ -583,6 +587,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
+        assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
         let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         let s3 = s3_client().await;
@@ -692,6 +697,7 @@ mod integration_tests {
                 assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
             }
         };
+    }).await;
     }
 
     /// creates a new SQS queue

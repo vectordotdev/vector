@@ -30,7 +30,7 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
         StreamClosedError,
     },
     serde::default_decoding,
@@ -391,7 +391,12 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+    while let Some(((mut events, byte_size), stream)) = receiver.recv().await {
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "exec",
+        });
+
         let count = events.len();
         emit!(ExecEventsReceived {
             count,
@@ -669,7 +674,6 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))]
     async fn test_run_command_linux() {
-        trace_init();
         let config = standard_scheduled_test_config();
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
@@ -682,7 +686,8 @@ mod tests {
             run_command(config.clone(), hostname, decoder, shutdown, tx),
         );
 
-        let timeout_result = timeout.await;
+        let timeout_result =
+            crate::test_util::components::assert_source_compliance(&[], timeout).await;
 
         let exit_status = timeout_result
             .expect("command timed out")

@@ -239,58 +239,63 @@ mod integration_tests {
     use tokio::time;
 
     use super::*;
-    use crate::{event::Value, test_util::trace_init, SourceSender};
+    use crate::{
+        event::Value,
+        test_util::components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+        SourceSender,
+    };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
-        trace_init();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let (sender, mut recv) = SourceSender::new_test();
+            tokio::spawn(async move {
+                let socket = get_socket(raw_data, query_type);
 
-        tokio::spawn(async move {
-            let socket = get_socket(raw_data, query_type);
-
-            DnstapConfig {
-                max_frame_length: 102400,
-                host_key: Some("key".to_string()),
-                socket_path: socket,
-                raw_data_only: Some(raw_data),
-                multithreaded: Some(false),
-                max_frame_handling_tasks: Some(100000),
-                socket_file_mode: Some(511),
-                socket_receive_buffer_size: Some(10485760),
-                socket_send_buffer_size: Some(10485760),
-            }
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
-
-        send_query(raw_data, query_type);
-
-        let event = time::timeout(time::Duration::from_secs(10), recv.next())
-            .await
-            .expect("fetch dnstap source event timeout")
-            .expect("failed to get dnstap source event from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_secs(1), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => {
-                    println!("None: No event");
-                    break;
+                DnstapConfig {
+                    max_frame_length: 102400,
+                    host_key: Some("key".to_string()),
+                    socket_path: socket,
+                    raw_data_only: Some(raw_data),
+                    multithreaded: Some(false),
+                    max_frame_handling_tasks: Some(100000),
+                    socket_file_mode: Some(511),
+                    socket_receive_buffer_size: Some(10485760),
+                    socket_send_buffer_size: Some(10485760),
                 }
-                Err(e) => {
-                    println!("Error: {}", e);
-                    break;
+                .build(SourceContext::new_test(sender, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+            });
+
+            send_query(raw_data, query_type);
+
+            let event = time::timeout(time::Duration::from_secs(10), recv.next())
+                .await
+                .expect("fetch dnstap source event timeout")
+                .expect("failed to get dnstap source event from a stream");
+            let mut events = vec![event];
+            loop {
+                match time::timeout(time::Duration::from_secs(1), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => {
+                        println!("None: No event");
+                        break;
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        break;
+                    }
                 }
             }
-        }
 
-        verify_events(raw_data, query_type, &events);
+            verify_events(raw_data, query_type, &events);
 
-        cleanup(raw_data, query_type).await;
+            cleanup(raw_data, query_type).await;
+        })
+        .await;
     }
 
     fn send_query(raw_data: bool, query_type: &'static str) {

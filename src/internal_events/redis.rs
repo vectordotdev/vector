@@ -3,6 +3,29 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct RedisBytesReceived<'a> {
+    pub byte_size: usize,
+    pub protocol: &'static str,
+    pub remote_addr: &'a str,
+}
+
+impl<'a> InternalEvent for RedisBytesReceived<'a> {
+    fn emit(self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            remote_addr = %self.remote_addr,
+        );
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol,
+            "remote_addr" => self.remote_addr.to_string()
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct RedisEventsSent {
     pub count: usize,
     pub byte_size: usize,

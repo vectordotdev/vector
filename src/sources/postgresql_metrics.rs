@@ -923,7 +923,11 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::trace_init, tls, SourceSender};
+    use crate::{
+        event::Event,
+        test_util::components::{assert_source_compliance, SOCKET_PULL_SOURCE_TAGS},
+        tls, SourceSender,
+    };
     use std::path::PathBuf;
 
     fn pg_host() -> String {
@@ -953,81 +957,83 @@ mod integration_tests {
         include_databases: Option<Vec<String>>,
         exclude_databases: Option<Vec<String>>,
     ) -> Vec<Event> {
-        trace_init();
+        assert_source_compliance(&SOCKET_PULL_SOURCE_TAGS, async move {
+            let config: Config = endpoint.parse().unwrap();
+            let tags_endpoint = config_to_endpoint(&config);
+            let tags_host = match config.get_hosts().get(0).unwrap() {
+                Host::Tcp(host) => host.clone(),
+                #[cfg(unix)]
+                Host::Unix(path) => path.to_string_lossy().to_string(),
+            };
 
-        let config: Config = endpoint.parse().unwrap();
-        let tags_endpoint = config_to_endpoint(&config);
-        let tags_host = match config.get_hosts().get(0).unwrap() {
-            Host::Tcp(host) => host.clone(),
-            #[cfg(unix)]
-            Host::Unix(path) => path.to_string_lossy().to_string(),
-        };
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            PostgresqlMetricsConfig {
-                endpoints: vec![endpoint],
-                tls,
-                include_databases,
-                exclude_databases,
-                ..Default::default()
-            }
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
-
-        let event = time::timeout(time::Duration::from_secs(3), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
-            }
-        }
-        assert!(events.len() > 1);
-
-        // test up metric
-        assert_eq!(
-            events
-                .iter()
-                .map(|e| e.as_metric())
-                .find(|e| e.name() == "up")
+            tokio::spawn(async move {
+                PostgresqlMetricsConfig {
+                    endpoints: vec![endpoint],
+                    tls,
+                    include_databases,
+                    exclude_databases,
+                    ..Default::default()
+                }
+                .build(SourceContext::new_test(sender, None))
+                .await
                 .unwrap()
-                .value(),
-            &gauge!(1)
-        );
+                .await
+                .unwrap()
+            });
 
-        // test namespace and tags
-        for event in &events {
-            let metric = event.as_metric();
+            let event = time::timeout(time::Duration::from_secs(3), recv.next())
+                .await
+                .expect("fetch metrics timeout")
+                .expect("failed to get metrics from a stream");
+            let mut events = vec![event];
+            loop {
+                match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
+            }
 
-            assert_eq!(metric.namespace(), Some("postgresql"));
+            assert!(events.len() > 1);
+
+            // test up metric
             assert_eq!(
-                metric.tags().unwrap().get("endpoint").unwrap(),
-                &tags_endpoint
+                events
+                    .iter()
+                    .map(|e| e.as_metric())
+                    .find(|e| e.name() == "up")
+                    .unwrap()
+                    .value(),
+                &gauge!(1)
             );
-            assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
-        }
 
-        // test metrics from different queries
-        let names = vec![
-            "pg_stat_database_datid",
-            "pg_stat_database_conflicts_confl_tablespace_total",
-            "pg_stat_bgwriter_checkpoints_timed_total",
-        ];
-        for name in names {
-            assert!(events.iter().any(|e| e.as_metric().name() == name));
-        }
+            // test namespace and tags
+            for event in &events {
+                let metric = event.as_metric();
 
-        events
+                assert_eq!(metric.namespace(), Some("postgresql"));
+                assert_eq!(
+                    metric.tags().unwrap().get("endpoint").unwrap(),
+                    &tags_endpoint
+                );
+                assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
+            }
+
+            // test metrics from different queries
+            let names = vec![
+                "pg_stat_database_datid",
+                "pg_stat_database_conflicts_confl_tablespace_total",
+                "pg_stat_bgwriter_checkpoints_timed_total",
+            ];
+            for name in names {
+                assert!(events.iter().any(|e| e.as_metric().name() == name));
+            }
+
+            events
+        })
+        .await
     }
 
     #[tokio::test]

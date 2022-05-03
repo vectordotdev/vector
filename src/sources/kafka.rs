@@ -441,7 +441,11 @@ mod integration_test {
     use super::{test::*, *};
     use crate::{
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
+        test_util::{
+            collect_n,
+            components::{assert_source_compliance, SOCKET_PULL_SOURCE_TAGS},
+            random_string,
+        },
         SourceSender,
     };
 
@@ -510,20 +514,25 @@ mod integration_test {
         )
         .await;
 
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let consumer = create_consumer(&config).unwrap();
-        tokio::spawn(kafka_source(
-            config,
-            consumer,
-            crate::codecs::Decoder::default(),
-            shutdown,
-            tx,
-            acknowledgements,
-        ));
-        let events = collect_n(rx, 10).await;
-        drop(trigger_shutdown);
-        shutdown_done.await;
+        let events = assert_source_compliance(&SOCKET_PULL_SOURCE_TAGS, async move {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let consumer = create_consumer(&config).unwrap();
+            tokio::spawn(kafka_source(
+                config,
+                consumer,
+                crate::codecs::Decoder::default(),
+                shutdown,
+                tx,
+                acknowledgements,
+            ));
+            let events = collect_n(rx, 10).await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
 
         let client: BaseConsumer = client_config(Some(&group_id));
         client.subscribe(&[&topic]).expect("Subscribing failed");
