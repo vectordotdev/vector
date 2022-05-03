@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity};
+use lookup::LookupBuf;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
 
@@ -19,6 +20,8 @@ pub(crate) struct Compiler<'a> {
     fallible: bool,
     abortable: bool,
     local: LocalEnv,
+    external_queries: Vec<LookupBuf>,
+    external_assignments: Vec<LookupBuf>,
 }
 
 impl<'a> Compiler<'a> {
@@ -29,6 +32,8 @@ impl<'a> Compiler<'a> {
             fallible: false,
             abortable: false,
             local: LocalEnv::default(),
+            external_queries: vec![],
+            external_assignments: vec![],
         }
     }
 
@@ -64,8 +69,8 @@ impl<'a> Compiler<'a> {
         let info = ProgramInfo {
             fallible: self.fallible,
             abortable: self.abortable,
-            target_queries: vec![],
-            target_assignments: vec![],
+            target_queries: self.external_queries,
+            target_assignments: self.external_assignments,
         };
 
         Ok((
@@ -398,17 +403,41 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        Assignment::new(node, &mut self.local, external).unwrap_or_else(|err| {
+        let assignment = Assignment::new(node, &mut self.local, external).unwrap_or_else(|err| {
             self.diagnostics.push(Box::new(err));
             Assignment::noop()
-        })
+        });
+
+        // Track any potential external target assignments within the program.
+        //
+        // This data is exposed to the caller of the compiler, to allow any
+        // potential external optimizations.
+        for target in assignment.targets() {
+            if let assignment::Target::External(path) = target {
+                match path {
+                    Some(path) => self.external_assignments.push(path),
+                    None => self.external_assignments.push(LookupBuf::root()),
+                }
+            }
+        }
+
+        assignment
     }
 
     fn compile_query(&mut self, node: Node<ast::Query>, external: &mut ExternalEnv) -> Query {
         let ast::Query { target, path } = node.into_inner();
+        let path = path.into_inner();
         let target = self.compile_query_target(target, external);
 
-        Query::new(target, path.into_inner())
+        // Track any potential external target queries within the program.
+        //
+        // This data is exposed to the caller of the compiler, to allow any
+        // potential external optimizations.
+        if let Target::External = target {
+            self.external_queries.push(path.clone())
+        }
+
+        Query::new(target, path)
     }
 
     fn compile_query_target(
