@@ -19,7 +19,7 @@ use crate::{
         SourceConfig, SourceContext, SourceDescription,
     },
     event::{Event, Value},
-    serde::{bool_or_struct, default_decoding, default_framing_stream_based},
+    serde::{bool_or_struct, default_decoding},
     sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
@@ -65,7 +65,7 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
-            framing: Some(default_framing_stream_based()),
+            framing: None,
             decoding: Some(default_decoding()),
             acknowledgements: AcknowledgementsConfig::default(),
         })
@@ -161,16 +161,12 @@ impl SourceConfig for SimpleHttpConfig {
                 ),
             }
         } else {
-            (
-                match self.framing.as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => default_framing_stream_based(),
-                },
-                match self.decoding.as_ref() {
-                    Some(decoding) => decoding.clone(),
-                    None => default_decoding(),
-                },
-            )
+            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
+            let framing = self
+                .framing
+                .clone()
+                .unwrap_or_else(|| decoding.default_stream_framing());
+            (framing, decoding)
         };
 
         let decoder = DecodingConfig::new(framing, decoding).build();

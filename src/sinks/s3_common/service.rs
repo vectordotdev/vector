@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},

@@ -1,4 +1,3 @@
-# SKIP
 # object: { "foo": true, "bar": "bar", "baz":   "", "qux": { "quux":   "", "derp": "derp" }, "quux": [{ "darp":   "" }] }
 # result: { "foo": true, "bar": "bar", "baz": null, "qux": { "quux": null, "derp": "derp" }, "quux": [{ "darp": null }] }
 

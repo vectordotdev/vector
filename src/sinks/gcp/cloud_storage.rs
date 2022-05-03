@@ -14,12 +14,12 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{event::Finalizable, ByteSizeOf};
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{

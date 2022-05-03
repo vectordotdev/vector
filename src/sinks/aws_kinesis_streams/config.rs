@@ -1,7 +1,9 @@
 use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
 use aws_sdk_kinesis::types::SdkError;
+use std::sync::Arc;
 
 use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
@@ -67,6 +69,13 @@ impl ClientBuilder for KinesisClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
     }
 
     fn client_from_conf_conn(

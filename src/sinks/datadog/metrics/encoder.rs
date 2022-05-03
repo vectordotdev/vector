@@ -465,48 +465,6 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::AggregatedSummary {
-            quantiles,
-            count,
-            sum,
-        } => {
-            let mut results = vec![
-                DatadogSeriesMetric {
-                    metric: format!("{}.count", &name),
-                    r#type: DatadogMetricType::Rate,
-                    interval,
-                    points: vec![DatadogPoint(ts, f64::from(*count))],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-                DatadogSeriesMetric {
-                    metric: format!("{}.sum", &name),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, *sum)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-            ];
-
-            for quantile in quantiles {
-                results.push(DatadogSeriesMetric {
-                    metric: format!("{}.{}percentile", &name, quantile.as_percentile()),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, quantile.value)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                })
-            }
-            results
-        }
         value => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",

@@ -1,5 +1,5 @@
 # result: null
 
-if false {
+if null == true {
     "yes"
 }

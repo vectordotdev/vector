@@ -9,12 +9,12 @@ use file_source::{
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    FutureExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::task::spawn_blocking;
+use tracing::{Instrument, Span};
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
 use crate::{
@@ -30,7 +30,6 @@ use crate::{
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    trace::{current_span, Instrument},
     SourceSender,
 };
 
@@ -327,7 +326,6 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let shutdown = shutdown.shared();
     let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
@@ -379,7 +377,7 @@ pub fn file_source(
 
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
-        let span = current_span();
+        let span = Span::current();
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();

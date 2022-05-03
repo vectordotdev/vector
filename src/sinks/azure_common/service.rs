@@ -8,7 +8,7 @@ use azure_core::HttpError;
 use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
     internal_events::azure_blob::{

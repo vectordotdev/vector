@@ -1,0 +1,14 @@
+# result:
+#
+# warning[E112]: predicate always resolves to `false`
+#   ┌─ :2:4
+#   │
+# 2 │ if false { false }
+#   │    ^^^^^
+#   │    │
+#   │    this predicate never resolves to true
+#   │    this means the code inside the block never runs
+#   │
+#   = see language documentation at https://vrl.dev
+
+if false { false }

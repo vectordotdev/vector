@@ -289,7 +289,11 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes, external),
         };
 
-        Predicate::new(Node::new(span, exprs), (&self.local, external))
+        Predicate::new(
+            Node::new(span, exprs),
+            (&self.local, external),
+            &mut self.diagnostics,
+        )
     }
 
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Op {
@@ -461,6 +465,12 @@ impl<'a> Compiler<'a> {
             None => (None, None),
         };
 
+        // Keep track of the known scope *before* we compile the closure.
+        //
+        // This allows us to revert to any known state that the closure
+        // arguments might overwrite.
+        let local_snapshot = self.local.clone();
+
         // First, we create a new function-call builder to validate the
         // expression.
         function_call::Builder::new(
@@ -483,7 +493,7 @@ impl<'a> Compiler<'a> {
                 Node::new(span, block)
             });
 
-            builder.compile(&mut self.local, external, block)
+            builder.compile(&mut self.local, external, block, local_snapshot)
         })
         .unwrap_or_else(|err| {
             self.diagnostics.push(Box::new(err));
