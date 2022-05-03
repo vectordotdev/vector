@@ -17,6 +17,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
+        http::HttpMethod,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
@@ -60,6 +61,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         source.run(
             self.address,
             "",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
