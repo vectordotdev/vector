@@ -173,7 +173,7 @@ serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.80", default-features = false, features = ["raw_value"] }
 serde_with = { version = "1.13.0", default-features = false, features = ["macros"], optional = true }
-serde_yaml = { version = "0.8.23", default-features = false }
+serde_yaml = { version = "0.8.24", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.0", default-features = false, optional = true }
