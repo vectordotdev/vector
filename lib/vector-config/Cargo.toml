@@ -10,6 +10,6 @@ indexmap = { version = "1.2", default-features = false }
 num-traits = { version = "0.2.14", default-features = false }
 schemars = { version = "0.8.8", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }
-serde_json = { version = "1.0.80", default-features = false }
+serde_json = { version = "1.0.81", default-features = false }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
