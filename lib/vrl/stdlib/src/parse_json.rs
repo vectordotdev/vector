@@ -3,23 +3,23 @@ use serde_json::{Error, Map};
 use std::collections::HashMap;
 use vrl::prelude::*;
 
-fn parse_json(value: Value, max_depth: Option<Value>) -> Resolved {
+fn parse_json(value: Value) -> Resolved {
     let bytes = value.try_bytes()?;
+    let value = serde_json::from_slice::<'_, Value>(&bytes)
+        .map_err(|e| format!("unable to parse json: {}", e))?;
+    Ok(value)
+}
 
-    if let Some(md) = max_depth {
-        let parsed_depth = positive_int_depth(md)?;
+fn parse_json_with_depth(value: Value, max_depth: Value) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let parsed_depth = positive_int_depth(max_depth)?;
 
-        let raw_value: Box<RawValue> = serde_json::from_slice::<_>(&bytes)
-            .map_err(|e| format!("unable to read json: {}", e))?;
+    let raw_value: Box<RawValue> =
+        serde_json::from_slice::<_>(&bytes).map_err(|e| format!("unable to read json: {}", e))?;
 
-        let res = parse_once_with_depth(raw_value, parsed_depth)
-            .map_err(|e| format!("unable to parse json with max depth: {}", e))?;
-        Ok(Value::from(res))
-    } else {
-        let value = serde_json::from_slice::<'_, Value>(&bytes)
-            .map_err(|e| format!("unable to parse json: {}", e))?;
-        Ok(value)
-    }
+    let res = parse_once_with_depth(raw_value, parsed_depth)
+        .map_err(|e| format!("unable to parse json with max depth: {}", e))?;
+    Ok(Value::from(res))
 }
 
 fn positive_int_depth(value: Value) -> std::result::Result<i64, ExpressionError> {
@@ -159,31 +159,52 @@ impl Function for ParseJson {
         let value = arguments.required("value");
         let max_depth = arguments.optional("max_depth");
 
-        Ok(Box::new(ParseJsonFn { value, max_depth }))
+        if let Some(max_depth) = max_depth {
+            Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth }))
+        } else {
+            Ok(Box::new(ParseJsonFn { value }))
+        }
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let max_depth = args.optional("max_depth");
-        parse_json(value, max_depth)
+
+        if let Some(max_depth) = max_depth {
+            parse_json_with_depth(value, max_depth)
+        } else {
+            parse_json(value)
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 struct ParseJsonFn {
     value: Box<dyn Expression>,
-    max_depth: Option<Box<dyn Expression>>,
 }
 
 impl Expression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let max_depth = self
-            .max_depth
-            .as_ref()
-            .map(|c| c.resolve(ctx))
-            .transpose()?;
-        parse_json(value, max_depth)
+        parse_json(value)
+    }
+
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        type_def()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ParseJsonMaxDepthFn {
+    value: Box<dyn Expression>,
+    max_depth: Box<dyn Expression>,
+}
+
+impl Expression for ParseJsonMaxDepthFn {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let max_depth = self.max_depth.resolve(ctx)?;
+        parse_json_with_depth(value, max_depth)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
