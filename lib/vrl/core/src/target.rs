@@ -251,7 +251,7 @@ mod tests {
                 result
             );
             assert_eq!(target, expect);
-            assert_eq!(Target::target_get(&target, &path), Ok(Some(value)));
+            assert_eq!(Target::target_get(&target, &path).map(|v| v.cloned()), Ok(Some(value)));
         }
     }
 
@@ -341,7 +341,7 @@ mod tests {
                 Target::target_remove(&mut target, &path, compact),
                 Ok(value)
             );
-            assert_eq!(Target::target_get(&target, &LookupBuf::root()), Ok(expect));
+            assert_eq!(Target::target_get(&target, &LookupBuf::root()).map(|v| v.cloned()), Ok(expect));
         }
     }
 }
