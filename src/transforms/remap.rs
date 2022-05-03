@@ -421,7 +421,7 @@ where
             None
         };
 
-        let mut target: VrlTarget = event.into();
+        let mut target = VrlTarget::new(event, self.program.info());
         let result = self.run_vrl(&mut target);
 
         match result {
