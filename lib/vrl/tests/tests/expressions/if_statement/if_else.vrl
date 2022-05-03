@@ -1,11 +1,12 @@
+# object: { "true": true }
 # result: ["yes", "no"]
 
-if1 = if true {
+if1 = if .true == true {
     "yes"
 } else {
     "no"
 }
 
-if2 = if false { "yes" } else { "no" }
+if2 = if .true == false { "yes" } else { "no" }
 
 [if1, if2]

@@ -158,7 +158,7 @@ jobs:
             // jobs to run. For example, the first job might have the values:
             // { target: "fluent_remap_aws_firehose", replica: [1] }
             const matrix = {
-              target: target, replica: [1,2,3] // run each experiment
+              target: target, replica: [1,2] // run each experiment
             }
 
             // export this variable to be available to other github steps

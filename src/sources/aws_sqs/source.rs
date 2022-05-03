@@ -1,26 +1,19 @@
-use std::{collections::HashMap, iter, panic, str::FromStr, sync::Arc};
+use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
     model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
     Client as SqsClient,
 };
-use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
-use codecs::StreamDecodingError;
 use futures::FutureExt;
 use tokio::{pin, select, time::Duration};
-use tokio_util::codec::Decoder as _;
-use vector_common::byte_size_of::ByteSizeOf;
 
 use crate::{
     codecs::Decoder,
-    config::log_schema,
-    event::{BatchNotifier, Event},
-    internal_events::{
-        AwsSqsBytesReceived, EventsReceived, SqsMessageDeleteError, StreamClosedError,
-    },
+    event::BatchNotifier,
+    internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
-    sources::util::finalizer::UnorderedFinalizer,
+    sources::util::{self, finalizer::UnorderedFinalizer},
     SourceSender,
 };
 
@@ -105,31 +98,35 @@ impl SqsSource {
         };
 
         if let Some(messages) = receive_message_output.messages {
+            let byte_size = messages
+                .iter()
+                .map(|message| message.body().map(|body| body.len()).unwrap_or(0))
+                .sum();
+            emit!(AwsSqsBytesReceived { byte_size });
+
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
             let mut events = Vec::with_capacity(messages.len());
-            let mut byte_size = 0;
 
             let (batch, batch_receiver) =
                 BatchNotifier::maybe_new_with_receiver(finalizer.is_some());
             for message in messages {
                 if let Some(body) = message.body {
-                    byte_size += body.len();
                     // a receipt handle should always exist
                     if let Some(receipt_handle) = message.receipt_handle {
                         receipts_to_ack.push(receipt_handle);
                     }
                     let timestamp = get_timestamp(&message.attributes);
-                    let decoded = decode_message(self.decoder.clone(), body.as_bytes(), timestamp);
-                    if let Some(batch) = batch.as_ref() {
-                        let decoded = decoded.map(|event| event.with_batch_notifier(batch));
-                        events.extend(decoded);
-                    } else {
-                        events.extend(decoded);
-                    }
+                    let decoded = util::decode_message(
+                        self.decoder.clone(),
+                        "aws_sqs",
+                        body.as_bytes(),
+                        timestamp,
+                        &batch,
+                    );
+                    events.extend(decoded);
                 }
             }
             drop(batch); // Drop last reference to batch acknowledgement finalizer
-            emit!(AwsSqsBytesReceived { byte_size });
             let count = events.len();
 
             match out.send_batch(events).await {
@@ -183,123 +180,20 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
     }
 }
 
-fn decode_message(
-    mut decoder: Decoder,
-    message: &[u8],
-    sent_time: Option<DateTime<Utc>>,
-) -> impl Iterator<Item = Event> {
-    let schema = log_schema();
-
-    let mut buffer = BytesMut::with_capacity(message.len());
-    buffer.extend_from_slice(message);
-
-    iter::from_fn(move || loop {
-        break match decoder.decode_eof(&mut buffer) {
-            Ok(Some((events, _))) => {
-                let count = events.len();
-                Some(
-                    events
-                        .into_iter()
-                        .map(move |mut event| {
-                            if let Event::Log(ref mut log) = event {
-                                log.try_insert(schema.source_type_key(), Bytes::from("aws_sqs"));
-                                if let Some(sent_time) = sent_time {
-                                    log.try_insert(schema.timestamp_key(), sent_time);
-                                }
-                            }
-                            event
-                        })
-                        .fold_finally(
-                            0,
-                            |size, event: &Event| size + event.size_of(),
-                            move |byte_size| emit!(EventsReceived { byte_size, count }),
-                        ),
-                )
-            }
-            Err(error) => {
-                // Error is logged by `crate::codecs::Decoder`, no further handling
-                // is needed here.
-                if error.can_continue() {
-                    continue;
-                }
-                None
-            }
-            Ok(None) => None,
-        };
-    })
-    .flatten()
-}
-
-trait FoldFinallyExt: Sized {
-    /// This adapter applies the `folder` function to every element in
-    /// the iterator, much as `Iterator::fold` does. However, instead
-    /// of returning the resulting folded value, it calls the
-    /// `finally` function after the last element. This function
-    /// returns an iterator over the original values.
-    fn fold_finally<A, Fo, Fi>(
-        self,
-        initial: A,
-        folder: Fo,
-        finally: Fi,
-    ) -> FoldFinally<Self, A, Fo, Fi>;
-}
-
-impl<I: Iterator + Sized> FoldFinallyExt for I {
-    fn fold_finally<A, Fo, Fi>(
-        self,
-        initial: A,
-        folder: Fo,
-        finally: Fi,
-    ) -> FoldFinally<Self, A, Fo, Fi> {
-        FoldFinally {
-            inner: self,
-            accumulator: initial,
-            folder,
-            finally,
-        }
-    }
-}
-
-struct FoldFinally<I, A, Fo, Fi> {
-    inner: I,
-    accumulator: A,
-    folder: Fo,
-    finally: Fi,
-}
-
-impl<I, A, Fo, Fi> Iterator for FoldFinally<I, A, Fo, Fi>
-where
-    I: Iterator,
-    A: Copy,
-    Fo: FnMut(A, &I::Item) -> A,
-    Fi: Fn(A),
-{
-    type Item = I::Item;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next() {
-            Some(item) => {
-                self.accumulator = (self.folder)(self.accumulator, &item);
-                Some(item)
-            }
-            None => {
-                (self.finally)(self.accumulator);
-                None
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use chrono::SecondsFormat;
 
     use super::*;
+    use crate::config::log_schema;
 
     #[tokio::test]
     async fn test_decode() {
         let message = "test";
         let now = Utc::now();
-        let events: Vec<_> = decode_message(Decoder::default(), b"test", Some(now)).collect();
+        let events: Vec<_> =
+            util::decode_message(Decoder::default(), "aws_sqs", b"test", Some(now), &None)
+                .collect();
         assert_eq!(events.len(), 1);
         assert_eq!(
             events[0]

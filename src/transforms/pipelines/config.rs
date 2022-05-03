@@ -77,7 +77,7 @@ impl PipelineConfig {
             );
             result.outputs.push((
                 filter_name.clone(),
-                vec![Output::from((UNMATCHED_ROUTE, DataType::all()))],
+                vec![Output::default(DataType::all()).with_port(UNMATCHED_ROUTE)],
             ));
             vec![filter_name.port("success")]
         } else {

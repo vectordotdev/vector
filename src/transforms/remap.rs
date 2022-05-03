@@ -170,7 +170,9 @@ impl TransformConfig for RemapConfig {
         if self.reroute_dropped {
             vec![
                 default_output,
-                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
+                Output::default(DataType::all())
+                    .with_schema_definition(dropped_definition)
+                    .with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -1278,7 +1280,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
@@ -1305,7 +1307,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
