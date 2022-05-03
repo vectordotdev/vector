@@ -10,12 +10,21 @@ use toml::value::Table;
 use typetag::serde;
 
 use super::{loader, prepare_input};
-use crate::config::{
-    loading::{deserialize_table, ComponentHint, Process},
-    ComponentKey,
+use crate::{
+    config::{
+        loading::{deserialize_table, ComponentHint, Process},
+        ComponentKey,
+    },
+    signal,
 };
-use crate::signal;
 
+// The following regex aims to extract a pair of strings, the first being the secret backend name
+// and the second being the secret key. Here are some matching & non-matching examples:
+// - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
+// - "SECRET[backend.secret.name]" will match and catpure "backend" and "secret.name"
+// - "SECRET[backend..secret.name]" will match and catpure "backend" and ".secret.name"
+// - "SECRET[secret_name]" will not match
+// - "SECRET[.secret.name]" wil not match
 static COLLECTOR: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
@@ -319,7 +328,9 @@ mod test {
             SECRET[second_backend.secret_key]
             SECRET[second_backend.secret.key]
             SECRET[first_backend.a_third.secret_key]
+            SECRET[first_backend...an_extra_secret_key]
             SECRET[non_matching_syntax]
+            SECRET[.non.matching.syntax]
         "#},
             &mut keys,
         );
@@ -328,10 +339,11 @@ mod test {
         assert!(keys.contains_key("second_backend"));
 
         let first_backend_keys = keys.get("first_backend").unwrap();
-        assert_eq!(first_backend_keys.len(), 3);
+        assert_eq!(first_backend_keys.len(), 4);
         assert!(first_backend_keys.contains(&"secret_key".into()));
         assert!(first_backend_keys.contains(&"another_secret_key".into()));
         assert!(first_backend_keys.contains(&"a_third.secret_key".into()));
+        assert!(first_backend_keys.contains(&"..an_extra_secret_key".into()));
 
         let second_backend_keys = keys.get("second_backend").unwrap();
         assert_eq!(second_backend_keys.len(), 2);
