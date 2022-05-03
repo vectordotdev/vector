@@ -347,7 +347,7 @@ impl DatadogMetricsEncoder {
         }
     }
 
-    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>), FinishError> {
+    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
         let _ = self.try_encode_pending()?;
 
@@ -356,6 +356,7 @@ impl DatadogMetricsEncoder {
             .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
+        let raw_bytes_written = self.state.written;
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -379,7 +380,7 @@ impl DatadogMetricsEncoder {
 
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
-            Ok((payload, processed))
+            Ok((payload, processed, raw_bytes_written))
         } else {
             Err(FinishError::TooLarge {
                 metrics: processed,

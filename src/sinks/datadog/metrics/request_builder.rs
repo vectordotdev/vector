@@ -113,6 +113,7 @@ pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: DatadogMetricsEncoder,
     sketches_encoder: DatadogMetricsEncoder,
+    raw_bytes: usize,
 }
 
 impl DatadogMetricsRequestBuilder {
@@ -130,6 +131,7 @@ impl DatadogMetricsRequestBuilder {
                 DatadogMetricsEndpoint::Sketches,
                 default_namespace,
             )?,
+            raw_bytes: 0,
         })
     }
 
@@ -159,6 +161,8 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 
         let mut results = Vec::new();
         let mut pending = None;
+        let mut raw_bytes = 0;
+
         while metric_drain.len() != 0 {
             let mut n = 0;
 
@@ -196,8 +200,9 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
             // If we encoded one or more metrics this pass, finalize the payload.
             if n > 0 {
                 match encoder.finish() {
-                    Ok((payload, mut metrics)) => {
+                    Ok((payload, mut metrics, raw_bytes_written)) => {
                         let finalizers = metrics.take_finalizers();
+                        raw_bytes += raw_bytes_written;
                         results.push(Ok(((endpoint, n, finalizers), payload)));
                     }
                     Err(err) => match err {
@@ -229,10 +234,24 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                             while recommended_splits > 1 {
                                 split_idx -= stride;
                                 let chunk = metrics.split_off(split_idx);
-                                results.push(encode_now_or_never(encoder, endpoint, chunk));
+                                match encode_now_or_never(encoder, endpoint, chunk) {
+                                    Ok((result, bytes, raw_bytes_written)) => {
+                                        results.push(Ok((result, bytes)));
+                                        raw_bytes += raw_bytes_written;
+                                    }
+                                    Err(err) => results.push(Err(err)),
+                                }
+
                                 recommended_splits -= 1;
                             }
-                            results.push(encode_now_or_never(encoder, endpoint, metrics));
+
+                            match encode_now_or_never(encoder, endpoint, metrics) {
+                                Ok((result, bytes, raw_bytes_written)) => {
+                                    results.push(Ok((result, bytes)));
+                                    raw_bytes += raw_bytes_written;
+                                }
+                                Err(err) => results.push(Err(err)),
+                            }
                         }
                         // Not an error we can do anything about, so just forward it on.
                         suberr => results.push(Err(RequestBuilderError::Unexpected {
@@ -244,6 +263,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
             }
         }
 
+        self.raw_bytes = raw_bytes;
         results
     }
 
@@ -257,6 +277,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
             content_type: endpoint.content_type(),
             finalizers,
             batch_size,
+            raw_bytes: self.raw_bytes,
         }
     }
 }
@@ -273,7 +294,14 @@ fn encode_now_or_never(
     encoder: &mut DatadogMetricsEncoder,
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
-) -> Result<((DatadogMetricsEndpoint, usize, EventFinalizers), Bytes), RequestBuilderError> {
+) -> Result<
+    (
+        (DatadogMetricsEndpoint, usize, EventFinalizers),
+        Bytes,
+        usize,
+    ),
+    RequestBuilderError,
+> {
     let metrics_len = metrics.len() as u64;
 
     let n = metrics
@@ -287,9 +315,9 @@ fn encode_now_or_never(
 
     encoder
         .finish()
-        .map(|(payload, mut processed)| {
+        .map(|(payload, mut processed, raw_bytes_written)| {
             let finalizers = processed.take_finalizers();
-            ((endpoint, n, finalizers), payload)
+            ((endpoint, n, finalizers), payload, raw_bytes_written)
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
             dropped_events: metrics_len,

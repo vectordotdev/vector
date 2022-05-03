@@ -65,6 +65,7 @@ pub struct DatadogMetricsRequest {
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
+    pub raw_bytes: usize,
 }
 
 impl DatadogMetricsRequest {
@@ -184,6 +185,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let byte_size = request.payload.len();
             let batch_size = request.batch_size;
             let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+            let raw_byte_size = request.raw_bytes;
 
             let request = request
                 .into_http_request(api_key)
@@ -199,7 +201,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 body,
                 batch_size,
                 byte_size,
-                raw_byte_size: byte_size,
+                raw_byte_size,
                 protocol,
             })
         })
