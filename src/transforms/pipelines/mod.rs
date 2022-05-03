@@ -180,7 +180,7 @@ impl TransformConfig for PipelinesConfig {
             // the default route of the type router should always be redirected
             outputs: vec![(
                 router_name.clone(),
-                vec![Output::from((UNMATCHED_ROUTE, DataType::all()))],
+                vec![Output::default(DataType::all()).with_port(UNMATCHED_ROUTE)],
             )],
         };
         let mut conditions = IndexMap::new();
