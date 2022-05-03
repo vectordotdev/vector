@@ -1,0 +1,11 @@
+[package]
+name = "vector-config-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+darling = { version = "0.14", default-features = false, features = ["suggestions"] }
+proc-macro2 = { version = "1.0", default-features = false }
+schemars = { version = "0.8.8", default-features = false }
+syn = { version = "1.0", default-features = false }
+quote = { version = "1.0", default-features = false }

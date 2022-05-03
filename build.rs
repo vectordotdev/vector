@@ -102,6 +102,7 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/dnstap.proto");
         println!("cargo:rerun-if-changed=proto/ddsketch.proto");
+        println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
         let mut prost_build = prost_build::Config::new();
@@ -112,10 +113,11 @@ fn main() {
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
-                    "proto/vector.proto",
                     "proto/dnstap.proto",
                     "proto/ddsketch.proto",
                     "proto/dd_trace.proto",
+                    "proto/google/pubsub/v1/pubsub.proto",
+                    "proto/vector.proto",
                 ],
                 &["proto/", "lib/vector-core/proto/"],
             )

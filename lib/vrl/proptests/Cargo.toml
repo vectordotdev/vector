@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4"
 proptest = "1.0"
-ordered-float = "2"
+ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser/" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic/" }
 lookup = { path = "../../lookup/" }
