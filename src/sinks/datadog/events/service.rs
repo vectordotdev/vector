@@ -57,9 +57,12 @@ pub struct DatadogEventsService {
 }
 
 impl DatadogEventsService {
-    pub fn new(endpoint: String, default_api_key: String, http_client: HttpClient<Body>) -> Self {
-        let uri = http::Uri::try_from(endpoint.clone()).expect("URI not valid");
-        let protocol = uri.scheme_str().unwrap_or("http").to_string();
+    pub fn new(
+        endpoint: http::Uri,
+        default_api_key: String,
+        http_client: HttpClient<Body>,
+    ) -> Self {
+        let protocol = endpoint.scheme_str().unwrap_or("http").to_string();
 
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
             let req: DatadogEventsRequest = req;
@@ -69,7 +72,7 @@ impl DatadogEventsService {
                 None => default_api_key.as_str(),
             };
 
-            let request = Request::post(endpoint.as_str())
+            let request = Request::post(&endpoint)
                 .header("Content-Type", "application/json")
                 .header("DD-API-KEY", api_key)
                 .header("Content-Length", req.body.len())
