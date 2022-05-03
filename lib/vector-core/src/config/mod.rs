@@ -127,10 +127,7 @@ impl Output {
 
     /// Set the port name for this `Output`.
     #[must_use]
-    pub fn with_port<S>(mut self, name: S) -> Self
-    where
-        S: Into<String>,
-    {
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
         self.port = Some(name.into());
         self
     }
