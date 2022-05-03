@@ -6,6 +6,7 @@ use parser::ast::{self, AssignmentOp, Node};
 
 use crate::{
     expression::*,
+    program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
     Function, Program, Value,
 };
@@ -60,11 +61,17 @@ impl<'a> Compiler<'a> {
             return Err(errors.into());
         }
 
+        let info = ProgramInfo {
+            fallible: self.fallible,
+            abortable: self.abortable,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+
         Ok((
             Program {
                 expressions,
-                fallible: self.fallible,
-                abortable: self.abortable,
+                info,
                 local_env: self.local,
             },
             warnings.into(),
