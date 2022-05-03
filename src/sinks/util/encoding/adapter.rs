@@ -103,6 +103,14 @@ where
         }
     }
 
+    /// Get the migrated configuration.
+    pub fn config(self) -> SerializerConfig {
+        match self {
+            Self::Encoding(config) => config.encoding.encoding,
+            Self::LegacyEncodingConfig(config) => Migrator::migrate(config.encoding.codec()),
+        }
+    }
+
     /// Build the serializer for this configuration.
     pub fn encoding(self) -> Serializer {
         match self {
@@ -213,6 +221,14 @@ where
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
             },
+        }
+    }
+
+    /// Get the migrated configuration.
+    pub fn config(self) -> (Option<FramingConfig>, SerializerConfig) {
+        match self {
+            Self::Encoding(config) => (config.framing, config.encoding.encoding),
+            Self::LegacyEncodingConfig(config) => Migrator::migrate(config.encoding.codec()),
         }
     }
 

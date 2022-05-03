@@ -191,7 +191,8 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        let encoder_input_type = self.encoding.clone().config().input_type();
+        Input::new((DataType::Metric | DataType::Log) & encoder_input_type)
     }
 
     fn sink_type(&self) -> &'static str {

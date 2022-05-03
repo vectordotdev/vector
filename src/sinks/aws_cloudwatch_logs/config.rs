@@ -4,12 +4,14 @@ use tower::ServiceBuilder;
 
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
-use vector_core::config::log_schema;
 
 use crate::{
     aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext,
+    },
     sinks::{
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
@@ -146,7 +148,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let encoder_input_type = self.encoding.clone().config().input_type();
+        Input::new(DataType::Log & encoder_input_type)
     }
 
     fn sink_type(&self) -> &'static str {

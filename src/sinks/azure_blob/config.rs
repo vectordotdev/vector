@@ -12,7 +12,7 @@ use super::request_builder::AzureBlobRequestOptions;
 
 use crate::{
     codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         azure_common::{
             self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
@@ -92,7 +92,8 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let encoder_input_type = self.encoding.clone().config().1.input_type();
+        Input::new(DataType::Log & encoder_input_type)
     }
 
     fn sink_type(&self) -> &'static str {
