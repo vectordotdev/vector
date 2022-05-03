@@ -29,13 +29,15 @@ use crate::{
 #[derive(Default)]
 struct EventPartitioner;
 
+// Use all fields from the top level protobuf contruct associated with the API key
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(crate) struct PartitionKey {
     pub(crate) api_key: Option<Arc<str>>,
     pub(crate) env: Option<String>,
     pub(crate) hostname: Option<String>,
-    pub(crate) lang: Option<String>,
-    pub(crate) endpoint: DatadogTracesEndpoint,
+    pub(crate) agent_version: Option<String>,
+    pub(crate) target_tps: Option<i64>,
+    pub(crate) error_tps: Option<i64>,
 }
 
 impl Partitioner for EventPartitioner {
@@ -43,26 +45,24 @@ impl Partitioner for EventPartitioner {
     type Key = PartitionKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        let (endpoint, env, hostname, lang) = match item {
-            Event::Metric(_) => (DatadogTracesEndpoint::APMStats, None, None, None),
+        match item {
+            Event::Metric(_) => {
+                panic!("unexpected metric");
+            }
             Event::Log(_) => {
                 panic!("unexpected log");
             }
-            Event::Trace(t) => (
-                DatadogTracesEndpoint::Traces,
-                t.get("env").map(|s| s.to_string_lossy()),
-                t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                t.get("language").map(|s| s.to_string_lossy()),
-            ),
+            Event::Trace(t) => {
+                return PartitionKey {
+                    api_key: item.metadata().datadog_api_key().clone(),
+                    env: t.get("env").map(|s| s.to_string_lossy()),
+                    hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
+                    agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
+                    target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
+                    error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
+                }
+            }
         };
-
-        PartitionKey {
-            api_key: item.metadata().datadog_api_key().clone(),
-            env,
-            hostname,
-            lang,
-            endpoint,
-        }
     }
 }
 

@@ -141,8 +141,8 @@ fn handle_dd_trace_payload_v2(
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
     let agent_version = decoded_payload.agent_version;
-    let target_tps = decoded_payload.target_tps;
-    let error_tps = decoded_payload.error_tps;
+    let target_tps = decoded_payload.target_tps.round();
+    let error_tps = decoded_payload.error_tps.round();
     let tags = convert_tags(decoded_payload.tags);
 
     let trace_events: Vec<TraceEvent> = decoded_payload
@@ -172,8 +172,8 @@ fn handle_dd_trace_payload_v2(
             trace_event.insert(source.log_schema_host_key, hostname.clone());
             trace_event.insert("env", env.clone());
             trace_event.insert("agent_version", agent_version.clone());
-            trace_event.insert("target_tps", target_tps as i64);
-            trace_event.insert("error_tps", error_tps as i64);
+            trace_event.insert("target_tps", target_tps);
+            trace_event.insert("error_tps", error_tps);
             if let Some(Value::Object(span_tags)) = trace_event.get_mut("tags") {
                 span_tags.extend(tags.clone());
             } else {

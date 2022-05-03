@@ -78,7 +78,6 @@ pub struct RequestMetadata {
     batch_size: usize,
     endpoint: DatadogTracesEndpoint,
     finalizers: EventFinalizers,
-    lang: Option<String>,
 }
 
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
@@ -94,53 +93,41 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let (mut key, events) = input;
         let mut results = Vec::new();
         let n = events.len();
-        match key.endpoint {
-            DatadogTracesEndpoint::APMStats => {
-                results.push(Err(RequestBuilderError::UnsupportedEndpoint {
-                    reason: "APM stats are not yet supported.".into(),
-                    dropped_events: n as u64,
-                }))
-            }
-            DatadogTracesEndpoint::Traces => {
-                let traces_event = events
-                    .into_iter()
-                    .filter_map(|e| e.try_into_trace())
-                    .collect();
-                self.trace_encoder
-                    .encode_trace(&key, traces_event)
-                    .into_iter()
-                    .for_each(|r| match r {
-                        Ok((payload, mut processed)) => {
-                            let metadata = RequestMetadata {
-                                api_key: key
-                                    .api_key
-                                    .take()
-                                    .unwrap_or_else(|| Arc::clone(&self.api_key)),
-                                batch_size: n,
-                                lang: key.lang.clone(),
-                                endpoint: key.endpoint,
-                                finalizers: processed.take_finalizers(),
-                            };
-                            let mut compressor = Compressor::from(self.compression);
-                            match compressor.write_all(&payload) {
-                                Ok(()) => {
-                                    results.push(Ok((metadata, compressor.into_inner().freeze())))
-                                }
-                                Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
-                                    message: "Payload compression failed.",
-                                    reason: e.to_string(),
-                                    dropped_events: n as u64,
-                                })),
-                            }
-                        }
-                        Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
-                            message: err.parts().0,
-                            reason: err.parts().1.into(),
-                            dropped_events: err.parts().2,
+
+        let traces_event = events
+            .into_iter()
+            .filter_map(|e| e.try_into_trace())
+            .collect();
+        self.trace_encoder
+            .encode_trace(&key, traces_event)
+            .into_iter()
+            .for_each(|r| match r {
+                Ok((payload, mut processed)) => {
+                    let metadata = RequestMetadata {
+                        api_key: key
+                            .api_key
+                            .take()
+                            .unwrap_or_else(|| Arc::clone(&self.api_key)),
+                        batch_size: n,
+                        endpoint: DatadogTracesEndpoint::Traces,
+                        finalizers: processed.take_finalizers(),
+                    };
+                    let mut compressor = Compressor::from(self.compression);
+                    match compressor.write_all(&payload) {
+                        Ok(()) => results.push(Ok((metadata, compressor.into_inner().freeze()))),
+                        Err(e) => results.push(Err(RequestBuilderError::FailedToEncode {
+                            message: "Payload compression failed.",
+                            reason: e.to_string(),
+                            dropped_events: n as u64,
                         })),
-                    })
-            }
-        }
+                    }
+                }
+                Err(err) => results.push(Err(RequestBuilderError::FailedToEncode {
+                    message: err.parts().0,
+                    reason: err.parts().1.into(),
+                    dropped_events: err.parts().2,
+                })),
+            });
         results
     }
 
@@ -151,10 +138,6 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             "application/x-protobuf".to_string(),
         );
         headers.insert("DD-API-KEY".to_string(), metadata.api_key.to_string());
-        headers.insert(
-            "X-Datadog-Reported-Languages".to_string(),
-            metadata.lang.unwrap_or_else(|| "".into()),
-        );
         if let Some(ce) = self.compression.content_encoding() {
             headers.insert("Content-Encoding".to_string(), ce.to_string());
         }
@@ -193,6 +176,7 @@ impl EncoderError {
         }
     }
 }
+
 impl DatadogTracesEncoder {
     fn encode_trace(
         &self,
@@ -225,27 +209,93 @@ impl DatadogTracesEncoder {
         encoded_payloads
     }
 
-    fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::TracePayload {
-        let mut traces: Vec<dd_proto::ApiTrace> = Vec::new();
-        let mut transactions: Vec<dd_proto::Span> = Vec::new();
-        for e in events.iter() {
-            if e.contains("spans") {
-                trace!("Encoding a trace.");
-                traces.push(DatadogTracesEncoder::vector_trace_into_dd_trace(e));
-            } else {
-                trace!("Encoding an APM event.");
-                transactions.push(DatadogTracesEncoder::convert_span(e.as_map()));
-            }
-        }
-        dd_proto::TracePayload {
+    fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::AgentPayload {
+        dd_proto::AgentPayload {
             host_name: key.hostname.clone().unwrap_or_else(|| "".to_string()),
             env: key.env.clone().unwrap_or_else(|| "".into()),
-            traces,
-            transactions,
+            tracer_payloads: events
+                .iter()
+                .map(DatadogTracesEncoder::vector_trace_into_dd_tracer_payload)
+                .collect(),
+            // We only send tags at the Trace level
+            tags: BTreeMap::new(),
+            agent_version: key.agent_version.clone().unwrap_or_else(|| "".into()),
+            target_tps: key
+                .target_tps
+                .clone()
+                .map(|tps| tps as f64)
+                .unwrap_or(10f64),
+            error_tps: key.error_tps.clone().map(|tps| tps as f64).unwrap_or(10f64),
         }
     }
 
-    fn vector_trace_into_dd_trace(trace: &TraceEvent) -> dd_proto::ApiTrace {
+    fn vector_trace_into_dd_tracer_payload(trace: &TraceEvent) -> dd_proto::TracerPayload {
+        let tags = trace
+            .get("tags")
+            .and_then(|m| m.as_object())
+            .map(|m| {
+                m.iter()
+                    .map(|(k, v)| (k.clone(), v.to_string_lossy()))
+                    .collect::<BTreeMap<String, String>>()
+            })
+            .unwrap_or_else(BTreeMap::new);
+
+        let spans = match trace.get("spans") {
+            Some(Value::Array(v)) => v
+                .iter()
+                .filter_map(|s| s.as_object().map(DatadogTracesEncoder::convert_span))
+                .collect(),
+            _ => vec![],
+        };
+
+        let chunk = dd_proto::TraceChunk {
+            priority: trace
+                .get("priority")
+                .and_then(|v| v.as_integer().map(|v| v as i32))
+                .unwrap_or(1i32),
+            origin: trace
+                .get("origin")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            dropped_trace: trace
+                .get("dropped")
+                .and_then(|v| v.as_boolean())
+                .unwrap_or(false),
+            spans,
+            tags,
+        };
+
+        dd_proto::TracerPayload {
+            container_id: trace
+                .get("container_id")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            language_name: trace
+                .get("language_name")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            language_version: trace
+                .get("language_version")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            tracer_version: trace
+                .get("tracer_version")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            runtime_id: trace
+                .get("runtime_id")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+            chunks: vec![chunk],
+            app_version: trace
+                .get("app_version")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_else(|| "".into()),
+        }
+    }
+
+    /* Deprecated -to remove-
+    fn vector_trace_into_dd_trace_v1(trace: &TraceEvent) -> dd_proto::ApiTrace {
         let trace_id = match trace.get("trace_id") {
             Some(Value::Integer(val)) => *val,
             _ => 0,
@@ -274,6 +324,7 @@ impl DatadogTracesEncoder {
             end_time,
         }
     }
+    */
 
     fn convert_span(span: &BTreeMap<String, Value>) -> dd_proto::Span {
         let trace_id = match span.get("trace_id") {
@@ -303,8 +354,7 @@ impl DatadogTracesEncoder {
 
         let meta = span
             .get("meta")
-            .map(|m| m.as_object())
-            .flatten()
+            .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| (k.clone(), v.to_string_lossy()))
@@ -316,8 +366,7 @@ impl DatadogTracesEncoder {
 
         let metrics = span
             .get("metrics")
-            .map(|m| m.as_object())
-            .flatten()
+            .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
                     .filter_map(|(k, v)| {
