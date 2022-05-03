@@ -589,7 +589,10 @@ mod test {
             let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(vrl_lib::Target::target_get(&target, &path), expect);
+            assert_eq!(
+                vrl_lib::Target::target_get(&target, &path).map(|v| v.cloned()),
+                expect
+            );
         }
     }
 
@@ -705,7 +708,10 @@ mod test {
                 vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
-            assert_eq!(vrl_lib::Target::target_get(&target, &path), Ok(Some(value)));
+            assert_eq!(
+                vrl_lib::Target::target_get(&target, &path).map(|v| v.cloned()),
+                Ok(Some(value))
+            );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
         }
     }
@@ -798,14 +804,16 @@ mod test {
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let path = LookupBuf::from_segments(segments);
-            let removed = vrl_lib::Target::target_get(&target, &path).unwrap();
+            let removed = vrl_lib::Target::target_get(&target, &path)
+                .unwrap()
+                .cloned();
 
             assert_eq!(
                 vrl_lib::Target::target_remove(&mut target, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &LookupBuf::root()),
+                vrl_lib::Target::target_get(&target, &LookupBuf::root()).map(|v| v.cloned()),
                 Ok(expect)
             );
         }
@@ -905,7 +913,7 @@ mod test {
                 }
                 .into()
             )),
-            target.target_get(&LookupBuf::root())
+            target.target_get(&LookupBuf::root()).map(|v| v.cloned())
         );
     }
 
@@ -956,13 +964,16 @@ mod test {
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
 
-            assert_eq!(Ok(current), target.target_get(&path));
+            assert_eq!(Ok(current), target.target_get(&path).map(|v| v.cloned()));
             assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
-            assert_eq!(Ok(Some(new.clone())), target.target_get(&path));
+            assert_eq!(
+                Ok(Some(new.clone())),
+                target.target_get(&path).map(|v| v.cloned())
+            );
 
             if delete {
                 assert_eq!(Ok(Some(new)), target.target_remove(&path, true));
-                assert_eq!(Ok(None), target.target_get(&path));
+                assert_eq!(Ok(None), target.target_get(&path).map(|v| v.cloned()));
             }
         }
     }
