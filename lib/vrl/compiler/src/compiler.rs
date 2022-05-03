@@ -289,7 +289,11 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes, external),
         };
 
-        Predicate::new(Node::new(span, exprs), (&self.local, external))
+        Predicate::new(
+            Node::new(span, exprs),
+            (&self.local, external),
+            &mut self.diagnostics,
+        )
     }
 
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Op {
