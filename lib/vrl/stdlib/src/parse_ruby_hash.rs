@@ -252,7 +252,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
             parse_nil,
             parse_hash,
             parse_array,
-            map(parse_colon_key, |x| Value::from(x)),
+            map(parse_colon_key, Value::from),
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
