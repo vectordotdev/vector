@@ -26,6 +26,10 @@ impl<'a> Formatter<'a> {
     pub fn enable_colors(&mut self, color: bool) {
         self.color = color
     }
+
+    pub fn diagnostics(&self) -> &DiagnosticList {
+        &self.diagnostics
+    }
 }
 
 impl<'a> fmt::Display for Formatter<'a> {
@@ -34,6 +38,10 @@ impl<'a> fmt::Display for Formatter<'a> {
 
         use codespan_reporting::{files::SimpleFile, term};
         use termcolor::Buffer;
+
+        if self.diagnostics.is_empty() {
+            return Ok(());
+        }
 
         let file = SimpleFile::new("", self.source);
         let config = term::Config::default();

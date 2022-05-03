@@ -162,4 +162,6 @@ pub enum ParseError {
     IndexTemplate { source: TemplateParseError },
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
+    #[snafu(display("aws.region required when AWS authentication is in use"))]
+    RegionRequired,
 }

@@ -70,14 +70,17 @@ impl ElasticsearchCommon {
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let region = match &config.aws {
-            Some(region) => region.region(),
-            None => None,
-        };
-
         let aws_auth = match &config.auth {
             Some(ElasticsearchAuth::Basic { .. }) | None => None,
-            Some(ElasticsearchAuth::Aws(aws)) => Some(aws.credentials_provider().await?),
+            Some(ElasticsearchAuth::Aws(aws)) => {
+                let region = config
+                    .aws
+                    .as_ref()
+                    .map(|config| config.region())
+                    .ok_or(ParseError::RegionRequired)?;
+
+                Some(aws.credentials_provider(region).await?)
+            }
         };
 
         let compression = config.compression;
@@ -116,6 +119,8 @@ impl ElasticsearchCommon {
             metric_config.host_tag,
             metric_config.timezone.unwrap_or_default(),
         );
+
+        let region = config.aws.as_ref().map(|config| config.region());
 
         Ok(Self {
             http_auth,
@@ -162,17 +167,19 @@ pub async fn sign_request(
 ) -> crate::Result<()> {
     let signable_request = SignableRequest::from(&*request);
     let credentials = credentials_provider.provide_credentials().await?;
-    let signing_params = SigningParams::builder()
+    let mut signing_params_builder = SigningParams::builder()
         .access_key(credentials.access_key_id())
         .secret_key(credentials.secret_access_key())
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
         .service_name("es")
         .time(SystemTime::now())
-        .settings(SigningSettings::default())
-        .build()?;
+        .settings(SigningSettings::default());
+
+    signing_params_builder.set_security_token(credentials.session_token());
 
     let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params)?.into_parts();
+        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
+            .into_parts();
     signing_instructions.apply_to_request(request);
 
     Ok(())

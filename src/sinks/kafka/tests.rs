@@ -38,7 +38,7 @@ mod integration_test {
             VectorSink,
         },
         test_util::{components, random_lines_with_stream, random_string, wait_for},
-        tls::TlsOptions,
+        tls::TlsConfig,
     };
 
     fn kafka_host() -> String {
@@ -59,7 +59,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -111,7 +111,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -205,7 +205,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions::test_options(),
+                options: TlsConfig::test_config(),
             }),
             KafkaCompression::None,
         )
@@ -220,7 +220,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions::test_options(),
+                options: TlsConfig::test_config(),
             }),
             KafkaCompression::None,
         )
@@ -257,7 +257,7 @@ mod integration_test {
             bootstrap_servers: server.clone(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),

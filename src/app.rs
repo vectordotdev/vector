@@ -133,7 +133,7 @@ impl Application {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::Graph(g) => graph::cmd(&g),
-                        SubCommand::Config(c) => config::cmd(&c, &config_paths),
+                        SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         #[cfg(windows)]
@@ -242,7 +242,7 @@ impl Application {
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
-        crate::trace::stop_buffering();
+        crate::trace::stop_early_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);

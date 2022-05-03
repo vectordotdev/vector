@@ -1,16 +1,15 @@
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::encoding::Framer;
 use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
+    codecs::Encoder,
     event::{Event, Finalizable},
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            Compression, RequestBuilder,
-        },
+        util::{encoding::Transformer, Compression, RequestBuilder},
     },
 };
 
@@ -19,14 +18,14 @@ pub struct AzureBlobRequestOptions {
     pub container_name: String,
     pub blob_time_format: String,
     pub blob_append_uuid: bool,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
     type Metadata = AzureBlobMetadata;
     type Events = Vec<Event>;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = AzureBlobRequest;
     type Error = std::io::Error;
@@ -36,7 +35,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {

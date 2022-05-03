@@ -259,7 +259,9 @@ mod test {
         use tokio_stream::wrappers::IntervalStream;
 
         use crate::event::EventArray;
-        use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
+        use crate::tls::{
+            self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig,
+        };
 
         trace_init();
 
@@ -268,9 +270,9 @@ mod test {
             mode: Mode::Tcp(TcpSinkConfig::new(
                 addr.to_string(),
                 None,
-                Some(TlsConfig {
+                Some(TlsEnableableConfig {
                     enabled: Some(true),
-                    options: TlsOptions {
+                    options: TlsConfig {
                         verify_certificate: Some(false),
                         verify_hostname: Some(false),
                         ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
@@ -303,7 +305,7 @@ mod test {
         let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
         let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
-        let config = Some(TlsConfig::test_config());
+        let config = Some(TlsEnableableConfig::test_config());
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {

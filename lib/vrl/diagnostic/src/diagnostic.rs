@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use codespan_reporting::diagnostic;
 
-use crate::{DiagnosticError, Label, Note, Severity, Span};
+use crate::{DiagnosticMessage, Label, Note, Severity, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
@@ -105,14 +105,14 @@ impl Diagnostic {
     }
 }
 
-impl From<Box<dyn DiagnosticError>> for Diagnostic {
-    fn from(error: Box<dyn DiagnosticError>) -> Self {
+impl From<Box<dyn DiagnosticMessage>> for Diagnostic {
+    fn from(message: Box<dyn DiagnosticMessage>) -> Self {
         Self {
-            severity: Severity::Error,
-            code: error.code(),
-            message: error.message(),
-            labels: error.labels(),
-            notes: error.notes(),
+            severity: message.severity(),
+            code: message.code(),
+            message: message.message(),
+            labels: message.labels(),
+            notes: message.notes(),
         }
     }
 }

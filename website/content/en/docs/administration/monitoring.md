@@ -83,13 +83,23 @@ Method | Description
 #### Stack traces
 
 You can enable full error backtraces by setting the `RUST_BACKTRACE=full` environment variable. More on this in the
-[Troubleshooting guide][troubleshooting]. You can
+[Troubleshooting guide][troubleshooting].
 
 ## Metrics
 
 You can monitor metrics produced by Vector using the [`internal_metrics`][internal_metrics] source. As with Vector's
 [internal logs](#using-vector-logs), you can configure an `internal_metrics` source and use the piped-in metrics
-however you wish. Here's an example configuration that
+however you wish. Here's an example configuration that delivers Vector's metrics to a Prometheus remote write endpoint.
+
+```toml
+[sources.vector_metrics]
+type = "internal_metrics"
+
+[sources.prometheus]
+type = ["prometheus_remote_write"]
+endpoint = ["https://localhost:8087/"]
+inputs = ["vector_metrics"]
+```
 
 ### Metrics catalogue
 

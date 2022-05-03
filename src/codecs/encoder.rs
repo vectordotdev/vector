@@ -5,7 +5,7 @@ use crate::{
 use bytes::BytesMut;
 use codecs::{
     encoding::{Error, Framer, Serializer},
-    NewlineDelimitedEncoder, RawMessageSerializer,
+    CharacterDelimitedEncoder, NewlineDelimitedEncoder, RawMessageSerializer,
 };
 use tokio_util::codec::Encoder as _;
 
@@ -41,8 +41,20 @@ impl<Framer> Encoder<Framer>
 where
     Framer: Clone,
 {
-    // Serialize the event.
-    fn serialize(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
+    /// Serialize the event without applying framing.
+    pub fn serialize(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
+        let len = buffer.len();
+        let mut payload = buffer.split_off(len);
+
+        self.serialize_at_start(event, &mut payload)?;
+
+        buffer.unsplit(payload);
+
+        Ok(())
+    }
+
+    /// Serialize the event without applying framing, at the start of the provided buffer.
+    fn serialize_at_start(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         self.serializer.encode(event, buffer).map_err(|error| {
             emit!(EncoderSerializeFailed { error: &error });
             Error::SerializingError(error)
@@ -66,6 +78,28 @@ impl Encoder<Framer> {
     /// Get the serializer.
     pub const fn serializer(&self) -> &Serializer {
         &self.serializer
+    }
+
+    /// Get the prefix that encloses a batch of events.
+    pub const fn batch_prefix(&self) -> &[u8] {
+        match (&self.framer, &self.serializer) {
+            (
+                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+                Serializer::Json(_) | Serializer::NativeJson(_),
+            ) => b"[",
+            _ => &[],
+        }
+    }
+
+    /// Get the suffix that encloses a batch of events.
+    pub const fn batch_suffix(&self) -> &[u8] {
+        match (&self.framer, &self.serializer) {
+            (
+                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+                Serializer::Json(_) | Serializer::NativeJson(_),
+            ) => b"]",
+            _ => &[],
+        }
     }
 }
 
@@ -92,7 +126,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
         let len = buffer.len();
         let mut payload = buffer.split_off(len);
 
-        self.serialize(event, &mut payload)?;
+        self.serialize_at_start(event, &mut payload)?;
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
@@ -113,7 +147,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
         let len = buffer.len();
         let mut payload = buffer.split_off(len);
 
-        self.serialize(event, &mut payload)?;
+        self.serialize_at_start(event, &mut payload)?;
 
         buffer.unsplit(payload);
 

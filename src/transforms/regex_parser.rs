@@ -194,28 +194,6 @@ impl RegexParser {
         let types =
             parse_check_conversion_map(&config.types, names, config.timezone.unwrap_or(timezone))?;
 
-        Ok(Transform::function(RegexParser::new(
-            regexset,
-            patterns,
-            field,
-            config.drop_field,
-            config.drop_failed,
-            config.target_field.clone(),
-            config.overwrite_target,
-            types,
-        )))
-    }
-
-    pub fn new(
-        regexset: RegexSet,
-        patterns: Vec<Regex>,
-        field: String,
-        mut drop_field: bool,
-        drop_failed: bool,
-        target_field: Option<String>,
-        overwrite_target: bool,
-        types: HashMap<String, Conversion>,
-    ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
         let patterns: Vec<CompiledRegex> = patterns
@@ -224,21 +202,22 @@ impl RegexParser {
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        drop_field = drop_field
+        let drop_field = config.drop_field
             && !patterns
                 .iter()
                 .flat_map(|p| &p.capture_names)
                 .any(|(_, f, _)| *f == field);
 
-        Self {
+        let parser = Self {
             regexset,
             patterns,
             field,
             drop_field,
-            drop_failed,
-            target_field,
-            overwrite_target,
-        }
+            drop_failed: config.drop_failed,
+            target_field: config.target_field.clone(),
+            overwrite_target: config.overwrite_target,
+        };
+        Ok(Transform::function(parser))
     }
 }
 

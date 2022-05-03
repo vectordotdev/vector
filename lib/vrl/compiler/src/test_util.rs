@@ -212,6 +212,6 @@ macro_rules! type_def {
     }};
 
     (array) => {
-        TypeDef::array(::std::collections::BTreeMap::default())
+        TypeDef::array(value::kind::Collection::any())
     };
 }

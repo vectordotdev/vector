@@ -37,6 +37,11 @@ impl Default for LengthDelimitedDecoder {
 
 impl Clone for LengthDelimitedDecoder {
     fn clone(&self) -> Self {
+        // This has been fixed with https://github.com/tokio-rs/tokio/pull/4089,
+        // however we are blocked on upgrading to a new release of `tokio-util`
+        // that includes the `Clone` implementation:
+        // https://github.com/vectordotdev/vector/issues/11257.
+        //
         // This is an awful implementation for `Clone` since it resets the
         // internal state. However, it works for our use case because we
         // generally only clone a codec that has not been mutated yet.

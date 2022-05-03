@@ -31,6 +31,7 @@ use super::util::{
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -40,7 +41,6 @@ use crate::{
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
-        gcp::{GcpAuthConfig, GcpCredentials},
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
@@ -59,7 +59,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
@@ -91,7 +91,7 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

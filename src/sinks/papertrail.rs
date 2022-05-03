@@ -17,7 +17,7 @@ use crate::{
     },
     tcp::TcpKeepaliveConfig,
     template::Template,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -26,7 +26,7 @@ pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig<Encoding>,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
     process: Option<Template>,
 }
@@ -65,7 +65,11 @@ impl SinkConfig for PapertrailConfig {
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let address = format!("{}:{}", host, port);
-        let tls = Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled));
+        let tls = Some(
+            self.tls
+                .clone()
+                .unwrap_or_else(TlsEnableableConfig::enabled),
+        );
 
         let pid = std::process::id();
         let encoding = self.encoding.clone();

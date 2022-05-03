@@ -31,7 +31,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
 
@@ -66,7 +66,7 @@ pub struct ElasticsearchConfig {
     pub auth: Option<ElasticsearchAuth>,
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(alias = "normal")]
     pub bulk: Option<BulkConfig>,
