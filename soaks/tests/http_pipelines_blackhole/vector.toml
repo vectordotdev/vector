@@ -10,7 +10,7 @@ type = "internal_metrics"
 [sources.logs]
 type = "http"
 address = "0.0.0.0:8282"
-encoding = "text"
+encoding = "ndjson"
 
 ##
 ## Transforms
@@ -20,7 +20,6 @@ encoding = "text"
 type = "remap"
 inputs = ["logs"]
 source = '''
-., err = parse_json(.message)
 if starts_with(strip_whitespace!(.message), "{") {
   custom, err = parse_json(.message)
   if (err == null) {
