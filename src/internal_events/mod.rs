@@ -56,6 +56,8 @@ mod exec;
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
+#[cfg(feature = "sources-gcp_pubsub")]
+mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
 mod heartbeat;
@@ -211,6 +213,8 @@ pub(crate) use self::file::*;
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]
 pub(crate) use self::fluent::*;
+#[cfg(feature = "sources-gcp_pubsub")]
+pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
 #[cfg(any(

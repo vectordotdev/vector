@@ -122,6 +122,10 @@ impl TransformConfig for RouteConfig {
     fn transform_type(&self) -> &'static str {
         "route"
     }
+
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs

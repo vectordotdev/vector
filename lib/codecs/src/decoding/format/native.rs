@@ -20,7 +20,7 @@ impl NativeDeserializerConfig {
         NativeDeserializer::default()
     }
 
-    /// The data type of returned events
+    /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         DataType::all()
     }

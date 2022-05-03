@@ -127,6 +127,8 @@ mod log;
 mod log_util;
 #[cfg(feature = "map_keys")]
 mod map_keys;
+#[cfg(feature = "map_values")]
+mod map_values;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -394,6 +396,8 @@ pub use length::Length;
 pub use log::Log;
 #[cfg(feature = "map_keys")]
 pub use map_keys::MapKeys;
+#[cfg(feature = "map_values")]
+pub use map_values::MapValues;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
@@ -653,6 +657,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "map_keys")]
         Box::new(MapKeys),
+        #[cfg(feature = "map_values")]
+        Box::new(MapValues),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "match_any")]

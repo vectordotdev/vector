@@ -19,7 +19,7 @@ components: sources: socket: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+			default_framing: "`newline_delimited` for TCP and Unix stream modes when using codecs other than `native` (which defaults to `length_delimited`), `bytes` for UDP and Unix datagram modes"
 		}
 		receive: {
 			from: {
