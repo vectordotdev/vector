@@ -56,7 +56,8 @@ pub(super) struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
-    method: Option<HttpMethod>,
+    #[serde(default)]
+    method: HttpMethod,
     framing: Option<FramingConfig>,
     decoding: Option<DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -78,7 +79,7 @@ impl GenerateConfig for SimpleHttpConfig {
             auth: None,
             path: "/".to_string(),
             path_key: "path".to_string(),
-            method: Some(HttpMethod::Post),
+            method: HttpMethod::Post,
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -94,10 +95,6 @@ fn default_path() -> String {
 
 fn default_path_key() -> String {
     "path".to_string()
-}
-
-const fn default_http_method() -> HttpMethod {
-    HttpMethod::Post
 }
 
 #[derive(Clone)]
@@ -195,15 +192,11 @@ impl SourceConfig for SimpleHttpConfig {
             path_key: self.path_key.clone(),
             decoder,
         };
-        let http_method = match self.method.as_ref() {
-            Some(http_method) => *http_method,
-            None => default_http_method(),
-        };
 
         source.run(
             self.address,
             self.path.as_str(),
-            http_method,
+            self.method,
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -322,7 +315,7 @@ mod tests {
                 strict_path,
                 path_key,
                 path,
-                method: Some(method),
+                method,
                 framing,
                 decoding,
                 acknowledgements: acknowledgements.into(),
