@@ -7,12 +7,13 @@ use std::{
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note};
+use dyn_clone::{clone_trait_object, DynClone};
+use parser::ast::Ident;
 use value::kind::Collection;
 
 use crate::{
     expression::{
-        container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure,
-        Literal, Query,
+        container::Variant, Block, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
     state::{ExternalEnv, LocalEnv},
@@ -25,7 +26,7 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
     Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
-pub trait Function: Send + Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug + DynClone {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -96,6 +97,8 @@ pub trait Function: Send + Sync + fmt::Debug {
         None
     }
 }
+
+clone_trait_object!(Function);
 
 // -----------------------------------------------------------------------------
 
@@ -470,6 +473,23 @@ impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
                 )
             })
             .collect()
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionClosure {
+    pub variables: Vec<Ident>,
+    pub block: Block,
+}
+
+impl FunctionClosure {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            block,
+        }
     }
 }
 

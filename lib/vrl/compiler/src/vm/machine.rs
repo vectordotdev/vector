@@ -1,3 +1,4 @@
+use super::VmFunctionClosure;
 use super::{state::VmState, Variable, VmArgumentList};
 use crate::value::{VrlValueArithmetic, VrlValueConvert};
 use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
@@ -131,6 +132,9 @@ pub enum OpCode {
     /// at compile time. (Used, for example, to precompile and store regexes at compile time.)
     MoveStaticParameter,
 
+    /// Moves a closure onto the closure stack.
+    MoveClosure,
+
     /// After each statement (with the exception of the last one) within a block we need to pop the
     /// stack, and if we are in an error state jump to the end of the block.
     EndStatement,
@@ -158,6 +162,7 @@ pub struct Vm {
     instructions: Vec<Instruction>,
     values: Vec<Value>,
     targets: Vec<Variable>,
+    closures: Vec<VmFunctionClosure>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
 }
 
@@ -211,6 +216,15 @@ impl Vm {
 
     pub fn function(&self, function_id: usize) -> Option<&(dyn Function)> {
         self.fns.get(function_id).map(|fun| fun.deref())
+    }
+
+    pub fn write_closure(&mut self, closure: VmFunctionClosure) -> usize {
+        self.closures.push(closure);
+        self.closures.len() - 1
+    }
+
+    pub fn functions(&self) -> &[Box<dyn Function>] {
+        &self.fns
     }
 
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.
@@ -518,7 +532,12 @@ impl Vm {
                         .collect();
 
                     let mut argumentlist = VmArgumentList::new(parameters, args);
+
                     let function = &self.fns[function_id];
+
+                    if function.closure().is_some() {
+                        argumentlist.set_closure(state.pop_closure()?);
+                    }
 
                     let result = argumentlist
                         .check_arguments()
@@ -568,6 +587,10 @@ impl Vm {
                     state
                         .parameter_stack
                         .push(Some(VmArgument::Any(&self.static_params[idx])));
+                }
+                OpCode::MoveClosure => {
+                    let idx = state.next_primitive()?;
+                    state.closure_stack.push(&self.closures[idx]);
                 }
             }
         }
