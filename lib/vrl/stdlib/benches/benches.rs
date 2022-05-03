@@ -1418,6 +1418,11 @@ bench_function! {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({key: "value"})),
     }
+
+    map_max_depth {
+        args: func_args![value: r#"{"key": "value"}"#, max_depth: 128],
+        want: Ok(value!({key: "value"})),
+    }
 }
 
 bench_function! {
