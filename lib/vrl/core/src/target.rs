@@ -137,7 +137,7 @@ mod tests {
             let value: Value = value;
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.target_get(&path), expect);
+            assert_eq!(value.target_get(&path).map(|v| v.cloned()), expect);
         }
     }
 
