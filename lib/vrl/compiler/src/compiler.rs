@@ -479,6 +479,13 @@ impl<'a> Compiler<'a> {
             closure,
         } = node.into_inner();
 
+        // TODO: Remove this (hacky) code once dynamic path syntax lands.
+        //
+        // See: https://github.com/vectordotdev/vector/issues/12547
+        if ident.as_deref() == "get" {
+            self.external_queries.push(LookupBuf::root())
+        }
+
         let arguments = arguments
             .into_iter()
             .map(|node| Node::new(node.span(), self.compile_function_argument(node, external)))
