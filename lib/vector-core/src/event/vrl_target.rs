@@ -580,7 +580,13 @@ mod test {
 
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(vrl_lib::Target::target_get(&target, &path), expect);
@@ -684,7 +690,13 @@ mod test {
 
         for (object, segments, value, expect, result) in cases {
             let object: BTreeMap<String, Value> = object;
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let expect = LogEvent::from(expect);
             let value: vrl_lib::Value = value;
             let path = LookupBuf::from_segments(segments);
@@ -778,7 +790,13 @@ mod test {
         ];
 
         for (object, segments, compact, expect) in cases {
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let path = LookupBuf::from_segments(segments);
             let removed = vrl_lib::Target::target_get(&target, &path).unwrap();
 
@@ -829,8 +847,16 @@ mod test {
 
         for (value, expect) in cases {
             let metadata = EventMetadata::default();
-            let mut target =
-                VrlTarget::new(Event::Log(LogEvent::new_with_metadata(metadata.clone())));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::new_with_metadata(metadata.clone())),
+                &info,
+            );
 
             vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
@@ -859,7 +885,13 @@ mod test {
         }))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
-        let target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let target = VrlTarget::new(Event::Metric(metric), &info);
 
         assert_eq!(
             Ok(Some(
@@ -913,7 +945,13 @@ mod test {
             ("tags.thing", None, "footag".into(), true),
         ];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
@@ -948,7 +986,13 @@ mod test {
 
         let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         assert_eq!(
             Err(format!(
