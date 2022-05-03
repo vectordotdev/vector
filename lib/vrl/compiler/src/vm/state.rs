@@ -68,7 +68,7 @@ impl<'a> VmState<'a> {
     pub(super) fn pop_closure(&mut self) -> Result<&VmFunctionClosure, ExpressionError> {
         self.closure_stack
             .pop()
-            .ok_or_else(|| "stack underflow".into())
+            .ok_or_else(|| "closure stack underflow".into())
     }
 
     pub(super) fn peek_stack(&self) -> Result<&Value, ExpressionError> {

@@ -736,7 +736,7 @@ impl Expression for FunctionCall {
         }
 
         if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
-            let mut closure_vm = crate::vm::Vm::new(vm.functions().to_vec());
+            let mut closure_vm = crate::vm::Vm::new(vm.functions());
             block.compile_to_vm(&mut closure_vm, (local, external))?;
             closure_vm.write_opcode(OpCode::Return);
 
@@ -1211,7 +1211,7 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Debug)]
+    #[derive(Debug)]
     struct TestFn;
 
     impl Function for TestFn {

@@ -3,7 +3,7 @@ use super::{state::VmState, Variable, VmArgumentList};
 use crate::value::{VrlValueArithmetic, VrlValueConvert};
 use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
 use diagnostic::Span;
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
@@ -158,7 +158,7 @@ pub enum Instruction {
 
 #[derive(Debug, Default)]
 pub struct Vm {
-    fns: Vec<Box<dyn Function>>,
+    fns: Arc<Vec<Box<dyn Function>>>,
     instructions: Vec<Instruction>,
     values: Vec<Value>,
     targets: Vec<Variable>,
@@ -167,7 +167,7 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new(fns: Vec<Box<dyn Function>>) -> Self {
+    pub fn new(fns: Arc<Vec<Box<dyn Function>>>) -> Self {
         Self {
             fns,
             ..Default::default()
@@ -223,8 +223,8 @@ impl Vm {
         self.closures.len() - 1
     }
 
-    pub fn functions(&self) -> &[Box<dyn Function>] {
-        &self.fns
+    pub fn functions(&self) -> Arc<Vec<Box<dyn Function>>> {
+        Arc::clone(&self.fns)
     }
 
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.

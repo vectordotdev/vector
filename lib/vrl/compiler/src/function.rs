@@ -7,7 +7,6 @@ use std::{
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note};
-use dyn_clone::{clone_trait_object, DynClone};
 use parser::ast::Ident;
 use value::kind::Collection;
 
@@ -26,7 +25,7 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
     Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
-pub trait Function: Send + Sync + fmt::Debug + DynClone {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -97,8 +96,6 @@ pub trait Function: Send + Sync + fmt::Debug + DynClone {
         None
     }
 }
-
-clone_trait_object!(Function);
 
 // -----------------------------------------------------------------------------
 

@@ -208,7 +208,6 @@ where
         let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
         (self.runner)(ctx)?;
-        // self.vm.interpret(ctx)?;
 
         cleanup(ctx.state_mut(), index_ident, old_index);
         cleanup(ctx.state_mut(), value_ident, old_value);
