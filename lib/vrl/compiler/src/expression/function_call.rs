@@ -1211,7 +1211,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     struct TestFn;
 
     impl Function for TestFn {
