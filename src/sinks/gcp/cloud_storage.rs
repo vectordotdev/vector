@@ -286,9 +286,13 @@ impl RequestSettings {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
             (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_) | Serializer::Text(_)) => {
-                NewlineDelimitedEncoder::new().into()
-            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
         let acl = config
