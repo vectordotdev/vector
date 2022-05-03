@@ -9,8 +9,8 @@ use crate::{
     aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::Encoder,
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -148,8 +148,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        let encoder_input_type = self.encoding.clone().config().input_type();
-        Input::new(DataType::Log & encoder_input_type)
+        Input::new(self.encoding.clone().config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

@@ -5,7 +5,7 @@ use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -191,8 +191,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        let encoder_input_type = self.encoding.clone().config().input_type();
-        Input::new((DataType::Metric | DataType::Log) & encoder_input_type)
+        Input::new(self.encoding.clone().config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

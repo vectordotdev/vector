@@ -12,10 +12,7 @@ use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::util::encoding::EncodingConfigWithFramingAdapter;
 use crate::{
     codecs::Encoder,
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -104,8 +101,7 @@ impl SinkConfig for S3SinkConfig {
     }
 
     fn input(&self) -> Input {
-        let encoder_input_type = self.encoding.clone().config().1.input_type();
-        Input::new(DataType::Log & encoder_input_type)
+        Input::new(self.encoding.clone().config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
