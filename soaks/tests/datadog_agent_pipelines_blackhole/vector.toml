@@ -8,10 +8,9 @@ data_dir = "/var/lib/vector"
 type = "internal_metrics"
 
 [sources.logs]
-type = "http"
+type = "datadog_agent"
+acknowledgements = false
 address = "0.0.0.0:8282"
-encoding = "text"
-acknowledgements = true
 
 ##
 ## Transforms
@@ -3065,7 +3064,7 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.aws_ecs-agent]
+[[transforms.processing.logs]]
 name = "aws_ecs-agent"
 filter.type = "datadog_search"
 filter.source = "source:amazon-ecs-agent"
