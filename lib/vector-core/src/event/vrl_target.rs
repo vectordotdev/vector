@@ -414,7 +414,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             }
 
             if !set_type {
-                map.insert("type".to_owned(), metric.value().to_owned().into());
+                map.insert("type".to_owned(), metric.value().clone().into());
             }
 
             if !set_namespace {
@@ -446,11 +446,11 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
 
         // For non-root paths, we contiuously populate the value with the
         // relevant data.
-        match path.iter().next() {
-            Some(SegmentBuf::Field(field)) => match field.as_str() {
+        if let Some(SegmentBuf::Field(field)) = path.iter().next() {
+            match field.as_str() {
                 "name" if !set_name => {
                     set_name = true;
-                    map.insert("name".to_owned(), metric.name().clone().into());
+                    map.insert("name".to_owned(), metric.name().to_owned().into());
                 }
                 "kind" if !set_kind => {
                     set_kind = true;
@@ -464,7 +464,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                     set_namespace = true;
                     map.insert(
                         "namespace".to_owned(),
-                        metric.namespace().unwrap().clone().into(),
+                        metric.namespace().unwrap().to_owned().into(),
                     );
                 }
                 "timestamp" if !set_timestamp && metric.timestamp().is_some() => {
@@ -486,8 +486,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                     );
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
     }
 
