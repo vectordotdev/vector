@@ -103,7 +103,6 @@ where
     Fut: Future<Output = ()> + Send + 'static,
 {
     async fn run<const SOE: bool>(mut self) {
-        assert!(self.failure.is_some());
         loop {
             tokio::select! {
                 _ = self.shutdown.clone() => break,
