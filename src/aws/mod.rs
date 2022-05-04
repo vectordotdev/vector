@@ -5,6 +5,7 @@ use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 pub use auth::AwsAuthentication;
+use aws_config::meta::region::ProvideRegion;
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::erase::DynConnector;
 use aws_smithy_client::SdkError;
@@ -84,11 +85,21 @@ pub trait ClientBuilder {
 
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
-    region: Region,
+    region: Option<Region>,
     endpoint: Option<Endpoint>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<T::Client> {
+    // The default credentials chains will look for a region if not given but we'd like to
+    // error up front if later SDK calls will fail due to lack of region configuration
+    let region = match region {
+        Some(region) => Ok(region),
+        None => aws_config::default_provider::region::default_provider()
+            .region()
+            .await
+            .ok_or("Could not determine region from Vector configuration or default providers"),
+    }?;
+
     let mut config_builder =
         T::create_config_builder(auth.credentials_provider(region.clone()).await?);
 
