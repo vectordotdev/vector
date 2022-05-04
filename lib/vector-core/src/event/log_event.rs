@@ -198,6 +198,10 @@ impl LogEvent {
         self.inner.fields.get_by_path(path)
     }
 
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.fields_mut().get_by_path_mut(path)
+    }
+
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         self.metadata()
             .schema_definition()

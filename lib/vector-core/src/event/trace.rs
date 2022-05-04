@@ -58,6 +58,10 @@ impl TraceEvent {
         self.0.lookup(path)
     }
 
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.0.lookup_mut(path)
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.0.as_map().get(key.as_ref())
     }
