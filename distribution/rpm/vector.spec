@@ -65,6 +65,12 @@ getent passwd %{_username} > /dev/null || \
   useradd --shell /sbin/nologin --system --home-dir %{_sharedstatedir}/%{_name} --user-group \
     --comment "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
+chmod 740 %{_sharedstatedir}/%{_name}
+chown %{_username} %{_sysconfdir}/%{_name}
+chmod 740 %{_sysconfdir}/%{_name}
+chown %{_username} %{_sysconfdir}/default/vector
+chmod 640 %{_sysconfdir}/default/vector
+usermod -aG adm %{_username}  || true
 usermod -aG systemd-journal %{_username}  || true
 usermod -aG systemd-journal-remote %{_username}  || true
 
