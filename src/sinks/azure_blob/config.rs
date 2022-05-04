@@ -92,7 +92,7 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.clone().config().1.input_type())
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {

@@ -191,7 +191,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.clone().config().input_type())
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

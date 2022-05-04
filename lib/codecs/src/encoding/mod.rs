@@ -93,14 +93,14 @@ impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub fn build(self) -> Framer {
+    pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
                 CharacterDelimitedEncoderConfig {
-                    character_delimited,
+                    character_delimited: character_delimited.clone(),
                 }
                 .build(),
             ),
