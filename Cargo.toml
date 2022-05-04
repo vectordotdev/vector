@@ -17,6 +17,10 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[[bin]]
+name = "secret-backend-example"
+path = "src/config/loading/secret_backend_example.rs"
+
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
 
