@@ -116,8 +116,8 @@ pub struct DatadogMetricsConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
-    tls: Option<TlsEnableableConfig>,
+    pub acknowledgements: AcknowledgementsConfig,
+    pub tls: Option<TlsEnableableConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -147,22 +147,6 @@ impl SinkConfig for DatadogMetricsConfig {
 }
 
 impl DatadogMetricsConfig {
-    /// Creates a [`DatadogMetricsConfig`] with enterprise reporting settings.
-    pub fn enterprise<T: Into<String>>(
-        api_key: T,
-        endpoint: Option<String>,
-        site: Option<String>,
-        region: Option<Region>,
-    ) -> Self {
-        Self {
-            default_api_key: api_key.into(),
-            endpoint,
-            site,
-            region,
-            ..Self::default()
-        }
-    }
-
     /// Gets the base URI of the Datadog agent API.
     ///
     /// Per the Datadog agent convention, we should include a unique identifier as part of the
