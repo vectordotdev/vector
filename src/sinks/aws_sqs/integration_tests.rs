@@ -27,7 +27,7 @@ async fn create_test_client() -> SqsClient {
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
         &auth,
-        Region::new("localstack"),
+        Some(Region::new("localstack")),
         Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
         &proxy,
         &None,

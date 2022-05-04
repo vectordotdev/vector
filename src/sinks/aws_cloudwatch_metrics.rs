@@ -168,7 +168,7 @@ impl CloudWatchMetricsSinkConfig {
     async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchClient> {
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            Region::new("us-east-1")
+            Some(Region::new("us-east-1"))
         } else {
             self.region.region()
         };
