@@ -170,10 +170,12 @@ struct InfluxDbLogsEncoder {
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
-    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
-        self.transformer.transform(&mut event);
+    fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
         let mut event = event.into_log();
         event.insert("metric_type", "logs".to_string());
+        let mut event = Event::from(event);
+        self.transformer.transform(&mut event);
+        let mut event = event.into_log();
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
