@@ -177,10 +177,9 @@ impl Function for ParseJson {
         let value = arguments.required("value");
         let max_depth = arguments.optional("max_depth");
 
-        if let Some(max_depth) = max_depth {
-            Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth }))
-        } else {
-            Ok(Box::new(ParseJsonFn { value }))
+        match max_depth {
+            Some(max_depth) => Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth })),
+            None => Ok(Box::new(ParseJsonFn { value })),
         }
     }
 
