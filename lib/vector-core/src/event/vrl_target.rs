@@ -19,6 +19,7 @@ const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tag
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
@@ -367,13 +368,11 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
 
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {
-            ["name"]
-            | ["namespace"]
-            | ["timestamp"]
-            | ["kind"]
-            | ["type"]
-            | ["tags"]
-            | ["tags", _] => return Ok(value.get_by_path(path)),
+            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value.get_by_path(path)),
+            ["namespace"] | ["timestamp"] | ["tags"] => match value.get_by_path(path) {
+                Some(value) => return Ok(Some(value)),
+                None => continue,
+            },
             _ => {
                 return Err(MetricPathError::InvalidPath {
                     path: &path.to_string(),
@@ -407,7 +406,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
         // Accessing a root path requires us to pre-populate all fields.
         if path.is_root() {
             if !set_name {
-                map.insert("name".to_owned(), metric.name().clone().into());
+                map.insert("name".to_owned(), metric.name().to_owned().into());
             }
 
             if !set_kind {
@@ -415,12 +414,12 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             }
 
             if !set_type {
-                map.insert("type".to_owned(), metric.value().clone().into());
+                map.insert("type".to_owned(), metric.value().to_owned().into());
             }
 
             if !set_namespace {
                 if let Some(namespace) = metric.namespace() {
-                    map.insert("namespace".to_owned(), namespace.clone().into());
+                    map.insert("namespace".to_owned(), namespace.to_owned().into());
                 }
             }
 
