@@ -249,6 +249,11 @@ async fn query_backend(
 
     let output = child.wait_with_output().await?;
     let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !stderr.trim().is_empty() {
+        warn!("A secret exec backend wrote a message on stderr: {}.", stderr);
+    }
 
     Ok(response)
 }
