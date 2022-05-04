@@ -1,1 +1,1 @@
-{"metric":{"name":"q","kind":"incremental","counter":{"value":972032.0}}}
+{"metric":{"name":"g","timestamp":"1970-01-01T02:55:39.000000047Z","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":-174272.0,"value":1472.0},{"quantile":574784.0,"value":-84672.0},{"quantile":-539648.0,"value":483456.0},{"quantile":-806208.0,"value":-496384.0}],"count":850901453,"sum":394944.0}}}

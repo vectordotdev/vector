@@ -56,6 +56,8 @@ mod exec;
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
+#[cfg(feature = "sources-gcp_pubsub")]
+mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
 mod heartbeat;
@@ -139,6 +141,8 @@ mod throttle;
 mod udp;
 mod unix;
 mod vector;
+#[cfg(feature = "sinks-websocket")]
+mod websocket;
 
 #[cfg(any(
     feature = "sources-file",
@@ -211,6 +215,8 @@ pub(crate) use self::file::*;
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]
 pub(crate) use self::fluent::*;
+#[cfg(feature = "sources-gcp_pubsub")]
+pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
 #[cfg(any(
@@ -309,6 +315,8 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sources-vector")]
 pub(crate) use self::vector::*;
+#[cfg(feature = "sinks-websocket")]
+pub(crate) use self::websocket::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{

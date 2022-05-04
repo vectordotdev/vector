@@ -830,6 +830,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             kubernetes_logs:
               type: kubernetes_logs
               extra_label_selector: "my_custom_negative_label_selector!=my_val"
+              extra_namespace_label_selector: "my_custom_negative_label_selector!=my_val"
               extra_field_selector: "metadata.name!=test-pod-excluded-by-name"
           sinks:
             stdout:

@@ -10,13 +10,15 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::PipelinesError;
+#[cfg(not(feature = "enterprise-tests"))]
+use crate::metrics;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics,
+    config, generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -99,6 +101,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
         let mut rt_builder = runtime::Builder::new_multi_thread();
@@ -169,6 +172,7 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
+                #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
                 let mut config = config::load_from_paths_with_provider_and_secrets(
@@ -193,6 +197,7 @@ impl Application {
                     )
                     .await
                 {
+                    error!(message = "Exiting due to configuration reporting failure.");
                     return Err(exitcode::UNAVAILABLE);
                 }
 
@@ -244,7 +249,7 @@ impl Application {
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
-        crate::trace::stop_buffering();
+        crate::trace::stop_early_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);
@@ -281,6 +286,7 @@ impl Application {
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                             config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                         {
+                                            error!(message = "Shutting down due to configuration reporting failure.");
                                             break SignalTo::Shutdown;
                                         }
 
@@ -329,6 +335,7 @@ impl Application {
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                         config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                     {
+                                        error!(message = "Shutting down due to configuration reporting failure.");
                                         break SignalTo::Shutdown;
                                     }
 

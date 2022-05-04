@@ -17,7 +17,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -41,7 +41,7 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

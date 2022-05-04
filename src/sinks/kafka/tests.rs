@@ -38,7 +38,7 @@ mod integration_test {
             VectorSink,
         },
         test_util::{components, random_lines_with_stream, random_string, wait_for},
-        tls::TlsOptions,
+        tls::TlsConfig,
     };
 
     fn kafka_host() -> String {
@@ -205,7 +205,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions::test_options(),
+                options: TlsConfig::test_config(),
             }),
             KafkaCompression::None,
         )
@@ -220,7 +220,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions::test_options(),
+                options: TlsConfig::test_config(),
             }),
             KafkaCompression::None,
         )

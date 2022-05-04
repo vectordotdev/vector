@@ -1,10 +1,11 @@
+# object: { "true": true }
 # result: "yes 3"
 
-if false {
+if .true == false {
     "yes"
-} else if false {
+} else if .true == false {
     "yes 2"
-} else if true {
+} else if .true == true {
     "yes 3"
 } else {
     "no"

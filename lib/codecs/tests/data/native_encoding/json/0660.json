@@ -1,1 +1,1 @@
-{"metric":{"name":"y","namespace":"w","tags":{"n":"a","x":"v"},"kind":"absolute","counter":{"value":-955136.0}}}
+{"metric":{"name":"n","tags":{"o":"g"},"kind":"incremental","counter":{"value":734016.0}}}

@@ -21,7 +21,7 @@ use crate::{
         HealthcheckError,
     },
     test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
+    tls::{self, TlsConfig},
 };
 
 fn aws_server() -> String {
@@ -223,7 +223,7 @@ async fn insert_events_over_https() {
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -241,7 +241,9 @@ async fn insert_events_on_aws() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
@@ -258,7 +260,9 @@ async fn insert_events_on_aws_with_compression() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),

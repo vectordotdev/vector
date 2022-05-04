@@ -27,7 +27,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
 };
 
@@ -49,7 +49,7 @@ pub enum Mode {
     Tcp {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         receive_buffer_bytes: Option<usize>,
         connection_limit: Option<u32>,
     },

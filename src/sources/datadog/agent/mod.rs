@@ -17,6 +17,7 @@ use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tracing::Span;
 use value::Kind;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -25,14 +26,14 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self, util::ErrorMessage},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -43,7 +44,7 @@ pub const TRACES: &str = "traces";
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct DatadogAgentConfig {
     address: SocketAddr,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
@@ -78,6 +79,10 @@ impl GenerateConfig for DatadogAgentConfig {
         })
         .unwrap()
     }
+}
+
+inventory::submit! {
+    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
 #[async_trait::async_trait]
@@ -118,7 +123,7 @@ impl SourceConfig for DatadogAgentConfig {
         )?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             let routes = filters
                 .with(warp::trace(move |_info| span.clone()))
                 .recover(|r: Rejection| async move {
@@ -172,9 +177,11 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::from((METRICS, DataType::Metric)),
-                Output::from((LOGS, DataType::Log)).with_schema_definition(definition),
-                Output::from((TRACES, DataType::Trace)),
+                Output::default(DataType::Metric).with_port(METRICS),
+                Output::default(DataType::Log)
+                    .with_schema_definition(definition)
+                    .with_port(LOGS),
+                Output::default(DataType::Trace).with_port(TRACES),
             ]
         } else {
             vec![Output::default(DataType::all()).with_schema_definition(definition)]
