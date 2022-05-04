@@ -77,6 +77,9 @@ pub(crate) struct DatadogLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[serde(skip)]
+    enterprise: bool,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -102,6 +105,7 @@ impl DatadogLogsConfig {
             endpoint,
             site,
             region,
+            enterprise: true,
             ..Self::default()
         }
     }
@@ -152,8 +156,10 @@ impl DatadogLogsConfig {
                 self.get_uri(),
                 cx.globals.enterprise,
             ));
+        let mut encoding = self.encoding.clone();
+        encoding.codec.enterprise = self.enterprise;
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
+            .encoding(encoding)
             .compression(self.compression.unwrap_or_default())
             .build();
 

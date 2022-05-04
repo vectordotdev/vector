@@ -116,6 +116,7 @@ pub struct LogSink<S> {
 pub struct DatadogLogsJsonEncoding {
     log_schema: &'static LogSchema,
     inner: StandardEncodings,
+    pub(super) enterprise: bool,
 }
 
 impl Default for DatadogLogsJsonEncoding {
@@ -123,6 +124,7 @@ impl Default for DatadogLogsJsonEncoding {
         DatadogLogsJsonEncoding {
             log_schema: log_schema(),
             inner: StandardEncodings::Json,
+            enterprise: false,
         }
     }
 }
@@ -135,6 +137,9 @@ impl Encoder<Vec<Event>> for DatadogLogsJsonEncoding {
             log.rename_key_flat(self.log_schema.host_key(), "host");
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
                 log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
+            }
+            if self.enterprise {
+                log.insert("source", "vector_enterprise");
             }
         }
 
