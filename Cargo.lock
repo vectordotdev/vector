@@ -116,6 +116,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c5d78ce20460b82d3fa150275ed9d55e21064fc7951177baacf86a145c4a4b1f"
 
 [[package]]
+name = "args"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4b7432c65177b8d5c032d56e020dd8d407e939468479fc8c300e2d93e6d970b"
+dependencies = [
+ "getopts",
+ "log",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1107,6 +1117,7 @@ dependencies = [
  "miniz_oxide 0.4.4",
  "object",
  "rustc-demangle",
+ "serde",
 ]
 
 [[package]]
@@ -2977,6 +2988,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4274,6 +4294,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "malloc_freq"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c67d29aa4c7e9627fd5aadb185e54fe3b488ab4f8cede845ff2439980a18b7ac"
+dependencies = [
+ "anyhow",
+ "args",
+ "backtrace",
+ "byteorder",
+ "getopts",
+ "glob",
+ "libc",
+ "num-format",
+ "once_cell",
+ "radix_trie",
+ "serde",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -6118,6 +6158,7 @@ checksum = "c069c179fcdc6a2fe24d8d18305cf085fdbd4f922c041943e203685d6a1c58fd"
 dependencies = [
  "endian-type",
  "nibble_vec",
+ "serde",
 ]
 
 [[package]]
@@ -8745,6 +8786,7 @@ dependencies = [
  "logfmt",
  "lookup",
  "lru",
+ "malloc_freq",
  "maxminddb",
  "md-5",
  "metrics 0.17.1",
