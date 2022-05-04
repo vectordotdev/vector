@@ -1,15 +1,44 @@
 #!/bin/sh
 set -e
 
-# Add vector:vector user & group
-id --user vector >/dev/null 2>&1 || \
-  useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
-    --comment "Vector observability data router" vector
+create_user() {
+  id vector >/dev/null 2>&1 ||
+    useradd --system \
+      --shell /sbin/nologin \
+      --home-dir /var/lib/vector \
+      --user-group \
+      --comment "Vector observability data router" \
+      vector
 
-# Create default Vector data directory
-mkdir -p /var/lib/vector
+  # Add to adm group to read /var/logs
+  usermod --append --groups adm vector || true
 
-# Make vector:vector the owner of the Vector data directory
-chown -R vector:vector /var/lib/vector
+  # Add to systemd-journal to read journald logs
+  if getent group 'systemd-journal'; then
+    usermod --append --groups systemd-journal vector || true
+  fi
+
+  # Add to systemd-journal-remote to read remote journald logs
+  if getent group 'systemd-journal-remote'; then
+    usermod --append --groups systemd-journal-remote vector || true
+  fi
+}
+
+first_time_configuration() {
+  if [ ! -d "/var/lib/vector" ]; then
+    # Create default Vector data directory
+    mkdir -p /var/lib/vector
+
+    # Make vector:vector the owner of the Vector data directory
+    chown -R vector:vector /var/lib/vector
+  fi
+}
+
+case "$1" in
+configure)
+  create_user
+  first_time_configuration
+  ;;
+esac
 
 #DEBHELPER#
