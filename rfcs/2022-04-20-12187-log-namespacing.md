@@ -4,6 +4,12 @@ Today, when deserializing data on an event the keys are arbitrary and can potent
 Not only is the loss of data inconvenient, but it prevents us from fully utilizing the power of schemas.
 The event data should be restructured to prevent collisions, and in general make them easier to use.
 
+## Goals
+
+
+1. The schema / type should be known in all cases when using the "Vector" namespace
+2. The "Global Log Schema" should be ignored
+3. Users can opt in to the new namespace on a per-source basis (as well as globally)
 
 ## Proposal
 
@@ -28,33 +34,37 @@ Similar to the Global Log Schema, some sources allow choosing key names where so
 removed when the "Vector" namespace is being used, in favor of static names (usually what the default was). An example
 is the "key_field" and "headers_key" in the kafka source.
 
+Many transforms / sinks rely on the "Global Log Schema" to get/modify info such as the timestamp. Since the log
+schema should be customizable per source, that means the transforms and sinks need to know which log namespace
+is being used by each log. In order to accomplish this, the `log_namespace` event metadata field will be set to
+`vector` if the new namespace is being used.
+
+
 
 ### Types of Data
 
 #### Data
 
-This is the main content of a log. The log message itself. This will be parsed according to the set codec.
-The decoded data will be placed on the event with a "data" prefix. In cases where the source
-does not have any metadata that will also be on the event, this may be placed at the root.
+This is the main content of a log.  It will be placed at the root of the event.
+What is considered the "main content" here is not very well-defined, but should generally be what most people would expect
+to receive from the source. It is not necessarily the "log message" itself.
 
-There is a special case when the codec is "bytes", and the data will be placed at the root. That means
+A good example is the "Datadog Agent" source. The root is the fields received by the Datadog agent. The log content is
+nested.
+
+Others such as the "socket" source will have the log content directly at the root.
+
+There is a special case when the codec is "bytes", since the data is just a string in that case. That means
 that the root is a string. Historically this has been forbidden, but it is possible to allow this.
 An example of this is the "socket" source, with the "bytes" codec.
 
-#### Metadata
-
-This is any additional data that is not considered the log message itself, but is important / part of the source protocol.
-A good example is the "key" for kafka events. Kafka is key/value based, but only the value is decoded by the chosen codec.
-The key is still very important information that will be used by the sink.
-
-In general, if the data would be used by a sink when writing the data, it is considered "metadata" (stored on the event).
-Otherwise, it iss "vector metadata" (stored on the event metadata).
 
 #### Vector Metadata
 
-This is anything that is not really part of the log, but describes something useful _about_ the log, such as where
-it came from, or when it was received. These will be stored in event metadata. Some improvements will be needed to
-event metadata to make this easier to use, as described below.
+This is any useful data that is not placed on the event. This will be stored in event metadata. Some improvements will be needed to
+event metadata to make this easier to use, as described below. This currently contains fields such as `datadog_api_key`.
+Other "vector" metadata such as `ingest_timestamp` and `source_type` will be added here, as well as additional metadata from
+sources, such as `key` and `headers` from the `kafka` source.
 
 ### Codecs
 
@@ -79,9 +89,13 @@ and no support is being added here.
 #### Native / Native JSON
 
 When these are used in the "Vector" source, the behavior will not change, and events will be passed through as-is.
-For any other source, deserialized data should be nested under "data", unless it can be elided (same rules as the JSON source).
 
 ### Event Metadata
+
+There are 3 sources of information that will be stored in Event Metadata.
+1. Vector "internal" metadata such as `datadog_api_key`, so it can be read/set by users. This data already exists.
+2. Vector metadata such as `ingest_timestamp`, and `source_type` which are set for every source.
+3. Source metadata which will vary for each source.
 
 There is currently minimal support for event metadata. Several changes will need to be made.
 
@@ -108,13 +122,15 @@ A proof of concept for the Datadog Agent Logs source is being worked on alongsid
 
 ### Examples
 
-#### Datadog Agent source / JSON codec / Vector namespace
+All examples shown are using the new Vector namespace
+
+#### Datadog Agent source / JSON codec
 
 event
 
 ```json
 {
-  "data": {
+  "content": {
     "derivative": -2.266778047142367e+125,
     "integral": "13028769352377685187",
     "mineral": "H 9 ",
@@ -134,20 +150,25 @@ metadata
 
 ```json
 {
+  "log_namespace": "vector",
   "source_type": "datadog_agent",
-  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
+  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z",
+
+  // These are existing fields in event metadata that may be on any event
+  "datadog_api_key": "2o86gyhufa2ugyf4",
+  "splunk_hec_token": "386ygfhawnfud6rjftg"
 }
 ```
 
 -----
 
-#### Datadog Agent source / bytes codec / Vector namespace
+#### Datadog Agent source / bytes codec
 
 event
 
 ```json
 {
-  "data": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
+  "content": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
   "ddsource": "waters",
   "ddtags": "env:prod",
   "hostname": "beta",
@@ -161,6 +182,7 @@ metadata
 
 ```json
 {
+  "log_namespace": "vector",
   "source_type": "datadog_agent",
   "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
@@ -168,25 +190,18 @@ metadata
 
 -----
 
-#### Kafka source / json codec / Vector namespace
+#### Kafka source / json codec
 
 event
 
 ```json
 {
-  "data": {
-    "derivative": -2.266778047142367e+125,
-    "integral": "13028769352377685187",
-    "mineral": "H 9 ",
-    "proportional": 3673342615,
-    "vegetable": -30083
-  },
-  "key": "the key of the message"
-  // headers were originally nested under a configurable "headers_key". This is using a static value.
-  "headers": {
-    "header-a-key": "header-a-value",
-    "header-b-key": "header-b-value",
-  }
+  "derivative": -2.266778047142367e+125,
+  "integral": "13028769352377685187",
+  "mineral": "H 9 ",
+  "proportional": 3673342615,
+  "vegetable": -30083
+
 }
 ```
 
@@ -194,6 +209,13 @@ metadata
 
 ```json
 {
+  "key": "the key of the message"
+  // headers were originally nested under a configurable "headers_key". This is using a static value.
+  "headers": {
+    "header-a-key": "header-a-value",
+    "header-b-key": "header-b-value",
+  }
+  "log_namespace": "vector",
   "topic": "name of topic",
   "partition": 3,
   "offset": 1829448,
@@ -216,6 +238,7 @@ metadata
 
 ```json
 {
+  "log_namespace": "vector",
   "file": "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log",
   "container_image": "gcr.io/k8s-minikube/storage-provisioner:v3",
   "container_name": "storage-provisioner",
@@ -272,6 +295,7 @@ metadata
 
 ```json
 {
+  "log_namespace": "vector",
   "source_ip": "127.0.0.1",
   "hostname": "localhost",
   "source_type": "syslog",
@@ -301,6 +325,7 @@ metadata
 
 ```json
 {
+  "log_namespace": "vector",
   "source_ip": "192.168.0.1",
   "hostname": "localhost",
   "source_type": "socket",
@@ -316,19 +341,8 @@ event
 
 ```json
 {
-    "data": {
-      "mineral": "quartz",
-      "food": "sushi"
-    },
-    "path": "/foo/bar",
-    // headers and query params were previously placed directly on the root. This needs to be nested to avoid potential naming conflicts.
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "query_params": {
-      "page": 14,
-      "size": 3
-    }
+  "mineral": "quartz",
+  "food": "sushi"
 }
 ```
 
@@ -336,6 +350,16 @@ metadata
 
 ```json
 {
+  "path": "/foo/bar",
+  // headers and query params were previously placed directly on the root. This needs to be nested to avoid potential naming conflicts.
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "query_params": {
+    "page": 14,
+    "size": 3
+  }
+  "log_namespace": "vector",
   "source_type": "http",
   "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
@@ -346,30 +370,17 @@ metadata
 #### Kafka source / Native codec / Vector namespace
 
 This is an example where an event came from a Kafka source (JSON codec), through a Kafka sink (using native codec), and then back out a Kafka source (native codec).
+Notice that since `key` and `headers` wasn't moved into the event (from the event metadata), those values from the first kafka source were lost.
 
 event
 
 ```json
 {
-  "data": {
-    "data": {
-      "derivative": -2.266778047142367e+125,
-      "integral": "13028769352377685187",
-      "mineral": "H 9 ",
-      "proportional": 3673342615,
-      "vegetable": -30083
-    },
-    "key": "the key of the message (from the 1st kafka source)"
-    "headers": {
-      "header-a-key": "header-a-value (from the 1st kafka source)",
-      "header-b-key": "header-b-value (from the 1st kafka source)",
-    }
-  },
-  "key": "the key of the message (from the 2nd kafka source)"
-  "headers": {
-    "header-a-key": "header-a-value (from the 2nd kafka source)",
-    "header-b-key": "header-b-value (from the 2nd kafka source)",
-  }
+  "derivative": -2.266778047142367e+125,
+  "integral": "13028769352377685187",
+  "mineral": "H 9 ",
+  "proportional": 3673342615,
+  "vegetable": -30083
 }
 ```
 
@@ -377,6 +388,12 @@ metadata (only from the 2nd kafka source)
 
 ```json
 {
+  "key": "the key of the message (from the 2nd kafka source)"
+  "headers": {
+    "header-a-key": "header-a-value (from the 2nd kafka source)",
+    "header-b-key": "header-b-value (from the 2nd kafka source)"
+  }
+  "log_namespace": "vector",
   "topic": "name of topic",
   "partition": 3,
   "offset": 1829448,
@@ -385,50 +402,13 @@ metadata (only from the 2nd kafka source)
 }
 ```
 
-
-
 ## Outstanding Questions / Alternatives
 
-### Minimize data on the event
+### Additional nesting in event metadata
 
-The split of which data belongs in the event vs event metadata can sometimes be ambiguous. An alternative is to store only the
-"data" in the event, and everything else ("metadata" and "vector metadata") in the event metadata.
-This will keep the event itself very clean and easy to access.
+There's now 3 sources of information for the event metadata. It might be confusing to users where the data is coming
+from (Vector vs source). Additional nesting could make this more clear, at the expense of things being a bit more nested.
 
-If there is extra data needed for a sink (such as the key for kafka), then the user will either need to use VRL
-to move that into the event, or a special path syntax will need to be added to refer to data on metadata in a sink.
-
-### Don't use Event Metadata
-
-One of the reasons to move some data to the "event metadata" is to prevent "unnecessary" data from
-being written to a sink that is just metadata.
-
-Using event metadata is a significant amount of work, as well as cognitive burden for users to introduce
-a new concept.
-
-Vector has the concept of "semantic meaning" to assign explicit meaning to different parts of an event.
-Today all data on the event is generally considered to be the "data" when writing to a sink, and by
-storing data in the "event metadata", it is effectively preventing the sink from writing that by default.
-
-Instead, everything could be stored in the event (under appropriate namespacing to prevent key collisions).
-Semantic meaning can be used to determine where the actual "data" lives. By default, data that would have been
-stored in "event metadata" would be ignored by sinks, based on the semantic meaning automatically applied.
-
-This should be able to achieve the same thing as using "event metadata". The main downside is that it
-requires semantic meaning to be fully implemented and enabled, which is not done yet.
-
-### Strings as a root event field
-
-This RFC proposes allowing a string as the root event element in some cases. This has historically not been
-allowed, and many parts of the code will currently panic in such a situation, although it's certainly possible
-to allow this. The alternative is to always nest this under "data" instead.
-
-
-### Namespace names
-
-Right now the decoded "data" is placed under the prefix "data". Other names might make more sense, such as
-`message`, `body`, `payload`, etc. It might also make sense to choose different names depending on each source.
-For example, it might be better for the `http` source to use `body` but the `kafka` source to use `message`.
 
 ## Prior Art
 
