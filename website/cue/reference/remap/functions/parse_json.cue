@@ -20,12 +20,12 @@ remap: functions: parse_json: {
 			type: ["string"]
 		},
 		{
-			name:        "max_depth"
+			name: "max_depth"
 			description: """
 				Number of layers to parse for nested JSON-formatted documents.
 				The value must be in range 1..128.
 				"""
-			required:    false
+			required: false
 			type: ["integer"]
 		},
 	]
