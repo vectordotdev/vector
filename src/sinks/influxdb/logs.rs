@@ -171,14 +171,16 @@ struct InfluxDbLogsEncoder {
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
-        let mut event = event.into_log();
-        event.insert("metric_type", "logs".to_string());
-        let mut event = Event::from(event);
-        self.transformer.transform(&mut event);
-        let mut event = event.into_log();
+        let mut log = event.into_log();
+        log.insert("metric_type", "logs".to_string());
+        let mut log = {
+            let mut event = Event::from(log);
+            self.transformer.transform(&mut event);
+            event.into_log()
+        };
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match log.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });
@@ -186,7 +188,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        event.all_fields().for_each(|(key, value)| {
+        log.all_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
