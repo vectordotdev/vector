@@ -30,12 +30,15 @@ configure_permissions() {
     mkdir -p /var/lib/vector
   fi
 
+  # Own and RW restrict Vector data directory
   chown -R vector:vector /var/lib/vector
   chmod 740 /var/lib/vector
 
+  # Own and RW restrict Vector config directory
   chown -R vector:vector /etc/vector
   chmod 740 /etc/vector
 
+  # Own and RW restrict SystemD default EnvironmentFile
   chown vector:vector /etc/default/vector
   chmod 640 /etc/default/vector
 }
