@@ -106,7 +106,7 @@ pub struct DatadogMetricsConfig {
     pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
