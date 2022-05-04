@@ -801,6 +801,10 @@ vector-unit-test-tests = [
   "transforms-remove_fields",
   "sinks-console"
 ]
+enterprise-tests = [
+  "sources-demo_logs",
+  "sinks-blackhole",
+]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions

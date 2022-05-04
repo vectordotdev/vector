@@ -5,6 +5,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
+use rand::{prelude::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
@@ -20,7 +21,10 @@ use crate::{
     common::datadog::{get_api_base_endpoint, Region},
     http::{HttpClient, HttpError},
     signal::{SignalRx, SignalTo},
-    sinks::datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+    sinks::{
+        datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
+        util::retries::ExponentialBackoff,
+    },
     sources::{
         host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
@@ -63,9 +67,6 @@ pub struct Options {
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
 
-    #[serde(default = "default_retry_interval_secs")]
-    pub retry_interval_secs: u32,
-
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -86,7 +87,6 @@ impl Default for Options {
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
-            retry_interval_secs: default_retry_interval_secs(),
             proxy: ProxyConfig::default(),
         }
     }
@@ -98,6 +98,7 @@ pub enum PipelinesError {
     Disabled,
     MissingApiKey,
     FatalCouldNotReportConfig,
+    CouldNotReportConfig,
     Interrupt,
 }
 
@@ -139,6 +140,7 @@ enum ReportingError {
     EndpointError(ParseError),
     TooManyRedirects,
     InvalidRedirectUrl,
+    MaxRetriesReached,
 }
 
 impl Display for ReportingError {
@@ -146,14 +148,66 @@ impl Display for ReportingError {
         match self {
             Self::Http(err) => write!(f, "{}", err),
             Self::StatusCode(status) => {
-                write!(f, "Request was unsuccessful: {}", status)
+                write!(
+                    f,
+                    "Request was unsuccessful and could not be retried: {}",
+                    status
+                )
             }
             Self::EndpointError(err) => write!(f, "{}", err),
             Self::TooManyRedirects => {
                 write!(f, "Too many redirects from the server")
             }
             Self::InvalidRedirectUrl => write!(f, "Server responded with an invalid redirect URL"),
+            Self::MaxRetriesReached => write!(f, "Maximum number of retries reached"),
         }
+    }
+}
+
+/// Exponential backoff with random jitter for retrying configuration reporting
+struct ReportingRetryBackoff {
+    backoff: ExponentialBackoff,
+    jitter_rng: ThreadRng,
+}
+
+impl ReportingRetryBackoff {
+    /// Retry every 2^n seconds with a maximum delay of 60 seconds (and any
+    /// additional jitter)
+    fn new() -> Self {
+        let backoff = ExponentialBackoff::from_millis(2)
+            .factor(1000)
+            .max_delay(Duration::from_secs(60));
+        let jitter_rng = rand::thread_rng();
+
+        Self {
+            backoff,
+            jitter_rng,
+        }
+    }
+
+    /// Wait before retrying as determined by the backoff and jitter
+    async fn wait(&mut self) {
+        let retry_backoff = self.next().unwrap();
+        info!(
+            "Retrying configuration reporting to {} in {} seconds.",
+            DATADOG_REPORTING_PRODUCT,
+            retry_backoff.as_secs_f32()
+        );
+        sleep(retry_backoff).await;
+    }
+}
+
+impl Iterator for ReportingRetryBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let jitter_milliseconds = Duration::from_millis(self.jitter_rng.gen_range(0..1000));
+        Some(
+            self.backoff
+                .next()
+                .unwrap()
+                .saturating_add(jitter_milliseconds),
+        )
     }
 }
 
@@ -253,56 +307,31 @@ pub async fn try_attach(
     // Datadog uses a JSON:API, so we'll serialize the config to a JSON
     let payload = PipelinesVersionPayload::new(&table, &fields);
 
-    // Attempt to report a config to Datadog. This should happen in a loop, up to a maximum
-    // of `max_retries`.
-    for _ in 0..datadog.max_retries {
-        select! {
-            biased;
-            Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
-            report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload) => {
-                match report {
-                    Ok(()) => {
-                        info!(
-                            "Vector config {} successfully reported to {}.",
-                            &config_version, DATADOG_REPORTING_PRODUCT
-                        );
-                        break;
-                    }
-                    Err(err) => {
-                        error!(
-                            err = ?err.to_string(),
-                            "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                        );
+    select! {
+        biased;
+        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
+        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, datadog.max_retries) => {
+            match report {
+                Ok(()) => {
+                    info!(
+                        "Vector config {} successfully reported to {}.",
+                        &config_version, DATADOG_REPORTING_PRODUCT
+                    );
+                }
+                Err(err) => {
+                    error!(
+                        err = ?err.to_string(),
+                        "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                    );
 
-                        if let ReportingError::StatusCode(status) = err {
-                            // If the error is 'fatal', and the user has elected to exit on fatal errors,
-                            // return control back upstream.
-                            //
-                            // A fatal error is currently determined to be one of the following:
-                            //
-                            // - 4xx class of status code (429 excepted; treated as a retry).
-                            if status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS {
-                                if datadog.exit_on_fatal_error {
-                                    return Err(PipelinesError::FatalCouldNotReportConfig);
-                                } else {
-                                    // Otherwise, break out of the loop, to avoid hitting the same error.
-                                    break;
-                                }
-                            }
-                        }
+                    if datadog.exit_on_fatal_error {
+                        return Err(PipelinesError::FatalCouldNotReportConfig);
+                    } else {
+                        return Err(PipelinesError::CouldNotReportConfig);
                     }
                 }
             }
         }
-
-        // If we're at this point, there was an error that was deemed non-fatal, so retry.
-        info!(
-            "Retrying config reporting to {} in {} seconds.",
-            DATADOG_REPORTING_PRODUCT, datadog.retry_interval_secs
-        );
-
-        // Sleep for the user-provided interval before retrying.
-        sleep(Duration::from_secs(datadog.retry_interval_secs as u64)).await;
     }
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
@@ -373,9 +402,9 @@ const fn default_enabled() -> bool {
     true
 }
 
-/// By default, Vector should exit when a fatal reporting error is encountered.
+/// By default, Vector should not exit when a fatal reporting error is encountered.
 const fn default_exit_on_fatal_error() -> bool {
-    true
+    false
 }
 
 /// By default, report to Datadog every 5 seconds.
@@ -383,14 +412,14 @@ const fn default_reporting_interval_secs() -> f64 {
     5.0
 }
 
-/// By default, keep retrying (recoverable) failed reporting (infinitely, for practical purposes.)
+/// By default, keep retrying (recoverable) failed reporting
+///
+/// This is set to 8 attempts which, with the exponential backoff strategy and
+/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
+/// roughly 3 minutes of retrying before giving up and allowing the rest of
+/// Vector to start.
 const fn default_max_retries() -> u32 {
-    u32::MAX
-}
-
-/// By default, retry (recoverable) failed reporting every 5 seconds.
-const fn default_retry_interval_secs() -> u32 {
-    5
+    8
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
@@ -432,6 +461,7 @@ async fn report_serialized_config_to_datadog<'a>(
     endpoint: &'a str,
     auth: &'a PipelinesAuth<'a>,
     payload: &'a PipelinesVersionPayload<'a>,
+    max_retries: u32,
 ) -> Result<(), ReportingError> {
     info!(
         "Attempting to report configuration to {}.",
@@ -439,14 +469,27 @@ async fn report_serialized_config_to_datadog<'a>(
     );
 
     let mut endpoint = Url::parse(endpoint).map_err(ReportingError::EndpointError)?;
+    let mut redirected = false;
+    let mut backoff = ReportingRetryBackoff::new();
+    let mut retries = 0;
 
-    // Follow redirection responses a maximum of one time.
-    for _ in 0..=1 {
+    while retries < max_retries {
+        retries += 1;
         let req = build_request(&endpoint, auth, payload);
-        let res = client.send(req).await.map_err(ReportingError::Http)?;
+        let res = client.send(req).await;
+        if let Err(HttpError::CallRequest { source: error }) = &res {
+            if error.is_timeout() {
+                info!(message = "Configuration reporting request timed out.", error = %error);
+                backoff.wait().await;
+                continue;
+            }
+        }
+        let res = res.map_err(ReportingError::Http)?;
         let status = res.status();
 
-        if status.is_redirection() {
+        // Follow redirection responses a maximum of one time.
+        if status.is_redirection() && !redirected {
+            redirected = true;
             // A `Location` header could contain a relative path. To guard against that, we'll
             // join the location to the original URL to get a new absolute path.
             endpoint = endpoint
@@ -458,6 +501,13 @@ async fn report_serialized_config_to_datadog<'a>(
                         .map_err(|_| ReportingError::InvalidRedirectUrl)?,
                 )
                 .map_err(ReportingError::EndpointError)?;
+            info!(message = "Configuration reporting request redirected.", endpoint = %endpoint);
+            continue;
+        } else if status.is_redirection() && redirected {
+            return Err(ReportingError::TooManyRedirects);
+        } else if status.is_client_error() || status.is_server_error() {
+            info!(message = "Encountered retriable error.", status = %status);
+            backoff.wait().await;
             continue;
         } else if status.is_success() {
             return Ok(());
@@ -466,5 +516,255 @@ async fn report_serialized_config_to_datadog<'a>(
         }
     }
 
-    Err(ReportingError::TooManyRedirects)
+    Err(ReportingError::MaxRetriesReached)
+}
+
+#[cfg(all(test, feature = "enterprise-tests"))]
+mod test {
+    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+
+    use http::StatusCode;
+    use indoc::formatdoc;
+    use vector_core::config::proxy::ProxyConfig;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    use crate::{
+        app::Application,
+        cli::{Color, LogFormat, Opts, RootOpts},
+        config::enterprise::default_max_retries,
+        http::HttpClient,
+    };
+
+    use super::{
+        report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
+        PipelinesVersionPayload,
+    };
+
+    const fn get_pipelines_auth() -> PipelinesAuth<'static> {
+        PipelinesAuth {
+            api_key: "api_key",
+            application_key: "application_key",
+        }
+    }
+
+    const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
+        PipelinesStrFields {
+            config_version: "config_version",
+            vector_version: "vector_version",
+        }
+    }
+
+    /// This mocked server will reply with the configured status code 3 times
+    /// before falling back to a 200 OK
+    async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockServer {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(status_code))
+            .up_to_n_times(3)
+            .with_priority(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK))
+            .with_priority(2)
+            .mount(&mock_server)
+            .await;
+
+        mock_server
+    }
+
+    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        let _ = writeln!(file, "{}", config.into());
+        file
+    }
+
+    fn get_root_opts(config_path: PathBuf) -> RootOpts {
+        RootOpts {
+            config_paths: vec![config_path],
+            config_dirs: vec![],
+            config_paths_toml: vec![],
+            config_paths_json: vec![],
+            config_paths_yaml: vec![],
+            require_healthy: None,
+            threads: None,
+            verbose: 0,
+            quiet: 3,
+            log_format: LogFormat::from_str("text").unwrap(),
+            color: Color::from_str("auto").unwrap(),
+            watch_config: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn retry_on_specific_client_error_status_codes() {
+        let server = build_test_server_error_and_recover(StatusCode::REQUEST_TIMEOUT).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            default_max_retries()
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn retry_on_server_error_status_codes() {
+        let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            default_max_retries()
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
+    async fn error_exceed_max_retries() {
+        let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+
+        let endpoint = server.uri();
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            1
+        )
+        .await
+        .is_err());
+    }
+
+    /// This test asserts that configuration reporting errors, by default, do
+    /// NOT impact the rest of Vector starting and running. To exit on errors,
+    /// an explicit option must be set in the [enterprise] configuration (see
+    /// [`super::Options`]).
+    ///
+    /// In general, Vector should continue operating even in the event that the
+    /// enterprise API is down/having issues. Do not modify this behavior
+    /// without prior approval.
+    #[tokio::test]
+    async fn vector_continues_on_reporting_error() {
+        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
+        let endpoint = server.uri();
+
+        let vector_config = formatdoc! {r#"
+            [enterprise]
+            application_key = "application_key"
+            api_key = "api_key"
+            configuration_key = "configuration_key"
+            endpoint = "{endpoint}"
+            max_retries = 1
+
+            [sources.in]
+            type = "demo_logs"
+            format = "syslog"
+            count = 1
+            interval = 0.0
+
+            [sinks.out]
+            type = "blackhole"
+            inputs = ["*"]
+        "#, endpoint=endpoint};
+
+        let config_file = get_vector_config_file(vector_config);
+
+        let opts = Opts {
+            root: get_root_opts(config_file.path().to_path_buf()),
+            sub_command: None,
+        };
+
+        // Spawn a separate thread to avoid nested async runtime errors
+        let vector_continued = thread::spawn(|| {
+            // Configuration reporting is guaranteed to fail here. However, the
+            // app should still start up and run since `exit_on_fatal_error =
+            // false` by default
+            Application::prepare_from_opts(opts).map_or(false, |app| {
+                // Finish running the topology to avoid error logs
+                app.run();
+                true
+            })
+        })
+        .join()
+        .unwrap();
+
+        assert!(vector_continued);
+    }
+
+    #[tokio::test]
+    async fn vector_exits_on_reporting_error_when_configured() {
+        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
+        let endpoint = server.uri();
+
+        let vector_config = formatdoc! {r#"
+            [enterprise]
+            application_key = "application_key"
+            api_key = "api_key"
+            configuration_key = "configuration_key"
+            endpoint = "{endpoint}"
+            exit_on_fatal_error = true
+            max_retries = 1
+
+            [sources.in]
+            type = "demo_logs"
+            format = "syslog"
+            count = 1
+            interval = 0.0
+
+            [sinks.out]
+            type = "blackhole"
+            inputs = ["*"]
+        "#, endpoint=endpoint};
+
+        let config_file = get_vector_config_file(vector_config);
+
+        let opts = Opts {
+            root: get_root_opts(config_file.path().to_path_buf()),
+            sub_command: None,
+        };
+
+        let vector_continued = thread::spawn(|| {
+            // With `exit_on_fatal_error = true`, starting the app should fail
+            Application::prepare_from_opts(opts).map_or(false, |app| {
+                app.run();
+                true
+            })
+        })
+        .join()
+        .unwrap();
+
+        assert!(!vector_continued);
+    }
 }
