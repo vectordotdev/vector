@@ -59,7 +59,7 @@ that the root is a string. Historically this has been forbidden, but it is possi
 An example of this is the "socket" source, with the "bytes" codec.
 
 
-#### Vector Metadata
+#### Metadata
 
 This is any useful data that is not placed on the event. This will be stored in event metadata. Some improvements will be needed to
 event metadata to make this easier to use, as described below. This currently contains fields such as `datadog_api_key`.
