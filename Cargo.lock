@@ -8002,6 +8002,7 @@ dependencies = [
  "pin-project 1.0.10",
  "prost 0.10.1",
  "prost-derive 0.10.1",
+ "rustls-native-certs 0.6.2",
  "rustls-pemfile 0.3.0",
  "tokio",
  "tokio-rustls 0.23.3",
