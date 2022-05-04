@@ -139,7 +139,7 @@ impl Encoder<Vec<Event>> for DatadogLogsJsonEncoding {
                 log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
             }
             if self.enterprise {
-                log.insert("source", "vector_enterprise");
+                log.insert("ddsource", "vector_enterprise");
             }
         }
 
