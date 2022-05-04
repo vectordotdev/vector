@@ -78,12 +78,17 @@ impl vrl_lib::Target for VrlTarget {
                 .insert(path.clone(), value)
                 .map(|_| ())
                 .map_err(|err| err.to_string()),
-            VrlTarget::Metric { ref mut metric, .. } => {
+            VrlTarget::Metric {
+                ref mut metric,
+                value: metric_value,
+            } => {
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
 
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
+                    let new = value.clone();
+
                     match paths.as_slice() {
                         ["tags"] => {
                             let value = value.try_object().map_err(|e| e.to_string())?;
@@ -96,7 +101,6 @@ impl vrl_lib::Target for VrlTarget {
                                         .into_owned(),
                                 );
                             }
-                            return Ok(());
                         }
                         ["tags", field] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
@@ -104,27 +108,22 @@ impl vrl_lib::Target for VrlTarget {
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
-                            return Ok(());
                         }
                         ["name"] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.name = String::from_utf8_lossy(&value).into_owned();
-                            return Ok(());
                         }
                         ["namespace"] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.namespace =
                                 Some(String::from_utf8_lossy(&value).into_owned());
-                            return Ok(());
                         }
                         ["timestamp"] => {
                             let value = value.try_timestamp().map_err(|e| e.to_string())?;
                             metric.data.timestamp = Some(value);
-                            return Ok(());
                         }
                         ["kind"] => {
                             metric.data.kind = MetricKind::try_from(value)?;
-                            return Ok(());
                         }
                         _ => {
                             return Err(MetricPathError::InvalidPath {
@@ -134,6 +133,10 @@ impl vrl_lib::Target for VrlTarget {
                             .to_string())
                         }
                     }
+
+                    metric_value.insert_by_path(path, new);
+
+                    return Ok(());
                 }
 
                 Err(MetricPathError::InvalidPath {
@@ -174,25 +177,24 @@ impl vrl_lib::Target for VrlTarget {
                         .map_err(|err| err.to_string())
                 }
             }
-            VrlTarget::Metric { ref mut metric, .. } => {
+            VrlTarget::Metric {
+                ref mut metric,
+                value,
+            } => {
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
 
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
-                    match paths.as_slice() {
-                        ["namespace"] => {
-                            return Ok(metric.series.name.namespace.take().map(Into::into))
-                        }
-                        ["timestamp"] => return Ok(metric.data.timestamp.take().map(Into::into)),
-                        ["tags"] => {
-                            return Ok(metric.series.tags.take().map(|map| {
-                                map.into_iter()
-                                    .map(|(k, v)| (k, v.into()))
-                                    .collect::<vrl_lib::Value>()
-                            }))
-                        }
-                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
+                    let removed_value = match paths.as_slice() {
+                        ["namespace"] => metric.series.name.namespace.take().map(Into::into),
+                        ["timestamp"] => metric.data.timestamp.take().map(Into::into),
+                        ["tags"] => metric.series.tags.take().map(|map| {
+                            map.into_iter()
+                                .map(|(k, v)| (k, v.into()))
+                                .collect::<vrl_lib::Value>()
+                        }),
+                        ["tags", field] => metric.remove_tag(field).map(Into::into),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
@@ -200,7 +202,11 @@ impl vrl_lib::Target for VrlTarget {
                             }
                             .to_string())
                         }
-                    }
+                    };
+
+                    value.remove_by_path(path, false);
+
+                    return Ok(removed_value);
                 }
 
                 Ok(None)
@@ -896,7 +902,14 @@ mod test {
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
-            target_queries: vec![],
+            target_queries: vec![
+                "name".into(),
+                "namespace".into(),
+                "timestamp".into(),
+                "kind".into(),
+                "type".into(),
+                "tags".into(),
+            ],
             target_assignments: vec![],
         };
         let target = VrlTarget::new(Event::Metric(metric), &info);
@@ -956,7 +969,12 @@ mod test {
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
-            target_queries: vec![],
+            target_queries: vec![
+                "name".into(),
+                "namespace".into(),
+                "timestamp".into(),
+                "kind".into(),
+            ],
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info);
