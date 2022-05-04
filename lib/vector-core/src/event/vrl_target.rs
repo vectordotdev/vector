@@ -391,7 +391,7 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
     Ok(None)
 }
 
-/// pre-compute the `Value` structure of the metric.
+/// Pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.

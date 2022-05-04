@@ -151,12 +151,13 @@ impl Assignment {
     /// For regular assignments, this contains a single target, for infallible
     /// assignments, it'll contain both the `ok` and `err` target.
     pub(crate) fn targets(&self) -> Vec<Target> {
-        let mut targets = vec![];
+        let mut targets = Vec::with_capacity(2);
 
         match &self.variant {
             Variant::Single { target, .. } => targets.push(target.clone()),
             Variant::Infallible { ok, err, .. } => {
-                targets.append(&mut vec![ok.clone(), err.clone()])
+                targets.push(ok.clone());
+                targets.push(err.clone());
             }
         }
 
