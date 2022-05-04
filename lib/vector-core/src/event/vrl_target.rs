@@ -88,11 +88,9 @@ impl vrl_lib::Target for VrlTarget {
                 }
 
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
-                    let new = value.clone();
-
                     match paths.as_slice() {
                         ["tags"] => {
-                            let value = value.try_object().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_object().map_err(|e| e.to_string())?;
                             for (field, value) in &value {
                                 metric.insert_tag(
                                     field.as_str().to_owned(),
@@ -104,27 +102,27 @@ impl vrl_lib::Target for VrlTarget {
                             }
                         }
                         ["tags", field] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.insert_tag(
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
                         }
                         ["name"] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.name = String::from_utf8_lossy(&value).into_owned();
                         }
                         ["namespace"] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.namespace =
                                 Some(String::from_utf8_lossy(&value).into_owned());
                         }
                         ["timestamp"] => {
-                            let value = value.try_timestamp().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
                             metric.data.timestamp = Some(value);
                         }
                         ["kind"] => {
-                            metric.data.kind = MetricKind::try_from(value)?;
+                            metric.data.kind = MetricKind::try_from(value.clone())?;
                         }
                         _ => {
                             return Err(MetricPathError::InvalidPath {
@@ -135,7 +133,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                     }
 
-                    metric_value.insert_by_path(path, new);
+                    metric_value.insert_by_path(path, value);
 
                     return Ok(());
                 }
