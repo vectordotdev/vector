@@ -9,7 +9,6 @@ type = "internal_metrics"
 
 [sources.logs]
 type = "datadog_agent"
-acknowledgements = false
 address = "0.0.0.0:8282"
 acknowledgements = true
 
