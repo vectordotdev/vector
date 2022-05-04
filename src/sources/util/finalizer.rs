@@ -17,7 +17,7 @@ use crate::shutdown::ShutdownSignal;
     feature = "sources-journald",
     feature = "sources-kafka",
 ))]
-pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>, true>;
+pub type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>, true>;
 
 /// The `UnorderedFinalizer` framework marks events from a source as
 /// done in a single background task *in the order the finalization
@@ -27,15 +27,14 @@ pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFu
     feature = "sources-splunk_hec",
     feature = "sources-gcp_pubsub"
 ))]
-pub(crate) type UnorderedFinalizer<T> =
-    FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>, false>;
+pub type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>, false>;
 
 /// The `FinalizerSet` framework here is a mechanism for marking
 /// events from a source as done in a single background task. The type
 /// `T` is the source-specific data associated with each entry to be
 /// used to complete the finalization.
 #[pin_project::pin_project]
-pub(crate) struct FinalizerSet<T, S, const SOE: bool> {
+pub struct FinalizerSet<T, S, const SOE: bool> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
     failed: Option<Tripwire>,
     _phantom: PhantomData<S>,
@@ -46,7 +45,7 @@ where
     T: std::fmt::Debug + Send + 'static,
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
-    pub(crate) fn new<F, Fut>(shutdown: ShutdownSignal, apply_done: F) -> Self
+    pub fn new<F, Fut>(shutdown: ShutdownSignal, apply_done: F) -> Self
     where
         F: Fn(T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
@@ -72,7 +71,7 @@ where
         }
     }
 
-    pub(crate) fn add(&self, entry: T, receiver: BatchStatusReceiver) {
+    pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
         if let Some(sender) = &self.sender {
             if let Err(error) = sender.send((receiver, entry)) {
                 error!(message = "FinalizerSet task ended prematurely.", %error);
@@ -80,6 +79,9 @@ where
         }
     }
 
+    // This is used by a subset of the sources, but removing the
+    // `allow` below means adding a `cfg` guard in eight places.
+    #[allow(dead_code)]
     pub fn failure_future(&mut self) -> Option<Tripwire> {
         self.failed.take()
     }
@@ -145,7 +147,7 @@ where
     }
 }
 
-pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
+pub trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
     fn is_empty(&self) -> bool;
     fn push(&mut self, future: Fut);
 }
@@ -171,7 +173,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesUnordered<Fut> {
 }
 
 #[pin_project::pin_project]
-pub(crate) struct FinalizerFuture<T> {
+pub struct FinalizerFuture<T> {
     receiver: BatchStatusReceiver,
     entry: Option<T>,
 }

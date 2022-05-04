@@ -1724,7 +1724,7 @@ mod tests {
             }
         }
 
-        fn acknowledgements(&self) -> bool {
+        const fn acknowledgements(&self) -> bool {
             !matches!(self, NoAcks)
         }
     }
