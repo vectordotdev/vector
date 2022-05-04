@@ -366,13 +366,16 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
         return Ok(Some(value));
     }
 
+    let value = value.get_by_path(path);
+
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {
-            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value.get_by_path(path)),
-            ["namespace"] | ["timestamp"] | ["tags"] => match value.get_by_path(path) {
-                Some(value) => return Ok(Some(value)),
-                None => continue,
-            },
+            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
+            ["namespace"] | ["timestamp"] | ["tags"] => {
+                if let Some(value) = value {
+                    return Ok(Some(value));
+                }
+            }
             _ => {
                 return Err(MetricPathError::InvalidPath {
                     path: &path.to_string(),
