@@ -21,9 +21,8 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(feature = "tikv-jemallocator")]
 #[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 #[macro_use]
 #[allow(unreachable_pub)]

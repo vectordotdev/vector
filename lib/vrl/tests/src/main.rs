@@ -19,7 +19,7 @@ use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 /// A list of tests currently only working on the "AST" runtime.
 ///
