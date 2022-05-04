@@ -594,7 +594,7 @@ mod test {
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(|v| v.cloned()),
+                vrl_lib::Target::target_get(&target, &path).map(Option::cloned),
                 expect
             );
         }
@@ -713,7 +713,7 @@ mod test {
                 result
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(|v| v.cloned()),
+                vrl_lib::Target::target_get(&target, &path).map(Option::cloned),
                 Ok(Some(value))
             );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
@@ -817,7 +817,7 @@ mod test {
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &LookupBuf::root()).map(|v| v.cloned()),
+                vrl_lib::Target::target_get(&target, &LookupBuf::root()).map(Option::cloned),
                 Ok(expect)
             );
         }
@@ -924,7 +924,7 @@ mod test {
                 }
                 .into()
             )),
-            target.target_get(&LookupBuf::root()).map(|v| v.cloned())
+            target.target_get(&LookupBuf::root()).map(Option::cloned)
         );
     }
 
@@ -980,16 +980,16 @@ mod test {
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
 
-            assert_eq!(Ok(current), target.target_get(&path).map(|v| v.cloned()));
+            assert_eq!(Ok(current), target.target_get(&path).map(Option::cloned));
             assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
             assert_eq!(
                 Ok(Some(new.clone())),
-                target.target_get(&path).map(|v| v.cloned())
+                target.target_get(&path).map(Option::cloned)
             );
 
             if delete {
                 assert_eq!(Ok(Some(new)), target.target_remove(&path, true));
-                assert_eq!(Ok(None), target.target_get(&path).map(|v| v.cloned()));
+                assert_eq!(Ok(None), target.target_get(&path).map(Option::cloned));
             }
         }
     }
