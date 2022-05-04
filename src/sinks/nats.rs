@@ -185,6 +185,7 @@ impl StreamSink<Event> for NatsSink {
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
+                // Error is logged by `Encoder`.
                 continue;
             }
 
