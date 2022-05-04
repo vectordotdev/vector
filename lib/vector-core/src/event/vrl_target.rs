@@ -983,7 +983,10 @@ mod test {
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
 
-            assert_eq!(Ok(current), target.target_get(&path).map(Option::cloned));
+            assert_eq!(
+                Ok(current),
+                target.target_get(&path).map(Option::<&Value>::cloned)
+            );
             assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
             assert_eq!(
                 Ok(Some(new.clone())),
