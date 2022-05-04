@@ -594,7 +594,7 @@ mod test {
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(Option::cloned),
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 expect
             );
         }
@@ -713,7 +713,7 @@ mod test {
                 result
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &path).map(Option::cloned),
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
@@ -817,7 +817,8 @@ mod test {
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &LookupBuf::root()).map(Option::cloned),
+                vrl_lib::Target::target_get(&target, &LookupBuf::root())
+                    .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
         }
@@ -924,7 +925,9 @@ mod test {
                 }
                 .into()
             )),
-            target.target_get(&LookupBuf::root()).map(Option::cloned)
+            target
+                .target_get(&LookupBuf::root())
+                .map(Option::<&Value>::cloned)
         );
     }
 
@@ -984,12 +987,15 @@ mod test {
             assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
             assert_eq!(
                 Ok(Some(new.clone())),
-                target.target_get(&path).map(Option::cloned)
+                target.target_get(&path).map(Option::<&Value>::cloned)
             );
 
             if delete {
                 assert_eq!(Ok(Some(new)), target.target_remove(&path, true));
-                assert_eq!(Ok(None), target.target_get(&path).map(Option::cloned));
+                assert_eq!(
+                    Ok(None),
+                    target.target_get(&path).map(Option::<&Value>::cloned)
+                );
             }
         }
     }
