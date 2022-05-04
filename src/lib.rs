@@ -21,7 +21,7 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(not(target_env = "msvc"))]
+#[cfg(feature = "jemalloc")]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
