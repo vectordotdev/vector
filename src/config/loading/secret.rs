@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use tokio::{io::AsyncWriteExt, process::Command, time::Duration};
+use tokio::{io::AsyncWriteExt, process::Command, time};
 use toml::value::Table;
 use typetag::serde;
 
@@ -188,20 +188,24 @@ impl SecretBackend for ExecBackend {
         secret_keys: Vec<String>,
         signal_rx: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
-        let mut output = executor::block_on(tokio::time::timeout(
-            Duration::from_secs(self.timeout),
-            async {
-                loop {
-                    tokio::select! {
-                        biased;
-                        Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
-                            break Err("Secret retrieval was interrupted.".into());
-                        }
-                        output = query_backend(&self.command, new_query(secret_keys.clone())) => break output,
+        let mut output = executor::block_on(async {
+            query_backend(
+                &self.command,
+                new_query(secret_keys.clone()),
+                self.timeout,
+                signal_rx,
+            )
+            .await
+            /*loop {
+                tokio::select! {
+                    biased;
+                    Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+                        break Err("Secret retrieval was interrupted.".into());
                     }
+                    output = query_backend(&self.command, new_query(secret_keys.clone()), self.timeout) => break output,
                 }
-            },
-        ))??;
+            }*/
+        })?;
         let mut secrets = HashMap::new();
         for k in secret_keys.into_iter() {
             if let Some(secret) = output.get_mut(&k) {
@@ -227,6 +231,8 @@ impl SecretBackend for ExecBackend {
 async fn query_backend(
     cmd: &[String],
     query: ExecQuery,
+    timeout: u64,
+    signal_rx: &mut signal::SignalRx,
 ) -> crate::Result<HashMap<String, ExecResponse>> {
     let command = &cmd[0];
     let mut command = Command::new(command);
@@ -244,17 +250,34 @@ async fn query_backend(
     let mut stdin = child.stdin.take().ok_or("unable to acquire stdin")?;
 
     let query = serde_json::to_vec(&query)?;
-
     tokio::spawn(async move { stdin.write_all(&query).await });
 
-    let output = child.wait_with_output().await?;
-    let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let timeout = time::sleep(time::Duration::from_secs(timeout));
+    tokio::pin!(timeout);
+    let output = loop {
+        tokio::select! {
+            biased;
+            Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+                drop(command);
+                return Err("Secret retrieval was interrupted.".into());
+            }
+            output = child.wait_with_output() => break output,
+            _ = &mut timeout => {
+                drop(command);
+                return Err("Command timed-out".into());
+            }
+        }
+    }?;
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
     if !stderr.trim().is_empty() {
-        warn!("A secret exec backend wrote a message on stderr: {}.", stderr);
+        warn!(
+            "A secret exec backend wrote a message on stderr: {}.",
+            stderr
+        );
     }
 
+    let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
     Ok(response)
 }
 

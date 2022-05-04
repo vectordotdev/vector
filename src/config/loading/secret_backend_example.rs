@@ -39,5 +39,8 @@ async fn main() {
             )
         })
         .collect::<HashMap<String, ExecResponse>>();
-    println!("{}", serde_json::to_string_pretty(&response).unwrap());
+    #[allow(clippy::print_stdout)]
+    {
+        print!("{}", serde_json::to_string_pretty(&response).unwrap());
+    }
 }
