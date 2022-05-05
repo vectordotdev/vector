@@ -70,8 +70,8 @@ where
         loop {
             match self.inner.poll_next_unpin(cx) {
                 Poll::Ready(Some(array)) => {
-                    self.enqueued.push(array);
                     self.enqueued_size += array.len();
+                    self.enqueued.push(array);
                     if self.enqueued_size >= self.enqueued_limit {
                         return Poll::Ready(Some(self.flush()));
                     }
