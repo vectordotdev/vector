@@ -410,7 +410,7 @@ pub async fn try_attach(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key.clone().into(),
+        default_api_key: api_key.clone(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
@@ -424,7 +424,7 @@ pub async fn try_attach(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key.clone().into(),
+        default_api_key: api_key.clone(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
