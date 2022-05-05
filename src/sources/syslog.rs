@@ -322,13 +322,9 @@ mod test {
 
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
-    use futures_util::{stream, SinkExt};
     use rand::{thread_rng, Rng};
-    use tokio::{
-        io::AsyncWriteExt,
-        time::{Duration, Instant},
-    };
-    use tokio_util::codec::{BytesCodec, FramedWrite, LinesCodec};
+    use tokio::time::{sleep, Duration, Instant};
+    use tokio_util::codec::BytesCodec;
     use value::Value;
     use vector_common::assert_event_data_eq;
     use vector_core::config::ComponentKey;
@@ -338,10 +334,7 @@ mod test {
         config::log_schema,
         event::Event,
         test_util::{
-            components::{
-                assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
-                SOCKET_PUSH_SOURCE_TAGS,
-            },
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
             CountReceiver,
         },
@@ -779,6 +772,9 @@ mod test {
 
             send_lines(in_addr, input_lines).await.unwrap();
 
+            // Wait a short period of time to ensure the messages get sent.
+            sleep(Duration::from_secs(1)).await;
+
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
                 .shutdown_all(Instant::now() + Duration::from_millis(100))
@@ -804,8 +800,12 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
+        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
+        use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
+        use tokio::io::AsyncWriteExt;
         use tokio::net::UnixStream;
+        use tokio_util::codec::{FramedWrite, LinesCodec};
 
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
@@ -850,10 +850,8 @@ mod test {
             let stream = sink.get_mut();
             stream.shutdown().await.unwrap();
 
-            // A small delay to ensure everything has been flushed out.
-            //
-            // TODO: Try the test with this removed to see if it _actually_ matters.
-            tokio::time::sleep(Duration::from_millis(1000)).await;
+            // Wait a short period of time to ensure the messages get sent.
+            sleep(Duration::from_secs(1)).await;
 
             shutdown
                 .shutdown_all(Instant::now() + Duration::from_millis(100))
@@ -927,6 +925,9 @@ mod test {
                 .collect();
 
             send_encodable(in_addr, codec, input_lines).await.unwrap();
+
+            // Wait a short period of time to ensure the messages get sent.
+            sleep(Duration::from_secs(1)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown

@@ -27,6 +27,7 @@ use crate::{
 };
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
+#[allow(clippy::too_many_arguments)]
 pub async fn firehose(
     request_id: String,
     source_arn: String,
