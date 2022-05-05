@@ -42,7 +42,7 @@ pub trait Target: std::fmt::Debug {
     /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<Value>, String>;
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String>;
 
     /// Remove the given path from the object.
     ///
@@ -71,12 +71,12 @@ impl Target for Value {
         Ok(())
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.get_by_path(path).cloned())
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        Ok(self.get_by_path(path))
     }
 
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        let value = self.target_get(path)?;
+        let value = self.target_get(path)?.cloned();
         self.remove_by_path(path, compact);
 
         Ok(value)
@@ -137,7 +137,7 @@ mod tests {
             let value: Value = value;
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.target_get(&path), expect);
+            assert_eq!(value.target_get(&path).map(|v| v.cloned()), expect);
         }
     }
 
@@ -251,7 +251,10 @@ mod tests {
                 result
             );
             assert_eq!(target, expect);
-            assert_eq!(Target::target_get(&target, &path), Ok(Some(value)));
+            assert_eq!(
+                Target::target_get(&target, &path).map(|v| v.cloned()),
+                Ok(Some(value))
+            );
         }
     }
 
@@ -341,7 +344,10 @@ mod tests {
                 Target::target_remove(&mut target, &path, compact),
                 Ok(value)
             );
-            assert_eq!(Target::target_get(&target, &LookupBuf::root()), Ok(expect));
+            assert_eq!(
+                Target::target_get(&target, &LookupBuf::root()).map(|v| v.cloned()),
+                Ok(expect)
+            );
         }
     }
 }
