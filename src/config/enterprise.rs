@@ -1,6 +1,6 @@
 use std::{
     env,
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter}, collections::HashMap,
 };
 
 use http::Request;
@@ -76,6 +76,8 @@ pub struct Options {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    tags: Option<HashMap<String, String>>,
 }
 
 impl Default for Options {
@@ -92,6 +94,7 @@ impl Default for Options {
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
+            tags: None,
         }
     }
 }
