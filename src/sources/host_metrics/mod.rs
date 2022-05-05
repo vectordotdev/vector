@@ -219,16 +219,6 @@ impl HostMetrics {
                 metric.insert_tag("host".into(), hostname.into());
             }
         }
-        //if let Some(version) = &version {
-        //for metric in &mut metrics {
-        //metric.insert_tag("version".to_owned(), version.clone());
-        //}
-        //}
-        //if let Some(configuration_key) = &configuration_key {
-        //for metric in &mut metrics {
-        //metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-        //}
-        //}
         emit!(EventsReceived {
             count: metrics.len(),
             byte_size: metrics.size_of(),
