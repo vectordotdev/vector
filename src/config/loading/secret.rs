@@ -267,15 +267,15 @@ async fn query_backend(
             }
             Some(stderr) = stderr_stream.next() => {
                 match stderr {
-                    Ok(l) => warn!("Stderr read from an exec backend: \"{}\".", l),
-                    Err(e) => warn!("Error while reading stderr from an exec backend: {}.", e),
+                    Ok(l) => warn!("An exec backend generated message on stderr: {}.", l),
+                    Err(e) => warn!("Error while reading from an exec backend stderr: {}.", e),
                 }
             }
             stdout = stdout_stream.next() => {
                 match stdout {
                     None => break,
                     Some(Ok(b)) => output.extend(b),
-                    Some(Err(e)) => return Err(format!("Error while reading stdout from an exec backend: {}.", e).into()),
+                    Some(Err(e)) => return Err(format!("Error while reading from an exec backend stdout: {}.", e).into()),
                 }
             }
             _ = &mut timeout => {
