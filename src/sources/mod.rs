@@ -26,6 +26,8 @@ pub mod exec;
 pub mod file;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
+#[cfg(feature = "sources-gcp_pubsub")]
+pub mod gcp_pubsub;
 #[cfg(feature = "sources-heroku_logs")]
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]

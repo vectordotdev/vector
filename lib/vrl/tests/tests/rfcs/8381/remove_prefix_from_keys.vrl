@@ -1,5 +1,4 @@
-# SKIP
 # object: { "my_prefix_message": "barbaz" }
 # result: {           "message": "barbaz" }
 
-map_keys(. ,recursive: true) -> |key| { replace(key, "my_prefix_", "") }
+map_keys(., recursive: true) -> |key| { replace(key, "my_prefix_", "") }

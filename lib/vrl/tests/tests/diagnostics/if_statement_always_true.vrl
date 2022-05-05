@@ -1,0 +1,14 @@
+# result:
+#
+# warning[E113]: predicate always resolves to `true`
+#   ┌─ :2:4
+#   │
+# 2 │ if true { true }
+#   │    ^^^^
+#   │    │
+#   │    this predicate always resolves to true
+#   │    this means the conditional around this block is unnecessary
+#   │
+#   = see language documentation at https://vrl.dev
+
+if true { true }

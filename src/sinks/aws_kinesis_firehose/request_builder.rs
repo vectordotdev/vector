@@ -6,16 +6,14 @@ use bytes::Bytes;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{
-        encoding::{EncodingConfig, StandardEncodings},
-        Compression, RequestBuilder,
-    },
+    sinks::util::{encoding::Transformer, Compression, RequestBuilder},
 };
 
 pub struct KinesisRequestBuilder {
     pub(super) compression: Compression,
-    pub(crate) encoder: EncodingConfig<StandardEncodings>,
+    pub(super) encoder: (Transformer, Encoder<()>),
 }
 
 pub struct Metadata {
@@ -71,7 +69,7 @@ impl ByteSizeOf for KinesisRequest {
 impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
     type Events = Event;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
     type Request = KinesisRequest;
     type Error = io::Error;

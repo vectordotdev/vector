@@ -1,11 +1,11 @@
-# result: [5, 7, 6]
+# result: [5, 7, "FOO"]
 
 foo = 5
 result = [foo]
 
 {
   # overwrite existing variable
-  foo = 6
+  foo = "foo"
 
   # instantiate new variable
   bar = 7
@@ -19,5 +19,6 @@ result = [foo]
 # result = push(result, bar)
 
 # variable is overwritten in inner scope
-push(result, foo)
-
+#
+# `upcase` proves type definition is also changed
+push(result, upcase(foo))

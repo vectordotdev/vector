@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::Error;
+use crate::{template_string::TemplateString, Error};
 
 // -----------------------------------------------------------------------------
 // node
@@ -76,6 +76,13 @@ impl<T> Node<T> {
         let Self { span, node } = self;
 
         (span.start(), node, span.end())
+    }
+
+    pub fn as_deref(&self) -> &T::Target
+    where
+        T: Deref,
+    {
+        self.as_ref().deref()
     }
 }
 
@@ -302,13 +309,20 @@ impl fmt::Debug for Ident {
     }
 }
 
+impl From<String> for Ident {
+    fn from(ident: String) -> Self {
+        Ident(ident)
+    }
+}
+
 // -----------------------------------------------------------------------------
 // literals
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
 pub enum Literal {
-    String(String),
+    String(TemplateString),
+    RawString(String),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
@@ -323,6 +337,7 @@ impl fmt::Display for Literal {
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
+            RawString(v) => write!(f, r#"s'{}'"#, v),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
@@ -746,6 +761,7 @@ impl FromStr for Opcode {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Assignment {
     Single {
         target: Node<AssignmentTarget>,
@@ -952,6 +968,7 @@ pub struct FunctionCall {
     pub ident: Node<Ident>,
     pub abort_on_error: bool,
     pub arguments: Vec<Node<FunctionArgument>>,
+    pub closure: Option<Node<FunctionClosure>>,
 }
 
 impl fmt::Display for FunctionCall {
@@ -968,7 +985,14 @@ impl fmt::Display for FunctionCall {
             }
         }
 
-        f.write_str(")")
+        f.write_str(")")?;
+
+        if let Some(closure) = &self.closure {
+            f.write_str(" ")?;
+            closure.fmt(f)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -988,7 +1012,14 @@ impl fmt::Debug for FunctionCall {
             }
         }
 
-        f.write_str("))")
+        f.write_str(")")?;
+
+        if let Some(closure) = &self.closure {
+            f.write_str(" ")?;
+            closure.fmt(f)?;
+        }
+
+        f.write_str(")")
     }
 }
 
@@ -1021,6 +1052,47 @@ impl fmt::Debug for FunctionArgument {
         } else {
             write!(f, "Argument({:?})", self.expr)
         }
+    }
+}
+
+/// A closure attached to a function.
+#[derive(Clone, PartialEq)]
+pub struct FunctionClosure {
+    pub variables: Vec<Node<Ident>>,
+    pub block: Node<Block>,
+}
+
+impl fmt::Display for FunctionClosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("-> |")?;
+
+        let mut iter = self.variables.iter().peekable();
+        while let Some(var) = iter.next() {
+            var.fmt(f)?;
+
+            if iter.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("| {\n")?;
+
+        let mut iter = self.block.0.iter().peekable();
+        while let Some(expr) = iter.next() {
+            f.write_str("\t")?;
+            expr.fmt(f)?;
+            if iter.peek().is_some() {
+                f.write_str("\n")?;
+            }
+        }
+
+        f.write_str("\n}")
+    }
+}
+
+impl fmt::Debug for FunctionClosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Closure(...)")
     }
 }
 

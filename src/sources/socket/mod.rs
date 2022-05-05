@@ -46,6 +46,17 @@ impl SocketConfig {
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
+
+    fn output_type(&self) -> DataType {
+        match &self.mode {
+            Mode::Tcp(config) => config.decoding().output_type(),
+            Mode::Udp(config) => config.decoding().output_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(config) => config.decoding.output_type(),
+            #[cfg(unix)]
+            Mode::UnixStream(config) => config.decoding.output_type(),
+        }
+    }
 }
 
 impl From<tcp::TcpConfig> for SocketConfig {
@@ -84,20 +95,29 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                if config.framing().is_some() && config.max_length().is_some() {
-                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                }
-
-                let max_length = config
-                    .max_length()
-                    .unwrap_or_else(crate::serde::default_max_length);
-
-                let framing = match config.framing().as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
+                let (framing, decoding) = match (config.framing(), config.max_length()) {
+                    (Some(_), Some(_)) => {
+                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                    }
+                    (Some(framing), None) => {
+                        let decoding = config.decoding().clone();
+                        let framing = framing.clone();
+                        (framing, decoding)
+                    }
+                    (None, Some(max_length)) => {
+                        let decoding = config.decoding().clone();
+                        let framing =
+                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
+                        (framing, decoding)
+                    }
+                    (None, None) => {
+                        let decoding = config.decoding().clone();
+                        let framing = decoding.default_stream_framing();
+                        (framing, decoding)
+                    }
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding().clone()).build();
+                let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
@@ -120,16 +140,7 @@ impl SourceConfig for SocketConfig {
                 let decoder =
                     DecodingConfig::new(config.framing().clone(), config.decoding().clone())
                         .build();
-                Ok(udp::udp(
-                    config.address(),
-                    config.max_length(),
-                    host_key,
-                    config.port_key().clone(),
-                    config.receive_buffer_bytes(),
-                    decoder,
-                    cx.shutdown,
-                    cx.out,
-                ))
+                Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
@@ -155,20 +166,28 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
-                if config.framing.is_some() && config.max_length.is_some() {
-                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
-                }
-
-                let max_length = config
-                    .max_length
-                    .unwrap_or_else(crate::serde::default_max_length);
-
-                let framing = match config.framing.as_ref() {
-                    Some(framing) => framing.clone(),
-                    None => NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into(),
+                let (framing, decoding) = match (config.framing, config.max_length) {
+                    (Some(_), Some(_)) => {
+                        return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                    }
+                    (Some(framing), None) => {
+                        let decoding = config.decoding.clone();
+                        (framing, decoding)
+                    }
+                    (None, Some(max_length)) => {
+                        let decoding = config.decoding.clone();
+                        let framing =
+                            NewlineDelimitedDecoderConfig::new_with_max_length(max_length).into();
+                        (framing, decoding)
+                    }
+                    (None, None) => {
+                        let decoding = config.decoding.clone();
+                        let framing = decoding.default_stream_framing();
+                        (framing, decoding)
+                    }
                 };
 
-                let decoder = DecodingConfig::new(framing, config.decoding.clone()).build();
+                let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let host_key = config
                     .host_key
@@ -186,7 +205,7 @@ impl SourceConfig for SocketConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -229,6 +248,9 @@ mod test {
     };
 
     use codecs::NewlineDelimitedDecoderConfig;
+    #[cfg(unix)]
+    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
+
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -257,7 +279,7 @@ mod test {
             components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{self, TlsConfig, TlsOptions},
+        tls::{self, TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -389,7 +411,7 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_tls(Some(TlsConfig::test_config()));
+        config.set_tls(Some(TlsEnableableConfig::test_config()));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx, None))
@@ -426,9 +448,9 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_tls(Some(TlsConfig {
+        config.set_tls(Some(TlsEnableableConfig {
             enabled: Some(true),
-            options: TlsOptions {
+            options: TlsConfig {
                 crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
                 key_file: Some("tests/data/Crt_from_intermediate.key".into()),
                 ..Default::default()
@@ -627,7 +649,7 @@ mod test {
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_id);
-        init_udp_inner(sender, source_id, shutdown_signal).await
+        init_udp_inner(sender, source_id, shutdown_signal, None).await
     }
 
     async fn init_udp(sender: SourceSender) -> SocketAddr {
@@ -635,6 +657,18 @@ mod test {
             sender,
             &ComponentKey::from("default"),
             ShutdownSignal::noop(),
+            None,
+        )
+        .await;
+        addr
+    }
+
+    async fn init_udp_with_config(sender: SourceSender, config: UdpConfig) -> SocketAddr {
+        let (addr, _handle) = init_udp_inner(
+            sender,
+            &ComponentKey::from("default"),
+            ShutdownSignal::noop(),
+            Some(config),
         )
         .await;
         addr
@@ -644,10 +678,17 @@ mod test {
         sender: SourceSender,
         source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
+        config: Option<UdpConfig>,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let address = next_addr();
+        let (address, config) = match config {
+            Some(config) => (config.address(), config),
+            None => {
+                let address = next_addr();
+                (address, UdpConfig::from_address(address))
+            }
+        };
 
-        let server = SocketConfig::from(UdpConfig::from_address(address))
+        let server = SocketConfig::from(config)
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
@@ -710,6 +751,67 @@ mod test {
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "test2".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn udp_max_length() {
+        let (tx, rx) = SourceSender::new_test();
+        let address = next_addr();
+        let mut config = UdpConfig::from_address(address);
+        config.max_length = 11;
+        let address = init_udp_with_config(tx, config).await;
+
+        send_lines_udp(
+            address,
+            vec![
+                "short line".to_string(),
+                "test with a long line".to_string(),
+                "a short un".to_string(),
+            ],
+        );
+
+        let events = collect_n(rx, 2).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "short line".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            "a short un".into()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    /// This test only works on Unix.
+    /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
+    /// Windows will drop the entire packet if we exceed the max_length so we are unable to
+    /// extract anything.
+    async fn udp_max_length_delimited() {
+        let (tx, rx) = SourceSender::new_test();
+        let address = next_addr();
+        let mut config = UdpConfig::from_address(address);
+        config.max_length = 10;
+        config.framing = CharacterDelimitedDecoderConfig {
+            character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
+        }
+        .into();
+        let address = init_udp_with_config(tx, config).await;
+
+        send_lines_udp(
+            address,
+            vec!["test with, long line".to_string(), "short one".to_string()],
+        );
+
+        let events = collect_n(rx, 2).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "test with".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            "short one".into()
         );
     }
 

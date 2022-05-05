@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, fmt};
 
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
 
 use crate::{
@@ -144,6 +144,24 @@ impl Assignment {
         let variant = Variant::Single { target, expr };
 
         Self { variant }
+    }
+
+    /// Get a list of targets for this assignment.
+    ///
+    /// For regular assignments, this contains a single target, for infallible
+    /// assignments, it'll contain both the `ok` and `err` target.
+    pub(crate) fn targets(&self) -> Vec<Target> {
+        let mut targets = Vec::with_capacity(2);
+
+        match &self.variant {
+            Variant::Single { target, .. } => targets.push(target.clone()),
+            Variant::Infallible { ok, err, .. } => {
+                targets.push(ok.clone());
+                targets.push(err.clone());
+            }
+        }
+
+        targets
     }
 }
 
@@ -520,7 +538,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

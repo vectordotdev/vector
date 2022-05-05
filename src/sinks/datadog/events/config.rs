@@ -18,7 +18,7 @@ use crate::{
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -30,7 +30,7 @@ pub struct DatadogEventsConfig {
     pub site: Option<String>,
     pub default_api_key: String,
 
-    pub(super) tls: Option<TlsConfig>,
+    pub(super) tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,

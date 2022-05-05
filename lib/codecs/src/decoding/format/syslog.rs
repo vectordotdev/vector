@@ -7,7 +7,7 @@ use value::Kind;
 
 use super::Deserializer;
 use vector_core::{
-    config::log_schema,
+    config::{log_schema, DataType},
     event::{Event, Value},
     schema,
 };
@@ -20,6 +20,11 @@ impl SyslogDeserializerConfig {
     /// Build the `SyslogDeserializer` from this configuration.
     pub const fn build(&self) -> SyslogDeserializer {
         SyslogDeserializer
+    }
+
+    /// Return the type of event build by this deserializer.
+    pub fn output_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

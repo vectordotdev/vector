@@ -1,1 +1,1 @@
-{"log":{"":343552.0,"&ﮕ":null,"N\r'":false}}
+{"metric":{"name":"x","namespace":"b","tags":{"g":"k","x":"v"},"timestamp":"1970-01-01T03:50:44.000009910Z","kind":"absolute","gauge":{"value":-738752.0}}}

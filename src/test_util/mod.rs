@@ -290,7 +290,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    std::iter::repeat(()).map(move |_| random_string(len))
+    iter::repeat_with(move || random_string(len))
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
@@ -305,7 +305,7 @@ pub fn random_maps(
     max_size: usize,
     field_len: usize,
 ) -> impl Iterator<Item = HashMap<String, String>> {
-    iter::repeat(()).map(move |_| random_map(max_size, field_len))
+    iter::repeat_with(move || random_map(max_size, field_len))
 }
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
@@ -316,7 +316,7 @@ where
 }
 
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
         let e = stream.next().await.unwrap();
@@ -518,6 +518,23 @@ impl<T: Send + 'static> CountReceiver<T> {
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+
+    pub fn receive_items_stream<S, F, Fut>(make_stream: F) -> CountReceiver<T>
+    where
+        S: Stream<Item = T> + Send + 'static,
+        F: FnOnce(oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut + Send + 'static,
+        Fut: Future<Output = S> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire, connected| async move {
+            let stream = make_stream(tripwire, connected).await;
+            stream
+                .inspect(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                })
+                .collect::<Vec<T>>()
+                .await
+        })
     }
 }
 

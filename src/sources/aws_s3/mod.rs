@@ -1,10 +1,13 @@
 use std::convert::TryInto;
 use std::io::ErrorKind;
+use std::sync::Arc;
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
@@ -16,7 +19,7 @@ use super::util::MultilineConfig;
 use crate::aws::RegionOrEndpoint;
 use crate::aws::{create_client, ClientBuilder};
 use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -70,7 +73,7 @@ struct AwsS3Config {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
 }
 
 inventory::submit! {
@@ -100,6 +103,20 @@ impl ClientBuilder for S3ClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(

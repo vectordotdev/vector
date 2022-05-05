@@ -1,6 +1,6 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 
 use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
@@ -406,7 +406,7 @@ pub enum Error {
     Expr(#[from] expression::Error),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 

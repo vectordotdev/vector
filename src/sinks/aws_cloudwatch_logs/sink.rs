@@ -37,7 +37,7 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder = self.request_builder;
+        let mut request_builder = self.request_builder;
         let batcher_settings = self.batcher_settings;
         let service = self.service;
         let acker = self.acker;
