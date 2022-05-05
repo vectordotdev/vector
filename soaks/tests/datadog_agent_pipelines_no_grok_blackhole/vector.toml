@@ -22,6 +22,7 @@ inputs = ["logs"]
 source = '''
 ., err = parse_json(.message)
 .custom = {}
+.source = del(.ddsource)
 '''
 
 [transforms.processing]

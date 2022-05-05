@@ -18,10 +18,17 @@ encoding.codec = "ndjson"
 ##
 ## Transforms
 ##
+#
+[transforms.preprocessing]
+type = "remap"
+inputs = ["logs"]
+source = '''
+.source = del(.ddsource)
+'''
 
 [transforms.processing]
 type = "pipelines"
-inputs = ["logs"]
+inputs = ["preprocessing"]
 
 [[transforms.processing.logs]]
 name = "nginx"

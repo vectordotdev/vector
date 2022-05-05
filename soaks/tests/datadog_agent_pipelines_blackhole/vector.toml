@@ -29,6 +29,7 @@ if starts_with(strip_whitespace!(.message), "{") {
 }
 .custom.message = .message
 .tags = []
+.source = del(.ddsource)
 '''
 
 [transforms.processing]
