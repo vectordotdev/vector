@@ -836,10 +836,12 @@ mod test {
             ("variant".to_string(), "baseline".to_string()),
         ]);
 
+        let vrl = convert_tags_to_vrl(tags, Some("tags".to_string()));
         assert_eq!(
-            convert_tags_to_vrl(tags, Some("tags".to_string())),
+            vrl,
             r#"merge(., {"tags": {"pull_request":"1234","replica":"abcd","variant":"baseline"}})"#
         );
+        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
 
     #[test]
@@ -849,10 +851,12 @@ mod test {
             ("replica".to_string(), "abcd".to_string()),
             ("variant".to_string(), "baseline".to_string()),
         ]);
+        let vrl = convert_tags_to_vrl(tags, None);
 
         assert_eq!(
-            convert_tags_to_vrl(tags, None),
+            vrl,
             r#"merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"})"#
         );
+        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
 }
