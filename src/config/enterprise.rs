@@ -368,13 +368,14 @@ pub async fn try_attach(
         ..Default::default()
     };
 
-    let custom_metric_tags_vrl = datadog.tags.clone().map_or("".to_string(), |tags| {
-        convert_tags_to_vrl(tags, Some("tags".to_string()))
-    });
+    let custom_metric_tags_vrl = datadog
+        .tags
+        .clone()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
     let custom_logs_tags_vrl = datadog
         .tags
         .clone()
-        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, None));
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
 
     let tag_metrics = RemapConfig {
         source: Some(format!(
@@ -481,12 +482,12 @@ const fn default_max_retries() -> u32 {
 
 /// Converts user configured tags to VRL source code for adding tags/fields to
 /// events
-fn convert_tags_to_vrl(tags: IndexMap<String, String>, namespace: Option<String>) -> String {
+fn convert_tags_to_vrl(tags: IndexMap<String, String>, is_metric: bool) -> String {
     let json_tags = serde_json::to_string(&tags).unwrap();
-    if let Some(namespace) = namespace {
-        format!(r#"merge(., {{"{}": {}}})"#, namespace, json_tags)
+    if is_metric {
+        format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)
     } else {
-        format!(r#"merge(., {})"#, json_tags)
+        format!(r#". = merge(., {}, deep: true)"#, json_tags)
     }
 }
 
@@ -594,6 +595,8 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use indoc::formatdoc;
+    use value::Kind;
+    use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
@@ -845,12 +848,18 @@ mod test {
             ("variant".to_string(), "baseline".to_string()),
         ]);
 
-        let vrl = convert_tags_to_vrl(tags, Some("tags".to_string()));
+        let vrl = convert_tags_to_vrl(tags, true);
         assert_eq!(
             vrl,
-            r#"merge(., {"tags": {"pull_request":"1234","replica":"abcd","variant":"baseline"}})"#
+            r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
         );
-        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
+        // We need to set up some state here to inform the VRL compiler that
+        // .tags is an object and merge() is thus a safe operation (mimicking
+        // the environment this code will actually run in).
+        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
+            "tags" => Kind::object(btreemap! {}),
+        }));
+        assert!(vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok());
     }
 
     #[test]
@@ -860,11 +869,11 @@ mod test {
             ("replica".to_string(), "abcd".to_string()),
             ("variant".to_string(), "baseline".to_string()),
         ]);
-        let vrl = convert_tags_to_vrl(tags, None);
+        let vrl = convert_tags_to_vrl(tags, false);
 
         assert_eq!(
             vrl,
-            r#"merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"})"#
+            r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
         );
         assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
