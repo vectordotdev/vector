@@ -56,6 +56,7 @@ pub struct LogApiRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
+    pub uncompressed_size: usize,
 }
 
 impl Ackable for LogApiRequest {
@@ -168,7 +169,7 @@ impl Service<LogApiRequest> for LogApiService {
 
         let count = request.batch_size;
         let events_byte_size = request.events_byte_size;
-        let raw_byte_size = request.body.len();
+        let raw_byte_size = request.uncompressed_size;
         let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
 
         let http_request = http_request
