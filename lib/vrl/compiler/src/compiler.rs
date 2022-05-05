@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity};
+use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
@@ -588,6 +588,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-abort")]
     fn compile_abort(&mut self, node: Node<ast::Abort>, external: &mut ExternalEnv) -> Abort {
         self.abortable = true;
         let (span, abort) = node.take();
@@ -601,7 +602,20 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-abort"))]
+    fn compile_abort(&mut self, node: Node<ast::Abort>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-abort")
+    }
+
     fn handle_parser_error(&mut self, error: parser::Error) {
         self.diagnostics.push(Box::new(error))
+    }
+
+    #[allow(dead_code)]
+    fn handle_missing_feature_error(&mut self, span: Span, feature: &'static str) -> Noop {
+        self.diagnostics
+            .push(Box::new(Error::Missing { span, feature }));
+
+        Noop
     }
 }

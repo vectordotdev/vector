@@ -5,9 +5,16 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+]
+expr-abort = ["compiler/expr-abort"]
+
 [dependencies]
 bytes = "1.1.0"
-compiler = { package = "vrl-compiler", path = "../compiler" }
+compiler = { package = "vrl-compiler", path = "../compiler", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "1"
 lookup = { path = "../../lookup" }

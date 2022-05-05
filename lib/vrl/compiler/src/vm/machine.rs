@@ -2,12 +2,12 @@ use super::VmFunctionClosure;
 use super::{state::VmState, Variable, VmArgumentList};
 use crate::value::{VrlValueArithmetic, VrlValueConvert};
 use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
-use diagnostic::Span;
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
     /// Aborts the process, returning `Err(ExpressionError::Abort)`.
+    #[cfg(feature = "expr-abort")]
     Abort,
 
     /// Ends the process, returning the top value from the stack.
@@ -287,6 +287,7 @@ impl Vm {
             let next = state.next_opcode()?;
 
             match next {
+                #[cfg(feature = "expr-abort")]
                 OpCode::Abort => {
                     // Aborts the process.
                     let start = state.next_primitive()?;
@@ -296,7 +297,7 @@ impl Vm {
                         value => Some(value.try_bytes_utf8_lossy()?.to_string()),
                     };
                     return Err(ExpressionError::Abort {
-                        span: Span::new(start, end),
+                        span: diagnostic::Span::new(start, end),
                         message,
                     });
                 }
@@ -550,6 +551,7 @@ impl Vm {
                     match result {
                         Ok(result) => state.stack.push(result),
                         Err(err) => match err {
+                            #[cfg(feature = "expr-abort")]
                             ExpressionError::Abort { .. } => {
                                 panic!("abort errors must only be defined by `abort` statement")
                             }

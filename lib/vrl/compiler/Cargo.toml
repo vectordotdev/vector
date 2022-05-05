@@ -5,6 +5,13 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+]
+expr-abort = []
+
 [dependencies]
 core = { package = "vrl-core", path = "../core" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
@@ -33,6 +40,3 @@ vector_common = { path = "../../vector-common", default-features = false, featur
 [[bench]]
 name = "kind"
 harness = false
-
-[features]
-test = []
