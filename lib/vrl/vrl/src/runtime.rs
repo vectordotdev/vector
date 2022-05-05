@@ -141,6 +141,7 @@ impl Runtime {
     ) -> Result<Value, Terminate> {
         let mut context = Context::new(target, &mut self.state, timezone);
         vm.interpret(&mut context).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),
         })
