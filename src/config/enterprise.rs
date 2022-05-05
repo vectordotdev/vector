@@ -380,6 +380,7 @@ pub async fn try_attach(
             r#"
             .version = "{}"
             .configuration_key = "{}"
+            .ddsource = "vector"
         "#,
             &config_version, &datadog.configuration_key,
         )),
