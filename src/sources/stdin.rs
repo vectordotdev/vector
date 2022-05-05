@@ -16,7 +16,7 @@ use crate::{
     codecs::DecodingConfig,
     config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
-    serde::{default_decoding, default_framing_stream_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -27,8 +27,7 @@ pub struct StdinConfig {
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-    #[serde(default = "default_framing_stream_based")]
-    pub framing: FramingConfig,
+    pub framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }
@@ -38,7 +37,7 @@ impl Default for StdinConfig {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
             host_key: Default::default(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -92,7 +91,11 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding).build();
+
+    let framing = config
+        .framing
+        .unwrap_or_else(|| config.decoding.default_stream_framing());
+    let decoder = DecodingConfig::new(framing, config.decoding).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 

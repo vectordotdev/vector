@@ -4010,4 +4010,5 @@ address = "0.0.0.0:9090"
 
 [sinks.blackhole]
 type = "blackhole"
+print_interval_secs = 0
 inputs = ["processing"]

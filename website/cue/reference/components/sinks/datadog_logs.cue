@@ -76,4 +76,14 @@ components: sinks: datadog_logs: {
 		metrics: null
 		traces:  false
 	}
+
+	how_it_works: {
+		attributes: {
+			title: "Attributes"
+			body: """
+				Datadog's logs API has special handling for the following fields: `ddsource`, `ddtags`, `hostname`, `message`, and `service`.
+				If your event contains any of these fields they will be used as described by the [API reference](https://docs.datadoghq.com/api/latest/logs/#send-logs).
+				"""
+		}
+	}
 }

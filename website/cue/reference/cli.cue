@@ -7,10 +7,6 @@ _default_flags: {
 		_short:      "h"
 		description: "Prints help information "
 	}
-	"version": {
-		_short:      "V"
-		description: "Prints version information"
-	}
 }
 
 cli: {
@@ -104,6 +100,10 @@ cli: {
 			_short:      "v"
 			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
 		}
+		"version": {
+			_short:      "V"
+			description: "Prints version information"
+		}
 		"watch-config": {
 			_short:      "w"
 			description: env_vars.VECTOR_WATCH_CONFIG.description
@@ -111,14 +111,7 @@ cli: {
 		}
 	}
 
-	// Reusable options
-	_core_options: {
-		"color": {
-			description: env_vars.VECTOR_COLOR.description
-			default:     env_vars.VECTOR_COLOR.type.string.default
-			enum:        env_vars.VECTOR_COLOR.type.string.enum
-			env_var:     "VECTOR_COLOR"
-		}
+	_core_config_options: {
 		"config": {
 			_short:      "c"
 			description: env_vars.VECTOR_CONFIG.description
@@ -146,6 +139,16 @@ cli: {
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_YAML"
 		}
+	}
+
+	// Reusable options
+	_core_options: _core_config_options & {
+		"color": {
+			description: env_vars.VECTOR_COLOR.description
+			default:     env_vars.VECTOR_COLOR.type.string.default
+			enum:        env_vars.VECTOR_COLOR.type.string.enum
+			env_var:     "VECTOR_COLOR"
+		}
 		"log-format": {
 			description: env_vars.VECTOR_LOG_FORMAT.description
 			default:     env_vars.VECTOR_LOG_FORMAT.type.string.default
@@ -164,6 +167,25 @@ cli: {
 	options: _core_options
 
 	commands: {
+		"config": {
+			description: """
+				(experimental) Output a provided Vector configuration file/directory as a single JSON object. Useful for checking configurations into version control.
+				"""
+			flags: _default_flags & {
+				"pretty": {
+					_short:      "p"
+					description: "Pretty print JSON"
+				}
+				"include-defaults": {
+					_short:      "i"
+					description: "Include default values where missing from config"
+				}
+			}
+
+			options: _core_config_options
+
+			example: "vector config --config /etc/vector/vector.toml"
+		}
 		"graph": {
 			description: """
 				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format)),

@@ -64,24 +64,8 @@ components: sinks: gcp_pubsub: {
 	}
 
 	configuration: {
-		api_key: {
-			common:      false
-			description: "A [Google Cloud API key](\(urls.gcp_authentication_api_key)) used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
-			}
-		}
-		credentials_path: {
-			common:      true
-			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["/path/to/credentials.json"]
-			}
-		}
+		api_key:          configuration._gcp_api_key
+		credentials_path: configuration._gcp_credentials_path
 		endpoint: {
 			common:      false
 			description: "The endpoint to which to send data."

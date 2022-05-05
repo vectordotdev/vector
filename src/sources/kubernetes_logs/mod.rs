@@ -76,6 +76,10 @@ pub struct Config {
     /// addition to the built-in `vector.dev/exclude` filter.
     extra_label_selector: String,
 
+    /// Specifies the label selector to filter `Namespace`s with, to be used in
+    /// addition to the built-in `vector.dev/exclude` filter.
+    extra_namespace_label_selector: String,
+
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
@@ -159,6 +163,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             extra_label_selector: "".to_string(),
+            extra_namespace_label_selector: "".to_string(),
             self_node_name: default_self_node_name_env_template(),
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
@@ -214,6 +219,7 @@ struct Source {
     namespace_fields_spec: namespace_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
+    namespace_label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     max_line_bytes: usize,
@@ -231,7 +237,9 @@ impl Source {
         key: &ComponentKey,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
-        let label_selector = prepare_label_selector(config);
+        let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
+        let namespace_label_selector =
+            prepare_label_selector(config.extra_namespace_label_selector.as_ref());
 
         // If the user passed a custom Kubeconfig use it, otherwise
         // we attempt to load the local kubec-config, followed by the
@@ -273,6 +281,7 @@ impl Source {
             namespace_fields_spec: config.namespace_annotation_fields.clone(),
             field_selector,
             label_selector,
+            namespace_label_selector,
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
@@ -297,6 +306,7 @@ impl Source {
             namespace_fields_spec,
             field_selector,
             label_selector,
+            namespace_label_selector,
             exclude_paths,
             max_read_bytes,
             max_line_bytes,
@@ -324,7 +334,13 @@ impl Source {
         // -----------------------------------------------------------------
 
         let namespaces = Api::<Namespace>::all(client);
-        let ns_watcher = watcher(namespaces, ListParams::default());
+        let ns_watcher = watcher(
+            namespaces,
+            ListParams {
+                label_selector: Some(namespace_label_selector),
+                ..Default::default()
+            },
+        );
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
@@ -608,14 +624,14 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
 
 // This function constructs the effective label selector to use, based on
 // the specified configuration.
-fn prepare_label_selector(config: &Config) -> String {
+fn prepare_label_selector(selector: &str) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
-    if config.extra_label_selector.is_empty() {
+    if selector.is_empty() {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, config.extra_label_selector)
+    format!("{},{}", BUILT_IN, selector)
 }
 
 #[cfg(test)]
@@ -708,19 +724,44 @@ mod tests {
     #[test]
     fn prepare_label_selector() {
         let cases = vec![
-            (Config::default(), "vector.dev/exclude!=true"),
+            (
+                Config::default().extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config::default().extra_namespace_label_selector,
+                "vector.dev/exclude!=true",
+            ),
             (
                 Config {
                     extra_label_selector: "".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true",
             ),
             (
                 Config {
                     extra_label_selector: "qwe".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true,qwe",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "qwe".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true,qwe",
             ),
         ];

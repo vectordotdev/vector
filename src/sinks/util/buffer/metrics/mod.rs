@@ -1,25 +1,24 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
 
-use vector_core::event::{
-    metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue, Sample},
-    EventMetadata,
-};
+use vector_core::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
     batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
     Merged, SinkBatchSettings,
 };
 
-/// The metrics buffer is a data structure for collecting a flow of data
-/// points into a batch.
+mod normalize;
+pub use self::normalize::*;
+
+mod split;
+pub use self::split::*;
+
+/// The metrics buffer is a data structure for collecting a flow of data points into a batch.
 ///
-/// Batching mostly means that we will aggregate away timestamp
-/// information, and apply metric-specific compression to improve the
-/// performance of the pipeline. In particular, only the latest in a
-/// series of metrics are output, and incremental metrics are summed
-/// into the output buffer. Any conversion of metrics is handled by the
-/// normalization type `N: MetricNormalize`. Further, distribution
-/// metrics have their their samples compressed with
+/// Batching mostly means that we will aggregate away timestamp information, and apply metric-specific compression to
+/// improve the performance of the pipeline. In particular, only the latest in a series of metrics are output, and
+/// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
+/// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
 /// `compress_distribution` below.
 pub struct MetricsBuffer {
     metrics: Option<MetricSet>,
@@ -27,6 +26,7 @@ pub struct MetricsBuffer {
 }
 
 impl MetricsBuffer {
+    /// Creates a new `MetricsBuffer` with the given batch settings.
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
@@ -70,245 +70,31 @@ impl Batch for MetricsBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics
-            .unwrap_or_else(|| MetricSet::with_capacity(0))
-            .0
-            .into_iter()
-            .map(finish_metric)
-            .collect()
+        // Collect all of our metrics together, finalize them, and hand them back.
+        let mut finalized = self
+            .metrics
+            .map(MetricSet::into_metrics)
+            .unwrap_or_default();
+        finalized.iter_mut().for_each(finalize_metric);
+        finalized
     }
 
     fn num_items(&self) -> usize {
         self.metrics
             .as_ref()
-            .map(|metrics| metrics.0.len())
+            .map(|metrics| metrics.len())
             .unwrap_or(0)
     }
 }
 
-/// This is a simple wrapper for using `MetricNormalize` with a
-/// persistent `MetricSet` state, to be used in sinks in `with_flat_map`
-/// before sending the events to the `MetricsBuffer`
-pub struct MetricNormalizer<N> {
-    state: MetricSet,
-    normalizer: N,
-}
-
-impl<N> MetricNormalizer<N> {
-    /// Gets a mutable reference to the current metric state for this normalizer.
-    pub fn get_state_mut(&mut self) -> &mut MetricSet {
-        &mut self.state
+fn finalize_metric(metric: &mut Metric) {
+    if let MetricValue::Distribution { samples, .. } = metric.data_mut().value_mut() {
+        let compressed_samples = compress_distribution(samples);
+        *samples = compressed_samples;
     }
 }
 
-impl<N: MetricNormalize> MetricNormalizer<N> {
-    /// Applies normalization to the given metric, potentially returning an updated metric.
-    ///
-    /// Depending on the normalizer, a metric may or may not be returned.  In the case of converting
-    /// a metric from absolute to incremental, a metric must be seen twice in order to generate an
-    /// incremental delta, so the first call for the same metric would return `None` while the
-    /// second call would return `Some(...)`.
-    pub fn apply(&mut self, metric: Metric) -> Option<Metric> {
-        self.normalizer.apply_state(&mut self.state, metric)
-    }
-}
-
-impl<N: Default> MetricNormalizer<N> {
-    pub fn default() -> Self {
-        Self {
-            state: MetricSet::default(),
-            normalizer: N::default(),
-        }
-    }
-}
-
-impl<N> From<N> for MetricNormalizer<N> {
-    fn from(normalizer: N) -> Self {
-        Self {
-            state: MetricSet::default(),
-            normalizer,
-        }
-    }
-}
-
-/// The metrics state trait abstracts how data point normalization is
-/// done. Normalisation is required to make sure Sources and Sinks are
-/// exchanging compatible data structures. For instance, delta gauges
-/// produced by Statsd source cannot be directly sent to Datadog API. In
-/// this case the buffer will keep the state of a gauge value, and
-/// produce absolute values gauges that are well supported by Datadog.
-///
-/// Another example of normalisation is disaggregation of counters. Most
-/// sinks would expect we send them delta counters (e.g. how many events
-/// occurred during the flush period). And most sources are producing
-/// exactly these kind of counters, with Prometheus being a notable
-/// exception. If the counter comes already aggregated inside the
-/// source, the buffer will compare it's values with the previous known
-/// and calculate the delta.
-pub trait MetricNormalize {
-    /// Apply normalizes the given `metric` using `state` to save any
-    /// persistent data between calls. The return value is `None` if the
-    /// incoming metric is only used to set a reference state, and
-    /// `Some(metric)` otherwise.
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric>;
-}
-
-type MetricEntry = (MetricData, EventMetadata);
-
-/// This is a convenience wrapper for HashMap<MetricSeries, MetricData>
-/// that provides some extra functionality.
-#[derive(Clone, Default)]
-pub struct MetricSet(HashMap<MetricSeries, MetricEntry>);
-
-impl MetricSet {
-    fn with_capacity(capacity: usize) -> Self {
-        Self(HashMap::with_capacity(capacity))
-    }
-
-    /// Consumes this `MetricSet` and returns a vector of `Metric`.
-    #[cfg(test)]
-    pub fn into_metrics(self) -> Vec<Metric> {
-        self.0
-            .into_iter()
-            .map(|(series, (data, metadata))| Metric::from_parts(series, data, metadata))
-            .collect()
-    }
-
-    /// Either pass the metric through as-is if absolute, or convert it
-    /// to absolute if incremental.
-    pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.kind() {
-            MetricKind::Absolute => Some(metric),
-            MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
-        }
-    }
-
-    /// Either convert the metric to incremental if absolute, or
-    /// aggregate it with any previous value if already incremental.
-    pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.kind() {
-            MetricKind::Absolute => self.absolute_to_incremental(metric),
-            MetricKind::Incremental => Some(metric),
-        }
-    }
-
-    /// Convert the incremental metric into an absolute one, using the
-    /// state buffer to keep track of the value throughout the entire
-    /// application uptime.
-    fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
-        match self.0.get_mut(metric.series()) {
-            Some(existing) => {
-                if existing.0.value.add(metric.value()) {
-                    metric = metric.with_value(existing.0.value.clone());
-                } else {
-                    // Metric changed type, store this as the new reference value
-                    self.0.insert(
-                        metric.series().clone(),
-                        (metric.data().clone(), EventMetadata::default()),
-                    );
-                }
-            }
-            None => {
-                self.0.insert(
-                    metric.series().clone(),
-                    (metric.data().clone(), EventMetadata::default()),
-                );
-            }
-        }
-        metric.into_absolute()
-    }
-
-    /// Convert the absolute metric into an incremental by calculating
-    /// the increment from the last saved absolute state.
-    fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
-        // NOTE: Crucially, like I did, you may wonder: why do we not always return a metric? Could
-        // this lead to issues where a metric isn't seen again and we, in effect, never emit it?
-        //
-        // You're not wrong, and that does happen based on the logic below.  However, the main
-        // problem this logic solves is avoiding massive counter updates when Vector restarts.
-        //
-        // If we emitted a metric for a newly-seen absolute metric in this method, we would
-        // naturally have to emit an incremental version where the value was the absolute value,
-        // with subsequent updates being only delta updates.  If we restarted Vector, however, we
-        // would be back to not having yet seen the metric before, so the first emission of the
-        // metric after converting it here would be... its absolute value.  Even if the value only
-        // changed by 1 between Vector stopping and restarting, we could be incrementing the counter
-        // by some outrageous amount.
-        //
-        // Thus, we only emit a metric when we've calculated an actual delta for it, which means
-        // that, yes, we're risking never seeing a metric if it's not re-emitted, and we're
-        // introducing a small amount of lag before a metric is emitted by having to wait to see it
-        // again, but this is a behavior we have to observe for sinks that can only handle
-        // incremental updates.
-        match self.0.get_mut(metric.series()) {
-            Some(reference) => {
-                let new_value = metric.value().clone();
-                // From the stored reference value, emit an increment
-                if metric.subtract(&reference.0) {
-                    reference.0.value = new_value;
-                    Some(metric.into_incremental())
-                } else {
-                    // Metric changed type, store this and emit nothing
-                    self.insert(metric);
-                    None
-                }
-            }
-            None => {
-                // No reference so store this and emit nothing
-                self.insert(metric);
-                None
-            }
-        }
-    }
-
-    fn insert(&mut self, metric: Metric) {
-        let (series, data, metadata) = metric.into_parts();
-        self.0.insert(series, (data, metadata));
-    }
-
-    fn insert_update(&mut self, metric: Metric) {
-        let update = match metric.kind() {
-            MetricKind::Absolute => Some(metric),
-            MetricKind::Incremental => {
-                // Incremental metrics update existing entries, if present
-                match self.0.get_mut(metric.series()) {
-                    Some(existing) => {
-                        let (series, data, metadata) = metric.into_parts();
-                        if existing.0.update(&data) {
-                            existing.1.merge(metadata);
-                            None
-                        } else {
-                            warn!(message = "Metric changed type, dropping old value.", %series);
-                            Some(Metric::from_parts(series, data, metadata))
-                        }
-                    }
-                    None => Some(metric),
-                }
-            }
-        };
-        if let Some(metric) = update {
-            self.insert(metric);
-        }
-    }
-
-    /// Removes a series from the set.
-    ///
-    /// If the series existed and was removed, returns `true`.  Otherwise, `false`.
-    pub fn remove(&mut self, series: &MetricSeries) -> bool {
-        self.0.remove(series).is_some()
-    }
-}
-
-fn finish_metric(item: (MetricSeries, MetricEntry)) -> Metric {
-    let (series, (mut data, metadata)) = item;
-    if let MetricValue::Distribution { samples, statistic } = data.value {
-        let samples = compress_distribution(samples);
-        data.value = MetricValue::Distribution { samples, statistic };
-    }
-    Metric::from_parts(series, data, metadata)
-}
-
-pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
     if samples.is_empty() {
         return Vec::new();
     }
@@ -326,7 +112,7 @@ pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
             acc.rate += sample.rate;
         } else {
             result.push(acc);
-            acc = sample;
+            acc = *sample;
         }
     }
     result.push(acc);
@@ -335,10 +121,11 @@ pub fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
 }
 
 #[cfg(test)]
-mod test {
+pub(self) mod tests {
     use std::collections::BTreeMap;
 
     use pretty_assertions::assert_eq;
+    use vector_core::event::MetricKind;
 
     use super::*;
     use crate::{
@@ -348,6 +135,78 @@ mod test {
     };
 
     type Buffer = Vec<Vec<Metric>>;
+
+    pub fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
+        Metric::new(
+            format!("counter-{}", num),
+            kind,
+            MetricValue::Counter { value },
+        )
+        .with_tags(Some(tag(tagstr)))
+    }
+
+    pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
+        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+    }
+
+    pub fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
+        Metric::new(
+            format!("set-{}", num),
+            kind,
+            MetricValue::Set {
+                values: values.iter().map(|s| s.to_string()).collect(),
+            },
+        )
+    }
+
+    pub fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
+        Metric::new(
+            format!("dist-{}", num),
+            kind,
+            MetricValue::Distribution {
+                samples: vector_core::samples![num as f64 => rate],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+    }
+
+    pub fn sample_aggregated_histogram(
+        num: usize,
+        kind: MetricKind,
+        bpower: f64,
+        cfactor: u32,
+        sum: f64,
+    ) -> Metric {
+        Metric::new(
+            format!("buckets-{}", num),
+            kind,
+            MetricValue::AggregatedHistogram {
+                buckets: vector_core::buckets![
+                    1.0 => cfactor,
+                    bpower.exp2() => cfactor * 2,
+                    4.0f64.powf(bpower) => cfactor * 4
+                ],
+                count: 7 * cfactor,
+                sum,
+            },
+        )
+    }
+
+    pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
+        Metric::new(
+            format!("quantiles-{}", num),
+            kind,
+            MetricValue::AggregatedSummary {
+                quantiles: vector_core::quantiles![
+                    0.0 => factor,
+                    0.5 => factor * 2.0,
+                    1.0 => factor * 4.0
+                ],
+                count: factor as u32 * 10,
+                sum: factor * 7.0,
+            },
+        )
+    }
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -365,7 +224,7 @@ mod test {
         let mut result = vec![];
 
         for metric in metrics {
-            if let Some(event) = normalizer.apply(metric) {
+            if let Some(event) = normalizer.normalize(metric) {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
@@ -712,7 +571,7 @@ mod test {
 
     #[test]
     fn compress_distributions() {
-        let samples = vector_core::samples![
+        let mut samples = vector_core::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -723,7 +582,7 @@ mod test {
         ];
 
         assert_eq!(
-            compress_distribution(samples),
+            compress_distribution(&mut samples),
             vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
@@ -846,77 +705,5 @@ mod test {
         // Since aggregated summaries cannot be added, they don't work
         // as incremental metrics and this results in an empty buffer.
         assert_eq!(buffer.len(), 0);
-    }
-
-    fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(
-            format!("counter-{}", num),
-            kind,
-            MetricValue::Counter { value },
-        )
-        .with_tags(Some(tag(tagstr)))
-    }
-
-    fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
-    }
-
-    fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
-        Metric::new(
-            format!("set-{}", num),
-            kind,
-            MetricValue::Set {
-                values: values.iter().map(|s| s.to_string()).collect(),
-            },
-        )
-    }
-
-    fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
-        Metric::new(
-            format!("dist-{}", num),
-            kind,
-            MetricValue::Distribution {
-                samples: vector_core::samples![num as f64 => rate],
-                statistic: StatisticKind::Histogram,
-            },
-        )
-    }
-
-    fn sample_aggregated_histogram(
-        num: usize,
-        kind: MetricKind,
-        bpower: f64,
-        cfactor: u32,
-        sum: f64,
-    ) -> Metric {
-        Metric::new(
-            format!("buckets-{}", num),
-            kind,
-            MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![
-                    1.0 => cfactor,
-                    bpower.exp2() => cfactor * 2,
-                    4.0f64.powf(bpower) => cfactor * 4
-                ],
-                count: 7 * cfactor,
-                sum,
-            },
-        )
-    }
-
-    fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
-        Metric::new(
-            format!("quantiles-{}", num),
-            kind,
-            MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![
-                    0.0 => factor,
-                    0.5 => factor * 2.0,
-                    1.0 => factor * 4.0
-                ],
-                count: factor as u32 * 10,
-                sum: factor * 7.0,
-            },
-        )
     }
 }

@@ -1,14 +1,13 @@
 use futures::FutureExt;
-use goauth::{auth::TokenErr, GoErr};
 use http::{StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 use crate::{
-    http::{HttpClient, HttpError},
+    gcp::{GcpCredentials, GcpError},
+    http::HttpClient,
     sinks::{
-        gcp::GcpCredentials,
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
         Healthcheck, HealthcheckError,
@@ -46,31 +45,6 @@ pub enum GcsStorageClass {
 pub enum GcsError {
     #[snafu(display("Bucket {:?} not found", bucket))]
     BucketNotFound { bucket: String },
-}
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum GcpError {
-    #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
-    MissingAuth,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials0,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials1 { source: GoErr },
-    #[snafu(display("Invalid RSA key in GCP credentials"))]
-    InvalidRsaKey { source: GoErr },
-    #[snafu(display("Failed to get OAuth token"))]
-    GetToken { source: GoErr },
-    #[snafu(display("Failed to get OAuth token text"))]
-    GetTokenBytes { source: hyper::Error },
-    #[snafu(display("Failed to get implicit GCP token"))]
-    GetImplicitToken { source: HttpError },
-    #[snafu(display("Failed to parse OAuth token JSON"))]
-    TokenFromJson { source: TokenErr },
-    #[snafu(display("Failed to parse OAuth token JSON text"))]
-    TokenJsonFromStr { source: serde_json::Error },
-    #[snafu(display("Failed to build HTTP client"))]
-    BuildHttpClient { source: HttpError },
 }
 
 #[derive(Debug, Snafu)]

@@ -4,7 +4,7 @@ use compiler::{
     ExpressionError, Function,
 };
 use lookup::LookupBuf;
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, sync::Arc};
 use vector_common::TimeZone;
 
 use crate::{state, Context, Program, Target, Value};
@@ -120,7 +120,7 @@ impl Runtime {
         external: &mut ExternalEnv,
     ) -> Result<Vm, String> {
         let mut local = LocalEnv::default();
-        let mut vm = Vm::new(fns);
+        let mut vm = Vm::new(Arc::new(fns));
 
         for expr in program.iter() {
             expr.compile_to_vm(&mut vm, (&mut local, external))?;

@@ -40,7 +40,6 @@ pub mod lua;
 pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-pub mod noop;
 #[cfg(feature = "transforms-pipelines")]
 pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]

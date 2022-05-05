@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     task::{Context, Poll},
@@ -8,6 +9,7 @@ use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
@@ -105,6 +107,13 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
         builder.region(region)
     }
 
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
     fn client_from_conf_conn(
         builder: Self::ConfigBuilder,
         connector: DynConnector,
@@ -159,7 +168,7 @@ impl CloudWatchMetricsSinkConfig {
     async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchClient> {
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
-            Region::new("us-east-1")
+            Some(Region::new("us-east-1"))
         } else {
             self.region.region()
         };
@@ -205,7 +214,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event.into_metric()).map(|mut metric| {
+                    normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -280,7 +289,7 @@ impl CloudWatchMetricsSvc {
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
