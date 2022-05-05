@@ -6,6 +6,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
+use indexmap::IndexMap;
 use rand::{prelude::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -78,7 +79,7 @@ pub struct Options {
     )]
     proxy: ProxyConfig,
 
-    tags: Option<HashMap<String, String>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 impl Default for Options {
@@ -469,10 +470,15 @@ const fn default_max_retries() -> u32 {
     8
 }
 
-/// Converts user configured tags to remap source code for adding tags/fields to
+/// Converts user configured tags to VRL source code for adding tags/fields to
 /// events
-fn tags_to_remap_config(tags: HashMap<String, String>, namespace: Option<String>) -> String {
-    todo!();
+fn convert_tags_to_vrl(tags: IndexMap<String, String>, namespace: Option<String>) -> String {
+    let json_tags = serde_json::to_string(&tags).unwrap();
+    if let Some(namespace) = namespace {
+        format!(r#"merge(., {{"{}": {}}})"#, namespace, json_tags)
+    } else {
+        format!(r#"merge(., {})"#, json_tags)
+    }
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
@@ -577,6 +583,7 @@ mod test {
     use std::{collections::HashMap, io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
+    use indexmap::IndexMap;
     use indoc::formatdoc;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
@@ -584,7 +591,7 @@ mod test {
     use crate::{
         app::Application,
         cli::{Color, LogFormat, Opts, RootOpts},
-        config::enterprise::{default_max_retries, tags_to_remap_config},
+        config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
     };
 
@@ -823,33 +830,29 @@ mod test {
 
     #[test]
     fn dynamic_tags_to_remap_config_for_metrics() {
-        let tags = HashMap::from([
+        let tags = IndexMap::from([
             ("pull_request".to_string(), "1234".to_string()),
             ("replica".to_string(), "abcd".to_string()),
             ("variant".to_string(), "baseline".to_string()),
         ]);
 
         assert_eq!(
-            tags_to_remap_config(tags, Some("tags".to_string())),
-            r#"
-            merge(., {"tags": {"pull_request":"1234","replica":"abcd","variant":"baseline"}})
-        "#
+            convert_tags_to_vrl(tags, Some("tags".to_string())),
+            r#"merge(., {"tags": {"pull_request":"1234","replica":"abcd","variant":"baseline"}})"#
         );
     }
 
     #[test]
     fn dynamic_tags_to_remap_config_for_logs() {
-        let tags = HashMap::from([
+        let tags = IndexMap::from([
             ("pull_request".to_string(), "1234".to_string()),
             ("replica".to_string(), "abcd".to_string()),
             ("variant".to_string(), "baseline".to_string()),
         ]);
 
         assert_eq!(
-            tags_to_remap_config(tags, None),
-            r#"
-            merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"})
-        "#
+            convert_tags_to_vrl(tags, None),
+            r#"merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"})"#
         );
     }
 }
