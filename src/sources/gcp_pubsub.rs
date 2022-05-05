@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::sync::Mutex;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
-    transport::{Certificate, Channel, ClientTlsConfig, Identity},
+    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Request,
 };
 use vector_core::ByteSizeOf;
@@ -71,11 +71,11 @@ enum PubsubError {
     Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
-    #[snafu(display("Could not create channel: {}", source))]
-    Channel { source: InvalidUri },
-    #[snafu(display("Could not set up channel TLS settings: {}", source))]
-    ChannelTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect channel: {}", source))]
+    #[snafu(display("Could not create endpoint: {}", source))]
+    Endpoint { source: InvalidUri },
+    #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
+    EndpointTls { source: tonic::transport::Error },
+    #[snafu(display("Could not connect: {}", source))]
     Connect { source: tonic::transport::Error },
     #[snafu(display("Could not pull data from remote: {}", source))]
     Pull { source: tonic::Status },
@@ -199,18 +199,19 @@ struct PubsubSource {
 
 impl PubsubSource {
     async fn run(mut self) -> crate::Result<()> {
-        while self.run_once().await? {}
+        let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
+        if self.uri.scheme() != Some(&Scheme::HTTP) {
+            endpoint = endpoint
+                .tls_config(self.make_tls_config())
+                .context(EndpointTlsSnafu)?;
+        }
+
+        while self.run_once(&endpoint).await? {}
         Ok(())
     }
 
-    async fn run_once(&mut self) -> Result<bool, PubsubError> {
-        let mut channel = Channel::from_shared(self.endpoint.clone()).context(ChannelSnafu)?;
-        if self.uri.scheme() != Some(&Scheme::HTTP) {
-            channel = channel
-                .tls_config(self.make_tls_config())
-                .context(ChannelTlsSnafu)?;
-        }
-        let connection = channel.connect().await.context(ConnectSnafu)?;
+    async fn run_once(&mut self, endpoint: &Endpoint) -> Result<bool, PubsubError> {
+        let connection = endpoint.connect().await.context(ConnectSnafu)?;
 
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             connection,
