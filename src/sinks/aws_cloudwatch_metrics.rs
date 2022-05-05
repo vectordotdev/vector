@@ -11,6 +11,7 @@ use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
@@ -112,6 +113,13 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
         sleep_impl: Arc<dyn AsyncSleep>,
     ) -> Self::ConfigBuilder {
         builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(
