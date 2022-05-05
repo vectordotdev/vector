@@ -33,5 +33,7 @@ default = ["repl", "expressions"]
 repl = ["once_cell", "prettytable-rs", "regex", "rustyline", "webbrowser"]
 expressions = [
   "expr-abort",
+  "expr-op",
 ]
 expr-abort = ["vrl/expr-abort"]
+expr-op = ["vrl/expr-op"]

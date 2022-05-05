@@ -308,6 +308,7 @@ impl<'a> Compiler<'a> {
         )
     }
 
+    #[cfg(feature = "expr-op")]
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Op {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
@@ -324,7 +325,13 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-op"))]
+    fn compile_op(&mut self, node: Node<ast::Op>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-op")
+    }
+
     /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    #[cfg(feature = "expr-op")]
     fn rewrite_to_merge(
         &mut self,
         span: diagnostic::Span,
@@ -345,6 +352,20 @@ impl<'a> Compiler<'a> {
                 ),
                 external,
             )),
+        ))
+    }
+
+    #[cfg(not(feature = "expr-op"))]
+    fn rewrite_to_merge(
+        &mut self,
+        span: diagnostic::Span,
+        _: &Node<ast::AssignmentTarget>,
+        _: Box<Node<ast::Expr>>,
+        _: &mut ExternalEnv,
+    ) -> Box<Node<Expr>> {
+        Box::new(Node::new(
+            span,
+            self.handle_missing_feature_error(span, "expr-op").into(),
         ))
     }
 

@@ -9,8 +9,10 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-op",
 ]
 expr-abort = ["compiler/expr-abort"]
+expr-op = ["compiler/expr-op"]
 
 [dependencies]
 bytes = "1.1.0"

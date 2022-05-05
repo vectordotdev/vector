@@ -20,6 +20,7 @@ mod levenstein;
 mod noop;
 mod not;
 mod object;
+#[cfg(feature = "expr-op")]
 mod op;
 mod unary;
 mod variable;
@@ -46,6 +47,7 @@ pub use literal::Literal;
 pub use noop::Noop;
 pub use not::Not;
 pub use object::Object;
+#[cfg(feature = "expr-op")]
 pub use op::Op;
 pub use predicate::Predicate;
 pub use query::{Query, Target};
@@ -108,6 +110,7 @@ pub enum Expr {
     Literal(Literal),
     Container(Container),
     IfStatement(IfStatement),
+    #[cfg(feature = "expr-op")]
     Op(Op),
     Assignment(Assignment),
     Query(Query),
@@ -133,6 +136,7 @@ impl Expr {
                 Object(..) => "object",
             },
             IfStatement(..) => "if-statement",
+            #[cfg(feature = "expr-op")]
             Op(..) => "operation",
             Assignment(..) => "assignment",
             Query(..) => "query",
@@ -199,6 +203,7 @@ impl Expression for Expr {
             Literal(v) => v.resolve(ctx),
             Container(v) => v.resolve(ctx),
             IfStatement(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-op")]
             Op(v) => v.resolve(ctx),
             Assignment(v) => v.resolve(ctx),
             Query(v) => v.resolve(ctx),
@@ -218,6 +223,7 @@ impl Expression for Expr {
             Literal(v) => Expression::as_value(v),
             Container(v) => Expression::as_value(v),
             IfStatement(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-op")]
             Op(v) => Expression::as_value(v),
             Assignment(v) => Expression::as_value(v),
             Query(v) => Expression::as_value(v),
@@ -237,6 +243,7 @@ impl Expression for Expr {
             Literal(v) => v.type_def(state),
             Container(v) => v.type_def(state),
             IfStatement(v) => v.type_def(state),
+            #[cfg(feature = "expr-op")]
             Op(v) => v.type_def(state),
             Assignment(v) => v.type_def(state),
             Query(v) => v.type_def(state),
@@ -261,6 +268,7 @@ impl Expression for Expr {
             Literal(v) => v.compile_to_vm(vm, state),
             Container(v) => v.compile_to_vm(vm, state),
             IfStatement(v) => v.compile_to_vm(vm, state),
+            #[cfg(feature = "expr-op")]
             Op(v) => v.compile_to_vm(vm, state),
             Assignment(v) => v.compile_to_vm(vm, state),
             Query(v) => v.compile_to_vm(vm, state),
@@ -282,6 +290,7 @@ impl fmt::Display for Expr {
             Literal(v) => v.fmt(f),
             Container(v) => v.fmt(f),
             IfStatement(v) => v.fmt(f),
+            #[cfg(feature = "expr-op")]
             Op(v) => v.fmt(f),
             Assignment(v) => v.fmt(f),
             Query(v) => v.fmt(f),
@@ -315,6 +324,7 @@ impl From<IfStatement> for Expr {
     }
 }
 
+#[cfg(feature = "expr-op")]
 impl From<Op> for Expr {
     fn from(op: Op) -> Self {
         Expr::Op(op)

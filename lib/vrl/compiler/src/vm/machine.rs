@@ -1,6 +1,8 @@
 use super::VmFunctionClosure;
 use super::{state::VmState, Variable, VmArgumentList};
-use crate::value::{VrlValueArithmetic, VrlValueConvert};
+#[cfg(feature = "expr-op")]
+use crate::value::VrlValueArithmetic;
+use crate::value::VrlValueConvert;
 use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -17,45 +19,58 @@ pub enum OpCode {
     Constant,
 
     /// Adds the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Add,
 
     /// Subtracts the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Subtract,
 
     /// Multiplies the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Multiply,
 
     /// Divides the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Divide,
 
     /// Divides the two values at the top of the stack, placing the remainder back on the stack.
+    #[cfg(feature = "expr-op")]
     Rem,
 
     /// Merges the two objects at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Merge,
 
     /// Ands the two objects at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     And,
 
     /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
     Not,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater than the first.
+    #[cfg(feature = "expr-op")]
     Greater,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater or equal than the first.
+    #[cfg(feature = "expr-op")]
     GreaterEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is less than the first.
+    #[cfg(feature = "expr-op")]
     Less,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is less than or equal the first.
+    #[cfg(feature = "expr-op")]
     LessEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the two elements are not equal.
+    #[cfg(feature = "expr-op")]
     NotEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the two elements are equal.
+    #[cfg(feature = "expr-op")]
     Equal,
 
     /// Pops the top element from the stack, discarding it.
@@ -316,17 +331,29 @@ impl Vm {
                     Value::Boolean(value) => state.stack.push(Value::Boolean(!value)),
                     _ => return Err("Negating non boolean".into()),
                 },
+                #[cfg(feature = "expr-op")]
                 OpCode::Add => binary_op(&mut state, Value::try_add)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Subtract => binary_op(&mut state, Value::try_sub)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Multiply => binary_op(&mut state, Value::try_mul)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Divide => binary_op(&mut state, Value::try_div)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::And => binary_op(&mut state, Value::try_and)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Less => binary_op(&mut state, Value::try_lt)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::NotEqual => {
                     if state.error.is_none() {
                         let rhs = state.pop_stack()?;
@@ -336,6 +363,7 @@ impl Vm {
                         state.pop_stack()?;
                     }
                 }
+                #[cfg(feature = "expr-op")]
                 OpCode::Equal => {
                     if state.error.is_none() {
                         let rhs = state.pop_stack()?;
