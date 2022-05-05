@@ -156,7 +156,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1.7.0
+        uses: docker/setup-buildx-action@v2.0.0
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -201,7 +201,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1.7.0
+        uses: docker/setup-buildx-action@v2.0.0
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
