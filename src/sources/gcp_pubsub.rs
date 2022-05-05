@@ -229,10 +229,7 @@ impl PubsubSource {
         let request_stream = self.request_stream();
         let stream = tokio::select! {
             _ = &mut self.shutdown => return Ok(false),
-            result = client.streaming_pull(request_stream) => match result {
-                    Err(source) => return Err(PubsubError::Pull { source }.into()),
-                    Ok(stream) => stream,
-                }
+            result = client.streaming_pull(request_stream) => result.context(PullSnafu)?,
         };
         let mut stream = stream.into_inner();
 
