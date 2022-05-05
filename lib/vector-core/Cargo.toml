@@ -49,7 +49,7 @@ tracing-core = { version = "0.1.26", default-features = false }
 tracing-log = { version = "0.1.3", default-features = false }
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["std"] }
 typetag = { version = "0.1.8", default-features = false }
-twox-hash = { version = "1.6.2", default-features = false }
+twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector_buffers = { path = "../vector-buffers", default-features = false }
