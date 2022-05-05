@@ -1,11 +1,13 @@
 use std::{collections::HashMap, io::Read};
 
-use futures::executor;
+use bytes::BytesMut;
+use futures::{executor, StreamExt};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
+use tokio_util::codec;
 use toml::value::Table;
 use typetag::serde;
 
@@ -196,15 +198,6 @@ impl SecretBackend for ExecBackend {
                 signal_rx,
             )
             .await
-            /*loop {
-                tokio::select! {
-                    biased;
-                    Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
-                        break Err("Secret retrieval was interrupted.".into());
-                    }
-                    output = query_backend(&self.command, new_query(secret_keys.clone()), self.timeout) => break output,
-                }
-            }*/
         })?;
         let mut secrets = HashMap::new();
         for k in secret_keys.into_iter() {
@@ -248,36 +241,51 @@ async fn query_backend(
 
     let mut child = command.spawn()?;
     let mut stdin = child.stdin.take().ok_or("unable to acquire stdin")?;
+    let mut stderr_stream = child
+        .stderr
+        .map(|s| codec::FramedRead::new(s, codec::LinesCodec::new()))
+        .take()
+        .ok_or("unable to acquire stderr")?;
+    let mut stdout_stream = child
+        .stdout
+        .map(|s| codec::FramedRead::new(s, codec::BytesCodec::new()))
+        .take()
+        .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;
     tokio::spawn(async move { stdin.write_all(&query).await });
 
     let timeout = time::sleep(time::Duration::from_secs(timeout));
     tokio::pin!(timeout);
-    let output = loop {
+    let mut output = BytesMut::new();
+    loop {
         tokio::select! {
             biased;
             Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
                 drop(command);
                 return Err("Secret retrieval was interrupted.".into());
             }
-            output = child.wait_with_output() => break output,
+            Some(stderr) = stderr_stream.next() => {
+                match stderr {
+                    Ok(l) => warn!("Stderr read from an exec backend: \"{}\".", l),
+                    Err(e) => warn!("Error while reading stderr from an exec backend: {}.", e),
+                }
+            }
+            stdout = stdout_stream.next() => {
+                match stdout {
+                    None => break,
+                    Some(Ok(b)) => output.extend(b),
+                    Some(Err(e)) => return Err(format!("Error while reading stdout from an exec backend: {}.", e).into()),
+                }
+            }
             _ = &mut timeout => {
                 drop(command);
                 return Err("Command timed-out".into());
             }
         }
-    }?;
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if !stderr.trim().is_empty() {
-        warn!(
-            "A secret exec backend wrote a message on stderr: {}.",
-            stderr
-        );
     }
 
-    let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output.stdout)?;
+    let response = serde_json::from_slice::<HashMap<String, ExecResponse>>(&output)?;
     Ok(response)
 }
 
