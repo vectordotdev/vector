@@ -16,7 +16,7 @@ use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
 #[derive(Clone)]
 pub struct KinesisService {
     pub client: KinesisFirehoseClient,
-    pub region: Region,
+    pub region: Option<Region>,
     pub stream_name: String,
 }
 

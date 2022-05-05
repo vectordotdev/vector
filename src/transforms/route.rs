@@ -113,9 +113,9 @@ impl TransformConfig for RouteConfig {
         let mut result: Vec<Output> = self
             .route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::all())))
+            .map(|output_name| Output::default(DataType::all()).with_port(output_name))
             .collect();
-        result.push(Output::from((UNMATCHED_ROUTE, DataType::all())));
+        result.push(Output::default(DataType::all()).with_port(UNMATCHED_ROUTE));
         result
     }
 
@@ -243,7 +243,9 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
                 .collect(),
             1,
         );
@@ -282,7 +284,9 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
                 .collect(),
             1,
         );
@@ -320,7 +324,9 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::all())))
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
                 .collect(),
             1,
         );

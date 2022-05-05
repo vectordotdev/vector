@@ -125,7 +125,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.53", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.18.0", default-features = false, features = ["full"] }
+tokio = { version = "1.18.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -169,10 +169,10 @@ tower = { version = "0.4.12", default-features = false, features = ["buffer", "l
 # Serde
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
-serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.80", default-features = false, features = ["raw_value"] }
+serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
+serde_json = { version = "1.0.81", default-features = false, features = ["raw_value"] }
 serde_with = { version = "1.13.0", default-features = false, features = ["macros"], optional = true }
-serde_yaml = { version = "0.8.23", default-features = false }
+serde_yaml = { version = "0.8.24", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.0", default-features = false, optional = true }
@@ -219,7 +219,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
-clap = { version = "3.1.12", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.1.15", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -257,7 +257,7 @@ nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
-openssl = { version = "0.10.38", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.39", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -273,7 +273,7 @@ roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.9", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
-snafu = { version = "0.7.0", default-features = false, features = ["futures"] }
+snafu = { version = "0.7.1", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
@@ -282,9 +282,10 @@ strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
-tonic = { version = "0.7.1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "compression"] }
+tonic = { version = "0.7.1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -318,13 +319,13 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.4", default-features = false }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.124"
+libc = "0.2.125"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.18.0", features = ["test-util"] }
+tokio = { version = "1.18.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
@@ -621,6 +622,7 @@ sinks-logs = [
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-vector",
+  "sinks-websocket",
 ]
 sinks-metrics = [
   "sinks-aws_cloudwatch_metrics",
@@ -676,6 +678,7 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
+sinks-websocket = ["tokio-tungstenite"]
 
 # Datadog integration
 enterprise = [
@@ -793,6 +796,10 @@ vector-unit-test-tests = [
   "transforms-log_to_metric",
   "transforms-remove_fields",
   "sinks-console"
+]
+enterprise-tests = [
+  "sources-demo_logs",
+  "sinks-blackhole",
 ]
 
 # grouping together features for benchmarks
