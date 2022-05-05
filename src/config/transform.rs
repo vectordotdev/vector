@@ -16,6 +16,7 @@ pub struct TransformOuter<T> {
 }
 
 impl<T> TransformOuter<T> {
+    #[cfg(feature = "enterprise")]
     pub(super) fn new(inputs: Vec<T>, transform: impl TransformConfig + 'static) -> Self {
         TransformOuter {
             inputs,
