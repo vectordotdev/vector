@@ -20,10 +20,12 @@ address = "0.0.0.0:8282"
 type = "remap"
 inputs = ["logs"]
 source = '''
-source = del(.ddsource)
-., err = parse_json(.message)
+parsed, err = parse_json(.message)
+if err == null {
+  . |= object!(parsed)
+}
 .custom = {}
-.source = source
+.source = del(.ddsource) # below filters expect `source`
 '''
 
 [transforms.processing]
