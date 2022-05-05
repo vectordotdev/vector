@@ -96,7 +96,6 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                             }
                         },
                     };
-                    println!("{}", parsed);
                 }
             } else {
                 // this must be a regex named capturing group (?<name>group),
