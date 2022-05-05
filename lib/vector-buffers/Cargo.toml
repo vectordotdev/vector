@@ -29,7 +29,7 @@ serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 snafu = { version = "0.7.1", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.7.0", default-features = false }
-tokio = { version = "1.18.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.18.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 
