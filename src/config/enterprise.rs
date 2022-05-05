@@ -1,6 +1,7 @@
 use std::{
+    collections::HashMap,
     env,
-    fmt::{Display, Formatter}, collections::HashMap,
+    fmt::{Display, Formatter},
 };
 
 use http::Request;
@@ -468,6 +469,12 @@ const fn default_max_retries() -> u32 {
     8
 }
 
+/// Converts user configured tags to remap source code for adding tags/fields to
+/// events
+fn tags_to_remap_config(tags: HashMap<String, String>, namespace: Option<String>) -> String {
+    todo!();
+}
+
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
 fn get_reporting_endpoint(
     endpoint: Option<&String>,
@@ -567,7 +574,7 @@ async fn report_serialized_config_to_datadog<'a>(
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
-    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+    use std::{collections::HashMap, io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
     use indoc::formatdoc;
@@ -577,7 +584,7 @@ mod test {
     use crate::{
         app::Application,
         cli::{Color, LogFormat, Opts, RootOpts},
-        config::enterprise::default_max_retries,
+        config::enterprise::{default_max_retries, tags_to_remap_config},
         http::HttpClient,
     };
 
@@ -812,5 +819,37 @@ mod test {
         .unwrap();
 
         assert!(!vector_continued);
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_metrics() {
+        let tags = HashMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+
+        assert_eq!(
+            tags_to_remap_config(tags, Some("tags".to_string())),
+            r#"
+            merge(., {"tags": {"pull_request":"1234","replica":"abcd","variant":"baseline"}})
+        "#
+        );
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_logs() {
+        let tags = HashMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+
+        assert_eq!(
+            tags_to_remap_config(tags, None),
+            r#"
+            merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"})
+        "#
+        );
     }
 }
