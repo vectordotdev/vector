@@ -25,6 +25,7 @@ if err == null {
   . |= object!(parsed)
 }
 .custom = {}
+.tags = del(.ddtags) # below transforms would expect tags to be here
 .source = del(.ddsource) # below filters expect `source`
 '''
 

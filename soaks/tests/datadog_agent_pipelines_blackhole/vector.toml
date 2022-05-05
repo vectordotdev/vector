@@ -32,7 +32,7 @@ if starts_with(strip_whitespace!(.message), "{") {
   }
 }
 .custom.message = .message
-.tags = []
+.tags = del(.ddtags) # below transforms expect tags to be here
 .source = del(.ddsource) # below filters expect `source`
 '''
 
