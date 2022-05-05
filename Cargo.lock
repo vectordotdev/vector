@@ -8386,8 +8386,7 @@ dependencies = [
 [[package]]
 name = "uaparser"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7ce30305c85c8234dbea6fab090a21d53000a368df718d1aa11422a4a540971"
+source = "git+https://github.com/blt/uap-rs?branch=stringless_defaults#1698af0b636161fb35aaf6050116b1a983ff16ea"
 dependencies = [
  "derive_more",
  "lazy_static",
