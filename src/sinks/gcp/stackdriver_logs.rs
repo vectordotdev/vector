@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -24,7 +24,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::{Template, TemplateRenderingError},
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -56,7 +56,7 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,

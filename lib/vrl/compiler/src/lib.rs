@@ -21,16 +21,17 @@ pub use crate::value::Value;
 use ::serde::{Deserialize, Serialize};
 pub use context::Context;
 pub use core::{value, ExpressionError, Resolved, Target};
+use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
-pub use program::Program;
+pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
-pub type Result<T = Program> = std::result::Result<T, compiler::Errors>;
+pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
@@ -82,8 +83,10 @@ pub fn compile_for_repl(
     fns: &[Box<dyn Function>],
     local: state::LocalEnv,
     external: &mut ExternalEnv,
-) -> Result<(Program, state::LocalEnv)> {
-    compiler::Compiler::new_with_local_state(fns, local).compile(ast, external)
+) -> Result<Program> {
+    compiler::Compiler::new_with_local_state(fns, local)
+        .compile(ast, external)
+        .map(|(program, _)| program)
 }
 
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]
@@ -98,9 +101,7 @@ pub fn compile_with_state(
     fns: &[Box<dyn Function>],
     state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns)
-        .compile(ast, state)
-        .map(|(program, _)| program)
+    compiler::Compiler::new(fns).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.

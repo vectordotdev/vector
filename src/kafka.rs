@@ -4,7 +4,7 @@ use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-use crate::{internal_events::KafkaStatisticsReceived, tls::TlsOptions};
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsConfig};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -42,7 +42,7 @@ pub(crate) struct KafkaSaslConfig {
 pub(crate) struct KafkaTlsConfig {
     pub(crate) enabled: Option<bool>,
     #[serde(flatten)]
-    pub(crate) options: TlsOptions,
+    pub(crate) options: TlsConfig,
 }
 
 impl KafkaAuthConfig {

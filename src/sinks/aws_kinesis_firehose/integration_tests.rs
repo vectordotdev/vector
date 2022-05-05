@@ -78,7 +78,9 @@ async fn firehose_put_records() {
     components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
-        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+        auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+            load_timeout_secs: Some(5),
+        })),
         endpoint: elasticsearch_address(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
@@ -154,7 +156,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         aws_sdk_elasticsearch::config::Builder::new()
             .credentials_provider(
                 AwsAuthentication::test_auth()
-                    .credentials_provider(test_region_endpoint().region())
+                    .credentials_provider(test_region_endpoint().region().unwrap())
                     .await
                     .unwrap(),
             )

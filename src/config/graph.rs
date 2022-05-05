@@ -397,7 +397,9 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { outputs, .. }) => outputs.push(Output::from((name, ty))),
+                Some(Node::Transform { outputs, .. }) => {
+                    outputs.push(Output::default(ty).with_port(name))
+                }
                 _ => panic!("invalid transform"),
             }
         }
@@ -631,7 +633,7 @@ mod test {
                 in_ty: DataType::all(),
                 outputs: vec![
                     Output::default(DataType::all()),
-                    Output::from(("bar", DataType::all())),
+                    Output::default(DataType::all()).with_port("bar"),
                 ],
             },
         );
@@ -649,7 +651,7 @@ mod test {
                 in_ty: DataType::all(),
                 outputs: vec![
                     Output::default(DataType::all()),
-                    Output::from(("errors", DataType::all())),
+                    Output::default(DataType::all()).with_port("errors"),
                 ],
             },
         );

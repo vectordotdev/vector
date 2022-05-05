@@ -91,6 +91,7 @@ default = [
     "flatten",
     "float",
     "floor",
+    "for_each",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -121,6 +122,8 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -222,6 +225,7 @@ find_table_row = []
 flatten = []
 float = []
 floor = []
+for_each = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
@@ -252,6 +256,8 @@ is_timestamp = ["chrono"]
 join = []
 length = []
 log = ["tracing"]
+map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]

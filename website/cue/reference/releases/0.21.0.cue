@@ -84,7 +84,8 @@ releases: "0.21.0": {
 		  [report](https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+bug&template=bug.yml) any
 		  issues you find.
 		- A new `redis` source to complement the `redis` sink.
-		- Initial support for ingesting traces from the Datadog Agent and forwarding them to Datadog.
+		- Initial support for ingesting traces from the Datadog Agent (version < 6/7.33) and forwarding them to Datadog.
+		  We are working on adding support for newer Datadog Agents.
 		- The `kubernetes_logs` source has been rewritten to use the community supported
 		  [`kube-rs`](https://github.com/kube-rs/kube-rs) library. We expect that this will resolve some long
 		  outstanding bugs with Vector ceasing to process container logs. It also adds support for Kubernetes

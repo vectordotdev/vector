@@ -1,5 +1,5 @@
 use anymap::AnyMap;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 use value::Kind;
 
@@ -22,6 +22,21 @@ impl LocalEnv {
 
     pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
         self.bindings.insert(ident, details);
+    }
+
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<assignment::Details> {
+        self.bindings.remove(ident)
+    }
+
+    /// Merge state present in both `self` and `other`.
+    pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings.into_iter() {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = other_details;
+            }
+        }
+
+        self
     }
 }
 
@@ -107,5 +122,19 @@ impl Runtime {
 
     pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
         self.variables.insert(ident, value);
+    }
+
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) {
+        self.variables.remove(ident);
+    }
+
+    pub(crate) fn swap_variable(&mut self, ident: Ident, value: Value) -> Option<Value> {
+        match self.variables.entry(ident) {
+            Entry::Occupied(mut v) => Some(std::mem::replace(v.get_mut(), value)),
+            Entry::Vacant(v) => {
+                v.insert(value);
+                None
+            }
+        }
     }
 }

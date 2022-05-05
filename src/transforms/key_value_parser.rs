@@ -205,6 +205,7 @@ mod tests {
         transforms::OutputBuffer,
     };
 
+    #[allow(clippy::too_many_arguments)]
     async fn parse_log(
         text: &str,
         separator: Option<String>,

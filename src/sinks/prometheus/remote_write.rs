@@ -25,7 +25,7 @@ use crate::{
         },
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -63,7 +63,7 @@ pub struct RemoteWriteConfig {
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     pub auth: Option<Auth>,
 }
@@ -110,7 +110,7 @@ impl SinkConfig for RemoteWriteConfig {
                 .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
-                    stream::iter(normalizer.apply(event.into_metric()).map(|event| {
+                    stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
@@ -173,7 +173,7 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
 pub struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -462,7 +462,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     const HTTP_URL: &str = "http://localhost:8086";
@@ -487,7 +487,7 @@ mod integration_tests {
 
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),

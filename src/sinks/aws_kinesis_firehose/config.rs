@@ -2,9 +2,12 @@ use aws_sdk_firehose::error::{
     DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
 };
 use aws_sdk_firehose::types::SdkError;
+use std::sync::Arc;
 
 use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -30,7 +33,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -61,7 +64,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -129,6 +132,20 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(

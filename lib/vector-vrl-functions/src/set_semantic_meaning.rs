@@ -69,7 +69,7 @@ impl Function for SetSemanticMeaning {
             return Err(Box::new(ExpressionError::from(format!(
                 "meaning must be set on an external field: {}",
                 query
-            ))) as Box<dyn DiagnosticError>);
+            ))) as Box<dyn DiagnosticMessage>);
         }
 
         if let Some(list) = ctx.get_external_context_mut::<MeaningList>() {

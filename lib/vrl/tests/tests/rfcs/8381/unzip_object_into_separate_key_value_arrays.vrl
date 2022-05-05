@@ -1,8 +1,7 @@
-# SKIP
 # object: { "foo": true, "bar": "bar", "baz": "", "qux": { "quux": "" }, "quux": [true] }
 # result: [
-#   ["foo", "bar", "baz", "qux", "quux"],
-#   [true, "bar", "", { "quux": "" }, [true]],
+#   ["bar", "baz", "foo", "quux", "qux"],
+#   ["bar", "", true, [true], { "quux": "" }]
 # ]
 
 keys = []

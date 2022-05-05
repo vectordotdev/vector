@@ -12,7 +12,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::util::{encoding::EncodingConfig, TowerRequestConfig},
     template::{Template, TemplateParseError},
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -38,7 +38,7 @@ pub struct SqsSinkConfig {
     pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     pub(super) assume_role: Option<String>,
     #[serde(default)]

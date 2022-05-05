@@ -16,7 +16,7 @@ use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
     config::ProxyConfig,

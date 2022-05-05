@@ -9,7 +9,7 @@ use crate::{
     config::{GenerateConfig, SinkContext},
     sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -17,19 +17,19 @@ use crate::{
 pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
 impl VectorConfig {
-    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
         self.tls = config;
     }
 
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {

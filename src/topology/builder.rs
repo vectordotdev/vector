@@ -13,7 +13,7 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::{
         topology::{

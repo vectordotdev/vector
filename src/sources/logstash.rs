@@ -22,7 +22,7 @@ use crate::{
     event::{Event, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     types,
 };
 
@@ -30,7 +30,7 @@ use crate::{
 pub struct LogstashConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
@@ -675,7 +675,7 @@ mod integration_tests {
         config::SourceContext,
         event::EventStatus,
         test_util::{collect_n, trace_init, wait_for_tcp},
-        tls::TlsOptions,
+        tls::TlsConfig,
         SourceSender,
     };
 
@@ -715,9 +715,9 @@ mod integration_tests {
 
         let out = source(
             logstash_address(),
-            Some(TlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
-                options: TlsOptions {
+                options: TlsConfig {
                     crt_file: Some("tests/data/host.docker.internal.crt".into()),
                     key_file: Some("tests/data/host.docker.internal.key".into()),
                     ..Default::default()
@@ -741,7 +741,10 @@ mod integration_tests {
         assert!(log.get("host").is_some());
     }
 
-    async fn source(address: String, tls: Option<TlsConfig>) -> impl Stream<Item = Event> {
+    async fn source(
+        address: String,
+        tls: Option<TlsEnableableConfig>,
+    ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
         tokio::spawn(async move {

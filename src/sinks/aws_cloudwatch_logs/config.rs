@@ -1,4 +1,5 @@
 use aws_sdk_cloudwatchlogs::{Endpoint, Region};
+use std::sync::Arc;
 use tower::ServiceBuilder;
 
 use futures::FutureExt;
@@ -23,10 +24,12 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 
 pub struct CloudwatchLogsClientBuilder;
@@ -50,6 +53,20 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(
@@ -77,7 +94,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
