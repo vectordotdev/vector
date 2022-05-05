@@ -367,8 +367,8 @@ pub async fn try_attach(
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            tags.version = "{}"
-            tags.configuration_key = "{}"
+            .tags.version = "{}"
+            .tags.configuration_key = "{}"
         "#,
             &config_version, &datadog.configuration_key,
         )),
@@ -378,8 +378,8 @@ pub async fn try_attach(
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
-            version = "{}"
-            configuration_key = "{}"
+            .version = "{}"
+            .configuration_key = "{}"
         "#,
             &config_version, &datadog.configuration_key,
         )),
