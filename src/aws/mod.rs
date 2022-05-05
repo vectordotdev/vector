@@ -10,6 +10,7 @@ use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::erase::DynConnector;
 use aws_smithy_client::SdkError;
 use aws_smithy_http::endpoint::Endpoint;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use once_cell::sync::OnceCell;
@@ -79,6 +80,11 @@ pub trait ClientBuilder {
         sleep_impl: Arc<dyn AsyncSleep>,
     ) -> Self::ConfigBuilder;
 
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder;
+
     fn client_from_conf_conn(builder: Self::ConfigBuilder, connector: DynConnector)
         -> Self::Client;
 }
@@ -122,6 +128,8 @@ pub async fn create_client<T: ClientBuilder>(
     };
 
     config_builder = T::with_sleep_impl(config_builder, Arc::new(TokioSleep));
+    // we disable retries because we have our own retry layer wired together with ARC to backoff
+    config_builder = T::with_retry_config(config_builder, RetryConfig::disabled());
 
     Ok(T::client_from_conf_conn(config_builder, connector))
 }
