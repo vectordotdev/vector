@@ -199,16 +199,21 @@ struct PubsubSource {
 
 impl PubsubSource {
     async fn run(mut self) -> crate::Result<()> {
+        while self.run_once().await? {}
+        Ok(())
+    }
+
+    async fn run_once(&mut self) -> Result<bool, PubsubError> {
         let mut channel = Channel::from_shared(self.endpoint.clone()).context(ChannelSnafu)?;
         if self.uri.scheme() != Some(&Scheme::HTTP) {
             channel = channel
                 .tls_config(self.make_tls_config())
                 .context(ChannelTlsSnafu)?;
         }
-        let channel = channel.connect().await.context(ConnectSnafu)?;
+        let connection = channel.connect().await.context(ConnectSnafu)?;
 
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
-            channel,
+            connection,
             |mut req: Request<()>| {
                 if let Some(authorization) = &self.authorization {
                     req.metadata_mut()
@@ -222,7 +227,7 @@ impl PubsubSource {
         // start if there is no data in the subscription.
         let request_stream = self.request_stream();
         let stream = tokio::select! {
-            _ = &mut self.shutdown => return Ok(()),
+            _ = &mut self.shutdown => return Ok(false),
             result = client.streaming_pull(request_stream) => match result {
                     Err(source) => return Err(PubsubError::Pull { source }.into()),
                     Ok(stream) => stream,
@@ -242,7 +247,7 @@ impl PubsubSource {
 
         loop {
             tokio::select! {
-                _ = &mut self.shutdown => break,
+                _ = &mut self.shutdown => return Ok(false),
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
                     Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
@@ -251,7 +256,7 @@ impl PubsubSource {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn make_tls_config(&self) -> ClientTlsConfig {
