@@ -129,7 +129,7 @@ pub async fn create_client<T: ClientBuilder>(
 
     config_builder = T::with_sleep_impl(config_builder, Arc::new(TokioSleep));
     // we disable retries because we have our own retry layer wired together with ARC to backoff
-    config_builder = T::with_retry_config(config_builder, RetryConfig::new().with_max_attempts(1));
+    config_builder = T::with_retry_config(config_builder, RetryConfig::disabled());
 
     Ok(T::client_from_conf_conn(config_builder, connector))
 }
