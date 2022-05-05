@@ -79,7 +79,7 @@ pub struct HostMetricsConfig {
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
-    pub cgroups: cgroups::CGroupsConfig,
+    pub(crate) cgroups: cgroups::CGroupsConfig,
     #[serde(default)]
     pub disk: disk::DiskConfig,
     #[serde(default)]
