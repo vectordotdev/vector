@@ -63,6 +63,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(
+            self.address.to_string(),
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
@@ -145,7 +146,7 @@ mod tests {
         log_event,
         test_util::{
             collect_ready,
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{assert_source_compliance, PUSH_SOURCE_TAGS},
             next_addr, wait_for_tcp,
         },
         SourceSender,
@@ -401,7 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(None, None, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();

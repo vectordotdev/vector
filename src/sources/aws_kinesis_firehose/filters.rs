@@ -20,6 +20,7 @@ use crate::{
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
+    endpoint: String,
     access_key: Option<String>,
     record_compression: Compression,
     decoder: codecs::Decoder,
@@ -31,6 +32,7 @@ pub fn firehose(
         .and(authenticate(access_key))
         .and(warp::header("X-Amz-Firehose-Request-Id"))
         .and(warp::header("X-Amz-Firehose-Source-Arn"))
+        .and(warp::any().map(move || endpoint.clone()))
         .and(
             warp::header("X-Amz-Firehose-Protocol-Version")
                 .and_then(|version: String| async move {

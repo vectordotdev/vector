@@ -23,6 +23,9 @@ use crate::{
     SourceSender,
 };
 
+/// The standard set of tags for sources that have their data pushed in from an external source.
+pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
 /// The standard set of tags for sources that pull their data from an external source.
 pub const PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
@@ -203,7 +206,7 @@ impl ComponentTester {
         for name in names {
             if !event_test_util::contains_name(name) {
                 self.errors
-                    .push(format!("Missing emitted event `{}`", name));
+                    .push(format!("  - Missing emitted event `{}`", name));
             }
         }
     }

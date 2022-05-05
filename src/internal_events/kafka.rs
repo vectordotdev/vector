@@ -15,6 +15,7 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
+            protocol = "tcp",
             topic = self.topic,
             partition = %self.partition,
         );
