@@ -314,29 +314,36 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fmt, str::FromStr, time::Duration};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        fmt,
+        str::FromStr,
+    };
 
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
     use futures_util::{stream, SinkExt};
     use rand::{thread_rng, Rng};
-    use serde_json::Value;
-    use tokio::io::AsyncWriteExt;
+    use tokio::{
+        io::AsyncWriteExt,
+        time::{Duration, Instant},
+    };
     use tokio_util::codec::{BytesCodec, FramedWrite, LinesCodec};
+    use value::Value;
     use vector_common::assert_event_data_eq;
+    use vector_core::config::ComponentKey;
 
     use super::*;
     use crate::{
-        config::{self, log_schema},
+        config::log_schema,
         event::Event,
-        sinks::{
-            socket::{self, SocketSinkConfig},
-            util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding},
-        },
         test_util::{
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
-            next_addr, random_maps, random_string, send_encodable, send_lines, start_topology,
-            wait_for_tcp, CountReceiver,
+            components::{
+                assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
+                SOCKET_PUSH_SOURCE_TAGS,
+            },
+            next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
+            CountReceiver,
         },
     };
 
@@ -735,29 +742,34 @@ mod test {
     async fn test_tcp_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-
             let in_addr = next_addr();
-            let out_addr = next_addr();
 
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                SyslogConfig::from_mode(Mode::Tcp {
-                    address: in_addr.into(),
-                    keepalive: None,
-                    tls: None,
-                    receive_buffer_bytes: None,
-                    connection_limit: None,
-                }),
-            );
-            config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
+            // Create and spawn the source.
+            let config = SyslogConfig::from_mode(Mode::Tcp {
+                address: in_addr.into(),
+                keepalive: None,
+                tls: None,
+                receive_buffer_bytes: None,
+                connection_limit: None,
+            });
 
-            let output_lines = CountReceiver::receive_lines(out_addr);
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
 
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            // Wait for server to accept traffic
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            // Wait for source to become ready to accept traffic.
             wait_for_tcp(in_addr).await;
 
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Now craft and send syslog messages to the source, and collect them on the other side.
             let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
@@ -767,19 +779,21 @@ mod test {
 
             send_lines(in_addr, input_lines).await.unwrap();
 
-            // Shut down server
-            topology.stop().await;
+            // Shutdown the source, and make sure we've got all the messages we sent in.
+            shutdown
+                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .await;
+            shutdown_complete.await;
 
-            let output_lines = output_lines.await;
-            assert_eq!(output_lines.len(), num_messages);
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), num_messages);
 
-            let output_messages: Vec<SyslogMessageRfc5424> = output_lines
-                .iter()
-                .map(|s| {
-                    let mut value = Value::from_str(s).unwrap();
-                    value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
-                    serde_json::from_value(value).unwrap()
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .into_iter()
+                .map(|mut e| {
+                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.into()
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
@@ -793,31 +807,35 @@ mod test {
         use std::os::unix::net::UnixStream as StdUnixStream;
         use tokio::net::UnixStream;
 
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let num_messages: usize = 10000;
-
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let num_messages: usize = 1;
             let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
-            let out_addr = next_addr();
 
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                SyslogConfig::from_mode(Mode::Unix {
-                    path: in_path.clone(),
-                    socket_file_mode: None,
-                }),
-            );
-            config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
+            // Create and spawn the source.
+            let config = SyslogConfig::from_mode(Mode::Unix {
+                path: in_path.clone(),
+                socket_file_mode: None,
+            });
 
-            let output_lines = CountReceiver::receive_lines(out_addr);
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
 
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
 
-            // Wait for server to accept traffic
+            // Wait for source to become ready to accept traffic.
             while StdUnixStream::connect(&in_path).is_err() {
                 tokio::task::yield_now().await;
             }
 
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Now craft and send syslog messages to the source, and collect them on the other side.
             let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
@@ -832,22 +850,25 @@ mod test {
             let stream = sink.get_mut();
             stream.shutdown().await.unwrap();
 
-            // Otherwise some lines will be lost
+            // A small delay to ensure everything has been flushed out.
+            //
+            // TODO: Try the test with this removed to see if it _actually_ matters.
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
-            // Shut down server
-            topology.stop().await;
+            shutdown
+                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .await;
+            shutdown_complete.await;
 
-            let output_lines = output_lines.await;
-            assert_eq!(output_lines.len(), num_messages);
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), num_messages);
 
-            let output_messages: Vec<SyslogMessageRfc5424> = output_lines
-                .iter()
-                .map(|s| {
-                    let mut value = Value::from_str(s).unwrap();
-                    value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
-                    serde_json::from_value(value).unwrap()
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .into_iter()
+                .map(|mut e| {
+                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.into()
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
@@ -859,30 +880,34 @@ mod test {
     async fn test_octet_counting_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-
             let in_addr = next_addr();
-            let out_addr = next_addr();
 
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                SyslogConfig::from_mode(Mode::Tcp {
-                    address: in_addr.into(),
-                    keepalive: None,
-                    tls: None,
-                    receive_buffer_bytes: None,
-                    connection_limit: None,
-                }),
-            );
-            config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
+            // Create and spawn the source.
+            let config = SyslogConfig::from_mode(Mode::Tcp {
+                address: in_addr.into(),
+                keepalive: None,
+                tls: None,
+                receive_buffer_bytes: None,
+                connection_limit: None,
+            });
 
-            let output_lines = CountReceiver::receive_lines(out_addr);
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
 
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
 
-            // Wait for server to accept traffic
+            // Wait for source to become ready to accept traffic.
             wait_for_tcp(in_addr).await;
 
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Now craft and send syslog messages to the source, and collect them on the other side.
             let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
                 .map(|i| {
                     let mut msg = SyslogMessageRfc5424::random(i, 30, 4, 3, 3);
@@ -903,19 +928,21 @@ mod test {
 
             send_encodable(in_addr, codec, input_lines).await.unwrap();
 
-            // Shut down server
-            topology.stop().await;
+            // Shutdown the source, and make sure we've got all the messages we sent in.
+            shutdown
+                .shutdown_all(Instant::now() + Duration::from_millis(100))
+                .await;
+            shutdown_complete.await;
 
-            let output_lines = output_lines.await;
-            assert_eq!(output_lines.len(), num_messages);
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), num_messages);
 
-            let output_messages: Vec<SyslogMessageRfc5424> = output_lines
-                .iter()
-                .map(|s| {
-                    let mut value = Value::from_str(s).unwrap();
-                    value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
-                    serde_json::from_value(value).unwrap()
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .into_iter()
+                .map(|mut e| {
+                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.into()
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
@@ -987,6 +1014,59 @@ mod test {
         }
     }
 
+    impl From<Event> for SyslogMessageRfc5424 {
+        fn from(e: Event) -> Self {
+            let (mut fields, _) = e.into_log().into_parts();
+
+            Self {
+                msgid: fields.remove("msgid").map(value_to_string).unwrap(),
+                severity: fields
+                    .remove("severity")
+                    .map(value_to_string)
+                    .and_then(|s| Severity::from_str(s.as_str()))
+                    .unwrap(),
+                facility: fields
+                    .remove("facility")
+                    .map(value_to_string)
+                    .and_then(|s| Facility::from_str(s.as_str()))
+                    .unwrap(),
+                version: fields
+                    .remove("version")
+                    .map(value_to_string)
+                    .map(|s| u8::from_str(s.as_str()).unwrap())
+                    .unwrap(),
+                timestamp: fields.remove("timestamp").map(value_to_string).unwrap(),
+                host: fields.remove("host").map(value_to_string).unwrap(),
+                source_type: fields.remove("source_type").map(value_to_string).unwrap(),
+                appname: fields.remove("appname").map(value_to_string).unwrap(),
+                procid: fields
+                    .remove("procid")
+                    .map(value_to_string)
+                    .map(|s| usize::from_str(s.as_str()).unwrap())
+                    .unwrap(),
+                message: fields.remove("message").map(value_to_string).unwrap(),
+                structured_data: structured_data_from_fields(fields),
+            }
+        }
+    }
+
+    fn structured_data_from_fields(fields: BTreeMap<String, Value>) -> StructuredData {
+        let mut structured_data = StructuredData::default();
+
+        for (key, value) in fields.into_iter() {
+            let subfields = value
+                .into_object()
+                .unwrap()
+                .into_iter()
+                .map(|(k, v)| (k, value_to_string(v)))
+                .collect();
+
+            structured_data.insert(key, subfields);
+        }
+
+        structured_data
+    }
+
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
     pub enum Severity {
@@ -1008,6 +1088,25 @@ mod test {
         LOG_DEBUG,
     }
 
+    impl Severity {
+        fn from_str(s: &str) -> Option<Self> {
+            match s {
+                "emergency" => Some(Self::LOG_EMERG),
+                "alert" => Some(Self::LOG_ALERT),
+                "critical" => Some(Self::LOG_CRIT),
+                "error" => Some(Self::LOG_ERR),
+                "warn" => Some(Self::LOG_WARNING),
+                "notice" => Some(Self::LOG_NOTICE),
+                "info" => Some(Self::LOG_INFO),
+                "debug" => Some(Self::LOG_DEBUG),
+                x => {
+                    println!("converting severity str, got {}", x);
+                    None
+                }
+            }
+        }
+    }
+
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
     #[derive(Copy, Clone, PartialEq, Deserialize, Debug)]
     pub enum Facility {
@@ -1023,6 +1122,20 @@ mod test {
         LOG_AUTH = 4 << 3,
         #[serde(rename(deserialize = "syslog"))]
         LOG_SYSLOG = 5 << 3,
+    }
+
+    impl Facility {
+        fn from_str(s: &str) -> Option<Self> {
+            match s {
+                "kernel" => Some(Self::LOG_KERN),
+                "user" => Some(Self::LOG_USER),
+                "mail" => Some(Self::LOG_MAIL),
+                "daemon" => Some(Self::LOG_DAEMON),
+                "auth" => Some(Self::LOG_AUTH),
+                "syslog" => Some(Self::LOG_SYSLOG),
+                _ => None,
+            }
+        }
     }
 
     type StructuredData = HashMap<String, HashMap<String, String>>;
@@ -1063,10 +1176,15 @@ mod test {
         facility as u8 | severity as u8
     }
 
-    fn tcp_json_sink(address: String) -> SocketSinkConfig {
-        SocketSinkConfig::new(
-            socket::Mode::Tcp(TcpSinkConfig::from_address(address)),
-            EncodingConfig::from(Encoding::Json),
-        )
+    fn value_to_string(v: Value) -> String {
+        if v.is_bytes() {
+            let buf = v.as_bytes().unwrap();
+            String::from_utf8_lossy(buf).to_string()
+        } else if v.is_timestamp() {
+            let ts = v.as_timestamp().unwrap();
+            ts.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        } else {
+            v.to_string()
+        }
     }
 }

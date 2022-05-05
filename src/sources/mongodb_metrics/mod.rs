@@ -21,8 +21,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
-        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
+        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
+        MongoDbMetricsRequestError, MongodbMetricsBytesReceived, StreamClosedError,
     },
 };
 
@@ -259,7 +259,7 @@ impl MongoDbMetrics {
         emit!(MongoDbMetricsEventsReceived {
             byte_size: metrics.size_of(),
             count: metrics.len(),
-            uri: &self.endpoint,
+            endpoint: &self.endpoint,
         });
 
         metrics
@@ -279,9 +279,10 @@ impl MongoDbMetrics {
             .await
             .map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
-        emit!(BytesReceived {
+        emit!(MongodbMetricsBytesReceived {
             protocol: "tcp",
             byte_size,
+            endpoint: &self.endpoint,
         });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
@@ -1081,7 +1082,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         test_util::{
-            components::{assert_source_compliance, SOCKET_PULL_SOURCE_TAGS},
+            components::{assert_source_compliance, PULL_SOURCE_TAGS},
             trace_init,
         },
         SourceSender,
@@ -1105,7 +1106,7 @@ mod integration_tests {
     }
 
     async fn test_instance(endpoint: String) {
-        assert_source_compliance(&SOCKET_PULL_SOURCE_TAGS, async {
+        assert_source_compliance(&PULL_SOURCE_TAGS, async {
             let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
             let namespace = "vector_mongodb";
 

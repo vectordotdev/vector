@@ -12,8 +12,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
-        EventStoreDbStatsParsingError, StreamClosedError,
+        EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
+        EventStoreDbStatsParsingError, HttpClientBytesReceived, StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -48,7 +48,7 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
-            self.endpoint.as_str(),
+            self.endpoint.clone(),
             self.scrape_interval_secs,
             self.default_namespace.clone(),
             cx,
@@ -69,7 +69,7 @@ impl SourceConfig for EventStoreDbConfig {
 }
 
 fn eventstoredb(
-    endpoint: &str,
+    endpoint: String,
     interval: u64,
     namespace: Option<String>,
     mut cx: SourceContext,
@@ -78,7 +78,7 @@ fn eventstoredb(
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
-    let url: Uri = endpoint.parse()?;
+    let url: Uri = endpoint.as_str().parse()?;
 
     Ok(Box::pin(
         async move {
@@ -106,9 +106,10 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(BytesReceived {
+                        emit!(HttpClientBytesReceived {
                             byte_size: bytes.len(),
                             protocol: "http",
+                            endpoint: endpoint.as_str(),
                         });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {

@@ -224,7 +224,6 @@ pub(crate) use self::geoip::*;
     feature = "sources-utils-http-encoding",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
-    feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
 #[cfg(feature = "sources-internal_logs")]

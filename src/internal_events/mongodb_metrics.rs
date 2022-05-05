@@ -6,10 +6,33 @@ use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct MongodbMetricsBytesReceived<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub endpoint: &'a str,
+}
+
+impl InternalEvent for MongodbMetricsBytesReceived<'_> {
+    fn emit(self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint,
+        );
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub byte_size: usize,
-    pub uri: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
@@ -18,20 +41,20 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
-            uri = self.uri,
+            endpoint = self.endpoint,
         );
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated
         counter!(
             "events_in_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
     }
 }

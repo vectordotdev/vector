@@ -23,6 +23,9 @@ use crate::{
     SourceSender,
 };
 
+/// The standard set of tags for sources that pull their data from an external source.
+pub const PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
@@ -104,8 +107,8 @@ impl ComponentTests {
         test.emitted_all_counters(self.untagged_counters, &[]);
         if !test.errors.is_empty() {
             panic!(
-                "Failed to assert compliance, errors:\n    {}\n",
-                test.errors.join("\n    ")
+                "Failed to assert compliance, errors:\n{}\n",
+                test.errors.join("\n")
             );
         }
     }
@@ -165,8 +168,33 @@ impl ComponentTester {
                     && m.name() == *name
                     && has_tags(m, tags)
             }) {
-                self.errors
-                    .push(format!("Missing metric named {}{}", name, tag_suffix));
+                // If we didn't find a direct match, see if any other metrics exist which are counters of the same name,
+                // which could represent metrics being emitted but without the correct tag(s).
+                let partial_matches = self
+                    .metrics
+                    .iter()
+                    .filter(|m| {
+                        matches!(m.value(), MetricValue::Counter { .. })
+                            && m.name() == *name
+                            && !has_tags(m, tags)
+                    })
+                    .map(|m| {
+                        let tags = m
+                            .tags()
+                            .map(|t| {
+                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
+                                format!("{{{}}}", tag_keys.join(","))
+                            })
+                            .unwrap_or_default();
+                        format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
+                    })
+                    .collect::<Vec<_>>();
+                let partial = partial_matches.join("");
+
+                self.errors.push(format!(
+                    "  - Missing metric `{}{}`{}",
+                    name, tag_suffix, partial
+                ));
             }
         }
     }
@@ -174,7 +202,8 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if !event_test_util::contains_name(name) {
-                self.errors.push(format!("Missing emitted event {}", name));
+                self.errors
+                    .push(format!("Missing emitted event `{}`", name));
             }
         }
     }

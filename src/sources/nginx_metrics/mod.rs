@@ -16,7 +16,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
-        BytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
+        NginxMetricsBytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
     tls::{TlsConfig, TlsSettings},
@@ -185,7 +185,7 @@ impl NginxMetrics {
         emit!(NginxMetricsEventsReceived {
             count: metrics.len(),
             byte_size,
-            uri: &self.endpoint
+            endpoint: &self.endpoint
         });
 
         metrics
@@ -198,9 +198,10 @@ impl NginxMetrics {
                 endpoint: &self.endpoint,
             })
         })?;
-        emit!(BytesReceived {
+        emit!(NginxMetricsBytesReceived {
             byte_size: response.len(),
             protocol: "http",
+            endpoint: &self.endpoint,
         });
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())

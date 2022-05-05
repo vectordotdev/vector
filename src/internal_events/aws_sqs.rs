@@ -215,27 +215,6 @@ impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
 
 #[cfg(feature = "sources-aws_sqs")]
 #[derive(Debug)]
-pub struct AwsSqsBytesReceived {
-    pub byte_size: usize,
-}
-
-#[cfg(feature = "sources-aws_sqs")]
-impl InternalEvent for AwsSqsBytesReceived {
-    fn emit(self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = "http",
-        );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "http",
-        );
-    }
-}
-
-#[cfg(feature = "sources-aws_sqs")]
-#[derive(Debug)]
 pub struct SqsMessageDeleteError<'a, E> {
     pub error: &'a E,
 }
