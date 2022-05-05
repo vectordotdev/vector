@@ -10,10 +10,10 @@ default = ["expressions"]
 expressions = [
   "expr-abort",
 ]
-expr-abort = []
+expr-abort = ["core/expr-abort"]
 
 [dependencies]
-core = { package = "vrl-core", path = "../core" }
+core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
