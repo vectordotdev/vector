@@ -5,15 +5,15 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use crate::{
     expression::assignment::Details,
-    expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
-        ArgumentList, Example, FunctionCompileContext, Parameter,
+        ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    vm::OpCode,
+    vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
@@ -373,6 +373,7 @@ impl<'a> Builder<'a> {
         mut local_snapshot: LocalEnv,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
+        let mut closure = None;
 
         // Check if we have a closure we need to compile.
         if let Some((variables, input)) = self.closure.clone() {
@@ -405,8 +406,10 @@ impl<'a> Builder<'a> {
                 });
             }
 
-            let closure = FunctionClosure::new(variables, block);
-            self.list.set_closure(closure);
+            let fnclosure = FunctionClosure::new(variables, block);
+            self.list.set_closure(fnclosure.clone());
+
+            closure = Some(fnclosure);
         };
 
         let call_span = self.call_span;
@@ -453,6 +456,7 @@ impl<'a> Builder<'a> {
             expr,
             maybe_fallible_arguments: self.maybe_fallible_arguments,
             closure_fallible,
+            closure,
             span: call_span,
             ident: self.function.identifier(),
             function_id: self.function_id,
@@ -467,6 +471,7 @@ pub struct FunctionCall {
     expr: Box<dyn Expression>,
     maybe_fallible_arguments: bool,
     closure_fallible: bool,
+    closure: Option<FunctionClosure>,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
@@ -542,6 +547,7 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments: false,
             closure_fallible: false,
+            closure: None,
             span: Span::default(),
             ident: "noop",
             arguments: Arc::new(Vec::new()),
@@ -727,6 +733,20 @@ impl Expression for FunctionCall {
                     }
                 },
             }
+        }
+
+        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
+            let mut closure_vm = crate::vm::Vm::new(vm.functions());
+            block.compile_to_vm(&mut closure_vm, (local, external))?;
+            closure_vm.write_opcode(OpCode::Return);
+
+            let closure = vm.write_closure(VmFunctionClosure {
+                vm: closure_vm,
+                variables,
+            });
+
+            vm.write_opcode(OpCode::MoveClosure);
+            vm.write_primitive(closure);
         }
 
         // Re-insert the external context into the compiler state.

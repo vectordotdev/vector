@@ -7,6 +7,7 @@ use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
@@ -111,6 +112,13 @@ impl ClientBuilder for S3ClientBuilder {
         builder.sleep_impl(sleep_impl)
     }
 
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
+    }
+
     fn client_from_conf_conn(
         builder: Self::ConfigBuilder,
         connector: DynConnector,
@@ -157,7 +165,10 @@ impl AwsS3Config {
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
     ) -> crate::Result<sqs::Ingestor> {
-        let region = self.region.region();
+        let region = self
+            .region
+            .region()
+            .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
         let endpoint = self
             .region
@@ -166,7 +177,7 @@ impl AwsS3Config {
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            region.clone(),
+            Some(region.clone()),
             endpoint.clone(),
             proxy,
             &self.tls_options,
@@ -177,7 +188,7 @@ impl AwsS3Config {
             Some(ref sqs) => {
                 let sqs_client = create_client::<SqsClientBuilder>(
                     &self.auth,
-                    region.clone(),
+                    Some(region.clone()),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
@@ -211,6 +222,8 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
+    #[snafu(display("Region is required"))]
+    RegionMissing,
     #[snafu(display("Endpoint is invalid"))]
     InvalidEndpoint,
 }
@@ -752,7 +765,7 @@ mod integration_tests {
     async fn s3_client() -> S3Client {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: "us-east-1".to_owned(),
+            region: Some("us-east-1".to_owned()),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
@@ -770,7 +783,7 @@ mod integration_tests {
     async fn sqs_client() -> SqsClient {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: "us-east-1".to_owned(),
+            region: Some("us-east-1".to_owned()),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();

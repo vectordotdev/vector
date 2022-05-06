@@ -454,7 +454,7 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Region::new("localstack");
+    let region = Some(Region::new("localstack"));
     let watchlogs_address = watchlogs_address();
     let endpoint = Some(Endpoint::immutable(
         Uri::from_str(&watchlogs_address).unwrap(),
