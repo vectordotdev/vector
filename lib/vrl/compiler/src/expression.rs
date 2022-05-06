@@ -31,6 +31,7 @@ mod variable;
 pub(crate) mod assignment;
 pub(crate) mod container;
 pub(crate) mod function_call;
+#[cfg(feature = "expr-literal")]
 pub(crate) mod literal;
 #[cfg(feature = "expr-if_statement")]
 pub(crate) mod predicate;
@@ -48,6 +49,7 @@ pub use function_call::FunctionCall;
 pub use group::Group;
 #[cfg(feature = "expr-if_statement")]
 pub use if_statement::IfStatement;
+#[cfg(feature = "expr-literal")]
 pub use literal::Literal;
 pub use noop::Noop;
 #[cfg(feature = "expr-unary")]
@@ -115,6 +117,7 @@ clone_trait_object!(Expression);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
+    #[cfg(feature = "expr-literal")]
     Literal(Literal),
     Container(Container),
     #[cfg(feature = "expr-if_statement")]
@@ -138,6 +141,7 @@ impl Expr {
         use Expr::*;
 
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(..) => "literal",
             Container(v) => match &v.variant {
                 Group(..) => "group",
@@ -163,6 +167,7 @@ impl Expr {
 
     pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
         let literal = match self {
+            #[cfg(feature = "expr-literal")]
             Expr::Literal(literal) => Ok(literal.clone()),
             Expr::Variable(var) if var.value().is_some() => {
                 match var.value().unwrap().clone().into() {
@@ -212,6 +217,7 @@ impl Expression for Expr {
         use Expr::*;
 
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(v) => v.resolve(ctx),
             Container(v) => v.resolve(ctx),
             #[cfg(feature = "expr-if_statement")]
@@ -234,6 +240,7 @@ impl Expression for Expr {
         use Expr::*;
 
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(v) => Expression::as_value(v),
             Container(v) => Expression::as_value(v),
             #[cfg(feature = "expr-if_statement")]
@@ -256,6 +263,7 @@ impl Expression for Expr {
         use Expr::*;
 
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(v) => v.type_def(state),
             Container(v) => v.type_def(state),
             #[cfg(feature = "expr-if_statement")]
@@ -283,6 +291,7 @@ impl Expression for Expr {
 
         // Pass the call on to the contained expression.
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(v) => v.compile_to_vm(vm, state),
             Container(v) => v.compile_to_vm(vm, state),
             #[cfg(feature = "expr-if_statement")]
@@ -307,6 +316,7 @@ impl fmt::Display for Expr {
         use Expr::*;
 
         match self {
+            #[cfg(feature = "expr-literal")]
             Literal(v) => v.fmt(f),
             Container(v) => v.fmt(f),
             #[cfg(feature = "expr-if_statement")]
@@ -328,6 +338,7 @@ impl fmt::Display for Expr {
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "expr-literal")]
 impl From<Literal> for Expr {
     fn from(literal: Literal) -> Self {
         Expr::Literal(literal)
@@ -398,6 +409,7 @@ impl From<Abort> for Expr {
     }
 }
 
+#[cfg(feature = "expr-literal")]
 impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use Value::*;
@@ -427,6 +439,13 @@ impl From<Value> for Expr {
             Regex(v) => Literal::from(v).into(),
             Null => Literal::from(()).into(),
         }
+    }
+}
+
+#[cfg(not(feature = "expr-literal"))]
+impl From<Value> for Expr {
+    fn from(value: Value) -> Self {
+        Self::Noop(Noop)
     }
 }
 
