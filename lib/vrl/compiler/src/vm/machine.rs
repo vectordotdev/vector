@@ -632,6 +632,7 @@ impl Vm {
 }
 
 /// Op that applies a function to the top two elements on the stack.
+#[cfg(feature = "expr-op")]
 fn binary_op<F, E>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
 where
     E: Into<ExpressionError>,
