@@ -112,11 +112,13 @@ pub enum OpCode {
     /// Takes the path indicated by the ensuing primitive and sets this path with the value
     /// at the top of the stack. The value is not removed from the stack so it can continue
     /// to be used.
+    #[cfg(feature = "expr-assignment")]
     SetPath,
 
     /// Sets either a success or error path. The next primitive is the index to the target for
     /// the success path, the one after is the error path. After that is a pointer to a
     /// constant indicating the default value to set to the success path should there be an error.
+    #[cfg(feature = "expr-assignment")]
     SetPathInfallible,
 
     /// Takes the ensuing primitive as a pointer to a path. Retrieves this value from the state
@@ -443,6 +445,7 @@ impl Vm {
                     let jump = state.next_primitive()?;
                     state.instruction_pointer += jump;
                 }
+                #[cfg(feature = "expr-assignment")]
                 OpCode::SetPath => {
                     // Sets the path specified by the target to the value at the top of the stack.
                     // The value is then pushed back onto the stack since the assignment expression
@@ -455,6 +458,7 @@ impl Vm {
                     set_variable(ctx, variable, value.clone())?;
                     state.push_stack(value);
                 }
+                #[cfg(feature = "expr-assignment")]
                 OpCode::SetPathInfallible => {
                     // Sets the path for an infallible assignment statement ie.
                     // `thing, err = fallible_call()`

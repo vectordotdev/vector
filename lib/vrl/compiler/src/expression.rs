@@ -28,6 +28,7 @@ mod op;
 mod unary;
 mod variable;
 
+#[cfg(feature = "expr-assignment")]
 pub(crate) mod assignment;
 pub(crate) mod container;
 pub(crate) mod function_call;
@@ -40,6 +41,7 @@ pub(crate) mod query;
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
+#[cfg(feature = "expr-assignment")]
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
@@ -124,6 +126,7 @@ pub enum Expr {
     IfStatement(IfStatement),
     #[cfg(feature = "expr-op")]
     Op(Op),
+    #[cfg(feature = "expr-assignment")]
     Assignment(Assignment),
     Query(Query),
     FunctionCall(FunctionCall),
@@ -153,6 +156,7 @@ impl Expr {
             IfStatement(..) => "if-statement",
             #[cfg(feature = "expr-op")]
             Op(..) => "operation",
+            #[cfg(feature = "expr-assignment")]
             Assignment(..) => "assignment",
             Query(..) => "query",
             FunctionCall(..) => "function call",
@@ -224,6 +228,7 @@ impl Expression for Expr {
             IfStatement(v) => v.resolve(ctx),
             #[cfg(feature = "expr-op")]
             Op(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.resolve(ctx),
             Query(v) => v.resolve(ctx),
             FunctionCall(v) => v.resolve(ctx),
@@ -247,6 +252,7 @@ impl Expression for Expr {
             IfStatement(v) => Expression::as_value(v),
             #[cfg(feature = "expr-op")]
             Op(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-assignment")]
             Assignment(v) => Expression::as_value(v),
             Query(v) => Expression::as_value(v),
             FunctionCall(v) => Expression::as_value(v),
@@ -270,6 +276,7 @@ impl Expression for Expr {
             IfStatement(v) => v.type_def(state),
             #[cfg(feature = "expr-op")]
             Op(v) => v.type_def(state),
+            #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.type_def(state),
             Query(v) => v.type_def(state),
             FunctionCall(v) => v.type_def(state),
@@ -298,6 +305,7 @@ impl Expression for Expr {
             IfStatement(v) => v.compile_to_vm(vm, state),
             #[cfg(feature = "expr-op")]
             Op(v) => v.compile_to_vm(vm, state),
+            #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.compile_to_vm(vm, state),
             Query(v) => v.compile_to_vm(vm, state),
             FunctionCall(v) => v.compile_to_vm(vm, state),
@@ -323,6 +331,7 @@ impl fmt::Display for Expr {
             IfStatement(v) => v.fmt(f),
             #[cfg(feature = "expr-op")]
             Op(v) => v.fmt(f),
+            #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.fmt(f),
             Query(v) => v.fmt(f),
             FunctionCall(v) => v.fmt(f),
@@ -365,6 +374,7 @@ impl From<Op> for Expr {
     }
 }
 
+#[cfg(feature = "expr-assignment")]
 impl From<Assignment> for Expr {
     fn from(assignment: Assignment) -> Self {
         Expr::Assignment(assignment)

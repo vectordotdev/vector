@@ -380,6 +380,7 @@ impl<'a> Compiler<'a> {
         ))
     }
 
+    #[cfg(feature = "expr-assignment")]
     fn compile_assignment(
         &mut self,
         node: Node<ast::Assignment>,
@@ -458,6 +459,11 @@ impl<'a> Compiler<'a> {
         }
 
         assignment
+    }
+
+    #[cfg(not(feature = "expr-assignment"))]
+    fn compile_assignment(&mut self, node: Node<ast::Assignment>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-assignment")
     }
 
     fn compile_query(&mut self, node: Node<ast::Query>, external: &mut ExternalEnv) -> Query {
