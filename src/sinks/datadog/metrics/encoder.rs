@@ -91,13 +91,7 @@ impl FinishError {
 
 struct EncoderState {
     writer: Compressor,
-
-    /// The total number of bytes written by the encoder - includes header and footers.
     written: usize,
-
-    /// The bytes written by the encoder that represent actual event bytes.
-    event_bytes_written: usize,
-
     buf: Vec<u8>,
 
     pending: Vec<Metric>,
@@ -112,7 +106,6 @@ impl Default for EncoderState {
             // conversion trait implementations that are also only none vs gzip.
             writer: get_compressor(),
             written: 0,
-            event_bytes_written: 0,
             buf: Vec::with_capacity(1024),
             pending: Vec::new(),
             processed: Vec::new(),
@@ -277,7 +270,6 @@ impl DatadogMetricsEncoder {
         // We should be safe to write our holding buffer to the compressor and store the metric.
         let _ = self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
-        self.state.event_bytes_written += n;
         Ok(true)
     }
 
@@ -301,7 +293,9 @@ impl DatadogMetricsEncoder {
         // Make sure we've written our header already.
         if self.state.written == 0 {
             match write_payload_header(self.endpoint, &mut self.state.writer) {
-                Ok(n) => self.state.written += n,
+                Ok(n) => {
+                    self.state.written += n;
+                }
                 Err(_) => return Ok(Some(metric)),
             }
         }
@@ -364,7 +358,7 @@ impl DatadogMetricsEncoder {
             .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
-        let raw_bytes_written = self.state.event_bytes_written;
+        let raw_bytes_written = self.state.written;
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -787,10 +781,10 @@ mod tests {
         assert_eq!(100, payload.len());
 
         // The payload is:
-        // {"metric":"basic_counter","type":"count","interval":null,"points":[[1651664333,3.14]],"tags":[]}
+        // {"series":[{"metric":"basic_counter","type":"count","interval":null,"points":[[1651664333,3.14]],"tags":[]}]}
         // which comes to a total of 98 bytes.
         // There are extra bytes that make up the header and footer. These should not be included in the raw bytes.
-        assert_eq!(96, raw_bytes);
+        assert_eq!(109, raw_bytes);
     }
 
     #[test]
@@ -877,7 +871,9 @@ mod tests {
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
-        assert_eq!(0, raw_bytes);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     #[test]
@@ -912,7 +908,9 @@ mod tests {
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
-        assert_eq!(0, raw_bytes);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     fn arb_counter_metric() -> impl Strategy<Value = Metric> {
