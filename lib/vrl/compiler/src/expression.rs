@@ -15,6 +15,7 @@ mod array;
 mod block;
 mod function_argument;
 mod group;
+#[cfg(feature = "expr-if_statement")]
 mod if_statement;
 mod levenstein;
 mod noop;
@@ -31,6 +32,7 @@ pub(crate) mod assignment;
 pub(crate) mod container;
 pub(crate) mod function_call;
 pub(crate) mod literal;
+#[cfg(feature = "expr-if_statement")]
 pub(crate) mod predicate;
 pub(crate) mod query;
 
@@ -44,6 +46,7 @@ pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
+#[cfg(feature = "expr-if_statement")]
 pub use if_statement::IfStatement;
 pub use literal::Literal;
 pub use noop::Noop;
@@ -52,6 +55,7 @@ pub use not::Not;
 pub use object::Object;
 #[cfg(feature = "expr-op")]
 pub use op::Op;
+#[cfg(feature = "expr-if_statement")]
 pub use predicate::Predicate;
 pub use query::{Query, Target};
 #[cfg(feature = "expr-unary")]
@@ -113,6 +117,7 @@ clone_trait_object!(Expression);
 pub enum Expr {
     Literal(Literal),
     Container(Container),
+    #[cfg(feature = "expr-if_statement")]
     IfStatement(IfStatement),
     #[cfg(feature = "expr-op")]
     Op(Op),
@@ -140,6 +145,7 @@ impl Expr {
                 Array(..) => "array",
                 Object(..) => "object",
             },
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(..) => "if-statement",
             #[cfg(feature = "expr-op")]
             Op(..) => "operation",
@@ -208,6 +214,7 @@ impl Expression for Expr {
         match self {
             Literal(v) => v.resolve(ctx),
             Container(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(v) => v.resolve(ctx),
             #[cfg(feature = "expr-op")]
             Op(v) => v.resolve(ctx),
@@ -229,6 +236,7 @@ impl Expression for Expr {
         match self {
             Literal(v) => Expression::as_value(v),
             Container(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(v) => Expression::as_value(v),
             #[cfg(feature = "expr-op")]
             Op(v) => Expression::as_value(v),
@@ -250,6 +258,7 @@ impl Expression for Expr {
         match self {
             Literal(v) => v.type_def(state),
             Container(v) => v.type_def(state),
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(v) => v.type_def(state),
             #[cfg(feature = "expr-op")]
             Op(v) => v.type_def(state),
@@ -276,6 +285,7 @@ impl Expression for Expr {
         match self {
             Literal(v) => v.compile_to_vm(vm, state),
             Container(v) => v.compile_to_vm(vm, state),
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(v) => v.compile_to_vm(vm, state),
             #[cfg(feature = "expr-op")]
             Op(v) => v.compile_to_vm(vm, state),
@@ -299,6 +309,7 @@ impl fmt::Display for Expr {
         match self {
             Literal(v) => v.fmt(f),
             Container(v) => v.fmt(f),
+            #[cfg(feature = "expr-if_statement")]
             IfStatement(v) => v.fmt(f),
             #[cfg(feature = "expr-op")]
             Op(v) => v.fmt(f),
@@ -329,6 +340,7 @@ impl From<Container> for Expr {
     }
 }
 
+#[cfg(feature = "expr-if_statement")]
 impl From<IfStatement> for Expr {
     fn from(if_statement: IfStatement) -> Self {
         Expr::IfStatement(if_statement)
