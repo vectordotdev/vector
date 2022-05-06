@@ -6,8 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-serde = { version = "1.0.137", default-features = false, features = ["derive", "alloc"] }
-tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+serde = { version = "1.0.136", default-features = false, features = ["derive", "alloc"] }
 snafu = { version = "0.7", default-features = false }
 regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
@@ -18,6 +17,7 @@ quickcheck = { version = "1.0.3", optional = true }
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 serde_json = { version = "1.0.81", features = ["raw_value"] }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 quickcheck = { version = "1.0.3" }
 
 [build-dependencies]

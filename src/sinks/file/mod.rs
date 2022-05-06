@@ -22,9 +22,7 @@ use crate::{
     },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{
-        FileBytesSent, FileExpiringError, FileIoError, FileOpen, TemplateRenderingError,
-    },
+    internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -248,7 +246,7 @@ impl FileSink {
                         // We do not poll map when it's empty, so we should
                         // never reach this branch.
                         None => unreachable!(),
-                        Some(Ok((mut expired_file, path))) => {
+                        Some((mut expired_file, path)) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.close().await {
@@ -259,9 +257,6 @@ impl FileSink {
                                 count: self.files.len()
                             });
                         }
-                        Some(Err(error)) => {
-                            emit!(FileExpiringError { error });
-                        },
                     }
                 }
             }

@@ -58,14 +58,9 @@ pub async fn custom_reflector<K, W>(
             }
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
-                    Some(Ok(event)) => {
+                    Some(event) => {
                         trace!(message = "Processing Deleted event.", ?event);
                         store.apply_watcher_event(&event.into_inner());
-                    },
-                    // DelayQueue should never return an Err, resolved upstream
-                    // https://github.com/tokio-rs/tokio/pull/4241
-                    Some(Err(_)) => {
-                        unreachable!("a DelayQueue never returns an error");
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
