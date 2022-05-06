@@ -53,18 +53,23 @@ impl ConditionConfig for VrlConfig {
         let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(enrichment_tables.clone());
 
-        let program = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
-            |diagnostics| {
+        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
+            .map_err(|diagnostics| {
                 Formatter::new(&self.source, diagnostics)
                     .colored()
                     .to_string()
-            },
-        )?;
+            })?;
+
+        if !warnings.is_empty() {
+            let warnings = Formatter::new(&self.source, warnings).colored().to_string();
+            warn!(message = "VRL compilation warning.", %warnings);
+        }
 
         match self.runtime {
             VrlRuntime::Vm => {
                 let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
                 Ok(Condition::VrlVm(VrlVm {
+                    program,
                     source: self.source.clone(),
                     vm,
                 }))
@@ -99,7 +104,7 @@ impl Vrl {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event);
+        let mut target = VrlImmutableTarget::new(event, self.program.info());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
@@ -128,7 +133,7 @@ impl Conditional for Vrl {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -139,7 +144,7 @@ impl Conditional for Vrl {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -160,6 +165,7 @@ impl Conditional for Vrl {
 
 #[derive(Debug, Clone)]
 pub struct VrlVm {
+    pub(super) program: Program,
     pub(super) source: String,
     pub(super) vm: Arc<Vm>,
 }
@@ -178,7 +184,7 @@ impl VrlVm {
         // program wants to mutate its events.
         //
         // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event);
+        let mut target = VrlImmutableTarget::new(event, self.program.info());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
@@ -207,7 +213,7 @@ impl Conditional for VrlVm {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -218,7 +224,7 @@ impl Conditional for VrlVm {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()

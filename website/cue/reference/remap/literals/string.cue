@@ -11,7 +11,8 @@ remap: literals: string: {
 
 		**Interpreted string** literals are character sequences between double quotes (`"..."`). Within the quotes,
 		any character may appear except unescaped newline and unescaped double quote. The text between the quotes forms the result
-		of the literal, with backslash escapes interpreted as defined below.
+		of the literal, with backslash escapes interpreted as defined below. Strings can be templated by enclosing
+		variables in `{{..}}`. The value of the variables are inserted into the string at that position.
 		"""
 
 	examples: [
@@ -24,6 +25,9 @@ remap: literals: string: {
 		#"""
 			"Hello, \
 			 world!"
+			"""#,
+		#"""
+			"Hello, {{ planet }}!"
 			"""#,
 		#"""
 			s'Hello, world!'
@@ -48,7 +52,20 @@ remap: literals: string: {
 				"\\0":       "Null"
 				"\\\"":      "Double quote"
 				"\\'":       "Single quote"
+				"\\{":       "Brace"
 			}
+		}
+		templates: {
+			title: "Templates"
+			description: """
+				Strings can be templated by enclosing a variable name with `{{..}}`. The
+				value of the variable is inserted into the string at this position at runtime.
+				Currently, the variable has to be a string. Only variables are supported, if
+				you want to insert a path from the event you must assign it to a variable
+				first. To insert a `{{` into the string it can be escaped with a `\\`
+				escape: `\\{{..\\}}`. We plan to expand this in future to allow paths and
+				format strings to enable non string variables.
+				"""
 		}
 		multiline_strings: {
 			title: "Multiline strings"

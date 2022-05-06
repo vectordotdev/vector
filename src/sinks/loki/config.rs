@@ -15,7 +15,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -44,7 +44,7 @@ pub struct LokiConfig {
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,

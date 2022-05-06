@@ -7,7 +7,7 @@
 #   │ ^^^^^^^^^^
 #   │ │
 #   │ unexpected syntax token: "PathField"
-#   │ expected one of: "\n", "!", "(", "[", "_", "abort", "false", "float literal", "function call", "identifier", "if", "integer literal", "null", "regex literal", "string literal", "timestamp literal", "true", "{", "path literal"
+#   │ expected one of: "\n", "!", "(", "[", "_", "abort", "false", "float literal", "function call", "identifier", "if", "integer literal", "null", "raw string literal", "regex literal", "string literal", "timestamp literal", "true", "{", "path literal"
 #   │
 #   = see language documentation at https://vrl.dev
 @timestamp = now()

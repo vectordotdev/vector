@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"f","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":447232.0,"value":-253440.0},{"quantile":-593216.0,"value":762560.0},{"quantile":915072.0,"value":-352448.0},{"quantile":-348352.0,"value":-367104.0},{"quantile":896704.0,"value":-864256.0},{"quantile":987264.0,"value":33792.0},{"quantile":308470.7764,"value":803072.0}],"count":1357984151,"sum":-808448.0}}}

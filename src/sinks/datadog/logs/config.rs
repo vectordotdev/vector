@@ -21,7 +21,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -45,38 +45,38 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
-    region: Option<Region>,
-    site: Option<String>,
+    pub region: Option<Region>,
+    pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsConfig>,
+    pub encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    pub tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
-    compression: Option<Compression>,
+    pub compression: Option<Compression>,
 
     #[serde(default)]
-    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
+    pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -151,7 +151,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)

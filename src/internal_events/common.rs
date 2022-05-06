@@ -71,17 +71,17 @@ pub struct AwsBytesSent {
 #[cfg(feature = "aws-core")]
 impl InternalEvent for AwsBytesSent {
     fn emit(self) {
+        let region = self
+            .region
+            .as_ref()
+            .map(|r| r.as_ref().to_string())
+            .unwrap_or_default();
         trace!(
             message = "Bytes sent.",
             protocol = "https",
             byte_size = %self.byte_size,
             region = ?self.region,
         );
-        let region = self
-            .region
-            .as_ref()
-            .map(|r| r.as_ref().to_string())
-            .unwrap_or_default();
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",

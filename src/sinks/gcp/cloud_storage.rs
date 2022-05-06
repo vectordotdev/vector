@@ -14,12 +14,12 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{event::Finalizable, ByteSizeOf};
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -41,7 +41,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const NAME: &str = "gcp_cloud_storage";
@@ -66,7 +66,7 @@ pub struct GcsSinkConfig {
     request: TowerRequestConfig,
     #[serde(flatten)]
     auth: GcpAuthConfig,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

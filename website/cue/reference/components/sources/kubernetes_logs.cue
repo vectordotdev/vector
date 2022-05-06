@@ -230,6 +230,18 @@ components: sources: kubernetes_logs: {
 				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
 			}
 		}
+		extra_namespace_label_selector: {
+			common: false
+			description: """
+				Specifies the label selector to filter `Namespace`s with, to be used in
+				addition to the built-in `vector.dev/exclude` filter.
+				"""
+			required: false
+			type: string: {
+				default: ""
+				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+			}
+		}
 		max_read_bytes: {
 			category:    "Reading"
 			common:      false

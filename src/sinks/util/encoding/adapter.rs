@@ -328,6 +328,7 @@ impl EncodingConfiguration for Transformer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use codecs::encoding::CharacterDelimitedEncoderOptions;
     use lookup::lookup_v2::parse_path;
 
     #[test]
@@ -355,6 +356,12 @@ mod tests {
     fn deserialize_encoding_with_framing_and_transformation() {
         let string = r#"
             {
+                "framing": {
+                    "method": "character_delimited",
+                    "character_delimited": {
+                        "delimiter": ","
+                    }
+                },
                 "encoding": {
                     "codec": "raw_message",
                     "only_fields": ["a.b[0]"],
@@ -365,6 +372,14 @@ mod tests {
         "#;
 
         let config = serde_json::from_str::<EncodingConfigWithFraming>(string).unwrap();
+
+        assert!(matches!(
+            config.framing,
+            Some(FramingConfig::CharacterDelimited {
+                character_delimited: CharacterDelimitedEncoderOptions { delimiter: b',' }
+            })
+        ));
+
         let encoding = config.encoding;
 
         assert_eq!(encoding.only_fields, Some(vec![parse_path("a.b[0]")]));
@@ -425,7 +440,19 @@ mod tests {
             }
         }
 
-        let string = r#"{ "encoding": { "codec": "raw_message" } }"#;
+        let string = r#"
+            {
+                "framing": {
+                    "method": "character_delimited",
+                    "character_delimited": {
+                        "delimiter": ","
+                    }
+                },
+                "encoding": {
+                    "codec": "raw_message"
+                }
+            }
+        "#;
 
         let config = serde_json::from_str::<
             EncodingConfigWithFramingAdapter<
@@ -435,12 +462,22 @@ mod tests {
         >(string)
         .unwrap();
 
-        let encoding = match config {
-            EncodingConfigWithFramingAdapter::Encoding(encoding) => encoding.encoding.encoding,
+        let config = match config {
+            EncodingConfigWithFramingAdapter::Encoding(config) => config,
             EncodingConfigWithFramingAdapter::LegacyEncodingConfig(_) => panic!(),
         };
 
-        assert!(matches!(encoding, SerializerConfig::RawMessage));
+        assert!(matches!(
+            config.framing,
+            Some(FramingConfig::CharacterDelimited {
+                character_delimited: CharacterDelimitedEncoderOptions { delimiter: b',' }
+            })
+        ));
+
+        assert!(matches!(
+            config.encoding.encoding,
+            SerializerConfig::RawMessage
+        ));
     }
 
     #[test]

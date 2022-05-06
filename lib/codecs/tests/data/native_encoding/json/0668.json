@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"u","namespace":"c","tags":{"s":"x","y":"_"},"kind":"incremental","gauge":{"value":41472.0}}}

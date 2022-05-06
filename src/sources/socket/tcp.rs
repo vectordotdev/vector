@@ -11,7 +11,7 @@ use crate::{
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -23,7 +23,7 @@ pub struct TcpConfig {
     shutdown_timeout_secs: u64,
     host_key: Option<String>,
     port_key: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
     framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
@@ -36,34 +36,6 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
-        address: SocketListenAddr,
-        keepalive: Option<TcpKeepaliveConfig>,
-        max_length: Option<usize>,
-        shutdown_timeout_secs: u64,
-        host_key: Option<String>,
-        port_key: Option<String>,
-        tls: Option<TlsConfig>,
-        receive_buffer_bytes: Option<usize>,
-        framing: Option<FramingConfig>,
-        decoding: DeserializerConfig,
-        connection_limit: Option<u32>,
-    ) -> Self {
-        Self {
-            address,
-            keepalive,
-            max_length,
-            shutdown_timeout_secs,
-            host_key,
-            port_key,
-            tls,
-            receive_buffer_bytes,
-            framing,
-            decoding,
-            connection_limit,
-        }
-    }
-
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -84,7 +56,7 @@ impl TcpConfig {
         &self.host_key
     }
 
-    pub const fn tls(&self) -> &Option<TlsConfig> {
+    pub const fn tls(&self) -> &Option<TlsEnableableConfig> {
         &self.tls
     }
 
@@ -126,7 +98,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_tls(&mut self, val: Option<TlsConfig>) -> &mut Self {
+    pub fn set_tls(&mut self, val: Option<TlsEnableableConfig>) -> &mut Self {
         self.tls = val;
         self
     }

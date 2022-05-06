@@ -12,8 +12,8 @@ use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverRe
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
+    gcp::GcpCredentials,
     http::{HttpClient, HttpError},
-    sinks::gcp::GcpCredentials,
 };
 
 #[derive(Debug, Clone)]

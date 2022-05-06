@@ -6,42 +6,50 @@ use std::{
 use futures::StreamExt;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use vector_buffers::{BufferConfig, BufferType, WhenFull};
+use vector_core::config::ComponentKey;
 
 use crate::{
-    buffers::{BufferConfig, WhenFull},
     config::Config,
     sinks::{
-        console::{ConsoleSinkConfig, Encoding, Target},
+        console::{ConsoleSinkConfig, Target},
         prometheus::exporter::PrometheusExporterConfig,
+        util::encoding::StandardEncodings,
     },
     sources::{demo_logs::DemoLogsConfig, splunk_hec::SplunkConfig},
     test_util::{next_addr, start_topology, temp_dir, wait_for_tcp},
     transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig},
 };
 
+fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
+    let mut config = SplunkConfig::default();
+    config.address = addr;
+    config
+}
+
 #[tokio::test]
 async fn topology_reuse_old_port() {
     let address = next_addr();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in1", SplunkConfig::on(address));
+    old_config.add_source("in1", splunk_source_config(address));
     old_config.add_sink(
         "out",
-        &[&"in1"],
+        &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 
     let mut new_config = Config::builder();
-    new_config.add_source("in2", SplunkConfig::on(address));
+    new_config.add_source("in2", splunk_source_config(address));
     new_config.add_sink(
         "out",
-        &[&"in2"],
+        &["in2"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 
@@ -58,24 +66,24 @@ async fn topology_rebuild_old() {
     let address_1 = next_addr();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in1", SplunkConfig::on(address_0));
+    old_config.add_source("in1", splunk_source_config(address_0));
     old_config.add_sink(
         "out",
-        &[&"in1"],
+        &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 
     let mut new_config = Config::builder();
-    new_config.add_source("in1", SplunkConfig::on(address_1));
+    new_config.add_source("in1", splunk_source_config(address_1));
     new_config.add_sink(
         "out",
-        &[&"in1"],
+        &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 
@@ -94,13 +102,13 @@ async fn topology_old() {
     let address = next_addr();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in1", SplunkConfig::on(address));
+    old_config.add_source("in1", splunk_source_config(address));
     old_config.add_sink(
         "out",
-        &[&"in1"],
+        &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
         },
     );
 
@@ -115,7 +123,7 @@ async fn topology_old() {
 async fn topology_reuse_old_port_sink() {
     let address = next_addr();
 
-    let source = DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
+    let source = DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, 0.001);
     let transform = LogToMetricConfig {
         metrics: vec![MetricConfig::Gauge(GaugeConfig {
             field: "message".to_string(),
@@ -127,26 +135,26 @@ async fn topology_reuse_old_port_sink() {
 
     let mut old_config = Config::builder();
     old_config.add_source("in", source.clone());
-    old_config.add_transform("trans", &[&"in"], transform.clone());
+    old_config.add_transform("trans", &["in"], transform.clone());
     old_config.add_sink(
         "out1",
-        &[&"trans"],
+        &["trans"],
         PrometheusExporterConfig {
             address,
-            flush_period_secs: 1,
+            flush_period_secs: Duration::from_secs(1),
             ..PrometheusExporterConfig::default()
         },
     );
 
     let mut new_config = Config::builder();
     new_config.add_source("in", source.clone());
-    new_config.add_transform("trans", &[&"in"], transform.clone());
+    new_config.add_transform("trans", &["in"], transform.clone());
     new_config.add_sink(
         "out1",
-        &[&"trans"],
+        &["trans"],
         PrometheusExporterConfig {
             address,
-            flush_period_secs: 2,
+            flush_period_secs: Duration::from_secs(2),
             ..PrometheusExporterConfig::default()
         },
     );
@@ -178,28 +186,28 @@ async fn topology_reuse_old_port_cross_dependency() {
     let mut old_config = Config::builder();
     old_config.add_source(
         "in",
-        DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
+        DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, 0.001),
     );
-    old_config.add_transform("trans", &[&"in"], transform.clone());
+    old_config.add_transform("trans", &["in"], transform.clone());
     old_config.add_sink(
         "out1",
-        &[&"trans"],
+        &["trans"],
         PrometheusExporterConfig {
             address: address_0,
-            flush_period_secs: 1,
+            flush_period_secs: Duration::from_secs(1),
             ..PrometheusExporterConfig::default()
         },
     );
 
     let mut new_config = Config::builder();
-    new_config.add_source("in", SplunkConfig::on(address_0));
-    new_config.add_transform("trans", &[&"in"], transform.clone());
+    new_config.add_source("in", splunk_source_config(address_0));
+    new_config.add_transform("trans", &["in"], transform.clone());
     new_config.add_sink(
         "out1",
-        &[&"trans"],
+        &["trans"],
         PrometheusExporterConfig {
             address: address_1,
-            flush_period_secs: 1,
+            flush_period_secs: Duration::from_secs(1),
             ..PrometheusExporterConfig::default()
         },
     );
@@ -224,11 +232,11 @@ async fn topology_disk_buffer_conflict() {
     old_config.global.data_dir = Some(data_dir);
     old_config.add_source(
         "in",
-        DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
+        DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, 0.001),
     );
     old_config.add_transform(
         "trans",
-        &[&"in"],
+        &["in"],
         LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
                 field: "message".to_string(),
@@ -240,27 +248,33 @@ async fn topology_disk_buffer_conflict() {
     );
     old_config.add_sink(
         "out",
-        &[&"trans"],
+        &["trans"],
         PrometheusExporterConfig {
             address: address_0,
-            flush_period_secs: 1,
+            flush_period_secs: Duration::from_secs(1),
             ..PrometheusExporterConfig::default()
         },
     );
-    old_config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 1024,
-        when_full: WhenFull::Block,
+
+    let sink_key = ComponentKey::from("out");
+    old_config.sinks[&sink_key].buffer = BufferConfig {
+        stages: vec![BufferType::DiskV1 {
+            max_size: std::num::NonZeroU64::new(1024).unwrap(),
+            when_full: WhenFull::Block,
+        }],
     };
 
     let mut new_config = old_config.clone();
-    new_config.sinks["out"].inner = Box::new(PrometheusExporterConfig {
+    new_config.sinks[&sink_key].inner = Box::new(PrometheusExporterConfig {
         address: address_1,
-        flush_period_secs: 1,
+        flush_period_secs: Duration::from_secs(1),
         ..PrometheusExporterConfig::default()
     });
-    new_config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 2048,
-        when_full: WhenFull::Block,
+    new_config.sinks[&sink_key].buffer = BufferConfig {
+        stages: vec![BufferType::DiskV1 {
+            max_size: std::num::NonZeroU64::new(1024).unwrap(),
+            when_full: WhenFull::Block,
+        }],
     };
 
     reload_sink_test(
@@ -271,6 +285,70 @@ async fn topology_disk_buffer_conflict() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn topology_reload_with_new_components() {
+    // This specifically exercises that we can add new components -- no changed or removed
+    // components -- via the reload mechanism and without any issues.
+    let address1 = next_addr();
+    let address2 = next_addr();
+
+    let source = DemoLogsConfig::repeat(vec!["msg".to_string()], usize::MAX, 0.001);
+    let transform = LogToMetricConfig {
+        metrics: vec![MetricConfig::Gauge(GaugeConfig {
+            field: "message".to_string(),
+            name: None,
+            namespace: None,
+            tags: None,
+        })],
+    };
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in1", source.clone());
+    old_config.add_transform("trans1", &["in1"], transform.clone());
+    old_config.add_sink(
+        "out1",
+        &["trans1"],
+        PrometheusExporterConfig {
+            address: address1,
+            flush_period_secs: Duration::from_secs(1),
+            ..PrometheusExporterConfig::default()
+        },
+    );
+
+    let mut new_config = Config::builder();
+    new_config.add_source("in1", source.clone());
+    new_config.add_transform("trans1", &["in1"], transform.clone());
+    new_config.add_sink(
+        "out1",
+        &["trans1"],
+        PrometheusExporterConfig {
+            address: address1,
+            flush_period_secs: Duration::from_secs(1),
+            ..PrometheusExporterConfig::default()
+        },
+    );
+    new_config.add_source("in2", source.clone());
+    new_config.add_transform("trans2", &["in2"], transform.clone());
+    new_config.add_sink(
+        "out2",
+        &["trans2"],
+        PrometheusExporterConfig {
+            address: address2,
+            flush_period_secs: Duration::from_secs(1),
+            ..PrometheusExporterConfig::default()
+        },
+    );
+
+    reload_sink_test(
+        old_config.build().unwrap(),
+        new_config.build().unwrap(),
+        address1,
+        address2,
+    )
+    .await;
+}
+
 async fn reload_sink_test(
     old_config: Config,
     new_config: Config,
