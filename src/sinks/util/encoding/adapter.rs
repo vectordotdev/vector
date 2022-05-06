@@ -314,6 +314,29 @@ pub struct Transformer {
 }
 
 impl Transformer {
+    /// Creates a new `Transformer`.
+    ///
+    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
+    /// exclusive.
+    pub fn new(
+        only_fields: Option<Vec<OwnedPath>>,
+        except_fields: Option<Vec<String>>,
+        timestamp_format: Option<TimestampFormat>,
+    ) -> Result<Self, crate::Error> {
+        let transformer = Self {
+            only_fields,
+            except_fields,
+            timestamp_format,
+        };
+
+        validate_fields(
+            transformer.only_fields.as_deref(),
+            transformer.except_fields.as_deref(),
+        )?;
+
+        Ok(transformer)
+    }
+
     /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
         self.apply_rules(event);
