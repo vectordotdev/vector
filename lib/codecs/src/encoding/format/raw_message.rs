@@ -1,4 +1,8 @@
-use vector_core::{config::log_schema, event::Event, schema};
+use vector_core::{
+    config::{log_schema, DataType},
+    event::Event,
+    schema,
+};
 
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
@@ -18,6 +22,11 @@ impl RawMessageSerializerConfig {
     /// Build the `RawMessageSerializer` from this configuration.
     pub const fn build(&self) -> RawMessageSerializer {
         RawMessageSerializer
+    }
+
+    /// The data type of events that are accepted by `RawMessageSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema required by the serializer.

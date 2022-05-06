@@ -196,7 +196,7 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.clone().encoding();
+        let encoding = self.encoding.encoding();
         let framing = encoding
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -236,7 +236,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
