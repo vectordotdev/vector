@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 impl Kind {
     /// Returns a tree representation of `Kind`, in a more human readable format.
     /// This is for debugging / development purposes only.
+    #[must_use]
     pub fn debug_info(&self) -> BTreeMap<String, Value> {
         let mut output = BTreeMap::new();
         insert_kind(&mut output, self, true);
