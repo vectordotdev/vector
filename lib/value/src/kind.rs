@@ -37,8 +37,12 @@ pub struct Kind {
     timestamp: Option<()>,
     regex: Option<()>,
     null: Option<()>,
-    array: Option<Collection<Index>>,
-    object: Option<Collection<Field>>,
+
+    /// Types of the array elements
+    pub array: Option<Collection<Index>>,
+
+    /// Types of the object elements
+    pub object: Option<Collection<Field>>,
 }
 
 impl std::fmt::Display for Kind {
