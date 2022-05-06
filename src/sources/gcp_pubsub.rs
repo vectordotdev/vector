@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::sync::Mutex;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
-    transport::{Certificate, Channel, ClientTlsConfig, Identity},
+    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
 use vector_core::ByteSizeOf;
@@ -71,11 +71,11 @@ enum PubsubError {
     Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
-    #[snafu(display("Could not create channel: {}", source))]
-    Channel { source: InvalidUri },
-    #[snafu(display("Could not set up channel TLS settings: {}", source))]
-    ChannelTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect channel: {}", source))]
+    #[snafu(display("Could not create endpoint: {}", source))]
+    Endpoint { source: InvalidUri },
+    #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
+    EndpointTls { source: tonic::transport::Error },
+    #[snafu(display("Could not connect: {}", source))]
     Connect { source: tonic::transport::Error },
     #[snafu(display("Could not pull data from remote: {}", source))]
     Pull { source: Status },
@@ -196,16 +196,22 @@ struct PubsubSource {
 
 impl PubsubSource {
     async fn run(mut self) -> crate::Result<()> {
-        let mut channel = Channel::from_shared(self.endpoint.clone()).context(ChannelSnafu)?;
+        let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
         if self.uri.scheme() != Some(&Scheme::HTTP) {
-            channel = channel
+            endpoint = endpoint
                 .tls_config(self.make_tls_config())
-                .context(ChannelTlsSnafu)?;
+                .context(EndpointTlsSnafu)?;
         }
-        let channel = channel.connect().await.context(ConnectSnafu)?;
+
+        while self.run_once(&endpoint).await? {}
+        Ok(())
+    }
+
+    async fn run_once(&mut self, endpoint: &Endpoint) -> Result<bool, PubsubError> {
+        let connection = endpoint.connect().await.context(ConnectSnafu)?;
 
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
-            channel,
+            connection,
             |mut req: Request<()>| {
                 if let Some(credentials) = &self.credentials {
                     let authorization = MetadataValue::from_str(&credentials.make_token())
@@ -226,11 +232,8 @@ impl PubsubSource {
         // start if there is no data in the subscription.
         let request_stream = self.request_stream();
         let stream = tokio::select! {
-            _ = &mut self.shutdown => return Ok(()),
-            result = client.streaming_pull(request_stream) => match result {
-                    Err(source) => return Err(PubsubError::Pull { source }.into()),
-                    Ok(stream) => stream,
-                }
+            _ = &mut self.shutdown => return Ok(false),
+            result = client.streaming_pull(request_stream) => result.context(PullSnafu)?,
         };
         let mut stream = stream.into_inner();
 
@@ -250,7 +253,7 @@ impl PubsubSource {
 
         loop {
             tokio::select! {
-                _ = &mut self.shutdown => break,
+                _ = &mut self.shutdown => return Ok(false),
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
                     Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
@@ -259,7 +262,7 @@ impl PubsubSource {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn make_tls_config(&self) -> ClientTlsConfig {
