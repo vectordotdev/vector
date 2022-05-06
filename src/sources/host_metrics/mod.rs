@@ -34,7 +34,7 @@ mod network;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-enum Collector {
+pub enum Collector {
     #[cfg(target_os = "linux")]
     CGroups,
     Cpu,
@@ -53,7 +53,7 @@ pub(self) struct FilterList {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Namespace(Option<String>);
+pub struct Namespace(Option<String>);
 
 impl Default for Namespace {
     fn default() -> Self {
@@ -61,29 +61,31 @@ impl Default for Namespace {
     }
 }
 
+impl From<Option<String>> for Namespace {
+    fn from(s: Option<String>) -> Self {
+        Namespace(s)
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
-    scrape_interval_secs: f64,
+    pub scrape_interval_secs: f64,
 
-    collectors: Option<Vec<Collector>>,
+    pub collectors: Option<Vec<Collector>>,
     #[serde(default)]
-    namespace: Namespace,
-    #[serde(skip)]
-    version: Option<String>,
-    #[serde(skip)]
-    configuration_key: Option<String>,
+    pub namespace: Namespace,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
-    cgroups: cgroups::CGroupsConfig,
+    pub(crate) cgroups: cgroups::CGroupsConfig,
     #[serde(default)]
-    disk: disk::DiskConfig,
+    pub disk: disk::DiskConfig,
     #[serde(default)]
-    filesystem: filesystem::FilesystemConfig,
+    pub filesystem: filesystem::FilesystemConfig,
     #[serde(default)]
-    network: network::NetworkConfig,
+    pub network: network::NetworkConfig,
 }
 
 const fn default_scrape_interval() -> f64 {
@@ -122,16 +124,6 @@ impl SourceConfig for HostMetricsConfig {
 }
 
 impl HostMetricsConfig {
-    /// Return a host metrics config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
-        Self {
-            namespace: Namespace(Some("pipelines".to_owned())),
-            version: Some(version.into()),
-            configuration_key: Some(configuration_key.into()),
-            ..Self::default()
-        }
-    }
-
     /// Set the interval to collect internal metrics.
     pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
@@ -194,8 +186,6 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> Vec<Metric> {
         let hostname = crate::get_hostname();
-        let version = self.config.version.clone();
-        let configuration_key = self.config.configuration_key.clone();
 
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
@@ -227,16 +217,6 @@ impl HostMetrics {
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
                 metric.insert_tag("host".into(), hostname.into());
-            }
-        }
-        if let Some(version) = &version {
-            for metric in &mut metrics {
-                metric.insert_tag("version".to_owned(), version.clone());
-            }
-        }
-        if let Some(configuration_key) = &configuration_key {
-            for metric in &mut metrics {
-                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
         emit!(EventsReceived {

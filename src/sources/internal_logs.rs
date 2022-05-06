@@ -16,12 +16,8 @@ use crate::{
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
-    host_key: Option<String>,
-    pid_key: Option<String>,
-    #[serde(skip)]
-    configuration_key: Option<String>,
-    #[serde(skip)]
-    version: Option<String>,
+    pub host_key: Option<String>,
+    pub pid_key: Option<String>,
 }
 
 inventory::submit! {
@@ -29,17 +25,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
-
-impl InternalLogsConfig {
-    /// Return an internal logs config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
-        Self {
-            version: Some(version.into()),
-            configuration_key: Some(configuration_key.into()),
-            ..Self::default()
-        }
-    }
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_logs")]
@@ -60,8 +45,6 @@ impl SourceConfig for InternalLogsConfig {
             subscription,
             cx.out,
             cx.shutdown,
-            self.configuration_key.to_owned(),
-            self.version.to_owned(),
         )))
     }
 
@@ -84,8 +67,6 @@ async fn run(
     mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
-    configuration_key: Option<String>,
-    version: Option<String>,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
@@ -114,12 +95,6 @@ async fn run(
         log.insert(pid_key.as_str(), pid);
         log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
         log.try_insert(log_schema().timestamp_key(), Utc::now());
-        if let Some(ref config_key) = configuration_key {
-            log.try_insert("configuration_key", Bytes::from(config_key.clone()));
-        }
-        if let Some(ref version) = version {
-            log.try_insert("version", Bytes::from(version.clone()));
-        }
         if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { error, count: 1 });

@@ -92,9 +92,8 @@ impl SinkConfig for SocketSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let encoding = self.encoding.clone();
-        let transformer = encoding.transformer();
-        let (framer, serializer) = encoding.encoding();
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.encoding();
         let framer = framer.unwrap_or_else(|| match self.mode {
             Mode::Tcp(_) => NewlineDelimitedEncoder::new().into(),
             Mode::Udp(_) => BytesEncoder::new().into(),
@@ -111,7 +110,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {

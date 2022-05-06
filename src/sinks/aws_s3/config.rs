@@ -101,7 +101,7 @@ impl SinkConfig for S3SinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -149,7 +149,7 @@ impl S3SinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.clone().encoding();
+        let (framer, serializer) = self.encoding.encoding();
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),

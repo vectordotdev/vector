@@ -117,3 +117,29 @@ mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
 
 # Apt cleanup
 apt clean
+
+# Install mold, because the system linker wastes a bunch of time.
+TEMP=$(mktemp -d)
+MOLD_VERSION=1.2.0
+MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
+curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+     --output "$TEMP/${MOLD_TARGET}.tar.gz"
+tar \
+    -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+
+# Set Cargo to use mold as its linker.
+CARGO_OVERRIDE_DIR="${HOME}/.csh check for exisargo"
+mkdir -p "${CARGO_OVERRIDE_DIR}"
+
+CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+cat <<EOF >"${CARGO_OVERRIDE_CONF}"
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold"]
+EOF
+
+# Install clang if we don't already have it, as we need it for overriding the linker.
+if ! [ -x "$(command -v clang)" ]; then
+    apt install --yes clang
+fi

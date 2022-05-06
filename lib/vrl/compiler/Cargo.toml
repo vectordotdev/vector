@@ -13,16 +13,15 @@ lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
 value = { path = "../../value" }
 
-bitflags = "1"
-bytes = "1.1.0"
-chrono = "0.4"
-dyn-clone = "1.0.5"
-lalrpop-util = "0.19"
-ordered-float = "3"
-paste = "1"
-regex = "1"
+bytes = { version = "1.1.0", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
+lalrpop-util = { version = "0.19", default-features = false }
+ordered-float = { version = "3", default-features = false }
+paste = { version = "1", default-features = false }
+regex = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
-thiserror = "1"
+thiserror ={ version =  "1", default-features = false }
 anymap = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
