@@ -686,13 +686,14 @@ sinks-websocket = ["tokio-tungstenite"]
 
 # Datadog integration
 enterprise = [
+  "hex",
+  "sha2",
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics",
   "sources-host_metrics",
   "sources-internal_logs",
   "sources-internal_metrics",
-  "sinks-datadog_logs",
-  "sinks-datadog_metrics",
-  "sha2",
-  "hex"
+  "transforms-remap",
 ]
 
 # Identifies that the build is a nightly build
