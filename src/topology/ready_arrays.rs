@@ -33,28 +33,18 @@ where
     ///
     /// The specified capacity is a soft limit, and chunks may be returned that contain more than
     /// that number of items.
-    pub fn with_capacity(inner: T, cap: usize) -> Self {
+    pub fn with_capacity(inner: T, capacity: usize) -> Self {
         Self {
             inner,
-            enqueued: Vec::with_capacity(cap),
+            enqueued: Vec::with_capacity(capacity),
             enqueued_size: 0,
-            enqueued_limit: cap,
+            enqueued_limit: capacity,
         }
     }
 
-    /// Returns a reference to the underlying stream.
-    pub fn get_ref(&self) -> &T {
-        &self.inner
-    }
-
-    /// Returns a mutable reference to the underlying stream.
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
     fn flush(&mut self) -> Vec<EventArray> {
-        let arrays = std::mem::take(&mut self.enqueued);
-        let size = self.enqueued_size;
+        let mut arrays = Vec::with_capacity(self.enqueued_limit);
+        std::mem::swap(&mut arrays, &mut self.enqueued);
         self.enqueued_size = 0;
         arrays
     }

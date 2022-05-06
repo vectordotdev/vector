@@ -661,7 +661,7 @@ impl Runner {
                         Some(input_arrays) => {
                             let mut len = 0;
                             for events in &input_arrays {
-                                self.on_events_received(&events);
+                                self.on_events_received(events);
                                 len += events.len();
                             }
 
