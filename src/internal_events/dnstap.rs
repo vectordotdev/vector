@@ -3,17 +3,41 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DnstapEventsReceived {
+pub struct DnstapBytesReceived<'a> {
     pub byte_size: usize,
+    pub endpoint: &'a str,
 }
 
-impl InternalEvent for DnstapEventsReceived {
+impl InternalEvent for DnstapBytesReceived<'_> {
     fn emit(self) {
-        trace!(message = "Events received.", count = 1, byte_size = %self.byte_size);
-        counter!("component_received_events_total", 1);
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = "protobuf",
+            endpoint = %self.endpoint,
+        );
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "protobuf",
+            "endpoint" => self.endpoint.to_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DnstapEventsReceived<'a> {
+    pub byte_size: usize,
+    pub endpoint: &'a str,
+}
+
+impl<'a> InternalEvent for DnstapEventsReceived<'a> {
+    fn emit(self) {
+        trace!(message = "Events received.", count = 1, byte_size = %self.byte_size, endpoint = self.endpoint);
+        counter!("component_received_events_total", 1, "endpoint" => self.endpoint.to_owned());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64
+            self.byte_size as u64,
+            "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated
         counter!("processed_events_total", 1);
