@@ -62,6 +62,7 @@ pub struct TraceApiRequest {
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
     pub uri: Uri,
+    pub uncompressed_size: usize,
 }
 
 impl TraceApiRequest {
@@ -92,6 +93,7 @@ pub struct TraceApiResponse {
     body: Bytes,
     batch_size: usize,
     byte_size: usize,
+    uncompressed_size: usize,
     protocol: String,
 }
 
@@ -116,7 +118,7 @@ impl DriverResponse for TraceApiResponse {
 
     fn bytes_sent(&self) -> Option<BytesSent> {
         Some(BytesSent {
-            byte_size: self.byte_size,
+            byte_size: self.uncompressed_size,
             protocol: &self.protocol,
         })
     }
@@ -154,6 +156,7 @@ impl Service<TraceApiRequest> for TraceApiService {
         Box::pin(async move {
             let byte_size = request.body.len();
             let batch_size = request.batch_size;
+            let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 
             let response = client.send(http_request).await?;
@@ -169,6 +172,7 @@ impl Service<TraceApiRequest> for TraceApiService {
                 batch_size,
                 byte_size,
                 protocol,
+                uncompressed_size,
             })
         })
     }
