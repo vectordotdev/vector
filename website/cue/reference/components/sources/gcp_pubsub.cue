@@ -87,6 +87,7 @@ components: sources: gcp_pubsub: {
 			}
 		}
 		retry_delay_seconds: {
+			common:      false
 			description: "The amount of time to wait between retry attempts after an error."
 			required:    false
 			type: float: {
