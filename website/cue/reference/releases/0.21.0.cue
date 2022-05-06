@@ -13,6 +13,10 @@ releases: "0.21.0": {
 		"Vector panics when loading configuration that includes event paths like `encoding.only_fields`. [#12256](https://github.com/vectordotdev/vector/issues/12256). Fixed in `0.21.1`.",
 		"Vector panicked when reloading configuration that added components to a running topology. [#12273](https://github.com/vectordotdev/vector/issues/12273). Fixed in `0.21.1`.",
 		"Using `assume_role` on AWS components did not function correctly. [#12314](https://github.com/vectordotdev/vector/issues/12314). Fixed in `0.21.1`.",
+		"The Vector VRL REPL loses variable assignments if the expression being evaluated errors. [#12400](https://github.com/vectordotdev/vector/issues/12400). Fixed in `0.21.2`.",
+		"Vector docker images require a volume to be mounted at `/var/lib/vector` to start correctly when the default `data_dir` of is used. [#12413](https://github.com/vectordotdev/vector/issues/12413). Fixed in `0.21.2`.",
+		"For AWS components, the timeout for loading credentials was dropped from 30 seconds to 5 seconds. [#12421](https://github.com/vectordotdev/vector/issues/12421). `0.21.2` adds a new option, `load_timeout_secs` that can be configured to a higher value.",
+		"`vector generate` works again with the `datadog_agent` source. [#12469](https://github.com/vectordotdev/vector/issues/12469). Fixed in `0.21.2`.",
 	]
 
 	whats_next: [

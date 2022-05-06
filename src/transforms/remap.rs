@@ -170,7 +170,9 @@ impl TransformConfig for RemapConfig {
         if self.reroute_dropped {
             vec![
                 default_output,
-                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
+                Output::default(DataType::all())
+                    .with_schema_definition(dropped_definition)
+                    .with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -413,15 +415,15 @@ where
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
         let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
-        let original_event = if (self.program.can_fail() && forward_on_error)
-            || (self.program.can_abort() && forward_on_abort)
+        let original_event = if (self.program.info().fallible && forward_on_error)
+            || (self.program.info().abortable && forward_on_abort)
         {
             Some(event.clone())
         } else {
             None
         };
 
-        let mut target: VrlTarget = event.into();
+        let mut target = VrlTarget::new(event, self.program.info());
         let result = self.run_vrl(&mut target);
 
         match result {
@@ -1278,7 +1280,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
@@ -1305,7 +1307,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );

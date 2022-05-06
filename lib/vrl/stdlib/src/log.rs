@@ -8,21 +8,22 @@ fn log(
     span: vrl::diagnostic::Span,
 ) -> Resolved {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
+    let res = value.to_string_lossy();
     match level.as_ref() {
         b"trace" => {
-            trace!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            trace!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"debug" => {
-            debug!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            debug!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"warn" => {
-            warn!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            warn!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"error" => {
-            error!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            error!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         _ => {
-            info!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            info!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
     }
     Ok(Value::Null)
@@ -192,6 +193,7 @@ impl Expression for LogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing_test::traced_test;
 
     test_function![
         log => Log;
@@ -204,4 +206,20 @@ mod tests {
             tdef: TypeDef::null().infallible(),
         }
     ];
+
+    #[traced_test]
+    #[test]
+    fn output_quotes() {
+        // Check that a message is logged without additional quotes
+        log(
+            value!(1),
+            &Bytes::from("warn"),
+            value!("simple test message"),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert!(!logs_contain("\"simple test message\""));
+        assert!(logs_contain("simple test message"));
+    }
 }

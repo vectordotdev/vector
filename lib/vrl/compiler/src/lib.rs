@@ -26,7 +26,7 @@ pub(crate) use diagnostic::Span;
 pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
-pub use program::Program;
+pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
 use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;

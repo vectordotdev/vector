@@ -56,7 +56,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
 
             self.blob_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().to_hyphenated()))
+                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
                 .unwrap_or_else(|| formatted_ts.to_string())
         };
 

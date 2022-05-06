@@ -1,5 +1,25 @@
 use vrl::prelude::*;
 
+fn map_keys<T>(
+    value: Value,
+    recursive: bool,
+    ctx: &mut Context,
+    runner: closure::Runner<T>,
+) -> Resolved
+where
+    T: Fn(&mut Context) -> Resolved,
+{
+    let mut iter = value.into_iter(recursive);
+
+    for item in iter.by_ref() {
+        if let IterItem::KeyValue(key, _) = item {
+            runner.map_key(ctx, key)?;
+        }
+    }
+
+    Ok(iter.into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct MapKeys;
 
@@ -81,9 +101,18 @@ impl Function for MapKeys {
         })
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
-        // TODO: this work will happen in a follow-up PR
-        Err("function currently unavailable in VM runtime".into())
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+        let value = args.required("value");
+        let recursive = args
+            .optional("recursive")
+            .map(|v| v.try_boolean())
+            .transpose()?
+            .unwrap_or_default();
+
+        let VmFunctionClosure { variables, vm } = args.closure();
+        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
+
+        map_keys(value, recursive, ctx, runner)
     }
 }
 
@@ -102,20 +131,15 @@ impl Expression for MapKeysFn {
         };
 
         let value = self.value.resolve(ctx)?;
-        let mut iter = value.into_iter(recursive);
+        let FunctionClosure { variables, block } = &self.closure;
+        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
-        for item in iter.by_ref() {
-            if let IterItem::KeyValue(key, _) = item {
-                self.closure.map_key(ctx, key)?;
-            }
-        }
-
-        Ok(iter.into())
+        map_keys(value, recursive, ctx, runner)
     }
 
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(ctx)
-            .with_fallibility(self.closure.type_def(ctx).is_fallible())
+            .with_fallibility(self.closure.block.type_def(ctx).is_fallible())
     }
 }

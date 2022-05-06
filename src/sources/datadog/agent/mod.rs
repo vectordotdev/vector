@@ -26,7 +26,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext,
+        SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -79,6 +79,10 @@ impl GenerateConfig for DatadogAgentConfig {
         })
         .unwrap()
     }
+}
+
+inventory::submit! {
+    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
 }
 
 #[async_trait::async_trait]
@@ -173,9 +177,11 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             vec![
-                Output::from((METRICS, DataType::Metric)),
-                Output::from((LOGS, DataType::Log)).with_schema_definition(definition),
-                Output::from((TRACES, DataType::Trace)),
+                Output::default(DataType::Metric).with_port(METRICS),
+                Output::default(DataType::Log)
+                    .with_schema_definition(definition)
+                    .with_port(LOGS),
+                Output::default(DataType::Trace).with_port(TRACES),
             ]
         } else {
             vec![Output::default(DataType::all()).with_schema_definition(definition)]

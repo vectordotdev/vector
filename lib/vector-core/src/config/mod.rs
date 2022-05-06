@@ -118,21 +118,18 @@ impl Output {
         }
     }
 
-    /// Set the schema definition for this output.
+    /// Set the schema definition for this `Output`.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
         self.log_schema_definition = Some(schema_definition);
         self
     }
-}
 
-impl<T: Into<String>> From<(T, DataType)> for Output {
-    fn from((name, ty): (T, DataType)) -> Self {
-        Self {
-            port: Some(name.into()),
-            ty,
-            log_schema_definition: None,
-        }
+    /// Set the port name for this `Output`.
+    #[must_use]
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
+        self.port = Some(name.into());
+        self
     }
 }
 

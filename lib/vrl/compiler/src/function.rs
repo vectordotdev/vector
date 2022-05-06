@@ -7,12 +7,12 @@ use std::{
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note};
+use parser::ast::Ident;
 use value::kind::Collection;
 
 use crate::{
     expression::{
-        container::Variant, Container, Expr, Expression, FunctionArgument, FunctionClosure,
-        Literal, Query,
+        container::Variant, Block, Container, Expr, Expression, FunctionArgument, Literal, Query,
     },
     parser::Node,
     state::{ExternalEnv, LocalEnv},
@@ -470,6 +470,23 @@ impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
                 )
             })
             .collect()
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionClosure {
+    pub variables: Vec<Ident>,
+    pub block: Block,
+}
+
+impl FunctionClosure {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            block,
+        }
     }
 }
 

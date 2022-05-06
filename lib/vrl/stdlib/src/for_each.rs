@@ -1,5 +1,20 @@
 use vrl::prelude::*;
 
+fn for_each<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
+where
+    T: Fn(&mut Context) -> Resolved,
+{
+    for item in value.into_iter(false) {
+        match item {
+            IterItem::KeyValue(key, value) => runner.run_key_value(ctx, key, value)?,
+            IterItem::IndexValue(index, value) => runner.run_index_value(ctx, index, value)?,
+            _ => {}
+        };
+    }
+
+    Ok(Value::Null)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ForEach;
 
@@ -69,9 +84,12 @@ impl Function for ForEach {
         })
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
-        // TODO: this work will happen in a follow-up PR
-        Err("function currently unavailable in VM runtime".into())
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+        let value = args.required("value");
+        let VmFunctionClosure { variables, vm } = args.closure();
+        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
+
+        for_each(value, ctx, runner)
     }
 }
 
@@ -84,25 +102,14 @@ struct ForEachFn {
 impl Expression for ForEachFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let value = self.value.resolve(ctx)?;
-        let mut iter = value.into_iter(false);
+        let FunctionClosure { variables, block } = &self.closure;
+        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
-        for item in iter.by_ref() {
-            match item {
-                IterItem::KeyValue(key, value) => self.closure.run_key_value(ctx, key, value)?,
-
-                IterItem::IndexValue(index, value) => {
-                    self.closure.run_index_value(ctx, index, value)?
-                }
-
-                _ => {}
-            };
-        }
-
-        Ok(Value::Null)
+        for_each(value, ctx, runner)
     }
 
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let fallible = self.closure.type_def(ctx).is_fallible();
+        let fallible = self.closure.block.type_def(ctx).is_fallible();
 
         TypeDef::null().with_fallibility(fallible)
     }

@@ -1418,6 +1418,26 @@ bench_function! {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({key: "value"})),
     }
+
+    map_max_depth {
+        args: func_args![value: r#"{"key": "value"}"#, max_depth: 10],
+        want: Ok(value!({key: "value"})),
+    }
+
+    nested {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
+
+    nested_max_depth_1 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 1],
+        want: Ok(value!({"1":"{\"2\":{\"3\":{\"4\":{\"5\":{\"6\":\"end\"}}}}}"})),
+    }
+
+    nested_max_depth_10 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 10],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
 }
 
 bench_function! {
