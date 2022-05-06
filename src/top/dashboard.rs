@@ -280,7 +280,7 @@ impl<'a> Widgets<'a> {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
         let size = f.size();
         let rects = Layout::default()
-            .constraints(self.constraints.as_ref())
+            .constraints(self.constraints.clone())
             .split(size);
 
         self.title(f, rects[0], &state.connection_status);
