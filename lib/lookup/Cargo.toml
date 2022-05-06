@@ -10,7 +10,7 @@ serde = { version = "1.0.136", default-features = false, features = ["derive", "
 snafu = { version = "0.7", default-features = false }
 regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"
-lalrpop-util = { version = "0.19.7", features = ["lexer"] }
+lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 once_cell = { version = "1.9" }
 quickcheck = { version = "1.0.3", optional = true }
 
