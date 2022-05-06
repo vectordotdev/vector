@@ -338,18 +338,15 @@ impl Transformer {
         except_fields: Option<Vec<String>>,
         timestamp_format: Option<TimestampFormat>,
     ) -> Result<Self, crate::Error> {
-        let transformer = Self {
+        let inner = TransformerInner {
             only_fields,
             except_fields,
             timestamp_format,
         };
 
-        validate_fields(
-            transformer.only_fields.as_deref(),
-            transformer.except_fields.as_deref(),
-        )?;
+        validate_fields(inner.only_fields.as_deref(), inner.except_fields.as_deref())?;
 
-        Ok(transformer)
+        Ok(Self(inner))
     }
 
     /// Prepare an event for serialization by the given transformation rules.
