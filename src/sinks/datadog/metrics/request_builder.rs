@@ -244,22 +244,11 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                             while recommended_splits > 1 {
                                 split_idx -= stride;
                                 let chunk = metrics.split_off(split_idx);
-                                match encode_now_or_never(encoder, endpoint, chunk) {
-                                    Ok((result, bytes)) => {
-                                        results.push(Ok((result, bytes)));
-                                    }
-                                    Err(err) => results.push(Err(err)),
-                                }
-
+                                results.push(encode_now_or_never(encoder, endpoint, chunk));
                                 recommended_splits -= 1;
                             }
 
-                            match encode_now_or_never(encoder, endpoint, metrics) {
-                                Ok((result, bytes)) => {
-                                    results.push(Ok((result, bytes)));
-                                }
-                                Err(err) => results.push(Err(err)),
-                            }
+                            results.push(encode_now_or_never(encoder, endpoint, metrics));
                         }
                         // Not an error we can do anything about, so just forward it on.
                         suberr => results.push(Err(RequestBuilderError::Unexpected {
