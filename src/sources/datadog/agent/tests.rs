@@ -953,7 +953,7 @@ async fn decode_traces() {
         let trace = events[0].as_trace();
         assert_eq!(trace.as_map()["host"], "a_hostname".into());
         assert_eq!(trace.as_map()["env"], "an_environment".into());
-        assert_eq!(trace.as_map()["language"], "ada".into());
+        assert_eq!(trace.as_map()["language_name"], "ada".into());
         assert!(trace.contains("spans"));
         assert_eq!(trace.as_map()["spans"].as_array().unwrap().len(), 1);
         let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0]
@@ -987,13 +987,17 @@ async fn decode_traces() {
         );
 
         let apm_event = events[1].as_trace();
-        assert!(!apm_event.contains("spans"));
-        assert_eq!(apm_event.as_map()["env"], "an_environment".into());
-        assert_eq!(apm_event.as_map()["language"], "ada".into());
+        assert!(apm_event.contains("spans"));
         assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
-        assert_eq!(apm_event.as_map()["service"], "a_service".into());
-        assert_eq!(apm_event.as_map()["name"], "a_name".into());
-        assert_eq!(apm_event.as_map()["resource"], "a_resource".into());
+        assert_eq!(apm_event.as_map()["env"], "an_environment".into());
+        assert_eq!(apm_event.as_map()["language_name"], "ada".into());
+        let span_from_apm_event = apm_event.as_map()["spans"].as_array().unwrap()[0]
+            .as_object()
+            .unwrap();
+
+        assert_eq!(span_from_apm_event["service"], "a_service".into());
+        assert_eq!(span_from_apm_event["name"], "a_name".into());
+        assert_eq!(span_from_apm_event["resource"], "a_resource".into());
 
         assert_eq!(
             &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],

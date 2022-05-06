@@ -207,8 +207,20 @@ fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent
     payload
         .chunks
         .into_iter()
-        .map(|t| {
-            let mut trace_event = convert_dd_trace_chunk(t);
+        .map(|trace| {
+            let mut trace_event = TraceEvent::default();
+            trace_event.insert("priority", trace.priority as i64);
+            trace_event.insert("origin", trace.origin);
+            trace_event.insert("dropped", trace.dropped_trace);
+            trace_event.insert("tags", Value::from(convert_tags(trace.tags)));
+            trace_event.insert(
+                "spans",
+                trace
+                    .spans
+                    .into_iter()
+                    .map(|s| Value::from(convert_span(s)))
+                    .collect::<Vec<Value>>(),
+            );
             trace_event.insert("container_id", payload.container_id.clone());
             trace_event.insert("language_name", payload.language_name.clone());
             trace_event.insert("language_version", payload.language_version.clone());
@@ -220,25 +232,7 @@ fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent
         .collect()
 }
 
-fn convert_dd_trace_chunk(dd_chunk: dd_proto::TraceChunk) -> TraceEvent {
-    let mut trace_event = TraceEvent::default();
-    trace_event.insert("priority", dd_chunk.priority as i64);
-    trace_event.insert("origin", dd_chunk.origin);
-    trace_event.insert("dropped", dd_chunk.dropped_trace);
-    trace_event.insert("tags", Value::from(convert_tags(dd_chunk.tags)));
-    trace_event.insert(
-        "spans",
-        dd_chunk
-            .spans
-            .into_iter()
-            .map(|s| Value::from(convert_span(s)))
-            .collect::<Vec<Value>>(),
-    );
-    trace_event
-}
-
 // Decode Datadog older protobuf schema
-// TODO: rework to get an output compatible with the new format
 fn handle_dd_trace_payload_v1(
     frame: Bytes,
     api_key: Option<Arc<str>>,
@@ -255,10 +249,27 @@ fn handle_dd_trace_payload_v1(
     decoded_payload
         .traces
         .into_iter()
-        .map(convert_dd_api_trace)
+        .map(|dd_trace| {
+            let mut trace_event = TraceEvent::default();
+            trace_event.insert("trace_id", dd_trace.trace_id as i64);
+            trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
+            trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
+            trace_event.insert(
+                "spans",
+                dd_trace
+                    .spans
+                    .into_iter()
+                    .map(|s| Value::from(convert_span(s)))
+                    .collect::<Vec<Value>>(),
+            );
+            trace_event
+        })
         //... and each APM event is also mapped into its own event
         .chain(decoded_payload.transactions.into_iter().map(|s| {
-            TraceEvent::from(convert_span(s))
+            let mut trace_event = TraceEvent::default();
+            trace_event.insert("spans", vec![Value::from(convert_span(s))]);
+            trace_event.insert("dropped", true);
+            trace_event
         })).collect();
 
     emit!(EventsReceived {
@@ -289,22 +300,6 @@ fn handle_dd_trace_payload_v1(
         .collect();
 
     Ok(enriched_events)
-}
-
-fn convert_dd_api_trace(dd_trace: dd_proto::ApiTrace) -> TraceEvent {
-    let mut trace_event = TraceEvent::default();
-    trace_event.insert("trace_id", dd_trace.trace_id as i64);
-    trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
-    trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
-    trace_event.insert(
-        "spans",
-        dd_trace
-            .spans
-            .into_iter()
-            .map(|s| Value::from(convert_span(s)))
-            .collect::<Vec<Value>>(),
-    );
-    trace_event
 }
 
 fn convert_span(dd_span: dd_proto::Span) -> BTreeMap<String, Value> {

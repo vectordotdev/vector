@@ -290,38 +290,6 @@ impl DatadogTracesEncoder {
         }
     }
 
-    /* Deprecated -to remove-
-    fn vector_trace_into_dd_trace_v1(trace: &TraceEvent) -> dd_proto::ApiTrace {
-        let trace_id = match trace.get("trace_id") {
-            Some(Value::Integer(val)) => *val,
-            _ => 0,
-        };
-        let start_time = match trace.get("start_time") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
-            _ => 0,
-        };
-        let end_time = match trace.get("end_time") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
-            _ => 0,
-        };
-
-        let spans = match trace.get("spans") {
-            Some(Value::Array(v)) => v
-                .iter()
-                .filter_map(|s| s.as_object().map(DatadogTracesEncoder::convert_span))
-                .collect(),
-            _ => vec![],
-        };
-
-        dd_proto::ApiTrace {
-            trace_id: trace_id as u64,
-            spans,
-            start_time,
-            end_time,
-        }
-    }
-    */
-
     fn convert_span(span: &BTreeMap<String, Value>) -> dd_proto::Span {
         let trace_id = match span.get("trace_id") {
             Some(Value::Integer(val)) => *val,
