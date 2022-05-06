@@ -61,6 +61,7 @@ ofb = { version = "0.6.1", optional = true }
 anyhow = "1"
 chrono-tz = "0.6"
 criterion = "0.3"
+tracing-test = "0.1"
 value = { path = "../../value", features = ["test"]}
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
@@ -255,7 +256,7 @@ is_string = []
 is_timestamp = ["chrono"]
 join = []
 length = []
-log = ["tracing"]
+log = ["tracing", "value/json"]
 map_keys = []
 map_values = []
 match = ["regex"]
