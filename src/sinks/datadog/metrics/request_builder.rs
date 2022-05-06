@@ -167,7 +167,6 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 
         let mut results = Vec::new();
         let mut pending = None;
-
         while metric_drain.len() != 0 {
             let mut n = 0;
 
@@ -247,7 +246,6 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                                 results.push(encode_now_or_never(encoder, endpoint, chunk));
                                 recommended_splits -= 1;
                             }
-
                             results.push(encode_now_or_never(encoder, endpoint, metrics));
                         }
                         // Not an error we can do anything about, so just forward it on.
