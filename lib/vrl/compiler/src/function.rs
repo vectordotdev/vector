@@ -11,7 +11,7 @@ use parser::ast::Ident;
 use value::kind::Collection;
 
 use crate::{
-    expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument, Query},
+    expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
@@ -332,7 +332,11 @@ impl ArgumentList {
         Ok(required(self.optional_enum(keyword, variants)?))
     }
 
-    pub fn optional_query(&mut self, keyword: &'static str) -> Result<Option<Query>, Error> {
+    #[cfg(feature = "expr-query")]
+    pub fn optional_query(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<crate::expression::Query>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Query(query) => Ok(query),
@@ -345,7 +349,11 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_query(&mut self, keyword: &'static str) -> Result<Query, Error> {
+    #[cfg(feature = "expr-query")]
+    pub fn required_query(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<crate::expression::Query, Error> {
         Ok(required(self.optional_query(keyword)?))
     }
 

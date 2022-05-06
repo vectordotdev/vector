@@ -456,6 +456,7 @@ impl<'a> Compiler<'a> {
         self.handle_missing_feature_error(node.span(), "expr-assignment")
     }
 
+    #[cfg(feature = "expr-query")]
     fn compile_query(&mut self, node: Node<ast::Query>, external: &mut ExternalEnv) -> Query {
         let ast::Query { target, path } = node.into_inner();
         let path = path.into_inner();
@@ -472,6 +473,12 @@ impl<'a> Compiler<'a> {
         Query::new(target, path)
     }
 
+    #[cfg(not(feature = "expr-query"))]
+    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-query")
+    }
+
+    #[cfg(feature = "expr-query")]
     fn compile_query_target(
         &mut self,
         node: Node<ast::QueryTarget>,

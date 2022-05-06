@@ -38,6 +38,7 @@ expressions = [
   "expr-if_statement",
   "expr-literal",
   "expr-op",
+  "expr-query",
   "expr-unary",
 ]
 expr-abort = ["vrl/expr-abort"]
@@ -46,4 +47,5 @@ expr-function_call = ["vrl/expr-function_call"]
 expr-if_statement = ["vrl/expr-if_statement"]
 expr-literal = ["vrl/expr-literal"]
 expr-op = ["vrl/expr-op"]
+expr-query = ["vrl/expr-query"]
 expr-unary = ["vrl/expr-unary"]

@@ -82,6 +82,7 @@ impl ExternalEnv {
         self.target().map(|details| details.type_def.kind())
     }
 
+    #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
         self.target = Some(details);
     }

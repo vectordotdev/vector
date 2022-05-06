@@ -14,6 +14,7 @@ expressions = [
   "expr-if_statement",
   "expr-literal",
   "expr-op",
+  "expr-query",
   "expr-unary",
 ]
 expr-abort = ["core/expr-abort"]
@@ -22,6 +23,7 @@ expr-function_call = []
 expr-if_statement = []
 expr-literal = []
 expr-op = []
+expr-query = []
 expr-unary = []
 
 [dependencies]
