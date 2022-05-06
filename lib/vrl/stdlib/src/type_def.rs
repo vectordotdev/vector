@@ -91,11 +91,7 @@ impl Function for TypeDef {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "return type definition",
-            source: r#"type_def(42)"#,
-            result: Ok("{ \"integer\": true }"),
-        }]
+        &[]
     }
 
     fn compile(
