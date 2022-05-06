@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::{Certificate, Channel, ClientTlsConfig, Identity},
-    Request,
+    Code, Request, Status,
 };
 use vector_core::ByteSizeOf;
 
@@ -20,7 +20,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, Event, MaybeAsLogMut, Value},
-    gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -78,7 +78,7 @@ enum PubsubError {
     #[snafu(display("Could not connect channel: {}", source))]
     Connect { source: tonic::transport::Error },
     #[snafu(display("Could not pull data from remote: {}", source))]
-    Pull { source: tonic::Status },
+    Pull { source: Status },
     #[snafu(display(
         "`ack_deadline_seconds` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECONDS,
@@ -132,21 +132,18 @@ impl SourceConfig for PubsubConfig {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
-        let authorization = if self.skip_authentication {
+        let credentials = if self.skip_authentication {
             None
         } else {
             self.auth.make_credentials(Scope::PubSub).await?
-        }
-        .map(|credentials| MetadataValue::from_str(&credentials.make_token()))
-        .transpose()
-        .context(MetadataSnafu)?;
+        };
 
         let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
         let uri: Uri = endpoint.parse().context(UriSnafu)?;
         let source = PubsubSource {
             endpoint,
             uri,
-            authorization,
+            credentials,
             subscription: format!(
                 "projects/{}/subscriptions/{}",
                 self.project, self.subscription
@@ -182,7 +179,7 @@ impl_generate_config_from_default!(PubsubConfig);
 struct PubsubSource {
     endpoint: String,
     uri: Uri,
-    authorization: Option<MetadataValue<tonic::metadata::Ascii>>,
+    credentials: Option<GcpCredentials>,
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
@@ -210,7 +207,14 @@ impl PubsubSource {
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             channel,
             |mut req: Request<()>| {
-                if let Some(authorization) = &self.authorization {
+                if let Some(credentials) = &self.credentials {
+                    let authorization = MetadataValue::from_str(&credentials.make_token())
+                        .map_err(|_| {
+                            Status::new(
+                                Code::FailedPrecondition,
+                                "Invalid token text returned by GCP",
+                            )
+                        })?;
                     req.metadata_mut()
                         .insert("authorization", authorization.clone());
                 }
@@ -229,6 +233,10 @@ impl PubsubSource {
                 }
         };
         let mut stream = stream.into_inner();
+
+        if let Some(credentials) = self.credentials.take() {
+            credentials.spawn_regenerate_token();
+        }
 
         let finalizer = self.acknowledgements.then(|| {
             let ack_ids = Arc::clone(&self.ack_ids);
