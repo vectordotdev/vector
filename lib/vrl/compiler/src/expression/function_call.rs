@@ -4,7 +4,6 @@ use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use crate::{
-    expression::assignment::Details,
     expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
@@ -12,6 +11,7 @@ use crate::{
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     value::Kind,
     vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,

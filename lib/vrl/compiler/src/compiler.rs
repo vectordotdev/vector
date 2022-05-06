@@ -1,15 +1,12 @@
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
-use ordered_float::NotNan;
-use parser::ast::{self, AssignmentOp, Node};
+use parser::ast::{self, Node};
 
 use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program, Value,
+    Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -143,9 +140,13 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(feature = "expr-literal")]
     fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
         use ast::Literal::*;
+        use bytes::Bytes;
+        use chrono::{TimeZone, Utc};
         use literal::ErrorVariant::*;
+        use ordered_float::NotNan;
 
         let (span, lit) = node.take();
 
@@ -189,6 +190,12 @@ impl<'a> Compiler<'a> {
         });
 
         literal.into()
+    }
+
+    #[cfg(not(feature = "expr-literal"))]
+    fn compile_literal(&mut self, node: Node<ast::Literal>, _: &mut ExternalEnv) -> Expr {
+        self.handle_missing_feature_error(node.span(), "expr-literal")
+            .into()
     }
 
     fn compile_container(
@@ -289,11 +296,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(not(feature = "expr-if_statement"))]
-    fn compile_if_statement(
-        &mut self,
-        node: Node<ast::IfStatement>,
-        external: &mut ExternalEnv,
-    ) -> Noop {
+    fn compile_if_statement(&mut self, node: Node<ast::IfStatement>, _: &mut ExternalEnv) -> Noop {
         self.handle_missing_feature_error(node.span(), "expr-if_statement")
     }
 
@@ -342,7 +345,7 @@ impl<'a> Compiler<'a> {
     }
 
     /// Rewrites the ast for `a |= b` to be `a = a | b`.
-    #[cfg(feature = "expr-op")]
+    #[cfg(feature = "expr-assignment")]
     fn rewrite_to_merge(
         &mut self,
         span: diagnostic::Span,
@@ -366,28 +369,15 @@ impl<'a> Compiler<'a> {
         ))
     }
 
-    #[cfg(not(feature = "expr-op"))]
-    fn rewrite_to_merge(
-        &mut self,
-        span: diagnostic::Span,
-        _: &Node<ast::AssignmentTarget>,
-        _: Box<Node<ast::Expr>>,
-        _: &mut ExternalEnv,
-    ) -> Box<Node<Expr>> {
-        Box::new(Node::new(
-            span,
-            self.handle_missing_feature_error(span, "expr-op").into(),
-        ))
-    }
-
     #[cfg(feature = "expr-assignment")]
     fn compile_assignment(
         &mut self,
         node: Node<ast::Assignment>,
         external: &mut ExternalEnv,
     ) -> Assignment {
+        use crate::Value;
         use assignment::Variant;
-        use ast::Assignment::*;
+        use ast::{Assignment::*, AssignmentOp};
 
         let assignment = node.into_inner();
 
@@ -600,6 +590,10 @@ impl<'a> Compiler<'a> {
         node: Node<ast::FunctionCall>,
         _: &mut ExternalEnv,
     ) -> Noop {
+        // Guard against `dead_code` lint, to avoid having to sprinkle
+        // attributes all over the place.
+        let _ = self.fns;
+
         self.handle_missing_feature_error(node.span(), "expr-function_call")
     }
 

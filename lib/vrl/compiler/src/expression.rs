@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
@@ -13,7 +12,6 @@ use crate::{
 mod abort;
 mod array;
 mod block;
-#[cfg(feature = "expr-function_call")]
 mod function_argument;
 mod group;
 #[cfg(feature = "expr-if_statement")]
@@ -48,7 +46,6 @@ pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
 pub use core::{ExpressionError, Resolved};
-#[cfg(feature = "expr-function_call")]
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
@@ -175,6 +172,7 @@ impl Expr {
         }
     }
 
+    #[cfg(feature = "expr-literal")]
     pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
         let literal = match self {
             #[cfg(feature = "expr-literal")]
@@ -204,6 +202,15 @@ impl Expr {
                 expr: self.clone(),
             }),
         }
+    }
+
+    #[cfg(not(feature = "expr-literal"))]
+    pub fn as_literal(&self, keyword: &'static str) -> Result<Value, super::function::Error> {
+        Err(super::function::Error::UnexpectedExpression {
+            keyword,
+            expected: "literal",
+            expr: self.clone(),
+        })
     }
 
     pub fn as_enum(
@@ -434,6 +441,7 @@ impl From<Abort> for Expr {
 #[cfg(feature = "expr-literal")]
 impl From<Value> for Expr {
     fn from(value: Value) -> Self {
+        use std::collections::BTreeMap;
         use Value::*;
 
         match value {
@@ -466,7 +474,7 @@ impl From<Value> for Expr {
 
 #[cfg(not(feature = "expr-literal"))]
 impl From<Value> for Expr {
-    fn from(value: Value) -> Self {
+    fn from(_: Value) -> Self {
         Self::Noop(Noop)
     }
 }

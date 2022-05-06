@@ -25,11 +25,15 @@ pub enum Literal {
     Null,
 }
 
-impl Literal {
-    pub fn to_value(&self) -> Value {
+impl Expression for Literal {
+    fn resolve(&self, _: &mut Context) -> Resolved {
+        Ok(self.as_value().unwrap())
+    }
+
+    fn as_value(&self) -> Option<Value> {
         use Literal::*;
 
-        match self {
+        let value = match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
@@ -37,17 +41,9 @@ impl Literal {
             Regex(v) => Value::Regex(v.clone()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
-        }
-    }
-}
+        };
 
-impl Expression for Literal {
-    fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(self.to_value())
-    }
-
-    fn as_value(&self) -> Option<Value> {
-        Some(self.to_value())
+        Some(value)
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -72,7 +68,7 @@ impl Expression for Literal {
         _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Add the literal as a constant.
-        let constant = vm.add_constant(self.to_value());
+        let constant = vm.add_constant(self.as_value().unwrap());
         vm.write_opcode(OpCode::Constant);
         vm.write_primitive(constant);
         Ok(())

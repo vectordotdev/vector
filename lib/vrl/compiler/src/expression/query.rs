@@ -7,9 +7,10 @@ use value::{
 };
 
 use crate::{
-    expression::{assignment, Container, Resolved, Variable},
+    expression::{Container, Resolved, Variable},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     vm::{self, OpCode},
     Context, Expression, TypeDef, Value,
 };
@@ -70,7 +71,7 @@ impl Query {
                 },
             );
 
-            external.update_target(assignment::Details { type_def, value });
+            external.update_target(Details { type_def, value });
 
             return result;
         }

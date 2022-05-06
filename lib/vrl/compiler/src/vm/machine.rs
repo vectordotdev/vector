@@ -1,5 +1,5 @@
 use super::VmFunctionClosure;
-use super::{state::VmState, Variable, VmArgumentList};
+use super::{state::VmState, Variable};
 #[cfg(feature = "expr-op")]
 use crate::value::VrlValueArithmetic;
 use crate::value::VrlValueConvert;
@@ -560,6 +560,8 @@ impl Vm {
                 }
                 #[cfg(feature = "expr-function_call")]
                 OpCode::Call => {
+                    use super::VmArgumentList;
+
                     // Calls a function in the stdlib.
                     let function_id = state.next_primitive()?;
                     let span_start = state.next_primitive()?;
@@ -667,6 +669,7 @@ where
 }
 
 /// Sets the value of the given variable to the provided value.
+#[cfg(feature = "expr-assignment")]
 fn set_variable<'a>(
     ctx: &mut Context<'a>,
     variable: &Variable,

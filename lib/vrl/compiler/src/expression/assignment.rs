@@ -4,12 +4,13 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
 
 use crate::{
-    expression::{Expr, Literal, Resolved},
+    expression::{Expr, Noop, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
     },
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     value::kind::DefaultValue,
     vm::OpCode,
     Context, Expression, Span, TypeDef, Value,
@@ -58,10 +59,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
 
@@ -112,10 +110,7 @@ impl Assignment {
                 let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 ok.insert_type_def(local, external, type_def, value);
 
@@ -140,7 +135,7 @@ impl Assignment {
 
     pub(crate) fn noop() -> Self {
         let target = Target::Noop;
-        let expr = Box::new(Expr::Literal(Literal::Null));
+        let expr = Box::new(Expr::Noop(Noop));
         let variant = Variant::Single { target, expr };
 
         Self { variant }
@@ -492,14 +487,6 @@ where
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Details {
-    pub(crate) type_def: TypeDef,
-    pub(crate) value: Option<Value>,
 }
 
 // -----------------------------------------------------------------------------

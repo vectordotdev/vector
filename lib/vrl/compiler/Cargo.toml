@@ -17,7 +17,7 @@ expressions = [
   "expr-unary",
 ]
 expr-abort = ["core/expr-abort"]
-expr-assignment = []
+expr-assignment = ["expr-op"]
 expr-function_call = []
 expr-if_statement = []
 expr-literal = []
