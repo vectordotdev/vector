@@ -371,7 +371,7 @@ fn setup_logs_reporting(
 
     let custom_logs_tags_vrl = datadog
         .tags
-        .clone()
+        .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
 
     let tag_logs = RemapConfig {
@@ -439,7 +439,7 @@ fn setup_metrics_reporting(
 
     let custom_metric_tags_vrl = datadog
         .tags
-        .clone()
+        .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
 
     let tag_metrics = RemapConfig {
@@ -515,7 +515,7 @@ const fn default_max_retries() -> u32 {
 
 /// Converts user configured tags to VRL source code for adding tags/fields to
 /// events
-fn convert_tags_to_vrl(tags: IndexMap<String, String>, is_metric: bool) -> String {
+fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
     let json_tags = serde_json::to_string(&tags).unwrap();
     if is_metric {
         format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)
@@ -881,7 +881,7 @@ mod test {
             ("variant".to_string(), "baseline".to_string()),
         ]);
 
-        let vrl = convert_tags_to_vrl(tags, true);
+        let vrl = convert_tags_to_vrl(&tags, true);
         assert_eq!(
             vrl,
             r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
@@ -904,7 +904,7 @@ mod test {
             ("replica".to_string(), "abcd".to_string()),
             ("variant".to_string(), "baseline".to_string()),
         ]);
-        let vrl = convert_tags_to_vrl(tags, false);
+        let vrl = convert_tags_to_vrl(&tags, false);
 
         assert_eq!(
             vrl,
