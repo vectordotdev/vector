@@ -170,7 +170,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@v2.10.0
+        uses: docker/build-push-action@v3.0.0
         with:
           context: baseline-vector/
           file: soaks/Dockerfile
@@ -215,7 +215,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
 
       - name: Build 'soak-vector' image
-        uses: docker/build-push-action@v2.10.0
+        uses: docker/build-push-action@v3.0.0
         with:
           context: comparison-vector/
           file: soaks/Dockerfile
