@@ -220,12 +220,8 @@ impl DatadogTracesEncoder {
             // We only send tags at the Trace level
             tags: BTreeMap::new(),
             agent_version: key.agent_version.clone().unwrap_or_else(|| "".into()),
-            target_tps: key
-                .target_tps
-                .clone()
-                .map(|tps| tps as f64)
-                .unwrap_or(10f64),
-            error_tps: key.error_tps.clone().map(|tps| tps as f64).unwrap_or(10f64),
+            target_tps: key.target_tps.clone().map(|tps| tps as f64).unwrap_or(0f64),
+            error_tps: key.error_tps.clone().map(|tps| tps as f64).unwrap_or(0f64),
         }
     }
 
@@ -362,7 +358,15 @@ impl DatadogTracesEncoder {
             })
             .unwrap_or_else(BTreeMap::new);
 
-        let meta_struct = BTreeMap::new();
+        let meta_struct = span
+            .get("meta_struct")
+            .and_then(|m| m.as_object())
+            .map(|m| {
+                m.iter()
+                    .map(|(k, v)| (k.clone(), v.coerce_to_bytes().into_iter().collect()))
+                    .collect::<BTreeMap<String, Vec<u8>>>()
+            })
+            .unwrap_or_else(BTreeMap::new);
 
         let metrics = span
             .get("metrics")

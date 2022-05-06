@@ -110,8 +110,8 @@ pub enum TraceProto {
     V1,
     #[serde(rename = "v2")]
     V2,
-    #[serde(rename = "both")]
-    Both,
+    #[serde(rename = "v1v2")]
+    V1V2,
 }
 
 impl TraceProto {
@@ -124,17 +124,35 @@ impl TraceProto {
     ) -> crate::Result<Vec<Event>> {
         match self {
             TraceProto::V1 => handle_dd_trace_payload_v1(frame, api_key, lang, source),
-            TraceProto::V2 => handle_dd_trace_payload_v2(frame, api_key, lang, source),
-            TraceProto::Both => handle_dd_trace_payload_v2(frame, api_key, lang, source),
+            TraceProto::V2 => handle_dd_trace_payload_v2(frame, api_key, source),
+            TraceProto::V1V2 => handle_dd_trace_payload_v1v2(frame, api_key, lang, source),
         }
     }
+}
+
+// Decode Datadog newer protobuf schema
+fn handle_dd_trace_payload_v1v2(
+    frame: Bytes,
+    api_key: Option<Arc<str>>,
+    lang: Option<&String>,
+    source: &DatadogAgentSource,
+) -> crate::Result<Vec<Event>> {
+    handle_dd_trace_payload_v2(frame.clone(), api_key.clone(), source).and_then(
+        |traces| {
+            (!traces.is_empty())
+                .then(|| traces)
+                .ok_or("no traces decoded".into())
+        },
+    ).or_else(|e| {
+        debug!("Failed to decode traces, attempting to decode the received payload with the older format: {}.", e);
+        handle_dd_trace_payload_v1(frame, api_key, lang, source)
+    })
 }
 
 // Decode Datadog newer protobuf schema
 fn handle_dd_trace_payload_v2(
     frame: Bytes,
     api_key: Option<Arc<str>>,
-    _: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = dd_proto::AgentPayload::decode(frame)?;
@@ -257,7 +275,7 @@ fn handle_dd_trace_payload_v1(
                     .set_datadog_api_key(Some(Arc::clone(k)));
             }
             if let Some(lang) = lang {
-                trace_event.insert("language", lang.clone());
+                trace_event.insert("language_name", lang.clone());
             }
             trace_event.insert(
                 source.log_schema_source_type_key,

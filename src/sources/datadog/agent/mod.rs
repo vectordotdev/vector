@@ -66,7 +66,7 @@ struct DatadogAgentConfig {
 }
 
 const fn default_trace_proto() -> traces::TraceProto {
-    traces::TraceProto::V1
+    traces::TraceProto::V1V2
 }
 
 impl GenerateConfig for DatadogAgentConfig {

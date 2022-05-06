@@ -19,12 +19,7 @@ use super::service::TraceApiRequest;
 use crate::{
     config::SinkContext,
     internal_events::DatadogTracesEncodingError,
-    sinks::{
-        datadog::traces::{
-            config::DatadogTracesEndpoint, request_builder::DatadogTracesRequestBuilder,
-        },
-        util::SinkBuilderExt,
-    },
+    sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
 #[derive(Default)]
 struct EventPartitioner;
