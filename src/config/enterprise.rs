@@ -342,20 +342,10 @@ pub async fn try_attach(
         }
     }
 
-    setup_metrics_reporting(
-        config,
-        &datadog,
-        api_key.clone(),
-        config_version.clone(),
-    );
+    setup_metrics_reporting(config, &datadog, api_key.clone(), config_version.clone());
 
     if datadog.enable_logs_reporting {
-        setup_logs_reporting(
-            config,
-            &datadog,
-            api_key,
-            config_version,
-        );
+        setup_logs_reporting(config, &datadog, api_key, config_version);
     }
 
     Ok(())
@@ -450,7 +440,7 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key.clone(),
+        default_api_key: api_key,
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
