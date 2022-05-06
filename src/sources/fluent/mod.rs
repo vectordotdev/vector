@@ -863,22 +863,22 @@ mod integration_tests {
                 "fluent-bit.conf",
                 &format!(
                     r#"
-    [SERVICE]
-        Grace      0
-        Flush      1
-        Daemon     off
+[SERVICE]
+    Grace      0
+    Flush      1
+    Daemon     off
 
-    [INPUT]
-        Name       http
-        Host       {listen_host}
-        Port       {listen_port}
+[INPUT]
+    Name       http
+    Host       {listen_host}
+    Port       {listen_port}
 
-    [OUTPUT]
-        Name          forward
-        Match         *
-        Host          host.docker.internal
-        Port          {send_port}
-        Require_ack_response true
+[OUTPUT]
+    Name          forward
+    Match         *
+    Host          host.docker.internal
+    Port          {send_port}
+    Require_ack_response true
     "#,
                     listen_host = test_address.ip(),
                     listen_port = test_address.port(),
