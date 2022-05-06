@@ -1644,7 +1644,7 @@ dependencies = [
  "indoc",
  "memchr",
  "pretty_assertions",
- "prost 0.10.1",
+ "prost 0.10.3",
  "serde",
  "serde_json",
  "smallvec",
@@ -1720,7 +1720,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24cb05777feccbb2642d4f2df44d0505601a2cd88ca517d8c913f263a5a8dc8b"
 dependencies = [
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-types 0.10.1",
  "tonic",
  "tracing-core 0.1.26",
@@ -5809,7 +5809,7 @@ dependencies = [
  "indexmap",
  "nom 7.1.1",
  "num_enum",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "snafu",
@@ -5860,9 +5860,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07b0857a71a8cb765763950499cae2413c3f9cede1133478c43600d9e146890"
+checksum = "bc03e116981ff7d8da8e5c220e374587b98d294af7ba7dd7fda761158f00086f"
 dependencies = [
  "bytes 1.1.0",
  "prost-derive 0.10.1",
@@ -5901,7 +5901,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph 0.6.0",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-types 0.10.1",
  "regex",
  "tempfile",
@@ -5951,7 +5951,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.1.0",
- "prost 0.10.1",
+ "prost 0.10.3",
 ]
 
 [[package]]
@@ -7926,7 +7926,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-derive 0.10.1",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 0.3.0",
@@ -8718,7 +8718,7 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "proptest",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "pulsar",
@@ -8959,7 +8959,7 @@ dependencies = [
  "pin-project",
  "pretty_assertions",
  "proptest",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "quickcheck",
