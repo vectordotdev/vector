@@ -7,7 +7,7 @@ use value::{
 };
 
 use crate::{
-    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    expression::{assignment, Container, Resolved, Variable},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     vm::{self, OpCode},
@@ -195,7 +195,11 @@ impl fmt::Debug for Query {
 pub enum Target {
     Internal(Variable),
     External,
-    FunctionCall(FunctionCall),
+
+    #[cfg(feature = "expr-function_call")]
+    FunctionCall(crate::expression::FunctionCall),
+    #[cfg(not(feature = "expr-function_call"))]
+    FunctionCall(crate::expression::Noop),
     Container(Container),
 }
 

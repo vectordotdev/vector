@@ -508,6 +508,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
@@ -582,6 +583,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_argument(
         &mut self,
         node: Node<ast::FunctionArgument>,
@@ -590,6 +592,15 @@ impl<'a> Compiler<'a> {
         let ast::FunctionArgument { ident, expr } = node.into_inner();
         let expr = Node::new(expr.span(), self.compile_expr(expr, external));
         FunctionArgument::new(ident, expr)
+    }
+
+    #[cfg(not(feature = "expr-function_call"))]
+    fn compile_function_call(
+        &mut self,
+        node: Node<ast::FunctionCall>,
+        _: &mut ExternalEnv,
+    ) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-function_call")
     }
 
     fn compile_variable(

@@ -126,6 +126,7 @@ pub enum OpCode {
     GetPath,
 
     /// Calls the function indicated by the ensuing primitive.
+    #[cfg(feature = "expr-function_call")]
     Call,
 
     /// Creates an array. The ensuing primitive indicates the number of elements in the array.
@@ -557,6 +558,7 @@ impl Vm {
 
                     state.stack.push(Value::Object(object));
                 }
+                #[cfg(feature = "expr-function_call")]
                 OpCode::Call => {
                     // Calls a function in the stdlib.
                     let function_id = state.next_primitive()?;

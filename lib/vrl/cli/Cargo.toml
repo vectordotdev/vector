@@ -34,6 +34,7 @@ repl = ["once_cell", "prettytable-rs", "regex", "rustyline", "webbrowser"]
 expressions = [
   "expr-abort",
   "expr-assignment",
+  "expr-function_call",
   "expr-if_statement",
   "expr-literal",
   "expr-op",
@@ -41,6 +42,7 @@ expressions = [
 ]
 expr-abort = ["vrl/expr-abort"]
 expr-assignment = ["vrl/expr-assignment"]
+expr-function_call = ["vrl/expr-function_call"]
 expr-if_statement = ["vrl/expr-if_statement"]
 expr-literal = ["vrl/expr-literal"]
 expr-op = ["vrl/expr-op"]

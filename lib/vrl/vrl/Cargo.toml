@@ -10,6 +10,7 @@ default = ["expressions"]
 expressions = [
   "expr-abort",
   "expr-assignment",
+  "expr-function_call",
   "expr-if_statement",
   "expr-literal",
   "expr-op",
@@ -17,6 +18,7 @@ expressions = [
 ]
 expr-abort = ["compiler/expr-abort"]
 expr-assignment = ["compiler/expr-assignment"]
+expr-function_call = ["compiler/expr-function_call"]
 expr-if_statement = ["compiler/expr-if_statement"]
 expr-literal = ["compiler/expr-literal"]
 expr-op = ["compiler/expr-op"]

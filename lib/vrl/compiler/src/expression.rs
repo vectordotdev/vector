@@ -13,6 +13,7 @@ use crate::{
 mod abort;
 mod array;
 mod block;
+#[cfg(feature = "expr-function_call")]
 mod function_argument;
 mod group;
 #[cfg(feature = "expr-if_statement")]
@@ -31,6 +32,7 @@ mod variable;
 #[cfg(feature = "expr-assignment")]
 pub(crate) mod assignment;
 pub(crate) mod container;
+#[cfg(feature = "expr-function_call")]
 pub(crate) mod function_call;
 #[cfg(feature = "expr-literal")]
 pub(crate) mod literal;
@@ -46,7 +48,9 @@ pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
 pub use core::{ExpressionError, Resolved};
+#[cfg(feature = "expr-function_call")]
 pub use function_argument::FunctionArgument;
+#[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
 pub use group::Group;
 #[cfg(feature = "expr-if_statement")]
@@ -129,6 +133,7 @@ pub enum Expr {
     #[cfg(feature = "expr-assignment")]
     Assignment(Assignment),
     Query(Query),
+    #[cfg(feature = "expr-function_call")]
     FunctionCall(FunctionCall),
     Variable(Variable),
     Noop(Noop),
@@ -159,6 +164,7 @@ impl Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(..) => "assignment",
             Query(..) => "query",
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(..) => "function call",
             Variable(..) => "variable call",
             Noop(..) => "noop",
@@ -231,6 +237,7 @@ impl Expression for Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.resolve(ctx),
             Query(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(v) => v.resolve(ctx),
             Variable(v) => v.resolve(ctx),
             Noop(v) => v.resolve(ctx),
@@ -255,6 +262,7 @@ impl Expression for Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(v) => Expression::as_value(v),
             Query(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(v) => Expression::as_value(v),
             Variable(v) => Expression::as_value(v),
             Noop(v) => Expression::as_value(v),
@@ -279,6 +287,7 @@ impl Expression for Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.type_def(state),
             Query(v) => v.type_def(state),
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(v) => v.type_def(state),
             Variable(v) => v.type_def(state),
             Noop(v) => v.type_def(state),
@@ -308,6 +317,7 @@ impl Expression for Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.compile_to_vm(vm, state),
             Query(v) => v.compile_to_vm(vm, state),
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(v) => v.compile_to_vm(vm, state),
             Variable(v) => v.compile_to_vm(vm, state),
             Noop(v) => v.compile_to_vm(vm, state),
@@ -334,6 +344,7 @@ impl fmt::Display for Expr {
             #[cfg(feature = "expr-assignment")]
             Assignment(v) => v.fmt(f),
             Query(v) => v.fmt(f),
+            #[cfg(feature = "expr-function_call")]
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Noop(v) => v.fmt(f),
@@ -387,6 +398,7 @@ impl From<Query> for Expr {
     }
 }
 
+#[cfg(feature = "expr-function_call")]
 impl From<FunctionCall> for Expr {
     fn from(function_call: FunctionCall) -> Self {
         Expr::FunctionCall(function_call)
