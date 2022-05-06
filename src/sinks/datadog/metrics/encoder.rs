@@ -293,9 +293,7 @@ impl DatadogMetricsEncoder {
         // Make sure we've written our header already.
         if self.state.written == 0 {
             match write_payload_header(self.endpoint, &mut self.state.writer) {
-                Ok(n) => {
-                    self.state.written += n;
-                }
+                Ok(n) => self.state.written += n,
                 Err(_) => return Ok(Some(metric)),
             }
         }
