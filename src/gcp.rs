@@ -32,9 +32,9 @@ pub enum GcpError {
     #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
     MissingAuth,
     #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials0,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials1 { source: GoErr },
+    InvalidCredentials { source: GoErr },
+    #[snafu(display("Healthcheck endpoint forbidden"))]
+    HealthcheckForbidden,
     #[snafu(display("Invalid RSA key in GCP credentials"))]
     InvalidRsaKey { source: GoErr },
     #[snafu(display("Failed to get OAuth token"))]
@@ -78,7 +78,7 @@ pub struct GcpCredentials {
 
 impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials1Snafu)?;
+        let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
         let jwt = make_jwt(&creds, &scope)?;
         let token = goauth::get_token(&jwt, &creds)
             .await
