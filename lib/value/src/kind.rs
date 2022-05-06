@@ -4,6 +4,7 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+mod debug;
 pub mod find;
 pub mod insert;
 pub mod merge;
