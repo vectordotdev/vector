@@ -103,7 +103,7 @@ Changes needed immediately:
 
 - Support arbitrarily nested values
 - Functions that access metadata (`get_metadata_field`, `remove_metadata_field`, and `set_metadata_field`) should support full paths as keys, and return
-  the `any` type instead of just `string. This is technically a breaking change.
+  the `any` type instead of just `string`. This is technically a breaking change.
 
 With these changes, using metadata can still be a bit annoying since the returned type will always be `any`, even if the
 value is set and read in the same VRL program.
