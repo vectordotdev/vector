@@ -462,7 +462,11 @@ impl Vm {
 
                     match &variable {
                         Variable::External(path) => {
-                            let value = ctx.target().target_get(path)?.unwrap_or(Value::Null);
+                            let value = ctx
+                                .target()
+                                .target_get(path)?
+                                .cloned()
+                                .unwrap_or(Value::Null);
                             state.stack.push(value);
                         }
                         Variable::Internal(ident, path) => {

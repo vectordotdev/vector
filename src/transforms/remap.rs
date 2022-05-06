@@ -415,15 +415,15 @@ where
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
         let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
-        let original_event = if (self.program.can_fail() && forward_on_error)
-            || (self.program.can_abort() && forward_on_abort)
+        let original_event = if (self.program.info().fallible && forward_on_error)
+            || (self.program.info().abortable && forward_on_abort)
         {
             Some(event.clone())
         } else {
             None
         };
 
-        let mut target: VrlTarget = event.into();
+        let mut target = VrlTarget::new(event, self.program.info());
         let result = self.run_vrl(&mut target);
 
         match result {

@@ -19,6 +19,15 @@ remap: functions: parse_json: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name: "max_depth"
+			description: """
+				Number of layers to parse for nested JSON-formatted documents.
+				The value must be in range 1..128.
+				"""
+			required: false
+			type: ["integer"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` isn't a valid JSON-formatted payload",
@@ -32,6 +41,13 @@ remap: functions: parse_json: {
 				parse_json!("{\"key\": \"val\"}")
 				"""#
 			return: key: "val"
+		},
+		{
+			title: "Parse JSON with max_depth"
+			source: #"""
+				parse_json!("{\"top_level\":{\"key\": \"val\"}}", max_depth: 1)
+				"""#
+			return: top_level: "{\"key\": \"val\"}"
 		},
 	]
 }

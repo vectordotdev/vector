@@ -255,7 +255,8 @@ impl PubsubSource {
     }
 
     fn make_tls_config(&self) -> ClientTlsConfig {
-        let mut config = ClientTlsConfig::new().domain_name("pubsub.googleapis.com");
+        let host = self.uri.host().unwrap_or("pubsub.googleapis.com");
+        let mut config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = self.tls.identity_pem() {
             config = config.identity(Identity::from_pem(cert, key));
         }

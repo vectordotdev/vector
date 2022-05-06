@@ -90,6 +90,7 @@ impl Expression for Query {
                     .target_get(&self.path)
                     .ok()
                     .flatten()
+                    .cloned()
                     .unwrap_or(Value::Null))
             }
             Internal(variable) => variable.resolve(ctx)?,
@@ -100,6 +101,7 @@ impl Expression for Query {
         Ok(crate::Target::target_get(&value, &self.path)
             .ok()
             .flatten()
+            .cloned()
             .unwrap_or(Value::Null))
     }
 

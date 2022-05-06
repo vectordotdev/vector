@@ -125,7 +125,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = "0.3.3"
 async-trait = "0.1.53"
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.18.0", default-features = false, features = ["full"] }
+tokio = { version = "1.18.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -258,7 +258,7 @@ nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
-openssl = { version = "0.10.39", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -286,7 +286,7 @@ tikv-jemallocator = { version = "0.4.3", default-features = false, optional = tr
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
-tonic = { version = "0.7.1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "compression"] }
+tonic = { version = "0.7.1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21", features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -329,7 +329,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.18.0", features = ["test-util"] }
+tokio = { version = "1.18.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
