@@ -859,7 +859,9 @@ mod test {
         let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
             "tags" => Kind::object(btreemap! {}),
         }));
-        assert!(vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok());
+        assert!(
+            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+        );
     }
 
     #[test]
