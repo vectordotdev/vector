@@ -34,6 +34,8 @@ repl = ["once_cell", "prettytable-rs", "regex", "rustyline", "webbrowser"]
 expressions = [
   "expr-abort",
   "expr-op",
+  "expr-unary",
 ]
 expr-abort = ["vrl/expr-abort"]
 expr-op = ["vrl/expr-op"]
+expr-unary = ["vrl/expr-unary"]

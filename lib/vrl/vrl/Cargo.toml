@@ -10,9 +10,11 @@ default = ["expressions"]
 expressions = [
   "expr-abort",
   "expr-op",
+  "expr-unary",
 ]
 expr-abort = ["compiler/expr-abort"]
 expr-op = ["compiler/expr-op"]
+expr-unary = ["compiler/expr-unary"]
 
 [dependencies]
 bytes = "1.1.0"

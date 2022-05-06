@@ -18,10 +18,12 @@ mod group;
 mod if_statement;
 mod levenstein;
 mod noop;
+#[cfg(feature = "expr-unary")]
 mod not;
 mod object;
 #[cfg(feature = "expr-op")]
 mod op;
+#[cfg(feature = "expr-unary")]
 mod unary;
 mod variable;
 
@@ -45,12 +47,14 @@ pub use group::Group;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
 pub use noop::Noop;
+#[cfg(feature = "expr-unary")]
 pub use not::Not;
 pub use object::Object;
 #[cfg(feature = "expr-op")]
 pub use op::Op;
 pub use predicate::Predicate;
 pub use query::{Query, Target};
+#[cfg(feature = "expr-unary")]
 pub use unary::Unary;
 pub use variable::Variable;
 
@@ -117,6 +121,7 @@ pub enum Expr {
     FunctionCall(FunctionCall),
     Variable(Variable),
     Noop(Noop),
+    #[cfg(feature = "expr-unary")]
     Unary(Unary),
     #[cfg(feature = "expr-abort")]
     Abort(Abort),
@@ -143,6 +148,7 @@ impl Expr {
             FunctionCall(..) => "function call",
             Variable(..) => "variable call",
             Noop(..) => "noop",
+            #[cfg(feature = "expr-unary")]
             Unary(..) => "unary operation",
             #[cfg(feature = "expr-abort")]
             Abort(..) => "abort operation",
@@ -210,6 +216,7 @@ impl Expression for Expr {
             FunctionCall(v) => v.resolve(ctx),
             Variable(v) => v.resolve(ctx),
             Noop(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-unary")]
             Unary(v) => v.resolve(ctx),
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.resolve(ctx),
@@ -230,6 +237,7 @@ impl Expression for Expr {
             FunctionCall(v) => Expression::as_value(v),
             Variable(v) => Expression::as_value(v),
             Noop(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-unary")]
             Unary(v) => Expression::as_value(v),
             #[cfg(feature = "expr-abort")]
             Abort(v) => Expression::as_value(v),
@@ -250,6 +258,7 @@ impl Expression for Expr {
             FunctionCall(v) => v.type_def(state),
             Variable(v) => v.type_def(state),
             Noop(v) => v.type_def(state),
+            #[cfg(feature = "expr-unary")]
             Unary(v) => v.type_def(state),
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.type_def(state),
@@ -275,6 +284,7 @@ impl Expression for Expr {
             FunctionCall(v) => v.compile_to_vm(vm, state),
             Variable(v) => v.compile_to_vm(vm, state),
             Noop(v) => v.compile_to_vm(vm, state),
+            #[cfg(feature = "expr-unary")]
             Unary(v) => v.compile_to_vm(vm, state),
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.compile_to_vm(vm, state),
@@ -297,6 +307,7 @@ impl fmt::Display for Expr {
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Noop(v) => v.fmt(f),
+            #[cfg(feature = "expr-unary")]
             Unary(v) => v.fmt(f),
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.fmt(f),
@@ -361,6 +372,7 @@ impl From<Noop> for Expr {
     }
 }
 
+#[cfg(feature = "expr-unary")]
 impl From<Unary> for Expr {
     fn from(unary: Unary) -> Self {
         Expr::Unary(unary)

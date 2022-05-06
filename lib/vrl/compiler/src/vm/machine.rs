@@ -47,6 +47,7 @@ pub enum OpCode {
     And,
 
     /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
+    #[cfg(feature = "expr-unary")]
     Not,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater than the first.
@@ -327,6 +328,7 @@ impl Vm {
                     let value = state.read_constant()?;
                     state.stack.push(value);
                 }
+                #[cfg(feature = "expr-unary")]
                 OpCode::Not => match state.pop_stack()? {
                     Value::Boolean(value) => state.stack.push(Value::Boolean(!value)),
                     _ => return Err("Negating non boolean".into()),

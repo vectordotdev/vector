@@ -10,9 +10,11 @@ default = ["expressions"]
 expressions = [
   "expr-abort",
   "expr-op",
+  "expr-unary",
 ]
 expr-abort = ["core/expr-abort"]
 expr-op = []
+expr-unary = []
 
 [dependencies]
 core = { package = "vrl-core", path = "../core", default-features = false }

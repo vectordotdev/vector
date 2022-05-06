@@ -588,6 +588,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-unary")]
     fn compile_unary(&mut self, node: Node<ast::Unary>, external: &mut ExternalEnv) -> Unary {
         use ast::Unary::*;
 
@@ -598,6 +599,18 @@ impl<'a> Compiler<'a> {
         Unary::new(variant)
     }
 
+    #[cfg(not(feature = "expr-unary"))]
+    fn compile_unary(&mut self, node: Node<ast::Unary>, _: &mut ExternalEnv) -> Noop {
+        use ast::Unary::*;
+
+        let span = match node.into_inner() {
+            Not(node) => node.take().1.take().0,
+        };
+
+        self.handle_missing_feature_error(span.span(), "expr-unary")
+    }
+
+    #[cfg(feature = "expr-unary")]
     fn compile_not(&mut self, node: Node<ast::Not>, external: &mut ExternalEnv) -> Not {
         let (not, expr) = node.into_inner().take();
 
