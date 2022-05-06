@@ -1,4 +1,4 @@
-use std::pin::Pin;
+use std::{num::NonZeroUsize, pin::Pin};
 
 use futures::{
     task::{Context, Poll},
@@ -16,6 +16,8 @@ const DEFAULT_CAPACITY: usize = 4096;
 pub struct ReadyArrays<T> {
     inner: T,
     enqueued: Vec<EventArray>,
+    /// Distinct from `enqueued.len()`, counts the number of total `Event`
+    /// instances in all sub-arrays.
     enqueued_size: usize,
     enqueued_limit: usize,
 }
@@ -26,19 +28,19 @@ where
 {
     /// Create a new `ReadyArrays` by wrapping an event array stream.
     pub fn new(inner: T) -> Self {
-        Self::with_capacity(inner, DEFAULT_CAPACITY)
+        Self::with_capacity(inner, NonZeroUsize::new(DEFAULT_CAPACITY).unwrap())
     }
 
     /// Create a new `ReadyArrays` with a specified capacity.
     ///
     /// The specified capacity is a soft limit, and chunks may be returned that contain more than
     /// that number of items.
-    pub fn with_capacity(inner: T, capacity: usize) -> Self {
+    pub fn with_capacity(inner: T, capacity: NonZeroUsize) -> Self {
         Self {
             inner,
-            enqueued: Vec::with_capacity(capacity),
+            enqueued: Vec::with_capacity(capacity.get()),
             enqueued_size: 0,
-            enqueued_limit: capacity,
+            enqueued_limit: capacity.get(),
         }
     }
 
@@ -66,18 +68,13 @@ where
                         return Poll::Ready(Some(self.flush()));
                     }
                 }
-                Poll::Ready(None) => {
+                Poll::Ready(None) | Poll::Pending => {
+                    // When the inner stream is empty or signals pending flush
+                    // everything we've got enqueued here.
                     if !self.enqueued.is_empty() {
                         return Poll::Ready(Some(self.flush()));
                     } else {
                         return Poll::Ready(None);
-                    }
-                }
-                Poll::Pending => {
-                    if !self.enqueued.is_empty() {
-                        return Poll::Ready(Some(self.flush()));
-                    } else {
-                        return Poll::Pending;
                     }
                 }
             }
