@@ -53,6 +53,7 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
     Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
+const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
@@ -636,7 +637,9 @@ impl Runner {
             .expect("can't run runner twice")
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
-        let mut input_rx = super::ready_arrays::ReadyArrays::new(input_rx);
+
+        let mut input_rx =
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;

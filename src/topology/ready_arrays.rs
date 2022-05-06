@@ -7,8 +7,6 @@ use futures::{
 
 use crate::event::{EventArray, EventContainer};
 
-const DEFAULT_CAPACITY: usize = 4096;
-
 /// A stream combinator aimed at improving the performance of event streams under load.
 ///
 /// This is similar in spirit to `StreamExt::ready_chunks`, but built specifically `EventArray`.
@@ -26,15 +24,10 @@ impl<T> ReadyArrays<T>
 where
     T: Stream<Item = EventArray> + Unpin,
 {
-    /// Create a new `ReadyArrays` by wrapping an event array stream.
-    pub fn new(inner: T) -> Self {
-        Self::with_capacity(inner, NonZeroUsize::new(DEFAULT_CAPACITY).unwrap())
-    }
-
     /// Create a new `ReadyArrays` with a specified capacity.
     ///
-    /// The specified capacity is a soft limit, and chunks may be returned that contain more than
-    /// that number of items.
+    /// The specified capacity is a soft limit, and chunks may be returned that
+    /// contain more than that number of items.
     pub fn with_capacity(inner: T, capacity: NonZeroUsize) -> Self {
         Self {
             inner,
@@ -68,13 +61,24 @@ where
                         return Poll::Ready(Some(self.flush()));
                     }
                 }
-                Poll::Ready(None) | Poll::Pending => {
-                    // When the inner stream is empty or signals pending flush
-                    // everything we've got enqueued here.
+                Poll::Ready(None) => {
+                    // When the inner stream is empty flush everything we've got
+                    // enqueued here. Next time we're polled we'll signal that
+                    // we're complete too.
                     if !self.enqueued.is_empty() {
                         return Poll::Ready(Some(self.flush()));
                     } else {
                         return Poll::Ready(None);
+                    }
+                }
+                Poll::Pending => {
+                    // When the inner stream signals pending flush everything
+                    // we've got enqueued here. Next time we're polled we'll
+                    // signal pending.
+                    if !self.enqueued.is_empty() {
+                        return Poll::Ready(Some(self.flush()));
+                    } else {
+                        return Poll::Pending;
                     }
                 }
             }
