@@ -5,6 +5,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
+use indexmap::IndexMap;
 use rand::{prelude::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -79,6 +80,8 @@ pub struct Options {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    tags: Option<IndexMap<String, String>>,
 }
 
 impl Default for Options {
@@ -96,6 +99,7 @@ impl Default for Options {
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
+            tags: None,
         }
     }
 }
@@ -365,14 +369,20 @@ fn setup_logs_reporting(
         ..Default::default()
     };
 
+    let custom_logs_tags_vrl = datadog
+        .tags
+        .as_ref()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
+
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
             .version = "{}"
             .configuration_key = "{}"
             .ddsource = "vector"
+            {}
         "#,
-            &config_version, &datadog.configuration_key,
+            &config_version, &datadog.configuration_key, custom_logs_tags_vrl,
         )),
         ..Default::default()
     };
@@ -427,13 +437,19 @@ fn setup_metrics_reporting(
         ..Default::default()
     };
 
+    let custom_metric_tags_vrl = datadog
+        .tags
+        .as_ref()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
+
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
             .tags.version = "{}"
             .tags.configuration_key = "{}"
+            {}
         "#,
-            &config_version, &datadog.configuration_key,
+            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
         )),
         ..Default::default()
     };
@@ -495,6 +511,17 @@ const fn default_reporting_interval_secs() -> f64 {
 /// Vector to start.
 const fn default_max_retries() -> u32 {
     8
+}
+
+/// Converts user configured tags to VRL source code for adding tags/fields to
+/// events
+fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
+    let json_tags = serde_json::to_string(&tags).unwrap();
+    if is_metric {
+        format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)
+    } else {
+        format!(r#". = merge(., {}, deep: true)"#, json_tags)
+    }
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
@@ -599,14 +626,17 @@ mod test {
     use std::{io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
+    use indexmap::IndexMap;
     use indoc::formatdoc;
+    use value::Kind;
+    use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use crate::{
         app::Application,
         cli::{Color, LogFormat, Opts, RootOpts},
-        config::enterprise::default_max_retries,
+        config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
     };
 
@@ -841,5 +871,45 @@ mod test {
         .unwrap();
 
         assert!(!vector_continued);
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_metrics() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+
+        let vrl = convert_tags_to_vrl(&tags, true);
+        assert_eq!(
+            vrl,
+            r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        // We need to set up some state here to inform the VRL compiler that
+        // .tags is an object and merge() is thus a safe operation (mimicking
+        // the environment this code will actually run in).
+        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
+            "tags" => Kind::object(btreemap! {}),
+        }));
+        assert!(
+            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+        );
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_logs() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+        let vrl = convert_tags_to_vrl(&tags, false);
+
+        assert_eq!(
+            vrl,
+            r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
 }

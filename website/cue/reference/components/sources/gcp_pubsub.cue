@@ -86,6 +86,16 @@ components: sources: gcp_pubsub: {
 				examples: ["vector-123456"]
 			}
 		}
+		retry_delay_seconds: {
+			common:      false
+			description: "The amount of time to wait between retry attempts after an error."
+			required:    false
+			type: float: {
+				default: 1.0
+				examples: [0.5]
+				unit: "seconds"
+			}
+		}
 		subscription: {
 			description: "The subscription within the project which is configured to receive logs."
 			required:    true
