@@ -187,9 +187,8 @@ impl RedisSinkConfig {
 
         let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
 
-        let encoding = self.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding();
         let mut encoder = Encoder::<()>::new(serializer);
 
         let method = self.list_option.map(|option| option.method);
