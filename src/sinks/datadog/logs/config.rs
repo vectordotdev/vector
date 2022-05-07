@@ -50,33 +50,33 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
-    region: Option<Region>,
-    site: Option<String>,
+    pub region: Option<Region>,
+    pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsEnableableConfig>,
+    pub encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    pub tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
-    compression: Option<Compression>,
+    pub compression: Option<Compression>,
 
     #[serde(default)]
-    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
+    pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -89,23 +89,6 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    /// Creates a default [`DatadogLogsConfig`] with the given API key.
-    #[cfg(feature = "enterprise")]
-    pub fn enterprise<T: Into<String>>(
-        api_key: T,
-        endpoint: Option<String>,
-        site: Option<String>,
-        region: Option<Region>,
-    ) -> Self {
-        Self {
-            default_api_key: api_key.into(),
-            endpoint,
-            site,
-            region,
-            ..Self::default()
-        }
-    }
-
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {

@@ -2,7 +2,7 @@
 
 use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
 
-use atomig::{Atom, Atomic, Ordering};
+use crossbeam_utils::atomic::AtomicCell;
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -96,7 +96,7 @@ impl Finalizable for EventFinalizers {
 /// a batch with that when the event is dropped.
 #[derive(Debug)]
 pub struct EventFinalizer {
-    status: Atomic<EventStatus>,
+    status: AtomicCell<EventStatus>,
     batch: Arc<BatchNotifier>,
 }
 
@@ -111,7 +111,7 @@ impl ByteSizeOf for EventFinalizer {
 impl EventFinalizer {
     /// Creates a new `EventFinalizer` attached to the given `batch`.
     pub fn new(batch: Arc<BatchNotifier>) -> Self {
-        let status = Atomic::new(EventStatus::Dropped);
+        let status = AtomicCell::new(EventStatus::Dropped);
         Self { status, batch }
     }
 
@@ -119,9 +119,7 @@ impl EventFinalizer {
     #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_status(&self, status: EventStatus) {
         self.status
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
-                Some(old_status.update(status))
-            })
+            .fetch_update(|old_status| Some(old_status.update(status)))
             .unwrap_or_else(|_| unreachable!());
     }
 
@@ -132,9 +130,7 @@ impl EventFinalizer {
     pub fn update_batch(&self) {
         let status = self
             .status
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_| {
-                Some(EventStatus::Recorded)
-            })
+            .fetch_update(|_| Some(EventStatus::Recorded))
             .unwrap_or_else(|_| unreachable!());
         self.batch.update_status(status);
     }
@@ -182,7 +178,7 @@ impl BatchStatusReceiver {
 /// shared among all events of a batch.
 #[derive(Debug)]
 pub struct BatchNotifier {
-    status: Atomic<BatchStatus>,
+    status: AtomicCell<BatchStatus>,
     notifier: Option<oneshot::Sender<BatchStatus>>,
 }
 
@@ -191,7 +187,7 @@ impl BatchNotifier {
     pub fn new_with_receiver() -> (Arc<Self>, BatchStatusReceiver) {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
-            status: Atomic::new(BatchStatus::Delivered),
+            status: AtomicCell::new(BatchStatus::Delivered),
             notifier: Some(sender),
         };
         (Arc::new(notifier), BatchStatusReceiver(receiver))
@@ -232,9 +228,7 @@ impl BatchNotifier {
         // status is different than that.
         if status != EventStatus::Delivered && status != EventStatus::Dropped {
             self.status
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
-                    Some(old_status.update(status))
-                })
+                .fetch_update(|old_status| Some(old_status.update(status)))
                 .unwrap_or_else(|_| unreachable!());
         }
     }
@@ -242,7 +236,7 @@ impl BatchNotifier {
     /// Sends the status of the notifier back to the source.
     fn send_status(&mut self) {
         if let Some(notifier) = self.notifier.take() {
-            let status = self.status.load(Ordering::Relaxed);
+            let status = self.status.load();
             // Ignore the error case, as it will happen during normal
             // source shutdown and we can't detect that here.
             let _ = notifier.send(status);
@@ -257,7 +251,7 @@ impl Drop for BatchNotifier {
 }
 
 /// The status of an individual batch.
-#[derive(Atom, Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
 #[derivative(Default)]
 #[repr(u8)]
 pub enum BatchStatus {
@@ -293,7 +287,7 @@ impl BatchStatus {
 }
 
 /// The status of an individual event.
-#[derive(Atom, Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
 #[derivative(Default)]
 #[repr(u8)]
 pub enum EventStatus {

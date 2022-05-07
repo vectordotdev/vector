@@ -90,21 +90,31 @@ where
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
     pub fn transformer(&self) -> Transformer {
         match self {
-            Self::Encoding(config) => Transformer {
+            Self::Encoding(config) => TransformerInner {
                 only_fields: config.encoding.only_fields.clone(),
                 except_fields: config.encoding.except_fields.clone(),
                 timestamp_format: config.encoding.timestamp_format,
-            },
-            Self::LegacyEncodingConfig(config) => Transformer {
+            }
+            .into(),
+            Self::LegacyEncodingConfig(config) => TransformerInner {
                 only_fields: config.encoding.only_fields().clone(),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
-            },
+            }
+            .into(),
+        }
+    }
+
+    /// Get the migrated configuration.
+    pub fn config(&self) -> SerializerConfig {
+        match self {
+            Self::Encoding(config) => config.encoding.encoding.clone(),
+            Self::LegacyEncodingConfig(config) => Migrator::migrate(config.encoding.codec()),
         }
     }
 
     /// Build the serializer for this configuration.
-    pub fn encoding(self) -> Serializer {
+    pub fn encoding(&self) -> Serializer {
         match self {
             Self::Encoding(config) => config.encoding.encoding.build(),
             Self::LegacyEncodingConfig(config) => {
@@ -203,31 +213,44 @@ where
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
     pub fn transformer(&self) -> Transformer {
         match self {
-            Self::Encoding(config) => Transformer {
+            Self::Encoding(config) => TransformerInner {
                 only_fields: config.encoding.only_fields.clone(),
                 except_fields: config.encoding.except_fields.clone(),
                 timestamp_format: config.encoding.timestamp_format,
-            },
-            Self::LegacyEncodingConfig(config) => Transformer {
+            }
+            .into(),
+            Self::LegacyEncodingConfig(config) => TransformerInner {
                 only_fields: config.encoding.only_fields().clone(),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
-            },
+            }
+            .into(),
+        }
+    }
+
+    /// Get the migrated configuration.
+    pub fn config(&self) -> (Option<FramingConfig>, SerializerConfig) {
+        match self {
+            Self::Encoding(config) => {
+                let config = config.clone();
+                (config.framing, config.encoding.encoding)
+            }
+            Self::LegacyEncodingConfig(config) => Migrator::migrate(config.encoding.codec()),
         }
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(self) -> (Option<Framer>, Serializer) {
+    pub fn encoding(&self) -> (Option<Framer>, Serializer) {
         let (framer, serializer) = match self {
             Self::Encoding(config) => {
-                let framer = config.framing.clone().map(FramingConfig::build);
+                let framer = config.framing.as_ref().map(FramingConfig::build);
                 let serializer = config.encoding.encoding.build();
 
                 (framer, serializer)
             }
             Self::LegacyEncodingConfig(config) => {
                 let migration = Migrator::migrate(config.encoding.codec());
-                let framer = migration.0.map(FramingConfig::build);
+                let framer = migration.0.as_ref().map(FramingConfig::build);
                 let serializer = migration.1.build();
 
                 (framer, serializer)
@@ -286,18 +309,70 @@ pub struct EncodingWithTransformationConfig {
     timestamp_format: Option<TimestampFormat>,
 }
 
-#[derive(Debug, Clone, Default)]
 /// Transformations to prepare an event for serialization.
-pub struct Transformer {
-    only_fields: Option<Vec<OwnedPath>>,
-    except_fields: Option<Vec<String>>,
-    timestamp_format: Option<TimestampFormat>,
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Transformer(TransformerInner);
+
+impl<'de> Deserialize<'de> for Transformer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let transformer: TransformerInner = Deserialize::deserialize(deserializer)?;
+        validate_fields(
+            transformer.only_fields.as_deref(),
+            transformer.except_fields.as_deref(),
+        )
+        .map_err(serde::de::Error::custom)?;
+        Ok(Self(transformer))
+    }
 }
 
 impl Transformer {
+    /// Creates a new `Transformer`.
+    ///
+    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
+    /// exclusive.
+    pub fn new(
+        only_fields: Option<Vec<OwnedPath>>,
+        except_fields: Option<Vec<String>>,
+        timestamp_format: Option<TimestampFormat>,
+    ) -> Result<Self, crate::Error> {
+        let inner = TransformerInner {
+            only_fields,
+            except_fields,
+            timestamp_format,
+        };
+
+        validate_fields(inner.only_fields.as_deref(), inner.except_fields.as_deref())?;
+
+        Ok(Self(inner))
+    }
+
     /// Prepare an event for serialization by the given transformation rules.
     pub fn transform(&self, event: &mut Event) {
         self.apply_rules(event);
+    }
+
+    /// Set the `except_fields` value.
+    ///
+    /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
+    /// with `only_fields`.
+    pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
+        let transformer = TransformerInner {
+            only_fields: self.0.only_fields.clone(),
+            except_fields,
+            timestamp_format: self.0.timestamp_format,
+        };
+
+        validate_fields(
+            transformer.only_fields.as_deref(),
+            transformer.except_fields.as_deref(),
+        )?;
+
+        self.0 = transformer;
+
+        Ok(())
     }
 }
 
@@ -313,16 +388,32 @@ impl EncodingConfiguration for Transformer {
     }
 
     fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
-        &self.only_fields
+        &self.0.only_fields
     }
 
     fn except_fields(&self) -> &Option<Vec<String>> {
-        &self.except_fields
+        &self.0.except_fields
     }
 
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
-        &self.timestamp_format
+        &self.0.timestamp_format
     }
+}
+
+impl From<TransformerInner> for Transformer {
+    fn from(inner: TransformerInner) -> Self {
+        Self(inner)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+struct TransformerInner {
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    only_fields: Option<Vec<OwnedPath>>,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    except_fields: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    timestamp_format: Option<TimestampFormat>,
 }
 
 #[cfg(test)]

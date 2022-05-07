@@ -23,7 +23,7 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
-pub(super) struct CGroupsConfig {
+pub(crate) struct CGroupsConfig {
     #[derivative(Default(value = "100"))]
     levels: usize,
     pub(super) base: Option<PathBuf>,
