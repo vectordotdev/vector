@@ -243,8 +243,7 @@ impl PubsubSource {
                                 "Invalid token text returned by GCP",
                             )
                         })?;
-                    req.metadata_mut()
-                        .insert("authorization", authorization.clone());
+                    req.metadata_mut().insert("authorization", authorization);
                 }
                 Ok(req)
             },
