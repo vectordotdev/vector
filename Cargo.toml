@@ -50,6 +50,8 @@ extended-description-file = "target/debian-extended-description.txt"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"
+enable = false
+start = false
 
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
