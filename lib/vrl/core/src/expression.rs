@@ -2,6 +2,7 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
+pub type Void = Result<(), ExpressionError>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionError {

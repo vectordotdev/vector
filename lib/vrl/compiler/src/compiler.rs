@@ -48,10 +48,21 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+        let expression_count = ast.len();
+
         let expressions = self
             .compile_root_exprs(ast, external)
             .into_iter()
-            .map(|expr| Box::new(expr) as _)
+            .enumerate()
+            .map(|(i, expr)| {
+                // For all root expressions, except the last one, the result value
+                // is voided.
+                if i < expression_count {
+                    Box::new(VoidExpr(expr)) as _
+                } else {
+                    Box::new(expr) as _
+                }
+            })
             .collect();
 
         let (errors, warnings): (Vec<_>, Vec<_>) =

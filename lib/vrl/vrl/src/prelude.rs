@@ -6,7 +6,7 @@ pub use compiler::{expression, state, value::kind};
 pub use compiler::{
     function::{closure, FunctionClosure},
     value::{Collection, Field, Index, IterItem, Kind},
-    Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
+    Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value, Void,
 };
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;

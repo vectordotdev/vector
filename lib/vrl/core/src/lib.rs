@@ -9,6 +9,6 @@ mod expression;
 mod r#macro;
 mod target;
 
-pub use expression::{ExpressionError, Resolved};
+pub use expression::{ExpressionError, Resolved, Void};
 pub use target::Target;
 pub use value::Value;

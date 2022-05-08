@@ -4,7 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
 
 use crate::{
-    expression::{Expr, Noop, Resolved},
+    expression::{Expr, Noop, Resolved, Void},
     parser::{
         ast::{self, Ident},
         Node,
@@ -163,6 +163,10 @@ impl Assignment {
 impl Expression for Assignment {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.variant.resolve(ctx)
+    }
+
+    fn resolve_void(&self, ctx: &mut Context) -> Void {
+        self.variant.resolve_void(ctx)
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -419,6 +423,35 @@ where
         };
 
         Ok(value)
+    }
+
+    fn resolve_void(&self, ctx: &mut Context) -> Void {
+        use Variant::*;
+
+        match self {
+            Single { target, expr } => {
+                let value = expr.resolve(ctx)?;
+                target.insert(value, ctx);
+            }
+            Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => match expr.resolve(ctx) {
+                Ok(value) => {
+                    ok.insert(value, ctx);
+                    err.insert(Value::Null, ctx);
+                }
+                Err(error) => {
+                    ok.insert(default.clone(), ctx);
+                    let value = Value::from(error.to_string());
+                    err.insert(value, ctx);
+                }
+            },
+        };
+
+        Ok(())
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

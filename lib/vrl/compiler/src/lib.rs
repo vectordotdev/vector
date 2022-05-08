@@ -20,7 +20,7 @@ pub mod vm;
 pub use crate::value::Value;
 use ::serde::{Deserialize, Serialize};
 pub use context::Context;
-pub use core::{value, ExpressionError, Resolved, Target};
+pub use core::{value, ExpressionError, Resolved, Target, Void};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;

@@ -46,7 +46,7 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
-pub use core::{ExpressionError, Resolved};
+pub use core::{ExpressionError, Resolved, Void};
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
@@ -69,6 +69,32 @@ pub use query::{Query, Target};
 pub use unary::Unary;
 pub use variable::Variable;
 
+/// A wrapper around an expression, that always resolves the `resolve_void`
+/// method.
+///
+/// This wrapper is used by the compiler to ensure an expression for which its
+/// return value can be omitted always does so.
+#[derive(Debug, Clone)]
+pub(crate) struct VoidExpr(pub(crate) Expr);
+
+impl Expression for VoidExpr {
+    #[inline(always)]
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        self.resolve_void(ctx)?;
+        Ok(Value::Null)
+    }
+
+    #[inline(always)]
+    fn resolve_void(&self, ctx: &mut Context) -> Void {
+        self.0.resolve_void(ctx)
+    }
+
+    #[inline(always)]
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        self.0.type_def(state)
+    }
+}
+
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
     ///
@@ -76,6 +102,22 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
+
+    /// Similar to `Expression::resolve`, except that it does not return any
+    /// resolved value.
+    ///
+    /// The VRL compiler can opt to call this method over `resolve` if the
+    /// return value of an expression is never used.
+    ///
+    /// The method defaults to running `resolve`, but discarding the return
+    /// value. This makes it safe to call by the compiler, but also means
+    /// there's no performance improvements in doing so. To gain any
+    /// performance, implementations must specialize this call by avoiding any
+    /// additional memory allocation needed to store the returned value, if
+    /// applicable.
+    fn resolve_void(&self, ctx: &mut Context) -> Void {
+        self.resolve(ctx).map(|_| ())
+    }
 
     /// Compile the expression to bytecode that can be interpreted by the VM.
     fn compile_to_vm(

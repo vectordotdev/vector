@@ -2,30 +2,41 @@ use vrl::prelude::*;
 
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
-    if query.is_external() {
-        return Ok(ctx
-            .target_mut()
+
+    // Remove field on external target.
+    let value = if query.is_external() {
+        ctx.target_mut()
             .target_remove(path, false)
             .ok()
             .flatten()
-            .unwrap_or(Value::Null));
+            .unwrap_or(Value::Null)
     }
-    if let Some(ident) = query.variable_ident() {
-        return match ctx.state_mut().variable_mut(ident) {
+    // Remove field on variable.
+    else if let Some(ident) = query.variable_ident() {
+        match ctx.state_mut().variable_mut(ident) {
             Some(value) => {
                 let new_value = value.get_by_path(path).cloned();
                 value.remove_by_path(path, false);
-                Ok(new_value.unwrap_or(Value::Null))
-            }
-            None => Ok(Value::Null),
-        };
-    }
-    if let Some(expr) = query.expression_target() {
-        let value = expr.resolve(ctx)?;
 
-        return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+                new_value.unwrap_or(Value::Null)
+            }
+            None => Value::Null,
+        }
     }
-    Ok(Value::Null)
+    // If target is an expression (collection or function call), first resolve
+    // the expression, and then remove the path from the resolved expression.
+    else if let Some(expr) = query.expression_target() {
+        let mut value = expr.resolve(ctx)?;
+        let new_value = value.get_by_path(path).cloned();
+
+        value.remove_by_path(path, false);
+
+        new_value.unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
+
+    Ok(value)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -160,6 +171,24 @@ impl Expression for DelFn {
     // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         del(&self.query, ctx)
+    }
+
+    fn resolve_void(&self, ctx: &mut Context) -> Void {
+        let path = self.query.path();
+
+        if self.query.is_external() {
+            let _ = ctx.target_mut().target_remove(path, false);
+        } else if let Some(ident) = self.query.variable_ident() {
+            if let Some(value) = ctx.state_mut().variable_mut(ident) {
+                value.remove_by_path(path, false);
+            }
+        } else if let Some(expr) = self.query.expression_target() {
+            let mut value = expr.resolve(ctx)?;
+
+            value.remove_by_path(path, false);
+        }
+
+        Ok(())
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
