@@ -67,29 +67,6 @@ impl<'a> InternalEvent for FileIoError<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct FileExpiringError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
-    fn emit(self) {
-        error!(
-            message = "Failed expiring a file.",
-            error = %self.error,
-            error_code = "expiring",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "expiring",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
-    }
-}
-
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
