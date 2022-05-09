@@ -31,23 +31,23 @@ pub static PUBSUB_ADDRESS: Lazy<String> = Lazy::new(|| {
 pub enum GcpError {
     #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
     MissingAuth,
-    #[snafu(display("Invalid GCP credentials"))]
+    #[snafu(display("Invalid GCP credentials: {}", source))]
     InvalidCredentials { source: GoErr },
     #[snafu(display("Healthcheck endpoint forbidden"))]
     HealthcheckForbidden,
-    #[snafu(display("Invalid RSA key in GCP credentials"))]
+    #[snafu(display("Invalid RSA key in GCP credentials: {}", source))]
     InvalidRsaKey { source: GoErr },
-    #[snafu(display("Failed to get OAuth token"))]
+    #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
-    #[snafu(display("Failed to get OAuth token text"))]
+    #[snafu(display("Failed to get OAuth token text: {}", source))]
     GetTokenBytes { source: hyper::Error },
-    #[snafu(display("Failed to get implicit GCP token"))]
+    #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
-    #[snafu(display("Failed to parse OAuth token JSON"))]
+    #[snafu(display("Failed to parse OAuth token JSON: {}", source))]
     TokenFromJson { source: TokenErr },
-    #[snafu(display("Failed to parse OAuth token JSON text"))]
+    #[snafu(display("Failed to parse OAuth token JSON text: {}", source))]
     TokenJsonFromStr { source: serde_json::Error },
-    #[snafu(display("Failed to build HTTP client"))]
+    #[snafu(display("Failed to build HTTP client: {}", source))]
     BuildHttpClient { source: HttpError },
 }
 
