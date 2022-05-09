@@ -347,7 +347,7 @@ impl DatadogMetricsEncoder {
         }
     }
 
-    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>), FinishError> {
+    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
         let _ = self.try_encode_pending()?;
 
@@ -356,6 +356,7 @@ impl DatadogMetricsEncoder {
             .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
+        let raw_bytes_written = self.state.written;
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -379,7 +380,7 @@ impl DatadogMetricsEncoder {
 
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
-            Ok((payload, processed))
+            Ok((payload, processed, raw_bytes_written))
         } else {
             Err(FinishError::TooLarge {
                 metrics: processed,
@@ -772,9 +773,16 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (_payload, mut processed) = result.unwrap();
+        let (payload, mut processed, raw_bytes) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
+        assert_eq!(100, payload.len());
+
+        // The payload is:
+        // {"series":[{"metric":"basic_counter","type":"count","interval":null,"points":[[1651664333,3.14]],"tags":[]}]}
+        // which comes to a total of 98 bytes.
+        // There are extra bytes that make up the header and footer. These should not be included in the raw bytes.
+        assert_eq!(109, raw_bytes);
     }
 
     #[test]
@@ -795,9 +803,12 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (_payload, mut processed) = result.unwrap();
+        let (payload, mut processed, raw_bytes) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
+
+        assert_eq!(81, payload.len());
+        assert_eq!(70, raw_bytes);
     }
 
     #[test]
@@ -854,10 +865,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed) = result.unwrap();
+        let (payload, processed, raw_bytes) = result.unwrap();
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     #[test]
@@ -888,10 +902,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed) = result.unwrap();
+        let (payload, processed, raw_bytes) = result.unwrap();
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     fn arb_counter_metric() -> impl Strategy<Value = Metric> {
@@ -934,7 +951,7 @@ mod tests {
             if let Ok(mut encoder) = result {
                 let _ = encoder.try_encode(metric);
 
-                if let Ok((payload, _processed)) = encoder.finish() {
+                if let Ok((payload, _processed, _raw_bytes)) = encoder.finish() {
                     prop_assert!(payload.len() <= compressed_limit);
 
                     let result = decompress_payload(payload);

@@ -156,6 +156,23 @@ impl From<io::Error> for RequestBuildError {
     }
 }
 
+/// The payload for the log request needs to store the length of the uncompressed
+/// data so we can report the metric on successful delivery.
+struct LogRequestPayload {
+    bytes: Bytes,
+    uncompressed_size: usize,
+}
+
+impl From<Bytes> for LogRequestPayload {
+    fn from(bytes: Bytes) -> Self {
+        let uncompressed_size = bytes.len();
+        Self {
+            bytes,
+            uncompressed_size,
+        }
+    }
+}
+
 struct LogRequestBuilder {
     default_api_key: Arc<str>,
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
@@ -166,7 +183,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<DatadogLogsJsonEncoding>;
-    type Payload = Bytes;
+    type Payload = LogRequestPayload;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -199,10 +216,15 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         }
 
         // Now just compress it like normal.
+        let uncompressed_size = buf.len();
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
+        let bytes = compressor.into_inner().freeze();
 
-        Ok(compressor.into_inner().freeze())
+        Ok(LogRequestPayload {
+            bytes,
+            uncompressed_size,
+        })
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
@@ -211,9 +233,10 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
             batch_size,
             api_key,
             compression: self.compression,
-            body: payload,
+            body: payload.bytes,
             finalizers,
             events_byte_size,
+            uncompressed_size: payload.uncompressed_size,
         }
     }
 }
