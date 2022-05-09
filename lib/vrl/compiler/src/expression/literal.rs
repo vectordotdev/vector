@@ -26,6 +26,12 @@ pub enum Literal {
 }
 
 impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
         use Literal::*;
 

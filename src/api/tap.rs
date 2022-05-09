@@ -4,7 +4,6 @@ use std::{
 };
 
 use futures::{future::try_join_all, FutureExt};
-use itertools::Itertools;
 use tokio::sync::{
     mpsc as tokio_mpsc,
     mpsc::error::{SendError, TrySendError},
@@ -288,9 +287,9 @@ async fn tap_handler(
                 for pattern in patterns.for_inputs.iter() {
                     match inputs.iter().filter(|(key, _)|
                         pattern.matches_glob(&key.to_string())
-                    ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect_vec()).collect::<HashSet<_>>() {
+                    ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect::<Vec<_>>()).collect::<HashSet<_>>() {
                         found if !found.is_empty() => {
-                            component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter().collect_vec()));
+                            component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter().collect::<Vec<_>>()));
                         }
                         _ => {
                             debug!(message="Input pattern not expanded: no matching components.", ?pattern);
@@ -304,7 +303,7 @@ async fn tap_handler(
                     match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&output.output_id.to_string()))
-                        .collect_vec()
+                        .collect::<Vec<_>>()
                     {
                         found if !found.is_empty() => {
                             debug!(
@@ -385,13 +384,13 @@ async fn tap_handler(
 
                 // Warnings on invalid matches.
                 for pattern in patterns.for_inputs.iter() {
-                    let invalid_matches = source_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    let invalid_matches = source_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect::<Vec<_>>();
                     if !invalid_matches.is_empty() {
                         notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
                     }
                 }
                 for pattern in patterns.for_outputs.iter() {
-                    let invalid_matches = sink_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect_vec();
+                    let invalid_matches = sink_keys.iter().filter(|key| pattern.matches_glob(key)).cloned().collect::<Vec<_>>();
                     if !invalid_matches.is_empty() {
                         notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
                     }

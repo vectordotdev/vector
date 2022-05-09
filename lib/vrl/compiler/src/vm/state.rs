@@ -65,6 +65,7 @@ impl<'a> VmState<'a> {
 
     /// Pops the closure from the top of the stack.
     /// Errors if the stack is empty.
+    #[cfg(feature = "expr-function_call")]
     pub(super) fn pop_closure(&mut self) -> Result<&VmFunctionClosure, ExpressionError> {
         self.closure_stack
             .pop()
@@ -79,10 +80,12 @@ impl<'a> VmState<'a> {
         Ok(&self.stack[self.stack.len() - 1])
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(super) fn parameter_stack(&self) -> &Vec<Option<VmArgument<'a>>> {
         &self.parameter_stack
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(super) fn parameter_stack_mut(&mut self) -> &mut Vec<Option<VmArgument<'a>>> {
         &mut self.parameter_stack
     }

@@ -8,7 +8,7 @@ use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(super) struct DiskConfig {
+pub struct DiskConfig {
     #[serde(default)]
     devices: FilterList,
 }

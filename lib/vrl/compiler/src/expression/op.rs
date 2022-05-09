@@ -478,7 +478,7 @@ impl DiagnosticMessage for Error {
 
 // -----------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "expressions"))]
 mod tests {
     use super::*;
     use crate::{

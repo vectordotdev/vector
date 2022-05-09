@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn uuid_v4() -> Resolved {
     let mut buf = [0; 36];
-    let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
+    let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
     Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
 }
 

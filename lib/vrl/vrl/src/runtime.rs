@@ -75,7 +75,7 @@ impl Runtime {
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
         match target.target_get(&self.root_lookup) {
-            Ok(Some(Value::Object(_))) => {}
+            Ok(Some(&Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(
                     format!(
@@ -104,6 +104,7 @@ impl Runtime {
             .iter()
             .map(|expr| {
                 expr.resolve(&mut context).map_err(|err| match err {
+                    #[cfg(feature = "expr-abort")]
                     ExpressionError::Abort { .. } => Terminate::Abort(err),
                     err @ ExpressionError::Error { .. } => Terminate::Error(err),
                 })
@@ -140,6 +141,7 @@ impl Runtime {
     ) -> Result<Value, Terminate> {
         let mut context = Context::new(target, &mut self.state, timezone);
         vm.interpret(&mut context).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),
         })

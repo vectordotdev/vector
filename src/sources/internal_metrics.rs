@@ -17,26 +17,12 @@ use crate::{
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     #[derivative(Default(value = "2.0"))]
-    scrape_interval_secs: f64,
-    tags: TagsConfig,
-    namespace: Option<String>,
-    #[serde(skip)]
-    version: Option<String>,
-    #[serde(skip)]
-    configuration_key: Option<String>,
+    pub scrape_interval_secs: f64,
+    pub tags: TagsConfig,
+    pub namespace: Option<String>,
 }
 
 impl InternalMetricsConfig {
-    /// Return an internal metrics config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
-        Self {
-            namespace: Some("pipelines".to_owned()),
-            version: Some(version.into()),
-            configuration_key: Some(configuration_key.into()),
-            ..Self::default()
-        }
-    }
-
     /// Set the interval to collect internal metrics.
     pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
@@ -68,8 +54,6 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
-        let version = self.version.clone();
-        let configuration_key = self.configuration_key.clone();
 
         let host_key = self
             .tags
@@ -84,8 +68,6 @@ impl SourceConfig for InternalMetricsConfig {
         Ok(Box::pin(
             InternalMetrics {
                 namespace,
-                version,
-                configuration_key,
                 host_key,
                 pid_key,
                 controller: Controller::get()?,
@@ -112,8 +94,6 @@ impl SourceConfig for InternalMetricsConfig {
 
 struct InternalMetrics<'a> {
     namespace: Option<String>,
-    version: Option<String>,
-    configuration_key: Option<String>,
     host_key: Option<String>,
     pid_key: Option<String>,
     controller: &'a Controller,
@@ -140,14 +120,6 @@ impl<'a> InternalMetrics<'a> {
                 // if an explicit namespace is provided to this source.
                 if let Some(namespace) = &self.namespace {
                     metric = metric.with_namespace(Some(namespace));
-                }
-
-                // Version and configuration key are reported in enterprise.
-                if let Some(version) = &self.version {
-                    metric.insert_tag("version".to_owned(), version.clone());
-                }
-                if let Some(configuration_key) = &self.configuration_key {
-                    metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
                 }
 
                 if let Some(host_key) = &self.host_key {

@@ -80,8 +80,17 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         // ignore empty strings if necessary
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => match parsed.target_get(field).expect("field does not exist") {
-                            Some(Value::Array(mut values)) => values.push(value),
+                        _ => match parsed
+                            .target_get(field)
+                            .expect("field does not exist")
+                            .cloned()
+                        {
+                            Some(Value::Array(mut values)) => {
+                                values.push(value);
+                                parsed.target_insert(field, values.into()).unwrap_or_else(
+                                    |error| warn!(message = "Error updating field value", field = %field, %error)
+                                );
+                            }
                             Some(v) => {
                                 parsed.target_insert(field, Value::Array(vec![v, value])).unwrap_or_else(
                                     |error| warn!(message = "Error updating field value", field = %field, %error)
@@ -402,13 +411,13 @@ mod tests {
             btreemap! {},
         )
             .expect("couldn't parse rules");
-        let parsed = parse_grok("1 info -", &rules, false).unwrap();
+        let parsed = parse_grok("1 info message", &rules, false).unwrap();
 
         assert_eq!(
             parsed,
             Value::from(btreemap! {
                 "nested" => btreemap! {
-                   "field" =>  Value::Array(vec![1.into(), "INFO".into()]),
+                   "field" =>  Value::Array(vec![1.into(), "INFO".into(), "message".into()]),
                 },
             })
         );

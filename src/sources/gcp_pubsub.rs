@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::sync::Mutex;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
-    transport::{Certificate, Channel, ClientTlsConfig, Identity},
+    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Request,
 };
 use vector_core::ByteSizeOf;
@@ -21,7 +21,10 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
-    internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
+    internal_events::{
+        GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
+        HttpClientBytesReceived, StreamClosedError,
+    },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::{self, finalizer::UnorderedFinalizer},
@@ -66,16 +69,16 @@ mod proto {
 }
 
 #[derive(Debug, Snafu)]
-enum PubsubError {
+pub(crate) enum PubsubError {
     #[snafu(display("Could not parse credentials metadata: {}", source))]
     Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
-    #[snafu(display("Could not create channel: {}", source))]
-    Channel { source: InvalidUri },
-    #[snafu(display("Could not set up channel TLS settings: {}", source))]
-    ChannelTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect channel: {}", source))]
+    #[snafu(display("Could not create endpoint: {}", source))]
+    Endpoint { source: InvalidUri },
+    #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
+    EndpointTls { source: tonic::transport::Error },
+    #[snafu(display("Could not connect: {}", source))]
     Connect { source: tonic::transport::Error },
     #[snafu(display("Could not pull data from remote: {}", source))]
     Pull { source: tonic::Status },
@@ -107,6 +110,9 @@ pub struct PubsubConfig {
     #[serde(default = "default_ack_deadline")]
     pub ack_deadline_seconds: i32,
 
+    #[serde(default = "default_retry_delay")]
+    pub retry_delay_seconds: f64,
+
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
@@ -120,6 +126,10 @@ pub struct PubsubConfig {
 
 const fn default_ack_deadline() -> i32 {
     600
+}
+
+const fn default_retry_delay() -> f64 {
+    1.0
 }
 
 #[async_trait::async_trait]
@@ -158,6 +168,7 @@ impl SourceConfig for PubsubConfig {
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             ack_ids: Default::default(),
+            retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
         }
         .run()
         .map_err(|error| error!(message = "Source failed.", %error));
@@ -195,20 +206,37 @@ struct PubsubSource {
     // generated in a separate async task from the response handling,
     // so the data needs to be shared this way.
     ack_ids: Arc<Mutex<Vec<String>>>,
+    retry_delay: Duration,
 }
 
 impl PubsubSource {
     async fn run(mut self) -> crate::Result<()> {
-        let mut channel = Channel::from_shared(self.endpoint.clone()).context(ChannelSnafu)?;
+        let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
         if self.uri.scheme() != Some(&Scheme::HTTP) {
-            channel = channel
+            endpoint = endpoint
                 .tls_config(self.make_tls_config())
-                .context(ChannelTlsSnafu)?;
+                .context(EndpointTlsSnafu)?;
         }
-        let channel = channel.connect().await.context(ConnectSnafu)?;
+
+        while self.run_once(&endpoint).await {
+            info!(timeout_secs = 1, "Retrying after timeout");
+            tokio::time::sleep(self.retry_delay).await;
+        }
+
+        Ok(())
+    }
+
+    async fn run_once(&mut self, endpoint: &Endpoint) -> bool {
+        let connection = match endpoint.connect().await {
+            Ok(connection) => connection,
+            Err(error) => {
+                emit!(GcpPubsubConnectError { error });
+                return true;
+            }
+        };
 
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
-            channel,
+            connection,
             |mut req: Request<()>| {
                 if let Some(authorization) = &self.authorization {
                     req.metadata_mut()
@@ -222,11 +250,14 @@ impl PubsubSource {
         // start if there is no data in the subscription.
         let request_stream = self.request_stream();
         let stream = tokio::select! {
-            _ = &mut self.shutdown => return Ok(()),
+            _ = &mut self.shutdown => return false,
             result = client.streaming_pull(request_stream) => match result {
-                    Err(source) => return Err(PubsubError::Pull { source }.into()),
-                    Ok(stream) => stream,
+                Ok(stream) => stream,
+                Err(error) => {
+                    emit!(GcpPubsubStreamingPullError { error });
+                    return true;
                 }
+            }
         };
         let mut stream = stream.into_inner();
 
@@ -234,15 +265,13 @@ impl PubsubSource {
             let ack_ids = Arc::clone(&self.ack_ids);
             Finalizer::new(self.shutdown.clone(), move |receipts| {
                 let ack_ids = Arc::clone(&ack_ids);
-                async move {
-                    ack_ids.lock().await.extend(receipts);
-                }
+                async move { ack_ids.lock().await.extend(receipts) }
             })
         });
 
         loop {
             tokio::select! {
-                _ = &mut self.shutdown => break,
+                _ = &mut self.shutdown => return false,
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
                     Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
@@ -251,7 +280,7 @@ impl PubsubSource {
             }
         }
 
-        Ok(())
+        true
     }
 
     fn make_tls_config(&self) -> ClientTlsConfig {
