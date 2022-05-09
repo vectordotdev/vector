@@ -143,9 +143,8 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                     || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
                 {
-                    let lookup: LookupBuf = Lookup::from_str(&k)
-                        .unwrap_or_else(|_| Lookup::from(&k))
-                        .into();
+
+                    let lookup: LookupBuf = Lookup::from(&k).into();
                     result.target_insert(&lookup, v).unwrap_or_else(
                         |error| warn!(message = "Error updating field value", field = %lookup, %error)
                     );
