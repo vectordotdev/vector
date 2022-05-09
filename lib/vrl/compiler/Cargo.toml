@@ -5,8 +5,29 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+  "expr-assignment",
+  "expr-function_call",
+  "expr-if_statement",
+  "expr-literal",
+  "expr-op",
+  "expr-query",
+  "expr-unary",
+]
+expr-abort = ["core/expr-abort"]
+expr-assignment = ["expr-op"]
+expr-function_call = []
+expr-if_statement = []
+expr-literal = []
+expr-op = []
+expr-query = []
+expr-unary = []
+
 [dependencies]
-core = { package = "vrl-core", path = "../core" }
+core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
@@ -32,6 +53,3 @@ vector_common = { path = "../../vector-common", default-features = false, featur
 [[bench]]
 name = "kind"
 harness = false
-
-[features]
-test = []
