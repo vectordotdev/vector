@@ -1575,9 +1575,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.15"
+version = "3.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85a35a599b11c089a7f49105658d089b8f2cf0882993c17daf6de15285c2c35d"
+checksum = "f52d4f8e4a1419219935762e32913b4430f37cb0c0200ad17a89ee18c0188a9f"
 dependencies = [
  "atty",
  "bitflags",
@@ -1644,7 +1644,7 @@ dependencies = [
  "indoc",
  "memchr",
  "pretty_assertions",
- "prost 0.10.1",
+ "prost 0.10.3",
  "serde",
  "serde_json",
  "smallvec",
@@ -1720,7 +1720,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24cb05777feccbb2642d4f2df44d0505601a2cd88ca517d8c913f263a5a8dc8b"
 dependencies = [
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-types 0.10.1",
  "tonic",
  "tracing-core 0.1.26",
@@ -4051,9 +4051,9 @@ dependencies = [
 
 [[package]]
 name = "lalrpop-util"
-version = "0.19.7"
+version = "0.19.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6d265705249fe209280676d8f68887859fa42e1d34f342fc05bd47726a5e188"
+checksum = "bcf796c978e9b4d983414f4caedc9273aa33ee214c5b887bd55fde84c85d2dc4"
 dependencies = [
  "regex",
 ]
@@ -5753,7 +5753,7 @@ dependencies = [
  "indexmap",
  "nom 7.1.1",
  "num_enum",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "snafu",
@@ -5804,9 +5804,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07b0857a71a8cb765763950499cae2413c3f9cede1133478c43600d9e146890"
+checksum = "bc03e116981ff7d8da8e5c220e374587b98d294af7ba7dd7fda761158f00086f"
 dependencies = [
  "bytes 1.1.0",
  "prost-derive 0.10.1",
@@ -5845,7 +5845,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph 0.6.0",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-types 0.10.1",
  "regex",
  "tempfile",
@@ -5895,7 +5895,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.1.0",
- "prost 0.10.1",
+ "prost 0.10.3",
 ]
 
 [[package]]
@@ -7870,7 +7870,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-derive 0.10.1",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 0.3.0",
@@ -7887,9 +7887,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c03447cdc9eaf8feffb6412dcb27baf2db11669a6c4789f29da799aabfb99547"
+checksum = "d9263bf4c9bfaae7317c1c2faf7f18491d2fe476f70c414b73bf5d445b00ffa1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -8590,7 +8590,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.1.15",
+ "clap 3.1.16",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8662,7 +8662,7 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "proptest",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "pulsar",
@@ -8796,7 +8796,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.1.15",
+ "clap 3.1.16",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8902,7 +8902,7 @@ dependencies = [
  "pin-project",
  "pretty_assertions",
  "proptest",
- "prost 0.10.1",
+ "prost 0.10.3",
  "prost-build 0.10.1",
  "prost-types 0.10.1",
  "quickcheck",
@@ -8963,7 +8963,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 3.1.15",
+ "clap 3.1.16",
  "exitcode",
  "indoc",
  "once_cell",
@@ -9093,7 +9093,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.1.15",
+ "clap 3.1.16",
  "enrichment",
  "glob",
  "prettydiff",

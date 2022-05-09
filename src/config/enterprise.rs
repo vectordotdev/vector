@@ -5,6 +5,7 @@ use std::{
 
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
+use indexmap::IndexMap;
 use rand::{prelude::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -51,6 +52,9 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    #[serde(default = "default_enable_logs_reporting")]
+    pub enable_logs_reporting: bool,
+
     #[serde(default = "default_exit_on_fatal_error")]
     pub exit_on_fatal_error: bool,
 
@@ -76,12 +80,15 @@ pub struct Options {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    tags: Option<IndexMap<String, String>>,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
+            enable_logs_reporting: default_enable_logs_reporting(),
             exit_on_fatal_error: default_exit_on_fatal_error(),
             site: None,
             region: None,
@@ -92,6 +99,7 @@ impl Default for Options {
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
+            tags: None,
         }
     }
 }
@@ -245,7 +253,7 @@ pub async fn try_attach(
     mut signal_rx: SignalRx,
 ) -> Result<(), PipelinesError> {
     // Only valid if a [enterprise] section is present in config.
-    let datadog = match config.enterprise.as_ref() {
+    let datadog = match config.enterprise.clone() {
         Some(datadog) => datadog,
         _ => return Err(PipelinesError::Disabled),
     };
@@ -268,7 +276,7 @@ pub async fn try_attach(
     );
 
     // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.as_ref().expect("Config should be versioned");
+    let config_version = config.version.clone().expect("Config should be versioned");
 
     // Get the Vector version. This is reported to Pipelines along with a config hash.
     let vector_version = crate::get_version();
@@ -284,7 +292,7 @@ pub async fn try_attach(
     // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
     // exploding as func arguments to avoid confusion with multiple &str fields.
     let fields = PipelinesStrFields {
-        config_version,
+        config_version: config_version.as_ref(),
         vector_version: &vector_version,
     };
 
@@ -338,13 +346,82 @@ pub async fn try_attach(
         }
     }
 
+    setup_metrics_reporting(config, &datadog, api_key.clone(), config_version.clone());
+
+    if datadog.enable_logs_reporting {
+        setup_logs_reporting(config, &datadog, api_key, config_version);
+    }
+
+    Ok(())
+}
+
+fn setup_logs_reporting(
+    config: &mut Config,
+    datadog: &Options,
+    api_key: String,
+    config_version: String,
+) {
+    let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
+    let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
+    let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
+
+    let internal_logs = InternalLogsConfig {
+        ..Default::default()
+    };
+
+    let custom_logs_tags_vrl = datadog
+        .tags
+        .as_ref()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
+
+    let tag_logs = RemapConfig {
+        source: Some(format!(
+            r#"
+            .version = "{}"
+            .configuration_key = "{}"
+            .ddsource = "vector"
+            {}
+        "#,
+            &config_version, &datadog.configuration_key, custom_logs_tags_vrl,
+        )),
+        ..Default::default()
+    };
+
+    // Create a Datadog logs sink to consume and emit internal logs.
+    let datadog_logs = DatadogLogsConfig {
+        default_api_key: api_key,
+        endpoint: datadog.endpoint.clone(),
+        site: datadog.site.clone(),
+        region: datadog.region,
+        ..Default::default()
+    };
+
+    config.sources.insert(
+        internal_logs_id.component.clone(),
+        SourceOuter::new(internal_logs),
+    );
+
+    config.transforms.insert(
+        tag_logs_id.component.clone(),
+        TransformOuter::new(vec![internal_logs_id], tag_logs),
+    );
+
+    config.sinks.insert(
+        datadog_logs_id,
+        SinkOuter::new(vec![tag_logs_id], Box::new(datadog_logs)),
+    );
+}
+
+fn setup_metrics_reporting(
+    config: &mut Config,
+    datadog: &Options,
+    api_key: String,
+    config_version: String,
+) {
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
-    let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
-    let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
-    let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
@@ -360,30 +437,29 @@ pub async fn try_attach(
         ..Default::default()
     };
 
-    let internal_logs = InternalLogsConfig {
-        ..Default::default()
-    };
+    let custom_metric_tags_vrl = datadog
+        .tags
+        .as_ref()
+        .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
 
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
             .tags.version = "{}"
             .tags.configuration_key = "{}"
+            {}
         "#,
-            &config_version, &datadog.configuration_key,
+            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
         )),
         ..Default::default()
     };
 
-    let tag_logs = RemapConfig {
-        source: Some(format!(
-            r#"
-            .version = "{}"
-            .configuration_key = "{}"
-            .ddsource = "vector"
-        "#,
-            &config_version, &datadog.configuration_key,
-        )),
+    // Create a Datadog metrics sink to consume and emit internal + host metrics.
+    let datadog_metrics = DatadogMetricsConfig {
+        default_api_key: api_key,
+        endpoint: datadog.endpoint.clone(),
+        site: datadog.site.clone(),
+        region: datadog.region,
         ..Default::default()
     };
 
@@ -395,53 +471,25 @@ pub async fn try_attach(
         internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
     );
-    config.sources.insert(
-        internal_logs_id.component.clone(),
-        SourceOuter::new(internal_logs),
-    );
 
     config.transforms.insert(
         tag_metrics_id.component.clone(),
         TransformOuter::new(vec![host_metrics_id, internal_metrics_id], tag_metrics),
     );
-    config.transforms.insert(
-        tag_logs_id.component.clone(),
-        TransformOuter::new(vec![internal_logs_id], tag_logs),
-    );
-
-    // Create a Datadog metrics sink to consume and emit internal + host metrics.
-    let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key.clone(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
-        region: datadog.region,
-        ..Default::default()
-    };
 
     config.sinks.insert(
         datadog_metrics_id,
         SinkOuter::new(vec![tag_metrics_id], Box::new(datadog_metrics)),
     );
-
-    // Create a Datadog logs sink to consume and emit internal logs.
-    let datadog_logs = DatadogLogsConfig {
-        default_api_key: api_key.clone(),
-        endpoint: datadog.endpoint.clone(),
-        site: datadog.site.clone(),
-        region: datadog.region,
-        ..Default::default()
-    };
-
-    config.sinks.insert(
-        datadog_logs_id,
-        SinkOuter::new(vec![tag_logs_id], Box::new(datadog_logs)),
-    );
-
-    Ok(())
 }
 
 /// By default, the Datadog feature is enabled.
 const fn default_enabled() -> bool {
+    true
+}
+
+/// By default, internal logs are reported to Datadog.
+const fn default_enable_logs_reporting() -> bool {
     true
 }
 
@@ -463,6 +511,17 @@ const fn default_reporting_interval_secs() -> f64 {
 /// Vector to start.
 const fn default_max_retries() -> u32 {
     8
+}
+
+/// Converts user configured tags to VRL source code for adding tags/fields to
+/// events
+fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
+    let json_tags = serde_json::to_string(&tags).unwrap();
+    if is_metric {
+        format!(r#".tags = merge(.tags, {}, deep: true)"#, json_tags)
+    } else {
+        format!(r#". = merge(., {}, deep: true)"#, json_tags)
+    }
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
@@ -567,14 +626,17 @@ mod test {
     use std::{io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
+    use indexmap::IndexMap;
     use indoc::formatdoc;
+    use value::Kind;
+    use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use crate::{
         app::Application,
         cli::{Color, LogFormat, Opts, RootOpts},
-        config::enterprise::default_max_retries,
+        config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
     };
 
@@ -809,5 +871,45 @@ mod test {
         .unwrap();
 
         assert!(!vector_continued);
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_metrics() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+
+        let vrl = convert_tags_to_vrl(&tags, true);
+        assert_eq!(
+            vrl,
+            r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        // We need to set up some state here to inform the VRL compiler that
+        // .tags is an object and merge() is thus a safe operation (mimicking
+        // the environment this code will actually run in).
+        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
+            "tags" => Kind::object(btreemap! {}),
+        }));
+        assert!(
+            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+        );
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_logs() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+        let vrl = convert_tags_to_vrl(&tags, false);
+
+        assert_eq!(
+            vrl,
+            r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
 }

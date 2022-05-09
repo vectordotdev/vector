@@ -29,7 +29,7 @@ vector_common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [dev-dependencies]
-vrl-compiler = { path = "../../vrl/compiler", features = ["test"] }
+vrl-compiler = { path = "../../vrl/compiler" }
 criterion = { version = "0.3.5" }
 tracing-test = { version = "0.2", default-features = false }
 

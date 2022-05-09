@@ -5,9 +5,30 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+  "expr-assignment",
+  "expr-function_call",
+  "expr-if_statement",
+  "expr-literal",
+  "expr-op",
+  "expr-query",
+  "expr-unary",
+]
+expr-abort = ["compiler/expr-abort"]
+expr-assignment = ["compiler/expr-assignment"]
+expr-function_call = ["compiler/expr-function_call"]
+expr-if_statement = ["compiler/expr-if_statement"]
+expr-literal = ["compiler/expr-literal"]
+expr-op = ["compiler/expr-op"]
+expr-query = ["compiler/expr-query"]
+expr-unary = ["compiler/expr-unary"]
+
 [dependencies]
 bytes = "1.1.0"
-compiler = { package = "vrl-compiler", path = "../compiler" }
+compiler = { package = "vrl-compiler", path = "../compiler", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "1"
 lookup = { path = "../../lookup" }

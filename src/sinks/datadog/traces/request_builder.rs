@@ -79,6 +79,7 @@ pub struct RequestMetadata {
     endpoint: DatadogTracesEndpoint,
     finalizers: EventFinalizers,
     lang: Option<String>,
+    uncompressed_size: usize,
 }
 
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
@@ -111,6 +112,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                     .into_iter()
                     .for_each(|r| match r {
                         Ok((payload, mut processed)) => {
+                            let uncompressed_size = payload.len();
                             let metadata = RequestMetadata {
                                 api_key: key
                                     .api_key
@@ -120,6 +122,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                                 lang: key.lang.clone(),
                                 endpoint: key.endpoint,
                                 finalizers: processed.take_finalizers(),
+                                uncompressed_size,
                             };
                             let mut compressor = Compressor::from(self.compression);
                             match compressor.write_all(&payload) {
@@ -166,6 +169,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             uri: self
                 .endpoint_configuration
                 .get_uri_for_endpoint(metadata.endpoint),
+            uncompressed_size: metadata.uncompressed_size,
         }
     }
 }

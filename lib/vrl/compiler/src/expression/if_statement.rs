@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::{
-    expression::{Block, Expr, Literal, Predicate, Resolved},
+    expression::{Block, Expr, Noop, Predicate, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::VrlValueConvert,
     vm::OpCode,
@@ -17,11 +17,9 @@ pub struct IfStatement {
 
 impl IfStatement {
     pub(crate) fn noop() -> Self {
-        let literal = Literal::Boolean(false);
-        let predicate = Predicate::new_unchecked(vec![Expr::Literal(literal)]);
+        let predicate = Predicate::new_unchecked(vec![]);
 
-        let literal = Literal::Null;
-        let consequent = Block::new(vec![Expr::Literal(literal)], LocalEnv::default());
+        let consequent = Block::new(vec![Expr::Noop(Noop)], LocalEnv::default());
 
         Self {
             predicate,
