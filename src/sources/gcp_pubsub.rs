@@ -408,8 +408,7 @@ mod tests {
     }
 }
 
-//#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
-#[cfg(test)]
+#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 

@@ -214,7 +214,7 @@ mod test {
     use crate::{
         event::MetricValue,
         test_util::{
-            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
             next_addr, wait_for_tcp,
         },
         Error,
@@ -537,12 +537,8 @@ mod test {
             namespace: default_namespace(),
         };
 
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
-        .await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
         assert!(!events.is_empty());
 
         let metrics = events
