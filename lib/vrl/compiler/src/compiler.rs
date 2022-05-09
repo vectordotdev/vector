@@ -1,15 +1,12 @@
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity};
+use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
-use ordered_float::NotNan;
-use parser::ast::{self, AssignmentOp, Node};
+use parser::ast::{self, Node};
 
 use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program, Value,
+    Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -143,9 +140,13 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(feature = "expr-literal")]
     fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
         use ast::Literal::*;
+        use bytes::Bytes;
+        use chrono::{TimeZone, Utc};
         use literal::ErrorVariant::*;
+        use ordered_float::NotNan;
 
         let (span, lit) = node.take();
 
@@ -189,6 +190,12 @@ impl<'a> Compiler<'a> {
         });
 
         literal.into()
+    }
+
+    #[cfg(not(feature = "expr-literal"))]
+    fn compile_literal(&mut self, node: Node<ast::Literal>, _: &mut ExternalEnv) -> Expr {
+        self.handle_missing_feature_error(node.span(), "expr-literal")
+            .into()
     }
 
     fn compile_container(
@@ -258,6 +265,7 @@ impl<'a> Compiler<'a> {
         Object::new(exprs)
     }
 
+    #[cfg(feature = "expr-if_statement")]
     fn compile_if_statement(
         &mut self,
         node: Node<ast::IfStatement>,
@@ -287,6 +295,12 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(not(feature = "expr-if_statement"))]
+    fn compile_if_statement(&mut self, node: Node<ast::IfStatement>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-if_statement")
+    }
+
+    #[cfg(feature = "expr-if_statement")]
     fn compile_predicate(
         &mut self,
         node: Node<ast::Predicate>,
@@ -308,6 +322,7 @@ impl<'a> Compiler<'a> {
         )
     }
 
+    #[cfg(feature = "expr-op")]
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Op {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
@@ -324,7 +339,13 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-op"))]
+    fn compile_op(&mut self, node: Node<ast::Op>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-op")
+    }
+
     /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    #[cfg(feature = "expr-assignment")]
     fn rewrite_to_merge(
         &mut self,
         span: diagnostic::Span,
@@ -348,13 +369,15 @@ impl<'a> Compiler<'a> {
         ))
     }
 
+    #[cfg(feature = "expr-assignment")]
     fn compile_assignment(
         &mut self,
         node: Node<ast::Assignment>,
         external: &mut ExternalEnv,
     ) -> Assignment {
+        use crate::Value;
         use assignment::Variant;
-        use ast::Assignment::*;
+        use ast::{Assignment::*, AssignmentOp};
 
         let assignment = node.into_inner();
 
@@ -428,6 +451,12 @@ impl<'a> Compiler<'a> {
         assignment
     }
 
+    #[cfg(not(feature = "expr-assignment"))]
+    fn compile_assignment(&mut self, node: Node<ast::Assignment>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-assignment")
+    }
+
+    #[cfg(feature = "expr-query")]
     fn compile_query(&mut self, node: Node<ast::Query>, external: &mut ExternalEnv) -> Query {
         let ast::Query { target, path } = node.into_inner();
         let path = path.into_inner();
@@ -444,6 +473,12 @@ impl<'a> Compiler<'a> {
         Query::new(target, path)
     }
 
+    #[cfg(not(feature = "expr-query"))]
+    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-query")
+    }
+
+    #[cfg(feature = "expr-query")]
     fn compile_query_target(
         &mut self,
         node: Node<ast::QueryTarget>,
@@ -470,6 +505,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
@@ -544,6 +580,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_argument(
         &mut self,
         node: Node<ast::FunctionArgument>,
@@ -552,6 +589,19 @@ impl<'a> Compiler<'a> {
         let ast::FunctionArgument { ident, expr } = node.into_inner();
         let expr = Node::new(expr.span(), self.compile_expr(expr, external));
         FunctionArgument::new(ident, expr)
+    }
+
+    #[cfg(not(feature = "expr-function_call"))]
+    fn compile_function_call(
+        &mut self,
+        node: Node<ast::FunctionCall>,
+        _: &mut ExternalEnv,
+    ) -> Noop {
+        // Guard against `dead_code` lint, to avoid having to sprinkle
+        // attributes all over the place.
+        let _ = self.fns;
+
+        self.handle_missing_feature_error(node.span(), "expr-function_call")
     }
 
     fn compile_variable(
@@ -567,6 +617,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-unary")]
     fn compile_unary(&mut self, node: Node<ast::Unary>, external: &mut ExternalEnv) -> Unary {
         use ast::Unary::*;
 
@@ -577,6 +628,18 @@ impl<'a> Compiler<'a> {
         Unary::new(variant)
     }
 
+    #[cfg(not(feature = "expr-unary"))]
+    fn compile_unary(&mut self, node: Node<ast::Unary>, _: &mut ExternalEnv) -> Noop {
+        use ast::Unary::*;
+
+        let span = match node.into_inner() {
+            Not(node) => node.take().1.take().0,
+        };
+
+        self.handle_missing_feature_error(span.span(), "expr-unary")
+    }
+
+    #[cfg(feature = "expr-unary")]
     fn compile_not(&mut self, node: Node<ast::Not>, external: &mut ExternalEnv) -> Not {
         let (not, expr) = node.into_inner().take();
 
@@ -588,6 +651,7 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-abort")]
     fn compile_abort(&mut self, node: Node<ast::Abort>, external: &mut ExternalEnv) -> Abort {
         self.abortable = true;
         let (span, abort) = node.take();
@@ -601,7 +665,20 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-abort"))]
+    fn compile_abort(&mut self, node: Node<ast::Abort>, _: &mut ExternalEnv) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-abort")
+    }
+
     fn handle_parser_error(&mut self, error: parser::Error) {
         self.diagnostics.push(Box::new(error))
+    }
+
+    #[allow(dead_code)]
+    fn handle_missing_feature_error(&mut self, span: Span, feature: &'static str) -> Noop {
+        self.diagnostics
+            .push(Box::new(Error::Missing { span, feature }));
+
+        Noop
     }
 }
