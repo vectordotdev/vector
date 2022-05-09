@@ -8,7 +8,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapParseError, EndpointBytesReceived, EventsReceived},
+    internal_events::{BytesReceived, DnstapParseError, EventsReceived},
     Result,
 };
 
@@ -98,7 +98,6 @@ impl SourceConfig for DnstapConfig {
 pub struct DnstapFrameHandler {
     max_frame_length: usize,
     socket_path: PathBuf,
-    socket_path_str: String,
     content_type: String,
     schema: DnstapEventSchema,
     raw_data_only: bool,
@@ -128,7 +127,6 @@ impl DnstapFrameHandler {
         Self {
             max_frame_length: config.max_frame_length,
             socket_path: config.socket_path.clone(),
-            socket_path_str: config.socket_path.to_string_lossy().to_string(),
             content_type: config.content_type(),
             schema,
             raw_data_only: config.raw_data_only.unwrap_or(false),
@@ -157,10 +155,9 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(EndpointBytesReceived {
+        emit!(BytesReceived {
             byte_size: frame.len(),
             protocol: "protobuf",
-            endpoint: &self.socket_path_str,
         });
         let mut event = Event::new_empty_log();
 
@@ -246,14 +243,14 @@ mod integration_tests {
     use crate::{
         event::Value,
         test_util::{
-            components::{assert_source_compliance, PUSH_SOURCE_TAGS},
+            components::{assert_source_compliance, SOURCE_TAGS},
             wait_for,
         },
         SourceSender,
     };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
-        assert_source_compliance(&PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let (sender, mut recv) = SourceSender::new_test();
 
             tokio::spawn(async move {

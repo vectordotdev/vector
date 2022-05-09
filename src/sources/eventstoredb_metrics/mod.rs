@@ -12,7 +12,7 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        EndpointBytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
+        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
         EventStoreDbStatsParsingError, StreamClosedError,
     },
     tls::TlsSettings,
@@ -106,10 +106,9 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(EndpointBytesReceived {
+                        emit!(BytesReceived {
                             byte_size: bytes.len(),
                             protocol: "http",
-                            endpoint: endpoint.as_str(),
                         });
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
@@ -145,7 +144,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
     const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://localhost:2113/stats";
 
@@ -157,12 +156,8 @@ mod integration_tests {
             default_namespace: None,
         };
 
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(5),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
-        .await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
         assert!(!events.is_empty());
     }
 }

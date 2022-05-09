@@ -23,6 +23,9 @@ use crate::{
     SourceSender,
 };
 
+/// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
+pub const SOURCE_TAGS: [&str; 1] = ["protocol"];
+
 /// The standard set of tags for sources that have their data pushed in from an external source.
 pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 

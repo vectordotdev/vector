@@ -11,7 +11,7 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, EndpointBytesReceived,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, BytesReceived,
         StreamClosedError,
     },
     shutdown::ShutdownSignal,
@@ -148,10 +148,9 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(EndpointBytesReceived {
+                        emit!(BytesReceived {
                             byte_size: body.len(),
                             protocol: "http",
-                            endpoint: uri.path(),
                         });
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
@@ -580,7 +579,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
     fn ecs_address() -> String {
         std::env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
@@ -598,12 +597,8 @@ mod integration_tests {
             namespace: default_namespace(),
         };
 
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(5),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
-        .await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
         assert!(!events.is_empty());
     }
 

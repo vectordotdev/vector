@@ -2,7 +2,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{EndpointBytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     SourceSender,
 };
@@ -53,12 +53,12 @@ pub enum Method {
 
 pub struct ConnectionInfo {
     protocol: &'static str,
-    remote_addr: String,
+    endpoint: String,
 }
 
 impl From<&redis::ConnectionInfo> for ConnectionInfo {
     fn from(redis_conn_info: &redis::ConnectionInfo) -> Self {
-        let (protocol, remote_addr) = match &redis_conn_info.addr {
+        let (protocol, endpoint) = match &redis_conn_info.addr {
             redis::ConnectionAddr::Tcp(host, port)
             | redis::ConnectionAddr::TcpTls { host, port, .. } => {
                 ("tcp", format!("{}:{}", host, port))
@@ -66,10 +66,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
             redis::ConnectionAddr::Unix(path) => ("uds", path.to_string_lossy().to_string()),
         };
 
-        Self {
-            protocol,
-            remote_addr,
-        }
+        Self { protocol, endpoint }
     }
 }
 
@@ -173,10 +170,9 @@ async fn handle_line(
 ) -> Result<(), ()> {
     let now = Utc::now();
 
-    emit!(EndpointBytesReceived {
+    emit!(BytesReceived {
         byte_size: line.len(),
         protocol: connection_info.protocol,
-        endpoint: connection_info.remote_addr.as_str(),
     });
 
     let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
@@ -231,9 +227,7 @@ mod test {
 mod integration_test {
     use super::*;
     use crate::config::log_schema;
-    use crate::test_util::components::{
-        run_and_assert_source_compliance_n, SOCKET_PULL_SOURCE_TAGS,
-    };
+    use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
     use crate::{
         test_util::{collect_n, random_string},
         SourceSender,
@@ -268,7 +262,7 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        let events = run_and_assert_source_compliance_n(config, 3, &SOCKET_PULL_SOURCE_TAGS).await;
+        let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
         assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
         assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
@@ -301,7 +295,7 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        let events = run_and_assert_source_compliance_n(config, 3, &SOCKET_PULL_SOURCE_TAGS).await;
+        let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
         assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
         assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());

@@ -204,7 +204,7 @@ mod integration_tests {
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::test_util::{
         collect_n,
-        components::{assert_source_compliance, SOCKET_PULL_SOURCE_TAGS},
+        components::{assert_source_compliance, SOURCE_TAGS},
         random_string,
     };
     use crate::tls::TlsConfig;
@@ -215,7 +215,7 @@ mod integration_tests {
         let nc_pub = nc.clone();
         let msg = "my message";
 
-        let events = assert_source_compliance(&SOCKET_PULL_SOURCE_TAGS, async move {
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
             let (tx, rx) = SourceSender::new_test();
             let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
             tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));

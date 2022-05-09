@@ -20,7 +20,7 @@ use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, EndpointBytesReceived, EventsReceived,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
         StreamClosedError,
     },
     SourceSender,
@@ -31,7 +31,6 @@ use crate::{
 pub async fn firehose(
     request_id: String,
     source_arn: String,
-    endpoint: String,
     request: FirehoseRequest,
     compression: Compression,
     decoder: Decoder,
@@ -44,10 +43,9 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(EndpointBytesReceived {
+        emit!(BytesReceived {
             byte_size: bytes.len(),
             protocol: "http",
-            endpoint: endpoint.as_str(),
         });
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());

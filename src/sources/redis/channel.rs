@@ -25,14 +25,14 @@ pub async fn subscribe(
         .get_async_connection()
         .await
         .context(ConnectionSnafu {})?;
-    trace!(remote_addr = %connection_info.remote_addr.as_str(), "Connected.");
+    trace!(endpoint = %connection_info.endpoint.as_str(), "Connected.");
 
     let mut pubsub_conn = conn.into_pubsub();
     pubsub_conn
         .subscribe(&key)
         .await
         .context(SubscribeSnafu {})?;
-    trace!(remote_addr = %connection_info.remote_addr.as_str(), channel = %key, "Subscribed to channel.");
+    trace!(endpoint = %connection_info.endpoint.as_str(), channel = %key, "Subscribed to channel.");
 
     Ok(Box::pin(async move {
         let shutdown = cx.shutdown;
