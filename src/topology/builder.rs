@@ -23,7 +23,8 @@ use vector_core::{
         BufferType, WhenFull,
     },
     internal_event::EventsSent,
-    ByteSizeOf, schema::Definition,
+    schema::Definition,
+    ByteSizeOf,
 };
 
 use super::{
@@ -510,7 +511,11 @@ struct TransformNode {
 }
 
 impl TransformNode {
-    pub fn from_parts(key: ComponentKey, transform: &TransformOuter<OutputId>, schema_definition: &Definition) -> Self {
+    pub fn from_parts(
+        key: ComponentKey,
+        transform: &TransformOuter<OutputId>,
+        schema_definition: &Definition,
+    ) -> Self {
         Self {
             key,
             typetag: transform.inner.transform_type(),
