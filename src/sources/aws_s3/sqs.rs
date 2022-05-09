@@ -692,7 +692,7 @@ pub struct S3Bucket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {
     // S3ObjectKeys are URL encoded
@@ -736,4 +736,23 @@ mod urlencoded_string {
             &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
         )
     }
+}
+
+#[test]
+fn test_key_deserialize() {
+    let value = serde_json::from_str(r#"{"key": "noog+nork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog nork".to_string(),
+        },
+        value
+    );
+
+    let value = serde_json::from_str(r#"{"key": "noog%2bnork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog+nork".to_string(),
+        },
+        value
+    );
 }
