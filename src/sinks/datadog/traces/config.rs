@@ -91,6 +91,7 @@ impl GenerateConfig for DatadogTracesConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DatadogTracesEndpoint {
     Traces,
+    #[allow(dead_code)] // This will be used when APM stats will be generated
     APMStats,
 }
 
