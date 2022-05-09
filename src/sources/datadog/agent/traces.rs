@@ -159,8 +159,8 @@ fn handle_dd_trace_payload_v2(
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
     let agent_version = decoded_payload.agent_version;
-    let target_tps = decoded_payload.target_tps.round();
-    let error_tps = decoded_payload.error_tps.round();
+    let target_tps = decoded_payload.target_tps;
+    let error_tps = decoded_payload.error_tps;
     let tags = convert_tags(decoded_payload.tags);
 
     let trace_events: Vec<TraceEvent> = decoded_payload
