@@ -5,28 +5,6 @@ use vector_core::internal_event::InternalEvent;
 use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug)]
-pub struct AwsKinesisFirehoseBytesReceived<'a> {
-    pub byte_size: usize,
-    pub endpoint: &'a str,
-}
-
-impl InternalEvent for AwsKinesisFirehoseBytesReceived<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = "http",
-            endpoint = %self.endpoint,
-        );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "http",
-            "endpoint" => self.endpoint.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
 pub struct AwsKinesisFirehoseEventsReceived<'a> {
     pub count: usize,
     pub byte_size: usize,

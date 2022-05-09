@@ -2,7 +2,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{EventsReceived, RedisBytesReceived, StreamClosedError},
+    internal_events::{EndpointBytesReceived, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     SourceSender,
 };
@@ -173,10 +173,10 @@ async fn handle_line(
 ) -> Result<(), ()> {
     let now = Utc::now();
 
-    emit!(RedisBytesReceived {
+    emit!(EndpointBytesReceived {
         byte_size: line.len(),
         protocol: connection_info.protocol,
-        remote_addr: connection_info.remote_addr.as_str(),
+        endpoint: connection_info.remote_addr.as_str(),
     });
 
     let mut stream = FramedRead::new(line.as_ref(), decoder.clone());

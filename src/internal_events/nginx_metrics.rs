@@ -7,29 +7,6 @@ use vector_core::internal_event::InternalEvent;
 use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug)]
-pub struct NginxMetricsBytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-    pub endpoint: &'a str,
-}
-
-impl InternalEvent for NginxMetricsBytesReceived<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = %self.protocol,
-            endpoint = %self.endpoint,
-        );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => self.protocol.to_owned(),
-            "endpoint" => self.endpoint.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,

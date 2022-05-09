@@ -6,6 +6,7 @@ use vector_core::{internal_event::InternalEvent, update_counter};
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {
     pub byte_size: usize,
+    pub protocol: &'static str,
     pub topic: &'a str,
     pub partition: i32,
 }
@@ -15,14 +16,14 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
-            protocol = "tcp",
+            protocol = %self.protocol,
             topic = self.topic,
             partition = %self.partition,
         );
         counter!(
             "component_received_bytes_total",
             self.byte_size as u64,
-            "protocol" => "tcp",
+            "protocol" => self.protocol,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );

@@ -30,8 +30,8 @@ use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        PostgresqlMetricsBytesReceived, PostgresqlMetricsCollectCompleted,
-        PostgresqlMetricsCollectError, PostgresqlMetricsEventsReceived, StreamClosedError,
+        EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
+        PostgresqlMetricsCollectError, StreamClosedError,
     },
 };
 
@@ -513,16 +513,12 @@ impl PostgresqlMetrics {
                     result.iter().fold((0, 0, 0), |res, (set, size)| {
                         (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
                     });
-                emit!(PostgresqlMetricsBytesReceived {
+                emit!(EndpointBytesReceived {
                     byte_size: received_byte_size,
                     protocol: "tcp",
                     endpoint: &self.endpoint,
                 });
-                emit!(PostgresqlMetricsEventsReceived {
-                    count,
-                    byte_size,
-                    endpoint: &self.endpoint
-                });
+                emit!(EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
                 Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }

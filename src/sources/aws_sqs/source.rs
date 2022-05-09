@@ -11,7 +11,7 @@ use tokio::{pin, select, time::Duration};
 use crate::{
     codecs::Decoder,
     event::BatchNotifier,
-    internal_events::{HttpClientBytesReceived, SqsMessageDeleteError, StreamClosedError},
+    internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::{self, finalizer::UnorderedFinalizer},
     SourceSender,
@@ -102,7 +102,7 @@ impl SqsSource {
                 .iter()
                 .map(|message| message.body().map(|body| body.len()).unwrap_or(0))
                 .sum();
-            emit!(HttpClientBytesReceived {
+            emit!(EndpointBytesReceived {
                 byte_size,
                 protocol: "http",
                 endpoint: &self.queue_url

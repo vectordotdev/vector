@@ -21,7 +21,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsRequestCompleted, ApacheMetricsResponseError, HttpClientBytesReceived,
+        ApacheMetricsRequestCompleted, ApacheMetricsResponseError, EndpointBytesReceived,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -187,7 +187,7 @@ fn apache_metrics(
 
                                 let byte_size = body.len();
                                 let body = String::from_utf8_lossy(&body);
-                                emit!(HttpClientBytesReceived {
+                                emit!(EndpointBytesReceived {
                                     byte_size,
                                     protocol: url.scheme().unwrap_or(&Scheme::HTTP).as_str(),
                                     endpoint: &sanitized_url,

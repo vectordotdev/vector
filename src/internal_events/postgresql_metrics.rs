@@ -5,29 +5,6 @@ use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct PostgresqlMetricsBytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-    pub endpoint: &'a str,
-}
-
-impl InternalEvent for PostgresqlMetricsBytesReceived<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = %self.protocol,
-            endpoint = %self.endpoint,
-        );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => self.protocol.to_owned(),
-            "endpoint" => self.endpoint.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
 pub struct PostgresqlMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,

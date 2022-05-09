@@ -17,13 +17,13 @@ impl InternalEvent for BytesReceived {
 }
 
 #[derive(Debug)]
-pub struct HttpClientBytesReceived<'a> {
+pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
     pub endpoint: &'a str,
 }
 
-impl InternalEvent for HttpClientBytesReceived<'_> {
+impl InternalEvent for EndpointBytesReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Bytes received.",

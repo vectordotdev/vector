@@ -21,8 +21,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
-        MongoDbMetricsRequestError, MongodbMetricsBytesReceived, StreamClosedError,
+        EndpointBytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
@@ -279,9 +279,9 @@ impl MongoDbMetrics {
             .await
             .map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
-        emit!(MongodbMetricsBytesReceived {
-            protocol: "tcp",
+        emit!(EndpointBytesReceived {
             byte_size,
+            protocol: "tcp",
             endpoint: &self.endpoint,
         });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;

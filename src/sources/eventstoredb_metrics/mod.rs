@@ -12,8 +12,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
-        EventStoreDbStatsParsingError, HttpClientBytesReceived, StreamClosedError,
+        EndpointBytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
+        EventStoreDbStatsParsingError, StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -106,7 +106,7 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(HttpClientBytesReceived {
+                        emit!(EndpointBytesReceived {
                             byte_size: bytes.len(),
                             protocol: "http",
                             endpoint: endpoint.as_str(),

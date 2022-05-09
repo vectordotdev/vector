@@ -18,7 +18,7 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        HttpClientBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
+        EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
         PrometheusHttpResponseError, PrometheusParseError, PrometheusRequestCompleted,
         StreamClosedError,
     },
@@ -272,7 +272,7 @@ async fn prometheus(
             .and_then(|response| async move {
                 let (header, body) = response.into_parts();
                 let body = hyper::body::to_bytes(body).await?;
-                emit!(HttpClientBytesReceived {
+                emit!(EndpointBytesReceived {
                     byte_size: body.len(),
                     protocol: "http",
                     endpoint: endpoint.as_str(),

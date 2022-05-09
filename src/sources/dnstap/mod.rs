@@ -8,7 +8,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{DnstapBytesReceived, DnstapEventsReceived, DnstapParseError},
+    internal_events::{DnstapParseError, EndpointBytesReceived, EventsReceived},
     Result,
 };
 
@@ -157,8 +157,9 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(DnstapBytesReceived {
+        emit!(EndpointBytesReceived {
             byte_size: frame.len(),
+            protocol: "protobuf",
             endpoint: &self.socket_path_str,
         });
         let mut event = Event::new_empty_log();
@@ -174,9 +175,9 @@ impl FrameHandler for DnstapFrameHandler {
                 self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(DnstapEventsReceived {
+            emit!(EventsReceived {
+                count: 1,
                 byte_size: event.size_of(),
-                endpoint: &self.socket_path_str,
             });
             Some(event)
         } else {
@@ -188,9 +189,9 @@ impl FrameHandler for DnstapFrameHandler {
                     None
                 }
                 Ok(_) => {
-                    emit!(DnstapEventsReceived {
+                    emit!(EventsReceived {
+                        count: 1,
                         byte_size: event.size_of(),
-                        endpoint: &self.socket_path_str,
                     });
                     Some(event)
                 }

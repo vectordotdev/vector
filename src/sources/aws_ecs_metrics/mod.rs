@@ -11,7 +11,7 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpClientBytesReceived,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, EndpointBytesReceived,
         StreamClosedError,
     },
     shutdown::ShutdownSignal,
@@ -148,7 +148,7 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(HttpClientBytesReceived {
+                        emit!(EndpointBytesReceived {
                             byte_size: body.len(),
                             protocol: "http",
                             endpoint: uri.path(),

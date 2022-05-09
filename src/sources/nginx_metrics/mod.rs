@@ -16,7 +16,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
-        NginxMetricsBytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
+        EndpointBytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
     tls::{TlsConfig, TlsSettings},
@@ -198,7 +198,7 @@ impl NginxMetrics {
                 endpoint: &self.endpoint,
             })
         })?;
-        emit!(NginxMetricsBytesReceived {
+        emit!(EndpointBytesReceived {
             byte_size: response.len(),
             protocol: "http",
             endpoint: &self.endpoint,

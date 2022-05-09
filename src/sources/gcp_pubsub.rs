@@ -21,7 +21,7 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
-    internal_events::{GcpPubsubReceiveError, HttpClientBytesReceived, StreamClosedError},
+    internal_events::{EndpointBytesReceived, GcpPubsubReceiveError, StreamClosedError},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::{self, finalizer::UnorderedFinalizer},
@@ -295,7 +295,7 @@ impl PubsubSource {
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
     ) {
-        emit!(HttpClientBytesReceived {
+        emit!(EndpointBytesReceived {
             byte_size: response.size_of(),
             protocol: self.uri.scheme().map(Scheme::as_str).unwrap_or("http"),
             endpoint: &self.endpoint,

@@ -197,6 +197,7 @@ async fn kafka_source(
             Ok(msg) => {
                 emit!(KafkaBytesReceived {
                     byte_size: msg.payload_len(),
+                    protocol: "tcp",
                     topic: msg.topic(),
                     partition: msg.partition(),
                 });
