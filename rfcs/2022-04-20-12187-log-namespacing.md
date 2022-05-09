@@ -130,7 +130,7 @@ event
 
 ```json
 {
-  "content": {
+  "message": {
     "derivative": -2.266778047142367e+125,
     "integral": "13028769352377685187",
     "mineral": "H 9 ",
@@ -168,7 +168,7 @@ event
 
 ```json
 {
-  "content": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
+  "message": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
   "ddsource": "waters",
   "ddtags": "env:prod",
   "hostname": "beta",
