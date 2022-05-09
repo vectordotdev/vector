@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use ::value::Value;
 use compiler::{state, Resolved};
@@ -30,6 +30,34 @@ extern "C" {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "simple",
+        target: "{}",
+        program: indoc! {r#"
+            .hostname = "vector"
+            if .status == "warning" {
+                .thing = upcase(.hostname)
+            } else if .status == "notice" {
+                .thung = downcase(.hostname)
+            } else {
+                .nong = upcase(.hostname)
+            }
+        "#},
+    },
+    Source {
+        name: "11",
+        target: "{}",
+        program: indoc! {r#"
+            .hostname = "vector"
+            if .status == "warning" {
+                .thing = upcase(.hostname)
+            } else if .status == "notice" {
+                .thung = downcase(.hostname)
+            } else {
+                .nong = upcase(.hostname)
+            }
+        "#},
+    },
+    Source {
         name: "10",
         target: "{}",
         program: indoc! {r#"
@@ -57,54 +85,32 @@ static SOURCES: &[Source] = &[
         name: "7",
         target: "{}",
         program: indoc! {r#"
-            uuid_v4()
+            .foo == "hi"
         "#},
     },
     Source {
         name: "6",
         target: "{}",
         program: indoc! {r#"
-            .hostname = "vector"
-
-            if .status == "warning" {
-                .thing = upcase(.hostname)
-            } else if .status == "notice" {
-                .thung = downcase(.hostname)
-            } else {
-                .nong = upcase(.hostname)
-            }
+            derp = "hi!"
         "#},
     },
     Source {
         name: "5",
         target: "{}",
         program: indoc! {r#"
-            .foo == "hi"
+            .derp = "hi!"
         "#},
     },
     Source {
         name: "4",
         target: "{}",
         program: indoc! {r#"
-            derp = "hi!"
-        "#},
-    },
-    Source {
-        name: "3",
-        target: "{}",
-        program: indoc! {r#"
-            .derp = "hi!"
-        "#},
-    },
-    Source {
-        name: "2",
-        target: "{}",
-        program: indoc! {r#"
             .derp
         "#},
     },
     Source {
-        name: "1",
+        name: "3",
         target: "{}",
         program: indoc! {r#"
             .
@@ -166,6 +172,13 @@ static SOURCES: &[Source] = &[
                 del(.kubernetes.pod_uid)
                 del(.kubernetes.pod_labels.app)
             }
+        "#},
+    },
+    Source {
+        name: "0",
+        target: "{}",
+        program: indoc! {r#"
+            uuid_v4()
         "#},
     },
     Source {
@@ -269,8 +282,11 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
             .unwrap();
         let builder = compiler::llvm::Compiler::new().unwrap();
         println!("bench 1");
+        let mut symbols = HashMap::new();
+        symbols.insert("vrl_fn_upcase", upcase as usize);
+        symbols.insert("vrl_fn_downcase", downcase as usize);
         let library = builder
-            .compile((&local_env, &external_env), &program)
+            .compile((&local_env, &external_env), &program, symbols)
             .unwrap();
         println!("bench 2");
         let execute = library.get_function().unwrap();

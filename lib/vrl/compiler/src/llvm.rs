@@ -36,6 +36,7 @@ impl Compiler {
         self,
         state: (&LocalEnv, &ExternalEnv),
         program: &Program,
+        mut symbols: HashMap<&'static str, usize>,
     ) -> Result<Library<'a>, String> {
         let context = self.0.context();
         let buffer =
@@ -121,9 +122,9 @@ impl Compiler {
             .add_module(&dylib, self.0.create_module(context.consume()))
             .unwrap();
 
-        let definition_generator = Box::new(DefinitionGenerator {
-            symbols: precompiled::symbols(),
-        });
+        symbols.extend(precompiled::symbols().iter());
+
+        let definition_generator = Box::new(DefinitionGenerator { symbols });
 
         Ok(Library::new(self.0, lljit, definition_generator))
     }
@@ -388,6 +389,8 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
             &[SymbolGenericFlag::Exported, SymbolGenericFlag::Callable],
             0,
         );
+
+        std::mem::forget(symbol_entry.clone());
 
         let symbol = EvaluatedSymbol::new(address as _, flags);
         let symbols = SymbolMapPairs::from_iter([(symbol_entry, symbol)]);
