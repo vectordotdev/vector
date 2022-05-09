@@ -1,4 +1,5 @@
 use diagnostic::DiagnosticMessage;
+use parser::ast::Ident;
 
 use crate::{
     expression::{Expr, FunctionArgument},
@@ -7,6 +8,8 @@ use crate::{
     ExpressionError, Function, Parameter, Value,
 };
 use std::{any::Any, collections::BTreeMap};
+
+use super::Vm;
 
 pub enum VmArgument<'a> {
     Value(Value),
@@ -42,11 +45,16 @@ impl<'a> VmArgument<'a> {
 pub struct VmArgumentList<'a> {
     args: &'static [Parameter],
     values: Vec<Option<VmArgument<'a>>>,
+    closure: Option<&'a VmFunctionClosure>,
 }
 
 impl<'a> VmArgumentList<'a> {
     pub fn new(args: &'static [Parameter], values: Vec<Option<VmArgument<'a>>>) -> Self {
-        Self { args, values }
+        Self {
+            args,
+            values,
+            closure: None,
+        }
     }
 
     fn argument_pos(&self, name: &str) -> usize {
@@ -100,6 +108,16 @@ impl<'a> VmArgumentList<'a> {
         self.values[pos].take().map(|v| v.into_any())
     }
 
+    /// Get closure parameter.
+    pub fn closure(&mut self) -> &VmFunctionClosure {
+        self.closure.take().unwrap()
+    }
+
+    /// Add closure to argument list.
+    pub fn set_closure(&mut self, closure: &'a VmFunctionClosure) {
+        self.closure = Some(closure);
+    }
+
     /// Validates the arguments are correct.
     pub fn check_arguments(&self) -> Result<(), ExpressionError> {
         for (param, args) in self.args.iter().zip(self.values.iter()) {
@@ -117,6 +135,21 @@ impl<'a> VmArgumentList<'a> {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct VmFunctionClosure {
+    pub variables: Vec<Ident>,
+    pub vm: Vm,
+}
+
+impl VmFunctionClosure {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, vm: Vm) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            vm,
+        }
     }
 }
 
@@ -188,5 +221,6 @@ where
     VmArgumentList {
         args: params,
         values,
+        closure: None,
     }
 }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -140,6 +141,13 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
         builder.sleep_impl(sleep_impl)
     }
 
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
+    }
+
     fn client_from_conf_conn(
         builder: Self::ConfigBuilder,
         connector: DynConnector,
@@ -174,7 +182,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {
@@ -192,7 +200,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

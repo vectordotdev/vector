@@ -138,6 +138,36 @@ impl TlsSettings {
         })
     }
 
+    #[cfg(feature = "sources-gcp_pubsub")]
+    pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
+        self.identity().map(|identity| {
+            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
+            if let Some(chain) = identity.chain {
+                for authority in chain {
+                    cert.extend(
+                        authority
+                            .to_pem()
+                            .expect("Invalid stored identity chain certificate"),
+                    );
+                }
+            }
+            let key = identity
+                .pkey
+                .private_key_to_pem_pkcs8()
+                .expect("Invalid stored private key");
+            (cert, key)
+        })
+    }
+
+    #[cfg(feature = "sources-gcp_pubsub")]
+    pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
+        self.authorities.iter().map(|authority| {
+            authority
+                .to_pem()
+                .expect("Invalid stored authority certificate")
+        })
+    }
+
     pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT

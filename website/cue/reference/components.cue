@@ -558,6 +558,24 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
+			_gcp_api_key: {
+				common:      false
+				description: "A [Google Cloud API key](\(urls.gcp_authentication_api_key)) used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				}
+			}
+			_gcp_credentials_path: {
+				common:      true
+				description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["/path/to/credentials.json"]
+				}
+			}
 			_source_acknowledgements: {
 				common:      true
 				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
