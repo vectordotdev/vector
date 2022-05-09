@@ -209,7 +209,7 @@ impl From<event::TraceEvent> for Trace {
 
 impl From<event::LogEvent> for WithMetadata<Log> {
     fn from(log_event: event::LogEvent) -> Self {
-        let (fields, metadata) = log_event.into_parts();
+        let (fields, metadata) = log_event.into_parts_deprecated();
         let fields = fields
             .into_iter()
             .map(|(k, v)| (k, encode_value(v)))

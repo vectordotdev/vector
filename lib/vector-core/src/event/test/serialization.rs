@@ -46,7 +46,7 @@ fn eventarray_can_go_from_raw_prost_to_encodable_and_vice_versa() {
         "key2" => "value2",
         "key3" => "value3",
     };
-    let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+    let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
     let events = EventArray::from(event);
 
     // First test: raw Prost encode -> `Encodable::decode`.
@@ -92,7 +92,7 @@ fn event_can_go_from_raw_prost_to_eventarray_encodable() {
         "key2" => "value2",
         "key3" => "value3",
     };
-    let event: Event = LogEvent::from_parts(event_fields, EventMetadata::default()).into();
+    let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
 
     let mut encode_buf = BytesMut::with_capacity(4096);
     proto::EventWrapper::from(event.clone())

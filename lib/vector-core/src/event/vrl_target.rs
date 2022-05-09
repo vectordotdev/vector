@@ -33,7 +33,7 @@ impl VrlTarget {
     pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
             Event::Log(event) => {
-                let (fields, metadata) = event.into_parts();
+                let (fields, metadata) = event.into_parts_deprecated();
                 VrlTarget::LogEvent(Value::Object(fields), metadata)
             }
             Event::Metric(metric) => {
@@ -546,10 +546,10 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
 // * If `.` is anything else, assign to the `message` key.
 fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
     match value {
-        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
+        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_map(object, metadata)))
             as Box<dyn Iterator<Item = LogEvent>>,
         Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Object(object) => LogEvent::from_parts(object, metadata.clone()),
+            Value::Object(object) => LogEvent::from_map(object, metadata.clone()),
             v => {
                 let mut log = LogEvent::new_with_metadata(metadata.clone());
                 log.insert(log_schema().message_key(), v);
@@ -922,7 +922,7 @@ mod test {
                 target.into_events().collect::<Vec<_>>(),
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }

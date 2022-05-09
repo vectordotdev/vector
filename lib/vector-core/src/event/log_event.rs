@@ -82,10 +82,10 @@ impl Default for Inner {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Inner {
-    fn from(fields: BTreeMap<String, Value>) -> Self {
+impl From<Value> for Inner {
+    fn from(value: Value) -> Self {
         Self {
-            fields: Value::Object(fields),
+            fields: value,
             size_cache: Default::default(),
         }
     }
@@ -143,9 +143,17 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` into a tuple of its components
-    pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let inner = Arc::new(Inner::from(map));
+    ///  Create a `LogEvent` from a Value and EventMetadata
+    pub fn from_parts(value: Value, metadata: EventMetadata) -> Self {
+        Self {
+            inner: Arc::new(value.into()),
+            metadata,
+        }
+    }
+
+    ///  Create a `LogEvent` from a BTreeMap and EventMetadata
+    pub fn from_map(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+        let inner = Arc::new(Inner::from(Value::Object(map)));
         Self { inner, metadata }
     }
 
@@ -162,7 +170,7 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts_deprecated(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
         self.fields_mut();
         (
             Arc::try_unwrap(self.inner)
@@ -172,6 +180,21 @@ impl LogEvent {
                 .unwrap_or_else(|| unreachable!("inner fields must be a map")),
             self.metadata,
         )
+    }
+
+    /// Convert a `LogEvent` into a tuple of its components
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
+    pub fn into_parts(mut self) -> (Value, EventMetadata) {
+        self.fields_mut();
+
+        let value = Arc::try_unwrap(self.inner)
+            .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
+            .fields;
+        let metadata = self.metadata;
+        (value, metadata)
     }
 
     #[must_use]
@@ -374,34 +397,20 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            inner: Arc::new(Inner::from(map)),
+            inner: Arc::new(Inner::from(Value::Object(map))),
             metadata: EventMetadata::default(),
         }
-    }
-}
-
-impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        event.into_parts().0
     }
 }
 
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            inner: Arc::new(Inner::from(map.into_iter().collect::<BTreeMap<_, _>>())),
+            inner: Arc::new(Inner::from(Value::Object(
+                map.into_iter().collect::<BTreeMap<_, _>>(),
+            ))),
             metadata: EventMetadata::default(),
         }
-    }
-}
-
-impl<S> From<LogEvent> for HashMap<String, Value, S>
-where
-    S: std::hash::BuildHasher + Default,
-{
-    fn from(event: LogEvent) -> HashMap<String, Value, S> {
-        let fields: BTreeMap<_, _> = event.into();
-        fields.into_iter().collect()
     }
 }
 
@@ -539,86 +548,89 @@ impl tracing::field::Visit for MakeLogEvent {
 mod test {
     use super::*;
     use crate::test_util::open_fixture;
+    use vrl_lib::value;
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.
     #[test]
     fn rename_key_flat_equiv_exists() {
-        let mut fields = BTreeMap::new();
-        fields.insert("one".to_string(), Value::Integer(1_i64));
-        fields.insert("two".to_string(), Value::Integer(2_i64));
-        let expected_fields = fields.clone();
+        let value = value!({
+            one: 1,
+            two: 2
+        });
 
-        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
         base.rename_key_flat("one", "one");
         let (actual_fields, _) = base.into_parts();
 
-        assert_eq!(expected_fields, actual_fields);
+        assert_eq!(value, actual_fields);
     }
     #[test]
     fn rename_key_flat_equiv_not_exists() {
-        let mut fields = BTreeMap::new();
-        fields.insert("one".to_string(), Value::Integer(1_i64));
-        fields.insert("two".to_string(), Value::Integer(2_i64));
-        let expected_fields = fields.clone();
+        let value = value!({
+            one: 1,
+            two: 2
+        });
 
-        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
         base.rename_key_flat("three", "three");
         let (actual_fields, _) = base.into_parts();
 
-        assert_eq!(expected_fields, actual_fields);
+        assert_eq!(value, actual_fields);
     }
     // Assert that renaming a key has no effect if the key does not originally
     // exist in the log, when the to -> from keys are not identical.
     #[test]
     fn rename_key_flat_not_exists() {
-        let mut fields = BTreeMap::new();
-        fields.insert("one".to_string(), Value::Integer(1_i64));
-        fields.insert("two".to_string(), Value::Integer(2_i64));
-        let expected_fields = fields.clone();
+        let value = value!({
+            one: 1,
+            two: 2
+        });
 
-        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
         base.rename_key_flat("three", "four");
         let (actual_fields, _) = base.into_parts();
 
-        assert_eq!(expected_fields, actual_fields);
+        assert_eq!(value, actual_fields);
     }
     // Assert that renaming a key has the effect of moving the value from one
     // key name to another if the key exists.
     #[test]
     fn rename_key_flat_no_overlap() {
-        let mut fields = BTreeMap::new();
-        fields.insert("one".to_string(), Value::Integer(1_i64));
-        fields.insert("two".to_string(), Value::Integer(2_i64));
+        let value = value!({
+            one: 1,
+            two: 2
+        });
 
-        let mut expected_fields = fields.clone();
-        let val = expected_fields.remove("one").unwrap();
-        expected_fields.insert("three".to_string(), val);
+        let mut expected_value = value.clone();
+        let val = expected_value.remove("one", true).unwrap().unwrap();
+        expected_value.insert("three", val).unwrap();
 
-        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key_flat("one", "three");
         let (actual_fields, _) = base.into_parts();
 
-        assert_eq!(expected_fields, actual_fields);
+        assert_eq!(expected_value, actual_fields);
     }
     // Assert that renaming a key has the effect of moving the value from one
     // key name to another if the key exists and will overwrite another key if
     // it exists.
     #[test]
     fn rename_key_flat_overlap() {
-        let mut fields = BTreeMap::new();
-        fields.insert("one".to_string(), Value::Integer(1_i64));
-        fields.insert("two".to_string(), Value::Integer(2_i64));
+        let value = value!({
+            one: 1,
+            two: 2
+        });
 
-        let mut expected_fields = fields.clone();
-        let val = expected_fields.remove("one").unwrap();
-        expected_fields.insert("two".to_string(), val);
+        let mut expected_value = value.clone();
+        let val = expected_value.remove("one", true).unwrap().unwrap();
+        expected_value.insert("two".to_string(), val);
 
-        let mut base = LogEvent::from_parts(fields, EventMetadata::default());
+        let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key_flat("one", "two");
-        let (actual_fields, _) = base.into_parts();
+        let (actual_value, _) = base.into_parts();
 
-        assert_eq!(expected_fields, actual_fields);
+        assert_eq!(expected_value, actual_value);
     }
 
     #[test]

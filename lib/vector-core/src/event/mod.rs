@@ -247,7 +247,7 @@ impl Event {
     /// Destroy the event and return the metadata.
     pub fn into_metadata(self) -> EventMetadata {
         match self {
-            Self::Log(log) => log.into_parts().1,
+            Self::Log(log) => log.into_parts_deprecated().1,
             Self::Metric(metric) => metric.into_parts().2,
             Self::Trace(trace) => trace.into_parts().1,
         }

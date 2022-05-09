@@ -17,11 +17,11 @@ pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
-        self.0.into_parts()
+        self.0.into_parts_deprecated()
     }
 
     pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        Self(LogEvent::from_parts(fields, metadata))
+        Self(LogEvent::from_map(fields, metadata))
     }
 
     pub fn metadata(&self) -> &EventMetadata {

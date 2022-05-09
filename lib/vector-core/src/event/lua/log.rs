@@ -5,7 +5,7 @@ use crate::event::{LogEvent, Value};
 impl<'a> ToLua<'a> for LogEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
-        let (fields, _metadata) = self.into_parts();
+        let (fields, _metadata) = self.into_parts_deprecated();
         // The metadata is handled when converting the enclosing `Event`.
         lua.create_table_from(fields).map(LuaValue::Table)
     }
