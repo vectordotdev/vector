@@ -135,7 +135,6 @@ async fn smoke() {
     );
     assert_eq!(parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-
     let mut decoded_payload = dd_proto::AgentPayload::decode(body).unwrap();
     assert_eq!(decoded_payload.tracer_payloads.len(), 1);
     assert_eq!(decoded_payload.host_name, "a_host");
