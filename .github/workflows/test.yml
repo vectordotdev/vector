@@ -350,7 +350,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - changes
       - cross-linux
       - test-misc
