@@ -51,7 +51,7 @@ impl Function for MatchDatadogQuery {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let query_value = arguments.required_literal("query")?.as_value().unwrap();
+        let query_value = arguments.required_literal("query")?.to_value();
 
         // Query should always be a string.
         let query = query_value

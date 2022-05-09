@@ -113,8 +113,7 @@ impl Function for ParseGrok {
 
         let pattern = arguments
             .required_literal("pattern")?
-            .as_value()
-            .unwrap()
+            .to_value()
             .try_bytes_utf8_lossy()
             .expect("grok pattern not bytes")
             .into_owned();

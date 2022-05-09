@@ -25,15 +25,17 @@ pub enum Literal {
     Null,
 }
 
-impl Expression for Literal {
-    fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(self.as_value().unwrap())
-    }
-
-    fn as_value(&self) -> Option<Value> {
+impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
+    pub fn to_value(&self) -> Value {
         use Literal::*;
 
-        let value = match self {
+        match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
@@ -41,9 +43,17 @@ impl Expression for Literal {
             Regex(v) => Value::Regex(v.clone()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
-        };
+        }
+    }
+}
 
-        Some(value)
+impl Expression for Literal {
+    fn resolve(&self, _: &mut Context) -> Resolved {
+        Ok(self.to_value())
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        Some(self.to_value())
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -68,7 +78,7 @@ impl Expression for Literal {
         _state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
         // Add the literal as a constant.
-        let constant = vm.add_constant(self.as_value().unwrap());
+        let constant = vm.add_constant(self.to_value());
         vm.write_opcode(OpCode::Constant);
         vm.write_primitive(constant);
         Ok(())

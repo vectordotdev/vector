@@ -161,7 +161,7 @@ impl TryFrom<Expr> for Value {
     fn try_from(expr: Expr) -> Result<Self, Self::Error> {
         match expr {
             #[cfg(feature = "expr-literal")]
-            Expr::Literal(literal) => Ok(literal.as_value().unwrap()),
+            Expr::Literal(literal) => Ok(literal.to_value()),
             Expr::Container(Container {
                 variant: Variant::Object(object),
             }) => Ok(Value::Object(

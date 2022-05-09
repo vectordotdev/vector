@@ -60,8 +60,7 @@ impl Function for SetSemanticMeaning {
 
         let meaning = arguments
             .required_literal("meaning")?
-            .as_value()
-            .unwrap()
+            .to_value()
             .try_bytes_utf8_lossy()
             .expect("meaning not bytes")
             .into_owned();
