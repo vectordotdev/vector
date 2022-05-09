@@ -713,16 +713,18 @@ mod urlencoded_string {
         serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
             let decoded = if s.iter().any(|c| *c == b'+') {
                 // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
-                let s = s.iter().map(|c| if *c == b'+' { b' ' } else { *c }).collect::<Vec<_>>();
+                let s = s
+                    .iter()
+                    .map(|c| if *c == b'+' { b' ' } else { *c })
+                    .collect::<Vec<_>>();
                 percent_decode(&s).decode_utf8().map(Into::into)
             } else {
                 percent_decode(s).decode_utf8().map(Into::into)
             };
 
-            decoded
-                .map_err(|err| {
-                    D::Error::custom(format!("error url decoding S3 object key: {}", err))
-                })
+            decoded.map_err(|err| {
+                D::Error::custom(format!("error url decoding S3 object key: {}", err))
+            })
         })
     }
 
