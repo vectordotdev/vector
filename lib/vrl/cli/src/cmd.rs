@@ -121,9 +121,10 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let (program, warnings) = vrl::compile(&source, &stdlib::all(), vrl::Options::default())
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {

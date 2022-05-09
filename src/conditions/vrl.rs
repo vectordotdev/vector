@@ -53,12 +53,20 @@ impl ConditionConfig for VrlConfig {
         let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(enrichment_tables.clone());
 
-        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
-            .map_err(|diagnostics| {
-                Formatter::new(&self.source, diagnostics)
-                    .colored()
-                    .to_string()
-            })?;
+        let options = vrl::Options {
+            // The return value of the program is used to determime the outcome
+            // of the condition, so it's important this value is returned as-is.
+            void_return: false,
+        };
+
+        let (program, warnings) =
+            vrl::compile_with_state(&self.source, &functions, options, &mut state).map_err(
+                |diagnostics| {
+                    Formatter::new(&self.source, diagnostics)
+                        .colored()
+                        .to_string()
+                },
+            )?;
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();

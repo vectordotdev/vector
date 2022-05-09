@@ -79,7 +79,15 @@ impl RemapConfig {
         let mut state = vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.into());
         state.set_external_context(enrichment_tables);
 
-        vrl::compile_with_state(&source, &functions, &mut state)
+        let options = vrl::Options {
+            // We do not care about the return `Value` of a VRL program in this
+            // transform (we only care about the mutated `Event`), so we allow
+            // the compiler to perform optimizations which might change the
+            // final return value.
+            void_return: true,
+        };
+
+        vrl::compile_with_state(&source, &functions, options, &mut state)
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()

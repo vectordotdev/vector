@@ -4,15 +4,19 @@ use parser::ast::{self, Node};
 
 use crate::{
     expression::*,
+    // optimizer::optimize,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program,
+    Function,
+    Options,
+    Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
 
 pub(crate) struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
+    options: Options,
     diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
@@ -22,9 +26,10 @@ pub(crate) struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(super) fn new(fns: &'a [Box<dyn Function>]) -> Self {
+    pub(super) fn new(fns: &'a [Box<dyn Function>], options: Options) -> Self {
         Self {
             fns,
+            options,
             diagnostics: vec![],
             fallible: false,
             abortable: false,
@@ -38,7 +43,7 @@ impl<'a> Compiler<'a> {
     ///
     /// This should only be used for its intended purpose.
     pub(super) fn new_with_local_state(fns: &'a [Box<dyn Function>], local: LocalEnv) -> Self {
-        let mut compiler = Self::new(fns);
+        let mut compiler = Self::new(fns, Options::default());
         compiler.local = local;
         compiler
     }
@@ -57,7 +62,10 @@ impl<'a> Compiler<'a> {
             .map(|(i, expr)| {
                 // For all root expressions, except the last one, the result value
                 // is voided.
-                if i < expression_count {
+                //
+                // If `void_return` is configured by the caller, the last
+                // expression is also allowed to void its value.
+                if i < expression_count - 1 || self.options.void_return {
                     Box::new(VoidExpr(expr)) as _
                 } else {
                     Box::new(expr) as _

@@ -90,6 +90,15 @@ impl Expression for VoidExpr {
     }
 
     #[inline(always)]
+    fn compile_to_vm(
+        &self,
+        vm: &mut vm::Vm,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+    ) -> Result<(), String> {
+        self.0.compile_to_vm(vm, state)
+    }
+
+    #[inline(always)]
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.0.type_def(state)
     }

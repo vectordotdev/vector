@@ -72,10 +72,28 @@ impl Display for VrlRuntime {
     }
 }
 
+pub struct Options {
+    /// If set to `true`, the compiler is allowed to void the return value of
+    /// the  final expression.
+    ///
+    /// This can improve runtime performance in situations where the caller of
+    /// the program has no interest in the return value of the program.
+    ///
+    /// Defaults to `false`.
+    pub void_return: bool,
+}
+
+#[allow(clippy::derivable_impls /* be explicit */)]
+impl Default for Options {
+    fn default() -> Self {
+        Self { void_return: false }
+    }
+}
+
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
-pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
+pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>], options: Options) -> Result {
     let mut external = ExternalEnv::default();
-    compile_with_state(ast, fns, &mut external)
+    compile_with_state(ast, fns, options, &mut external)
 }
 
 pub fn compile_for_repl(
@@ -99,9 +117,10 @@ pub fn compile_for_repl(
 pub fn compile_with_state(
     ast: parser::Program,
     fns: &[Box<dyn Function>],
+    options: Options,
     state: &mut ExternalEnv,
 ) -> Result {
-    compiler::Compiler::new(fns).compile(ast, state)
+    compiler::Compiler::new(fns, options).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.
