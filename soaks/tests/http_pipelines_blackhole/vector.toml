@@ -111,13 +111,13 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
@@ -1457,13 +1457,13 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
@@ -2767,13 +2767,13 @@ if .custom.http.useragent == null {
 del(.custom.data.user_agent)
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
@@ -3251,13 +3251,13 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
@@ -3534,13 +3534,13 @@ if (err == null) {
 }
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
@@ -3972,13 +3972,13 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 }
 '''
 
-[[transforms.processing.logs.transforms]]
-type = "remap"
-source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
-  .custom.http.useragent_details = details
-}
-'''
+# [[transforms.processing.logs.transforms]]
+# type = "remap"
+# source = '''
+# if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+#   .custom.http.useragent_details = details
+# }
+# '''
 
 [[transforms.processing.logs.transforms]]
 type = "remap"
