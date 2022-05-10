@@ -5754,7 +5754,7 @@ dependencies = [
  "nom 7.1.1",
  "num_enum",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "snafu",
  "vector_common",
@@ -5832,9 +5832,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "120fbe7988713f39d780a58cf1a7ef0d7ef66c6d87e5aa3438940c05357929f4"
+checksum = "65a1118354442de7feb8a2a76f3d80ef01426bd45542c8c1fdffca41a758f846"
 dependencies = [
  "bytes 1.1.0",
  "cfg-if 1.0.0",
@@ -7893,7 +7893,7 @@ checksum = "d9263bf4c9bfaae7317c1c2faf7f18491d2fe476f70c414b73bf5d445b00ffa1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "quote",
  "syn",
 ]
@@ -8663,7 +8663,7 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "pulsar",
  "quickcheck",
@@ -8903,7 +8903,7 @@ dependencies = [
  "pretty_assertions",
  "proptest",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "quickcheck",
  "rand 0.8.5",
