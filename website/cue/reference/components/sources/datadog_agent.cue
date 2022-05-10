@@ -99,8 +99,8 @@ components: sources: datadog_agent: {
 			type: string: {
 				default: "v1v2"
 				enum: {
-					v1: "Only support traces coming from older Datadog trace-agent (before v7.33)"
-					v2: "Only support traces coming from newer Datadog trace-agent (v7.33 and after)"
+					v1:   "Only support traces coming from older Datadog trace-agent (before v7.33)"
+					v2:   "Only support traces coming from newer Datadog trace-agent (v7.33 and after)"
 					v1v2: "Support both newer and older forma."
 				}
 			}
