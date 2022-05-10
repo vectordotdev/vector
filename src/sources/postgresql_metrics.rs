@@ -30,8 +30,8 @@ use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
-        PostgresqlMetricsCollectError, StreamClosedError,
+        CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
+        StreamClosedError,
     },
 };
 
@@ -158,7 +158,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
                 let count = metrics.len();
-                emit!(PostgresqlMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });

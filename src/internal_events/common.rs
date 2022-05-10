@@ -148,3 +148,17 @@ impl InternalEvent for RequestCompleted {
         histogram!("request_duration_seconds", self.end - self.start);
     }
 }
+
+#[derive(Debug)]
+pub struct CollectionCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for CollectionCompleted {
+    fn emit(self) {
+        debug!(message = "Collection completed.");
+        counter!("collect_completed_total", 1);
+        histogram!("collect_duration_seconds", self.end - self.start);
+    }
+}
