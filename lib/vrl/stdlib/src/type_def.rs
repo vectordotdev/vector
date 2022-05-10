@@ -4,12 +4,18 @@ use vrl::prelude::TypeDef as VrlTypeDef;
 
 fn type_def(type_def: &VrlTypeDef) -> Resolved {
     let mut tree = type_def.kind().debug_info();
+
     if type_def.is_fallible() {
-        tree.insert("fallible".to_owned(), Value::Boolean(true));
+        tree.insert("fallible".to_owned(), true.into());
     }
-    Ok(Value::Object(tree))
+
+    Ok(tree.into())
 }
 
+/// A debug function to print the type definition of an expression at runtime.
+///
+/// This function is *UNDOCUMENTED* and *UNSTABLE*. It is *NOT* to be advertised
+/// to users of Vector, even though it is technically useable by others.
 #[derive(Clone, Copy, Debug)]
 pub struct TypeDef;
 
@@ -27,7 +33,11 @@ impl Function for TypeDef {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[]
+        &[Example {
+            title: "return type definition",
+            source: r#"type_def(42)"#,
+            result: Ok(r#"{ "integer": true }"#),
+        }]
     }
 
     fn compile(
@@ -37,15 +47,13 @@ impl Function for TypeDef {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(TypeDefFn {
-            type_def: value.type_def((&*state.0, &*state.1)),
-        }))
+        let type_def = value.type_def((&*state.0, &*state.1));
+
+        Ok(Box::new(TypeDefFn { type_def }))
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Ok(Value::from(
-            "Unimplemented. Switch to the AST runtime to use this function.",
-        ))
+        Err("function not supported in VM runtime.".into())
     }
 }
 
