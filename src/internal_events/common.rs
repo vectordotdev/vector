@@ -1,5 +1,7 @@
+use std::time::Instant;
+
 use super::prelude::{error_stage, error_type};
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
@@ -130,5 +132,19 @@ pub struct FieldOverwritten<'a> {
 impl<'a> InternalEvent for FieldOverwritten<'a> {
     fn emit(self) {
         debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
+    }
+}
+
+#[derive(Debug)]
+pub struct RequestCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for RequestCompleted {
+    fn emit(self) {
+        debug!(message = "Request completed.");
+        counter!("requests_completed_total", 1);
+        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
