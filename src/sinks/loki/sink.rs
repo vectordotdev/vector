@@ -1,8 +1,8 @@
-use once_cell::sync::Lazy;
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use vector_common::encode_logfmt;

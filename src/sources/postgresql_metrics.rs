@@ -931,13 +931,10 @@ mod tests {
 
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{
-        event::Event,
-        test_util::components::{assert_source_compliance, PULL_SOURCE_TAGS},
-        tls, SourceSender,
-    };
     use std::path::PathBuf;
+
+    use super::*;
+    use crate::{event::Event, test_util::trace_init, tls, SourceSender};
 
     fn pg_host() -> String {
         std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())

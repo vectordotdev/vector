@@ -1,8 +1,9 @@
+use std::str::FromStr;
+
 use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]

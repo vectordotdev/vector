@@ -4,6 +4,9 @@
 pub mod format;
 pub mod framing;
 
+use std::fmt::Debug;
+
+use bytes::BytesMut;
 pub use format::{
     JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
     NativeSerializer, NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
@@ -13,10 +16,7 @@ pub use framing::{
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
     LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
-
-use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while encoding structured events into byte frames.

@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn ipv6_to_ipv4(value: Value) -> Resolved {

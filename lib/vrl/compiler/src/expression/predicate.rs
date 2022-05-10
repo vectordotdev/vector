@@ -1,6 +1,7 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use value::Value;
 
 use crate::{
     compiler::Diagnostics,
@@ -8,7 +9,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;

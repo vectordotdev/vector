@@ -1,9 +1,10 @@
+use std::time::Duration;
+
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change

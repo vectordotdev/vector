@@ -5,7 +5,6 @@ use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::codecs::Encoder;
 use crate::event::Event;
 use crate::sinks::util::{

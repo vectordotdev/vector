@@ -1,10 +1,11 @@
+use std::time::Duration;
+
 use bytes::{BufMut, BytesMut};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
     Throughput,
 };
-use std::time::Duration;
 use tokio_util::codec::Encoder;
 use vector::event::Event;
 use vector_common::{btreemap, byte_size_of::ByteSizeOf};

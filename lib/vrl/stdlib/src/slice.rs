@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {

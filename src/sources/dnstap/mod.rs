@@ -232,9 +232,10 @@ impl FrameHandler for DnstapFrameHandler {
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
 
+    use std::{env, path::Path};
+
     use bollard::exec::{CreateExecOptions, StartExecOptions};
     use bollard::Docker;
-
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;

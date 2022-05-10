@@ -1,5 +1,9 @@
-use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{http::HttpClient, sinks::util::Compression};
+use std::{
+    fmt::Debug,
+    sync::Arc,
+    task::{Context, Poll},
+};
+
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
@@ -7,11 +11,6 @@ use http::{
     Request,
 };
 use hyper::Body;
-use std::{
-    fmt::Debug,
-    sync::Arc,
-    task::{Context, Poll},
-};
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{
@@ -20,6 +19,9 @@ use vector_core::{
     internal_event::EventsSent,
     stream::DriverResponse,
 };
+
+use super::{NewRelicCredentials, NewRelicSinkError};
+use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {

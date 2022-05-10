@@ -11,18 +11,17 @@ use std::{
 };
 
 use config_builder::ConfigBuilderLoader;
+pub use config_builder::*;
+use glob::glob;
 use loader::process::Process;
+pub use loader::*;
+use once_cell::sync::Lazy;
+pub use source::*;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
-use glob::glob;
-use once_cell::sync::Lazy;
-
-pub use config_builder::*;
-pub use loader::*;
-pub use source::*;
 
 pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
 

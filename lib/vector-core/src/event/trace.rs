@@ -1,7 +1,7 @@
-use lookup::LookupBuf;
-use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
+use lookup::LookupBuf;
+use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 

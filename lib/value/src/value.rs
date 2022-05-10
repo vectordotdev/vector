@@ -19,6 +19,7 @@ mod serde;
 #[cfg(feature = "toml")]
 mod toml;
 
+use std::result::Result as StdResult;
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -28,14 +29,13 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 use error::ValueError;
+pub use iter::IterItem;
 use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
-use std::result::Result as StdResult;
 use tracing::{instrument, trace, trace_span};
 
 pub use crate::value::regex::ValueRegex;
-pub use iter::IterItem;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;

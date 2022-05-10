@@ -2,6 +2,24 @@
 mod tests;
 mod unit_test_components;
 
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+use futures_util::{stream::FuturesUnordered, StreamExt};
+use indexmap::IndexMap;
+use ordered_float::NotNan;
+use tokio::sync::{
+    oneshot::{self, Receiver},
+    Mutex,
+};
+use uuid::Uuid;
+
+use self::unit_test_components::{
+    UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
+};
+use super::{compiler::expand_globs, graph::Graph, OutputId};
 use crate::{
     conditions::Condition,
     config::{
@@ -16,24 +34,6 @@ use crate::{
         builder::{self, Pieces},
     },
 };
-use futures_util::{stream::FuturesUnordered, StreamExt};
-use indexmap::IndexMap;
-use ordered_float::NotNan;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-use tokio::sync::{
-    oneshot::{self, Receiver},
-    Mutex,
-};
-use uuid::Uuid;
-
-use self::unit_test_components::{
-    UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
-};
-
-use super::{compiler::expand_globs, graph::Graph, OutputId};
 
 pub struct UnitTest {
     pub name: String,

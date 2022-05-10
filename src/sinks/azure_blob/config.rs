@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::{
     codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},

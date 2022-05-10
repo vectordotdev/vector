@@ -5,11 +5,11 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
-    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
 
+    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::{
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,

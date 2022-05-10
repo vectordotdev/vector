@@ -23,7 +23,7 @@ pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
     numeric_groups: bool,
-) -> std::collections::BTreeMap<String, vrl::Value> {
+) -> std::collections::BTreeMap<String, ::value::Value> {
     let names = regex.capture_names().flatten().map(|name| {
         (
             name.to_owned(),
@@ -67,9 +67,9 @@ pub(crate) fn regex_kind(
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]
-pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
+pub(crate) fn is_nullish(value: &::value::Value) -> bool {
     match value {
-        vrl::Value::Bytes(v) => {
+        ::value::Value::Bytes(v) => {
             let s = &String::from_utf8_lossy(v)[..];
 
             match s {
@@ -77,7 +77,7 @@ pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
                 _ => s.chars().all(char::is_whitespace),
             }
         }
-        vrl::Value::Null => true,
+        ::value::Value::Null => true,
         _ => false,
     }
 }

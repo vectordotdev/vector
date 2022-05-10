@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn downcase(value: Value) -> Resolved {

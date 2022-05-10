@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::Kind;
-
-use super::Deserializer;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, Value},
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

@@ -375,9 +375,9 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Assignment>,
         external: &mut ExternalEnv,
     ) -> Assignment {
-        use crate::Value;
         use assignment::Variant;
         use ast::{Assignment::*, AssignmentOp};
+        use value::Value;
 
         let assignment = node.into_inner();
 

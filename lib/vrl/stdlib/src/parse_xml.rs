@@ -3,6 +3,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};

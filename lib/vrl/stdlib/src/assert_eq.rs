@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
