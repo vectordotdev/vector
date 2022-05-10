@@ -4,6 +4,7 @@ mod convert;
 mod display;
 mod error;
 mod iter;
+mod object;
 mod path;
 mod regex;
 mod target;
@@ -35,7 +36,10 @@ use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use ordered_float::NotNan;
 use tracing::{instrument, trace, trace_span};
 
-pub use crate::value::regex::ValueRegex;
+pub use crate::value::{
+    object::{Iter as ObjectIter, Object},
+    regex::ValueRegex,
+};
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -64,7 +68,7 @@ pub enum Value {
     Timestamp(DateTime<Utc>),
 
     /// Object.
-    Object(BTreeMap<String, Value>),
+    Object(Object<Value>),
 
     /// Array.
     Array(Vec<Value>),
@@ -252,10 +256,10 @@ impl Value {
                 *value = Self::Array(Vec::with_capacity(next_len.abs() as usize));
             }
             SegmentBuf::Field(_) if !matches!(value, Value::Object(_)) => {
-                *value = Self::Object(BTreeMap::default());
+                *value = Self::Object(Object::default());
             }
             SegmentBuf::Coalesce(_set) if !matches!(value, Value::Object(_)) => {
-                *value = Self::Object(BTreeMap::default());
+                *value = Self::Object(Object::default());
             }
             _ => (),
         }
@@ -285,7 +289,7 @@ impl Value {
                         Self::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
-                        Self::Object(BTreeMap::default())
+                        Self::Object(Object::default())
                     }
                 }
             })
@@ -384,7 +388,7 @@ impl Value {
                     name,
                     requires_quoting,
                 })) => {
-                    let mut inner = Self::Object(BTreeMap::default());
+                    let mut inner = Self::Object(Object::default());
                     let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                     let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                     retval = inner.insert(working_lookup, value).map_err(|mut e| {
@@ -408,7 +412,7 @@ impl Value {
                 Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
                     None => return Err(ValueError::EmptyCoalesceSubSegment),
                     Some(_) => {
-                        let mut inner = Self::Object(BTreeMap::default());
+                        let mut inner = Self::Object(Object::default());
                         let set = SegmentBuf::Coalesce(set.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let ValueError::PrimitiveDescent {

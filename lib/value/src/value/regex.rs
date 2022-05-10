@@ -1,5 +1,4 @@
-//! This was copied from VRL code, to make the Vector Value more similar to the VRL value.
-//! Both copies will eventually be merged when the value types are merged
+//! Regular expression.
 
 use std::cmp::Ordering;
 use std::{

@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use crate::{value::object::Object, value::regex::ValueRegex, Kind, Value};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-
-use crate::value::regex::ValueRegex;
-use crate::{Kind, Value};
 
 impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
@@ -18,10 +16,10 @@ impl Value {
         }
     }
 
-    /// Returns self as `BTreeMap<String, Value>`, only if self is `Value::Object`.
-    pub fn into_object(self) -> Option<BTreeMap<String, Self>> {
+    /// Returns self as `Object<Value>`, only if self is `Value::Object`.
+    pub fn into_object(self) -> Option<Object<Self>> {
         match self {
-            Value::Object(map) => Some(map),
+            Value::Object(obj) => Some(obj),
             _ => None,
         }
     }
@@ -315,7 +313,13 @@ impl From<f64> for Value {
 
 impl From<BTreeMap<String, Self>> for Value {
     fn from(value: BTreeMap<String, Self>) -> Self {
-        Self::Object(value)
+        Self::Object(Object::from(value.into_iter()))
+    }
+}
+
+impl From<Object<Self>> for Value {
+    fn from(object: Object<Self>) -> Self {
+        Self::Object(object)
     }
 }
 
@@ -327,7 +331,7 @@ impl FromIterator<Self> for Value {
 
 impl FromIterator<(String, Self)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Self)>>(iter: I) -> Self {
-        Self::Object(iter.into_iter().collect::<BTreeMap<String, Self>>())
+        Self::Object(iter.into_iter().collect::<Object<Self>>())
     }
 }
 
@@ -348,25 +352,32 @@ impl From<i64> for Value {
         Self::Integer(value)
     }
 }
-
 impl From<i32> for Value {
     fn from(value: i32) -> Self {
         Self::Integer(value as i64)
     }
 }
-
 impl From<i16> for Value {
     fn from(value: i16) -> Self {
         Self::Integer(value as i64)
     }
 }
-
 impl From<i8> for Value {
     fn from(value: i8) -> Self {
         Self::Integer(value as i64)
     }
 }
 
+impl From<u64> for Value {
+    fn from(value: u64) -> Self {
+        Self::Integer(value as i64)
+    }
+}
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Self::Integer(value as i64)
+    }
+}
 impl From<u16> for Value {
     fn from(value: u16) -> Self {
         Self::Integer(value as i64)
@@ -377,11 +388,7 @@ impl From<u8> for Value {
         Self::Integer(value as i64)
     }
 }
-impl From<u32> for Value {
-    fn from(value: u32) -> Self {
-        Self::Integer(value as i64)
-    }
-}
+
 impl From<isize> for Value {
     fn from(value: isize) -> Self {
         Self::Integer(value as i64)
@@ -389,11 +396,6 @@ impl From<isize> for Value {
 }
 impl From<usize> for Value {
     fn from(value: usize) -> Self {
-        Self::Integer(value as i64)
-    }
-}
-impl From<u64> for Value {
-    fn from(value: u64) -> Self {
         Self::Integer(value as i64)
     }
 }

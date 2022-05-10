@@ -1,6 +1,5 @@
+use crate::{value::object::Object, Value};
 use std::{marker::PhantomData, ops::IndexMut};
-
-use crate::Value;
 
 impl Value {
     /// Create an iterater over the `Value`.
@@ -264,7 +263,10 @@ impl From<IterData> for Value {
     fn from(iter: IterData) -> Self {
         match iter {
             IterData::Value(value) => value,
-            IterData::Object(object) => Self::Object(object.into_iter().collect()),
+            IterData::Object(object) => {
+                let obj: Object<Self> = object.into_iter().collect();
+                Self::Object(obj)
+            }
             IterData::Array(array) => Self::Array(array),
         }
     }
@@ -320,7 +322,7 @@ mod tests {
             (
                 "object non-recursive",
                 TestCase {
-                    value: Value::Object(BTreeMap::from([("foo".to_owned(), true.into())])),
+                    value: Value::Object(Object::from([("foo", true.into())])),
                     recursive: false,
                     items: vec![true.into()],
                 },
@@ -328,22 +330,13 @@ mod tests {
             (
                 "object recursive",
                 TestCase {
-                    value: BTreeMap::from([(
-                        "foo".to_owned(),
-                        BTreeMap::from([
-                            ("foo".to_owned(), true.into()),
-                            ("bar".to_owned(), "baz".into()),
-                        ])
-                        .into(),
-                    )])
-                    .into(),
+                    value: Value::Object(Object::from([(
+                        "foo",
+                        Value::Object(Object::from([("foo", true.into()), ("bar", "baz".into())])),
+                    )])),
                     recursive: true,
                     items: vec![
-                        BTreeMap::from([
-                            ("foo".to_owned(), true.into()),
-                            ("bar".to_owned(), "baz".into()),
-                        ])
-                        .into(),
+                        Value::Object(Object::from([("foo", true.into()), ("bar", "baz".into())])),
                         "baz".into(),
                         true.into(),
                     ],

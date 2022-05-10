@@ -1,6 +1,10 @@
 use std::collections::BTreeMap;
 
-use value::{kind::Collection, Kind, Value};
+use crate::{
+    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    Case, Condition, IndexHandle, TableRegistry, TableSearch,
+};
+use value::{kind::Collection, value::Object, Kind, Value};
 use vrl::{
     function::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
@@ -12,11 +16,6 @@ use vrl::{
     state,
     value::kind,
     Context, Expression, Function,
-};
-
-use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
-    Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
 fn get_enrichment_table_record(
@@ -39,13 +38,15 @@ fn get_enrichment_table_record(
             }),
         })
         .transpose()?;
-    let data = enrichment_tables.find_table_row(
-        table,
-        case_sensitive,
-        condition,
-        select.as_ref().map(|select| select.as_ref()),
-        index,
-    )?;
+    let data: Object<Value> = enrichment_tables
+        .find_table_row(
+            table,
+            case_sensitive,
+            condition,
+            select.as_ref().map(|select| select.as_ref()),
+            index,
+        )
+        .map(|x| Object::from_iter(x.into_iter()))?;
 
     Ok(Value::Object(data))
 }

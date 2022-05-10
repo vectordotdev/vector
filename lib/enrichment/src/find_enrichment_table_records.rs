@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ::value::Value;
+use ::value::{value::Object, Value};
 use vrl::prelude::*;
 
 use crate::{
@@ -38,7 +38,7 @@ fn find_enrichment_table_records(
             index,
         )?
         .into_iter()
-        .map(Value::Object)
+        .map(|x| Value::Object(Object::from(x.into_iter())))
         .collect();
     Ok(Value::Array(data))
 }

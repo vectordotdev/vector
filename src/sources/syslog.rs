@@ -314,18 +314,14 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        fmt,
-        str::FromStr,
-    };
+    use std::{collections::HashMap, fmt, str::FromStr};
 
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use value::Value;
+    use value::{value::Object, Value};
     use vector_common::assert_event_data_eq;
     use vector_core::config::ComponentKey;
 
@@ -1051,7 +1047,7 @@ mod test {
         }
     }
 
-    fn structured_data_from_fields(fields: BTreeMap<String, Value>) -> StructuredData {
+    fn structured_data_from_fields(fields: Object<Value>) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
         for (key, value) in fields.into_iter() {

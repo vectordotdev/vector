@@ -1,9 +1,7 @@
-use std::{
-    collections::{btree_map, BTreeMap},
-    iter, slice,
-};
+use std::{collections::BTreeMap, iter, slice};
 
 use serde::{Serialize, Serializer};
+use value::value::ObjectIter;
 
 use super::Value;
 
@@ -17,7 +15,7 @@ pub fn all_fields(
 
 #[derive(Clone)]
 enum LeafIter<'a> {
-    Map(btree_map::Iter<'a, String, Value>),
+    Map(ObjectIter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
@@ -41,7 +39,7 @@ struct FieldsIter<'a> {
 impl<'a> FieldsIter<'a> {
     fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
         FieldsIter {
-            stack: vec![LeafIter::Map(fields.iter())],
+            stack: vec![LeafIter::Map(fields.iter().into())],
             path: vec![],
         }
     }
@@ -133,6 +131,7 @@ impl<'a> Serialize for FieldsIter<'a> {
 mod test {
     use pretty_assertions::assert_eq;
     use serde_json::json;
+    use value::value::Object;
 
     use super::{super::test::fields_from_json, *};
 
@@ -158,7 +157,7 @@ mod test {
 
     #[test]
     fn keys_nested() {
-        let fields = fields_from_json(json!({
+        let fields: Object<Value> = fields_from_json(json!({
             "a": {
                 "b": {
                     "c": 5
@@ -180,7 +179,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Object(BTreeMap::new())),
+            ("d", Value::Object(Object::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()

@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
+use value::value::Object;
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
@@ -16,11 +17,11 @@ use crate::ByteSizeOf;
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
-    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(self) -> (Object<Value>, EventMetadata) {
         self.0.into_parts()
     }
 
-    pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+    pub fn from_parts(fields: Object<Value>, metadata: EventMetadata) -> Self {
         Self(LogEvent::from_parts(fields, metadata))
     }
 
@@ -46,7 +47,7 @@ impl TraceEvent {
         Self(self.0.with_batch_notifier_option(batch))
     }
 
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+    pub fn as_map(&self) -> &Object<Value> {
         self.0.as_map()
     }
 

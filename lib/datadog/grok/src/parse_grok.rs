@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-
 use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
 use tracing::warn;
-use value::Value;
+use value::{value::Object, Value};
 use vrl_compiler::Target;
 
 use crate::{
@@ -46,7 +44,7 @@ pub fn parse_grok(
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
-    let mut parsed = Value::Object(BTreeMap::new());
+    let mut parsed = Value::Object(Object::new());
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, match_str) in matches.iter() {
@@ -586,62 +584,62 @@ mod tests {
             (
                 "%{data:field:array}",
                 "[1,2]",
-                Ok(Value::Array(vec!["1".into(), "2".into()])),
+                Ok(Value::Array(vec![Value::from("1"), Value::from("2")])),
             ),
             (
                 r#"%{data:field:array("\\t")}"#,
                 "[1\t2]",
-                Ok(Value::Array(vec!["1".into(), "2".into()])),
+                Ok(Value::Array(vec![Value::from("1"), Value::from("2")])),
             ),
             (
                 r#"(?m)%{data:field:array("[]","\\n")}"#,
                 "[1\n2]",
-                Ok(Value::Array(vec!["1".into(), "2".into()])),
+                Ok(Value::Array(vec![Value::from("1"), Value::from("2")])),
             ),
             (
                 r#"%{data:field:array("","-")}"#,
                 "1-2",
-                Ok(Value::Array(vec!["1".into(), "2".into()])),
+                Ok(Value::Array(vec![Value::from("1"), Value::from("2")])),
             ),
             (
                 "%{data:field:array(integer)}",
                 "[1,2]",
-                Ok(Value::Array(vec![1.into(), 2.into()])),
+                Ok(Value::Array(vec![Value::Integer(1), Value::Integer(2)])),
             ),
             (
                 r#"%{data:field:array(";", integer)}"#,
                 "[1;2]",
-                Ok(Value::Array(vec![1.into(), 2.into()])),
+                Ok(Value::Array(vec![Value::Integer(1), Value::Integer(2)])),
             ),
             (
                 r#"%{data:field:array("{}",";", integer)}"#,
                 "{1;2}",
-                Ok(Value::Array(vec![1.into(), 2.into()])),
+                Ok(Value::Array(vec![Value::Integer(1), Value::Integer(2)])),
             ),
             (
                 "%{data:field:array(number)}",
                 "[1,2]",
-                Ok(Value::Array(vec![1.into(), 2.into()])),
+                Ok(Value::Array(vec![Value::Integer(1), Value::Integer(2)])),
             ),
             (
                 "%{data:field:array(integer)}",
                 "[1,2]",
-                Ok(Value::Array(vec![1.into(), 2.into()])),
+                Ok(Value::Array(vec![Value::Integer(1), Value::Integer(2)])),
             ),
             (
                 "%{data:field:array(scale(10))}",
                 "[1,2.1]",
-                Ok(Value::Array(vec![10.into(), 21.into()])),
+                Ok(Value::Array(vec![Value::Integer(10), Value::Integer(21)])),
             ),
             (
                 r#"%{data:field:array(";", scale(10))}"#,
                 "[1;2.1]",
-                Ok(Value::Array(vec![10.into(), 21.into()])),
+                Ok(Value::Array(vec![Value::Integer(10), Value::Integer(21)])),
             ),
             (
                 r#"%{data:field:array("{}",";", scale(10))}"#,
                 "{1;2.1}",
-                Ok(Value::Array(vec![10.into(), 21.into()])),
+                Ok(Value::Array(vec![Value::Integer(10), Value::Integer(21)])),
             ),
         ]);
 
@@ -650,13 +648,13 @@ mod tests {
             (
                 r#"%{data:field:array}"#,
                 "abc",
-                Ok(Value::Object(btreemap! {})),
+                Ok(Value::Object(Object::new())),
             ),
             // failed to apply value filter(values are strings)
             (
                 r#"%{data:field:array(scale(10))}"#,
                 "[a,b]",
-                Ok(Value::Object(btreemap! {})),
+                Ok(Value::Object(Object::new())),
             ),
         ]);
     }

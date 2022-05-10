@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
+use value::value::Object;
 use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
@@ -91,7 +92,7 @@ impl vrl_lib::Target for VrlTarget {
                     match paths.as_slice() {
                         ["tags"] => {
                             let value = value.clone().try_object().map_err(|e| e.to_string())?;
-                            for (field, value) in &value {
+                            for (field, value) in value.iter() {
                                 metric.insert_tag(
                                     field.as_str().to_owned(),
                                     value
@@ -175,7 +176,7 @@ impl vrl_lib::Target for VrlTarget {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
                 if path.is_root() {
                     Ok(Some({
-                        let mut map = Value::Object(BTreeMap::new());
+                        let mut map = Value::Object(Object::new());
                         std::mem::swap(log, &mut map);
                         map
                     }))
@@ -577,7 +578,7 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
-    use vector_common::btreemap;
+    use vector_common::{btreemap, object};
     use vrl_lib::Target;
 
     use super::{
@@ -875,24 +876,24 @@ mod test {
 
         let cases = vec![
             (
-                ::value::Value::from(btreemap! {"foo" => "bar"}),
+                ::value::Value::Object(object! {"foo" => "bar"}),
                 vec![btreemap! {"foo" => "bar"}],
             ),
-            (::value::Value::from(1), vec![btreemap! {"message" => 1}]),
+            (::value::Value::Integer(1), vec![btreemap! {"message" => 1}]),
             (
                 ::value::Value::from("2"),
                 vec![btreemap! {"message" => "2"}],
             ),
             (
-                ::value::Value::from(true),
+                ::value::Value::Boolean(true),
                 vec![btreemap! {"message" => true}],
             ),
             (
-                ::value::Value::from(vec![
-                    ::value::Value::from(1),
+                ::value::Value::Array(vec![
+                    ::value::Value::Integer(1),
                     ::value::Value::from("2"),
-                    ::value::Value::from(true),
-                    ::value::Value::from(btreemap! {"foo" => "bar"}),
+                    ::value::Value::Boolean(true),
+                    ::value::Value::Object(object! {"foo" => "bar"}),
                 ]),
                 vec![
                     btreemap! {"message" => 1},
@@ -922,7 +923,10 @@ mod test {
                 target.into_events().collect::<Vec<_>>(),
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_parts(
+                        Object::from(v.into_iter()),
+                        metadata.clone()
+                    )))
                     .collect::<Vec<_>>()
             );
         }

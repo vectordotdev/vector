@@ -51,6 +51,8 @@ mod test {
     use ordered_float::NotNan;
     use regex::Regex;
 
+    use crate::value::Object;
+
     use super::Value;
 
     #[test]
@@ -110,10 +112,8 @@ mod test {
 
     #[test]
     fn test_display_object() {
-        assert_eq!(
-            Value::Object([("foo".into(), "bar".into())].into()).to_string(),
-            r#"{ "foo": "bar" }"#
-        );
+        let obj = Value::Object(Object::from([("foo", "bar".into())]));
+        assert_eq!(obj.to_string(), r#"{ "foo": "bar" }"#);
     }
 
     #[test]

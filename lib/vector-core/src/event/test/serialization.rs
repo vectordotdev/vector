@@ -4,7 +4,7 @@ use prost::Message;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use vector_buffers::encoding::Encodable;
-use vector_common::btreemap;
+use vector_common::object;
 
 use super::*;
 use crate::{config::log_schema, event::ser::EventEncodableMetadataFlags};
@@ -41,7 +41,7 @@ fn eventarray_can_go_from_raw_prost_to_encodable_and_vice_versa() {
     // LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be
     // explained.
 
-    let event_fields = btreemap! {
+    let event_fields = object! {
         "key1" => "value1",
         "key2" => "value2",
         "key3" => "value3",
@@ -87,7 +87,7 @@ fn event_can_go_from_raw_prost_to_eventarray_encodable() {
     // LevelDB-based disk buffers being removed, or some other extenuating circumstance that must be
     // explained.
 
-    let event_fields = btreemap! {
+    let event_fields = object! {
         "key1" => "value1",
         "key2" => "value2",
         "key3" => "value3",

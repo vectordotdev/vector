@@ -9,7 +9,7 @@ fn type_def(type_def: &VrlTypeDef) -> Resolved {
         tree.insert("fallible".to_owned(), true.into());
     }
 
-    Ok(tree.into())
+    Ok(::value::Value::Object(tree))
 }
 
 /// A debug function to print the type definition of an expression at runtime.

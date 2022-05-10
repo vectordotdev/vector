@@ -116,7 +116,7 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         "user_agent": Kind::bytes(),
     }
     .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .map(|(key, kind): (String, _)| (key.into(), kind))
     .collect()
 }
 

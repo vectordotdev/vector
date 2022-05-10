@@ -1,4 +1,23 @@
 #[macro_export]
+macro_rules! object {
+    () => (::value::value::Object::new());
+
+    // trailing comma case
+    ($($key:expr => $value:expr,)+) => (object!($($key => $value),+));
+
+    ($($key:expr => $value:expr),*) => {
+        {
+            let mut _map = ::value::value::Object::new();
+            $(
+                #[allow(clippy::let_underscore_drop)]
+                let _ = _map.insert(String::from($key), $value.into());
+            )*
+            _map
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! btreemap {
     () => (::std::collections::BTreeMap::new());
 

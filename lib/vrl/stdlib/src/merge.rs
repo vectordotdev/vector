@@ -64,7 +64,7 @@ impl Function for Merge {
 
         merge_maps(&mut to, &from, deep);
 
-        Ok(to.into())
+        Ok(::value::Value::Object(to))
     }
 }
 
@@ -83,7 +83,7 @@ impl Expression for MergeFn {
 
         merge_maps(&mut to_value, &from_value, deep);
 
-        Ok(to_value.into())
+        Ok(::value::Value::Object(to_value))
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

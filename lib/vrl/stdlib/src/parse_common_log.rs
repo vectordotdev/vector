@@ -127,7 +127,7 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         "size": Kind::integer() | Kind::null(),
     }
     .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .map(|(key, kind): (String, _)| (key.into(), kind))
     .collect()
 }
 

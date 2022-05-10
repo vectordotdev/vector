@@ -1,9 +1,6 @@
-use std::{
-    borrow::Cow,
-    collections::{btree_map::Entry, BTreeMap},
-};
+use std::{borrow::Cow, collections::btree_map::Entry};
 
-use ::value::Value;
+use ::value::{value::Object, Value};
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
@@ -298,8 +295,8 @@ fn inner_kind() -> Kind {
 /// Process an XML node, and return a VRL `Value`.
 fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     // Helper to recurse over a `Node`s children, and build an object.
-    let recurse = |node: Node| -> BTreeMap<String, Value> {
-        let mut map = BTreeMap::new();
+    let recurse = |node: Node| -> Object<Value> {
+        let mut map = Object::new();
 
         // Expand attributes, if required.
         if config.include_attr {
@@ -368,7 +365,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 
                         // If the node is an element, treat it as an object.
                         if node.is_element() {
-                            let mut map = BTreeMap::new();
+                            let mut map = Object::new();
 
                             map.insert(
                                 node.tag_name().name().to_string(),

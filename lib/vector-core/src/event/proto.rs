@@ -1,3 +1,4 @@
+use ::value::value::Object;
 use chrono::TimeZone;
 use ordered_float::NotNan;
 
@@ -426,7 +427,7 @@ fn decode_value(input: Value) -> Option<event::Value> {
 }
 
 fn decode_map(fields: BTreeMap<String, Value>) -> Option<event::Value> {
-    let mut accum: BTreeMap<String, event::Value> = BTreeMap::new();
+    let mut accum: Object<event::Value> = Object::new();
     for (key, value) in fields {
         match decode_value(value) {
             Some(value) => {
@@ -468,7 +469,7 @@ fn encode_value(value: event::Value) -> Value {
     }
 }
 
-fn encode_map(fields: BTreeMap<String, event::Value>) -> ValueMap {
+fn encode_map(fields: Object<event::Value>) -> ValueMap {
     ValueMap {
         fields: fields
             .into_iter()

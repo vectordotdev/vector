@@ -14,6 +14,7 @@ use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
+use value::value::Object;
 use vector_common::EventDataEq;
 
 use super::{
@@ -85,7 +86,16 @@ impl Default for Inner {
 impl From<BTreeMap<String, Value>> for Inner {
     fn from(fields: BTreeMap<String, Value>) -> Self {
         Self {
-            fields: Value::Object(fields),
+            fields: Value::Object(Object::from(fields.into_iter())),
+            size_cache: Default::default(),
+        }
+    }
+}
+
+impl From<Object<Value>> for Inner {
+    fn from(object: Object<Value>) -> Self {
+        Self {
+            fields: Value::Object(object),
             size_cache: Default::default(),
         }
     }
@@ -144,7 +154,7 @@ impl LogEvent {
     }
 
     ///  Create a `LogEvent` into a tuple of its components
-    pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+    pub fn from_parts(map: Object<Value>, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(map));
         Self { inner, metadata }
     }
@@ -162,7 +172,7 @@ impl LogEvent {
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(mut self) -> (Object<Value>, EventMetadata) {
         self.fields_mut();
         (
             Arc::try_unwrap(self.inner)
@@ -304,14 +314,14 @@ impl LogEvent {
         self.as_map().is_empty()
     }
 
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+    pub fn as_map(&self) -> &Object<Value> {
         match &self.inner.fields {
             Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
 
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn as_map_mut(&mut self) -> &mut Object<Value> {
         match self.fields_mut() {
             Value::Object(ref mut map) => map,
             _ => unreachable!(),
@@ -380,28 +390,12 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     }
 }
 
-impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        event.into_parts().0
-    }
-}
-
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             inner: Arc::new(Inner::from(map.into_iter().collect::<BTreeMap<_, _>>())),
             metadata: EventMetadata::default(),
         }
-    }
-}
-
-impl<S> From<LogEvent> for HashMap<String, Value, S>
-where
-    S: std::hash::BuildHasher + Default,
-{
-    fn from(event: LogEvent) -> HashMap<String, Value, S> {
-        let fields: BTreeMap<_, _> = event.into();
-        fields.into_iter().collect()
     }
 }
 
@@ -544,7 +538,7 @@ mod test {
     // keys are equivalent, whether the key exists in the log or not.
     #[test]
     fn rename_key_flat_equiv_exists() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
@@ -557,7 +551,7 @@ mod test {
     }
     #[test]
     fn rename_key_flat_equiv_not_exists() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
@@ -572,7 +566,7 @@ mod test {
     // exist in the log, when the to -> from keys are not identical.
     #[test]
     fn rename_key_flat_not_exists() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
         let expected_fields = fields.clone();
@@ -587,7 +581,7 @@ mod test {
     // key name to another if the key exists.
     #[test]
     fn rename_key_flat_no_overlap() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
 
@@ -606,7 +600,7 @@ mod test {
     // it exists.
     #[test]
     fn rename_key_flat_overlap() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         fields.insert("one".to_string(), Value::Integer(1_i64));
         fields.insert("two".to_string(), Value::Integer(2_i64));
 

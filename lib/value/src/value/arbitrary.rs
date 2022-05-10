@@ -5,7 +5,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use ordered_float::NotNan;
 use quickcheck::{Arbitrary, Gen};
 
-use crate::Value;
+use crate::{value::Object, Value};
 
 const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
@@ -42,7 +42,7 @@ impl Arbitrary for Value {
             4 => Self::Timestamp(datetime(g)),
             5 => {
                 let mut gen = Gen::new(MAX_MAP_SIZE);
-                Self::Object(BTreeMap::arbitrary(&mut gen))
+                Self::Object(Object::from(BTreeMap::arbitrary(&mut gen).into_iter()))
             }
             6 => {
                 let mut gen = Gen::new(MAX_ARRAY_SIZE);

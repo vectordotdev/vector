@@ -1,11 +1,8 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    process::Command,
-};
+use std::{collections::HashMap, fs, process::Command};
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use value::value::Object;
 
 use crate::Test;
 
@@ -140,7 +137,7 @@ impl Test {
             Some(event) => {
                 serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
             }
-            None => Value::Object(BTreeMap::default()),
+            None => Value::Object(Object::default()),
         };
 
         if returns.is_some() && output.is_some() {

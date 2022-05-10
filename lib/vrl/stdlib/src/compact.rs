@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-
-use ::value::Value;
+use ::value::{value::Object, Value};
 use vrl::prelude::*;
 
 use crate::util;
@@ -47,8 +45,8 @@ fn compact(
     };
 
     match value {
-        Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
-        Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
+        Value::Object(object) => Ok(Value::Object(compact_object(object, &options))),
+        Value::Array(arr) => Ok(Value::Array(compact_array(arr, &options))),
         value => Err(value::Error::Expected {
             got: value.kind(),
             expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
@@ -258,16 +256,15 @@ impl Expression for CompactFn {
 /// Compact the value if we are recursing - otherwise, just return the value untouched.
 fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     match value {
-        Value::Array(array) if options.recursive => Value::from(compact_array(array, options)),
-        Value::Object(object) if options.recursive => Value::from(compact_object(object, options)),
+        Value::Array(array) if options.recursive => Value::Array(compact_array(array, options)),
+        Value::Object(object) if options.recursive => {
+            Value::Object(compact_object(object, options))
+        }
         _ => value,
     }
 }
 
-fn compact_object(
-    object: BTreeMap<String, Value>,
-    options: &CompactOptions,
-) -> BTreeMap<String, Value> {
+fn compact_object(object: Object<Value>, options: &CompactOptions) -> Object<Value> {
     object
         .into_iter()
         .filter_map(|(key, value)| {
@@ -297,7 +294,7 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
 
 #[cfg(test)]
 mod test {
-    use vector_common::btreemap;
+    use vector_common::object;
 
     use super::*;
 
@@ -356,11 +353,11 @@ mod test {
     fn test_compacted_map() {
         let cases = vec![
             (
-                btreemap! {
+                object! {
                     "key1" => "",
                     "key3" => "",
                 }, // expected
-                btreemap! {
+                object! {
                     "key1" => "",
                     "key2" => Value::Null,
                     "key3" => "",
@@ -371,40 +368,40 @@ mod test {
                 },
             ),
             (
-                btreemap! {
-                    "key1" => Value::from(1),
-                    "key3" => Value::from(2),
+                object! {
+                    "key1" => Value::Integer(1),
+                    "key3" => Value::Integer(2),
                 },
-                btreemap! {
-                    "key1" => Value::from(1),
+                object! {
+                    "key1" => Value::Integer(1),
                     "key2" => Value::Array(vec![]),
-                    "key3" => Value::from(2),
+                    "key3" => Value::Integer(2),
                 },
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key2": Value::from(3)]),
-                     "key3": Value::from(2),
+                map!["key1": Value::Integer(1),
+                     "key2": Value::Object(map!["key2": Value::Integer(3)]),
+                     "key3": Value::Integer(2),
                 ],
                 map![
-                    "key1": Value::from(1),
+                    "key1": Value::Integer(1),
                     "key2": Value::Object(map!["key1": Value::Null,
-                                            "key2": Value::from(3),
+                                            "key2": Value::Integer(3),
                                             "key3": Value::Null]),
-                    "key3": Value::from(2),
+                    "key3": Value::Integer(2),
                 ],
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
+                map!["key1": Value::Integer(1),
                      "key2": Value::Object(map!["key1": Value::Null,]),
-                     "key3": Value::from(2),
+                     "key3": Value::Integer(2),
                 ],
                 map![
-                    "key1": Value::from(1),
+                    "key1": Value::Integer(1),
                     "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
+                    "key3": Value::Integer(2),
                 ],
                 CompactOptions {
                     recursive: false,
@@ -412,26 +409,26 @@ mod test {
                 },
             ),
             (
-                map!["key1": Value::from(1),
-                     "key3": Value::from(2),
+                map!["key1": Value::Integer(1),
+                     "key3": Value::Integer(2),
                 ],
                 map![
-                    "key1": Value::from(1),
+                    "key1": Value::Integer(1),
                     "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
+                    "key3": Value::Integer(2),
                 ],
                 Default::default(),
             ),
             (
-                btreemap! {
-                    "key1" => Value::from(1),
-                    "key2" => Value::Array(vec![2.into()]),
-                    "key3" => Value::from(2),
+                object! {
+                    "key1" => Value::Integer(1),
+                    "key2" => Value::Array(vec![Value::Integer(2)]),
+                    "key3" => Value::Integer(2),
                 },
-                btreemap! {
-                    "key1" => Value::from(1),
-                    "key2" => Value::Array(vec![Value::Null, 2.into(), Value::Null]),
-                    "key3" => Value::from(2),
+                object! {
+                    "key1" => Value::Integer(1),
+                    "key2" => Value::Array(vec![Value::Null, Value::Integer(2), Value::Null]),
+                    "key3" => Value::Integer(2),
                 },
                 Default::default(),
             ),
@@ -446,30 +443,29 @@ mod test {
         compact => Compact;
 
         with_map {
-            args: func_args![value: map!["key1": Value::Null,
-                                         "key2": 1,
-                                         "key3": "",
-            ]],
-            want: Ok(Value::Object(map!["key2": 1])),
+            args: func_args![value: Value::Object(Object::from([("key1", Value::Null),
+                                                                ("key2", Value::Integer(1)),
+                                                                ("key3", Value::from(""))]))],
+            want: Ok(Value::Object(Object::from([("key2", Value::Integer(1))]))),
             tdef: TypeDef::object(Collection::any()),
         }
 
         with_array {
-            args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
-            want: Ok(Value::Array(vec![Value::from(1)])),
+            args: func_args![value: vec![Value::Null, Value::Integer(1), Value::from(""),]],
+            want: Ok(Value::Array(vec![Value::Integer(1)])),
             tdef: TypeDef::array(Collection::any()),
         }
 
         nullish {
             args: func_args![
-                value: btreemap! {
-                    "key1" => "-",
-                    "key2" => 1,
-                    "key3" => " "
-                },
+                value: Value::Object(Object::from([
+                    ("key1", Value::from("-")),
+                    ("key2", Value::Integer(1)),
+                    ("key3", Value::from(" "))
+                        ])),
                 nullish: true
             ],
-            want: Ok(Value::Object(map!["key2": 1])),
+            want: Ok(Value::Object(Object::from([("key2", Value::Integer(1))]))),
             tdef: TypeDef::object(Collection::any()),
         }
     ];

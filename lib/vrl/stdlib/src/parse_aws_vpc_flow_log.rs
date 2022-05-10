@@ -153,7 +153,7 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         "vpc_id": Kind::bytes() | Kind::null(),
     }
     .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
+    .map(|(key, kind): (String, _)| (key.into(), kind))
     .collect()
 }
 

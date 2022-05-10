@@ -1,12 +1,10 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-};
+use std::{collections::HashMap, convert::TryFrom};
 
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
+use value::value::Object;
 
 use crate::aws::RegionOrEndpoint;
 use crate::{
@@ -195,7 +193,7 @@ impl DataStreamConfig {
         }
         let map = log.as_map_mut();
         if let Some(value) = map.remove(timestamp_key) {
-            map.insert(DATA_STREAM_TIMESTAMP_KEY.into(), value);
+            map.insert(String::from(DATA_STREAM_TIMESTAMP_KEY), value);
         }
     }
 
@@ -250,7 +248,7 @@ impl DataStreamConfig {
         let existing = log
             .as_map_mut()
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Object(BTreeMap::new()))
+            .or_insert_with(|| Value::Object(Object::new()))
             .as_object_mut_unwrap();
         if let Some(dtype) = dtype {
             existing

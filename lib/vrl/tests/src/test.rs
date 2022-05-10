@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
 
-use ::value::Value;
+use ::value::{value::Object, Value};
 use vrl::function::Example;
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl Test {
 
         let mut error = None;
         let object = if object.is_empty() {
-            Value::Object(BTreeMap::default())
+            Value::Object(Object::default())
         } else {
             match serde_json::from_str::<'_, Value>(&object) {
                 Ok(value) => value,
@@ -102,7 +102,7 @@ impl Test {
     }
 
     pub fn from_example(func: impl ToString, example: &Example) -> Self {
-        let object = Value::Object(BTreeMap::default());
+        let object = Value::Object(Object::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
             Err(err) => err.to_string(),

@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
+use value::value::Object;
 use value::Value;
 
 use super::VmFunctionClosure;
@@ -549,7 +550,7 @@ impl Vm {
                     // The next primitive on the stack is the number of fields in the object
                     // followed by key, value pairs.
                     let count = state.next_primitive()?;
-                    let mut object = BTreeMap::new();
+                    let mut object = Object::new();
 
                     for _ in 0..count {
                         let value = state.pop_stack()?;

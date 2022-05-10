@@ -1,13 +1,12 @@
-use std::{collections::BTreeMap, fmt, ops::Deref};
-
-use value::Value;
-
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
     vm::OpCode,
     Context, Expression, TypeDef,
 };
+use ::value::Value;
+use std::{collections::BTreeMap, fmt, ops::Deref};
+use value::value::Object as ValueObject;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
@@ -33,7 +32,7 @@ impl Expression for Object {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
-            .collect::<Result<BTreeMap<_, _>, _>>()
+            .collect::<Result<ValueObject<_>, _>>()
             .map(Value::Object)
     }
 
@@ -41,7 +40,7 @@ impl Expression for Object {
         self.inner
             .iter()
             .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
-            .collect::<Option<BTreeMap<_, _>>>()
+            .collect::<Option<ValueObject<_>>>()
             .map(Value::Object)
     }
 

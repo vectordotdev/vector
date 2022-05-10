@@ -1,22 +1,19 @@
-use std::{collections::BTreeMap, iter::Peekable};
+use std::iter::Peekable;
 
 use lookup::lookup_v2::{BorrowedSegment, Path};
+use value::value::Object;
 
 use super::Value;
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
 #[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
-pub fn insert<'a>(
-    fields: &mut BTreeMap<String, Value>,
-    path: impl Path<'a>,
-    value: Value,
-) -> Option<Value> {
+pub fn insert<'a>(fields: &mut Object<Value>, path: impl Path<'a>, value: Value) -> Option<Value> {
     let path_iter = path.segment_iter().peekable();
     map_insert(fields, path_iter, value)
 }
 
 fn map_insert<'a>(
-    fields: &mut BTreeMap<String, Value>,
+    fields: &mut Object<Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
 ) -> Option<Value> {
@@ -26,7 +23,7 @@ fn map_insert<'a>(
             if let Some(Value::Object(map)) = fields.get_mut(current.as_ref()) {
                 map_insert(map, path_iter, value)
             } else {
-                let mut map = BTreeMap::new();
+                let mut map = Object::new();
                 map_insert(&mut map, path_iter, value);
                 fields.insert(current.to_string(), Value::Object(map))
             }
@@ -60,14 +57,14 @@ fn array_insert<'a>(
             if let Some(Value::Object(map)) = values.get_mut(current as usize) {
                 map_insert(map, path_iter, value)
             } else {
-                let mut map = BTreeMap::new();
-                map_insert(&mut map, path_iter, value);
+                let mut obj = Object::new();
+                map_insert(&mut obj, path_iter, value);
                 while values.len() <= (current as usize) {
                     values.push(Value::Null);
                 }
                 Some(std::mem::replace(
                     &mut values[current as usize],
-                    Value::Object(map),
+                    Value::Object(obj),
                 ))
             }
         }
@@ -92,15 +89,13 @@ fn array_insert<'a>(
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use serde_json::json;
 
     use super::{super::test::fields_from_json, *};
 
     #[test]
     fn test_insert_nested() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         insert(&mut fields, "a.b.c", Value::Integer(3));
 
         let expected = fields_from_json(json!({
@@ -115,7 +110,7 @@ mod test {
 
     #[test]
     fn test_insert_array() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Object::new();
         insert(&mut fields, "a.b[0].c[2]", Value::Integer(10));
         insert(&mut fields, "a.b[0].c[0]", Value::Integer(5));
 

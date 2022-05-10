@@ -1,13 +1,10 @@
-use std::collections::BTreeMap;
-use std::fmt;
-
+use crate::value::{timestamp_to_string, Object, StdError, Value};
 use bytes::Bytes;
 use ordered_float::NotNan;
 use serde::de::Error as SerdeError;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
-
-use crate::value::{timestamp_to_string, StdError, Value};
+use std::fmt;
 
 impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
@@ -59,7 +56,7 @@ impl Serialize for Value {
                 serializer.serialize_str(&self.to_string_lossy())
             }
             Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
-            Value::Object(m) => serializer.collect_map(m),
+            Value::Object(m) => serializer.collect_map(m.iter()),
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
         }
@@ -155,12 +152,12 @@ impl<'de> Deserialize<'de> for Value {
             where
                 V: MapAccess<'de>,
             {
-                let mut map = BTreeMap::new();
-                while let Some((key, value)) = visitor.next_entry()? {
-                    map.insert(key, value);
+                let mut obj = Object::new();
+                while let Some((key, value)) = visitor.next_entry::<String, Value>()? {
+                    obj.insert(key, value);
                 }
 
-                Ok(Value::Object(map))
+                Ok(Value::Object(obj))
             }
         }
 

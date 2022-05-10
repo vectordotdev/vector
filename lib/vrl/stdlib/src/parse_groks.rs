@@ -280,7 +280,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use ::value::Value;
-    use vector_common::btreemap;
+    use vector_common::object;
 
     use super::*;
 
@@ -311,7 +311,7 @@ mod test {
         parsed {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
                               patterns: vec!["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(object! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "message" => "Hello world",
@@ -322,7 +322,7 @@ mod test {
         parsed2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               patterns: vec!["(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"]],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(object! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
@@ -335,7 +335,7 @@ mod test {
                               remove_empty: true,
             ],
             want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
+                object! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
@@ -355,7 +355,7 @@ mod test {
                     "_message": "%{GREEDYDATA:message}"
                 })
             ],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(object! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "status" => "200",
@@ -379,7 +379,7 @@ mod test {
                     "_message": "%{GREEDYDATA:message}"
                 })
             ],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(object! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "message" => "hello world"
@@ -410,10 +410,10 @@ mod test {
                     "_x_forwarded_for": r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#
                 })
             ],
-            want: Ok(Value::Object(btreemap! {
+            want: Ok(Value::Object(object! {
                 "date_access" => "13/Jul/2016:10:55:36",
                 "duration" => 202000000,
-                "http" => btreemap! {
+                "http" => object! {
                     "auth" => "frank",
                     "ident" => "-",
                     "method" => "GET",
@@ -424,9 +424,9 @@ mod test {
                     "useragent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36",
                     "_x_forwarded_for" => Value::Null,
                 },
-                "network" => btreemap! {
+                "network" => object! {
                     "bytes_written" => 2326,
-                    "client" => btreemap! {
+                    "client" => object! {
                         "ip" => "127.0.0.1"
                     }
                 }

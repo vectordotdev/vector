@@ -1,8 +1,5 @@
-use std::collections::BTreeMap;
-
+use crate::{value::object::Object, Value};
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
-
-use crate::Value;
 
 impl Value {
     /// Insert the current value into a given path.
@@ -14,15 +11,15 @@ impl Value {
         for segment in path.as_segments().iter().rev() {
             match segment {
                 SegmentBuf::Field(FieldBuf { name, .. }) => {
-                    let mut map = BTreeMap::default();
-                    map.insert(name.as_str().to_owned(), self);
-                    self = Self::Object(map);
+                    let mut obj = Object::new();
+                    obj.insert(name, self);
+                    self = Self::Object(obj);
                 }
                 SegmentBuf::Coalesce(fields) => {
                     let field = fields.last().expect("fields should not be empty");
-                    let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
-                    self = Self::Object(map);
+                    let mut obj = Object::new();
+                    obj.insert(field, self);
+                    self = Self::Object(obj);
                 }
                 SegmentBuf::Index(index) => {
                     let mut array = vec![];
@@ -43,21 +40,18 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
+    use crate::{value::object::Object, Value};
     use lookup::{parser, LookupBuf};
-
-    use crate::Value;
 
     #[test]
     fn test_object() {
         let path = parser::parse_lookup(".foo.bar.baz").unwrap();
         let value = Value::Integer(12);
 
-        let bar_value = Value::Object(BTreeMap::from([("baz".into(), value.clone())]));
-        let foo_value = Value::Object(BTreeMap::from([("bar".into(), bar_value)]));
+        let bar_value = Value::Object(Object::from([("baz", value.clone())]));
+        let foo_value = Value::Object(Object::from([("bar", bar_value)]));
 
-        let object = Value::Object(BTreeMap::from([("foo".into(), foo_value)]));
+        let object = Value::Object(Object::from([("foo", foo_value)]));
 
         assert_eq!(value.at_path(&path.into_buf()), object);
     }
@@ -85,15 +79,15 @@ mod tests {
     #[test]
     fn test_complex() {
         let path = parser::parse_lookup("[2].foo.(bar | baz )[1]").unwrap();
-        let value = Value::Object([("bar".into(), vec![12].into())].into()); //value!({ "bar": [12] });
+        let value = Value::Object([("bar", vec![12].into())].into()); //value!({ "bar": [12] });
 
         let baz_value = Value::Array(vec![Value::Null, value.clone()]);
-        let foo_value = Value::Object(BTreeMap::from([("baz".into(), baz_value)]));
+        let foo_value = Value::Object(Object::from([("baz", baz_value)]));
 
         let object = Value::Array(vec![
             Value::Null,
             Value::Null,
-            Value::Object(BTreeMap::from([("foo".into(), foo_value)])),
+            Value::Object(Object::from([("foo", foo_value)])),
         ]);
 
         assert_eq!(value.at_path(&path.into_buf()), object);

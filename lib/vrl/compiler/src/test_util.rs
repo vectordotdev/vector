@@ -172,12 +172,12 @@ macro_rules! __prep_bench_or_test {
 #[macro_export]
 macro_rules! map {
     () => (
-        ::std::collections::BTreeMap::new()
+        ::value::value::Object::new()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
+        vec![$((String::from($k), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
+            .collect::<::value::value::Object<_>>()
     };
 }
 

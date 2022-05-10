@@ -1,9 +1,8 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::borrow::Cow;
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use value::kind::Collection;
-use value::{Value, ValueRegex};
+use value::{kind::Collection, value::Object, Value, ValueRegex};
 
 use crate::expression::{Container, Variant};
 use crate::value::{Error, Kind};
@@ -20,7 +19,7 @@ pub trait VrlValueConvert: Sized {
     fn try_regex(self) -> Result<ValueRegex, Error>;
     fn try_null(self) -> Result<(), Error>;
     fn try_array(self) -> Result<Vec<Value>, Error>;
-    fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
+    fn try_object(self) -> Result<Object<Value>, Error>;
     fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
 
     fn try_into_i64(&self) -> Result<i64, Error>;
@@ -131,7 +130,7 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+    fn try_object(self) -> Result<Object<Value>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {

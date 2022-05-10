@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, convert::TryInto};
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
+use value::value::Object;
 use vector_core::event::Value;
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
@@ -186,7 +187,7 @@ impl From<FluentValue> for Value {
                 )
             }
             rmpv::Value::Ext(code, bytes) => {
-                let mut fields = BTreeMap::new();
+                let mut fields = Object::new();
                 fields.insert(
                     String::from("msgpack_extension_code"),
                     Value::Integer(code.into()),
@@ -221,10 +222,9 @@ impl From<FluentTimestamp> for Value {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
+    use value::value::Object;
     use vector_core::event::Value;
 
     use crate::sources::fluent::message::FluentValue;
@@ -306,7 +306,7 @@ mod test {
             let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.clone().into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
-            let mut expected_inner = BTreeMap::new();
+            let mut expected_inner = Object::new();
             for (k,v) in input.into_iter() {
                 expected_inner.insert(k, Value::Integer(v));
             }
@@ -327,7 +327,7 @@ mod test {
             let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
-            let expected = Value::Object(BTreeMap::new());
+            let expected = Value::Object(Object::new());
 
             assert_eq!(Value::from(FluentValue(actual)), expected);
       }
@@ -342,7 +342,7 @@ mod test {
         fn from_ext(code: i8, bytes: Vec<u8>) -> () {
             let actual = rmpv::Value::Ext(code, bytes.clone());
 
-            let mut inner = BTreeMap::new();
+            let mut inner = Object::new();
             inner.insert("msgpack_extension_code".to_string(), Value::Integer(code.into()));
             inner.insert("bytes".to_string(), Value::Bytes(bytes.into()));
             let expected = Value::Object(inner);

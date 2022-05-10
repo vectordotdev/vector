@@ -8,6 +8,7 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use value::value::Object;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
@@ -80,7 +81,7 @@ impl Opts {
         }?;
 
         match input.as_str() {
-            "" => Ok(vec![Value::Object(BTreeMap::default())]),
+            "" => Ok(default_objects()),
             _ => input
                 .lines()
                 .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
@@ -223,5 +224,5 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
 }
 
 fn default_objects() -> Vec<Value> {
-    vec![Value::Object(BTreeMap::new())]
+    vec![Value::Object(Object::new())]
 }

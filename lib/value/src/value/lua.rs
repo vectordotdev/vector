@@ -43,7 +43,7 @@ impl<'a> FromLua<'a> for Value {
                 } else if table_is_timestamp(&t)? {
                     table_to_timestamp(t).map(Self::Timestamp)
                 } else {
-                    <_>::from_lua(LuaValue::Table(t), lua).map(Self::Object)
+                    <_>::from_lua(LuaValue::Table(t), lua) //.map(Self::Object)
                 }
             }
             other => Err(mlua::Error::FromLuaConversionError {

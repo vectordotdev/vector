@@ -7,6 +7,7 @@ use hyper::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
+use value::value::Object;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use crate::{
@@ -70,14 +71,14 @@ fn simple_span() -> BTreeMap<String, Value> {
         ("error".to_string(), Value::Integer(404)),
         (
             "meta".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
+            Value::Object(Object::<Value>::from([
                 ("foo".to_string(), Value::from("bar")),
                 ("bar".to_string(), Value::from("baz")),
             ])),
         ),
         (
             "metrics".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([(
+            Value::Object(Object::<Value>::from([(
                 "a_metric".to_string(),
                 Value::Float(NotNan::new(0.577).unwrap()),
             )])),

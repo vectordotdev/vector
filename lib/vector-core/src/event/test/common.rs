@@ -5,6 +5,7 @@ use std::{
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
+use value::value::Object;
 
 use crate::{
     event::{
@@ -79,7 +80,7 @@ impl Arbitrary for Event {
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut gen = Gen::new(MAX_MAP_SIZE);
-        let map: BTreeMap<String, Value> = BTreeMap::arbitrary(&mut gen);
+        let map: Object<Value> = Object::from(BTreeMap::arbitrary(&mut gen).into_iter());
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
         LogEvent::from_parts(map, metadata)
     }
@@ -90,6 +91,7 @@ impl Arbitrary for LogEvent {
         Box::new(
             fields
                 .shrink()
+                .map(|x| Object::from(x.into_iter()))
                 .map(move |x| LogEvent::from_parts(x, metadata.clone())),
         )
     }
@@ -106,6 +108,7 @@ impl Arbitrary for TraceEvent {
         Box::new(
             fields
                 .shrink()
+                .map(|x| Object::from(x.into_iter()))
                 .map(move |x| TraceEvent::from_parts(x, metadata.clone())),
         )
     }

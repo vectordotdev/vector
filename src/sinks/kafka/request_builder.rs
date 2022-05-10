@@ -78,7 +78,7 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                 match headers {
                     Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
-                        for (key, value) in headers_map {
+                        for (key, value) in headers_map.iter() {
                             if let Value::Bytes(value_bytes) = value {
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {

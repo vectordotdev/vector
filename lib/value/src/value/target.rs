@@ -52,8 +52,7 @@ impl Value {
     ///    # use std::collections::BTreeMap;
     ///    # use std::iter::FromIterator;
     ///
-    ///    let map = BTreeMap::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
-    ///    let value = Value::Object(map);
+    ///    let value = Value::Object([("foo", true.into())].into());
     ///    let path = LookupBuf::from_str("foo").unwrap();
     ///
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
@@ -82,10 +81,7 @@ impl Value {
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
     ///
-    /// let fields = vec![("foo".to_owned(), Value::from("bar"))];
-    /// let map = BTreeMap::from_iter(fields.into_iter());
-    ///
-    /// let mut value = Value::Object(map);
+    /// let mut value = Value::Object([("foo", Value::from("bar"))].into());
     /// let path = LookupBuf::from_str(".foo").unwrap();
     ///
     /// value.insert_by_path(&path, true.into());
@@ -110,7 +106,7 @@ impl Value {
     ///
     /// value.insert_by_path(&path, "bar".into());
     ///
-    /// let expected = Value::Array(vec![Value::Boolean(false), Value::Object([("foo".into(), "bar".into())].into())]);
+    /// let expected = Value::Array(vec![Value::Boolean(false), Value::Object([("foo", "bar".into())].into())]);
     /// assert_eq!(
     ///     value.get_by_path(&LookupBuf::root()),
     ///     Some(&expected),

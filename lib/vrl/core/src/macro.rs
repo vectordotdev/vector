@@ -10,13 +10,13 @@ macro_rules! value {
     });
 
     ({}) => ({
-        ::value::Value::Object(::std::collections::BTreeMap::default())
+        ::value::Value::Object(::value::value::Object::new())
     });
 
     ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({
         let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::value!($v))),+]
             .into_iter()
-            .collect::<::std::collections::BTreeMap<_, ::value::Value>>();
+            .collect::<::value::value::Object<::value::Value>>();
 
         ::value::Value::Object(map)
     });

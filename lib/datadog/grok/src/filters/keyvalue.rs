@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
 use bytes::Bytes;
@@ -18,7 +17,7 @@ use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
 use tracing::warn;
-use value::Value;
+use value::{value::Object, Value};
 use vrl_compiler::Target;
 
 use crate::{
@@ -127,7 +126,7 @@ impl std::fmt::Display for KeyValueFilter {
 pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, GrokRuntimeError> {
     match value {
         Value::Bytes(bytes) => {
-            let mut result = Value::Object(BTreeMap::default());
+            let mut result = Value::Object(Object::new());
             parse(
                 String::from_utf8_lossy(bytes).as_ref(),
                 &filter.key_value_delimiter,

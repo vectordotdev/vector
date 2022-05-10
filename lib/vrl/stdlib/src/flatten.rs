@@ -1,5 +1,3 @@
-use std::collections::btree_map;
-
 use ::value::Value;
 use vrl::prelude::*;
 
@@ -91,13 +89,13 @@ impl Expression for FlattenFn {
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
-    values: btree_map::Iter<'a, String, Value>,
+    values: ::value::value::ObjectIter<'a, String, Value>,
     inner: Option<Box<MapFlatten<'a>>>,
     parent: Option<String>,
 }
 
 impl<'a> MapFlatten<'a> {
-    fn new(values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new(values: ::value::value::ObjectIter<'a, String, Value>) -> Self {
         Self {
             values,
             inner: None,
@@ -105,7 +103,10 @@ impl<'a> MapFlatten<'a> {
         }
     }
 
-    fn new_from_parent(parent: String, values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new_from_parent(
+        parent: String,
+        values: ::value::value::ObjectIter<'a, String, Value>,
+    ) -> Self {
         Self {
             values,
             inner: None,
