@@ -26,10 +26,10 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        BytesReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        BytesReceived, OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        SqsS3EventsReceived, StreamClosedError,
+        StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -485,7 +485,8 @@ impl IngestorProcess {
                 }
             }
 
-            emit!(SqsS3EventsReceived {
+            emit!(OldEventsReceived {
+                count: 1,
                 byte_size: log.size_of()
             });
 

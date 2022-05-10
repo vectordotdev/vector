@@ -4,28 +4,6 @@ use prost::DecodeError;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct VectorEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for VectorEventReceived {
-    fn emit(self) {
-        trace!(
-            message = "Events received.",
-            count = 1,
-            byte_size = self.byte_size
-        );
-        counter!("component_received_events_total", 1);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        // deprecated
-        counter!("events_in_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct VectorProtoDecodeError<'a> {
     pub error: &'a DecodeError,
 }

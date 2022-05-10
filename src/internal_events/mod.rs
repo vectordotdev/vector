@@ -127,7 +127,6 @@ mod splunk_hec;
 mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
-mod stdin;
 #[cfg(feature = "sources-syslog")]
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
@@ -287,8 +286,6 @@ pub(crate) use self::splunk_hec::*;
 pub(crate) use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-stdin")]
-pub(crate) use self::stdin::*;
 #[cfg(feature = "sources-syslog")]
 pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]

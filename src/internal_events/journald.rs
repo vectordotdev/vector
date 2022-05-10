@@ -3,24 +3,6 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct JournaldEventsReceived {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for JournaldEventsReceived {
-    fn emit(self) {
-        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-        counter!("component_received_events_total", self.count as u64);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        counter!("events_in_total", self.count as u64); // deprecated
-    }
-}
-
-#[derive(Debug)]
 pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,

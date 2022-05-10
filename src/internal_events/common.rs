@@ -1,7 +1,7 @@
 use super::prelude::{error_stage, error_type};
 use metrics::counter;
-pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
+pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
 #[derive(Debug)]
 pub struct BytesReceived<'a> {
