@@ -4,22 +4,55 @@ use metrics::{counter, gauge};
 use vector_core::{internal_event::InternalEvent, update_counter};
 
 #[derive(Debug)]
-pub struct KafkaEventsReceived {
+pub struct KafkaBytesReceived<'a> {
     pub byte_size: usize,
-    pub count: usize,
+    pub protocol: &'static str,
+    pub topic: &'a str,
+    pub partition: i32,
 }
 
-impl InternalEvent for KafkaEventsReceived {
+impl<'a> InternalEvent for KafkaBytesReceived<'a> {
+    fn emit(self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            topic = self.topic,
+            partition = %self.partition,
+        );
+        counter!(
+            "component_received_bytes_total",
+            self.byte_size as u64,
+            "protocol" => self.protocol,
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct KafkaEventsReceived<'a> {
+    pub byte_size: usize,
+    pub count: usize,
+    pub topic: &'a str,
+    pub partition: i32,
+}
+
+impl<'a> InternalEvent for KafkaEventsReceived<'a> {
     fn emit(self) {
         trace!(
             message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
+            topic = self.topic,
+            partition = %self.partition,
         );
-        counter!("component_received_events_total", self.count as u64);
+        counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64
+            self.byte_size as u64,
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
         );
         // deprecated
         counter!("events_in_total", self.count as u64);

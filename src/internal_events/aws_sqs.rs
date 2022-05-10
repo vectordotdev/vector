@@ -146,25 +146,6 @@ mod s3 {
 }
 
 #[derive(Debug)]
-pub struct AwsSqsEventsSent<'a> {
-    pub byte_size: usize,
-    pub message_id: Option<&'a String>,
-}
-
-impl InternalEvent for AwsSqsEventsSent<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Events sent.",
-            message_id = ?self.message_id,
-            count = 1,
-            byte_size = %self.byte_size,
-        );
-        counter!("component_sent_events_total", 1);
-        counter!("component_sent_event_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct SqsS3EventsReceived {
     pub byte_size: usize,
 }
@@ -212,27 +193,6 @@ impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
 }
 
 // AWS sqs source
-
-#[cfg(feature = "sources-aws_sqs")]
-#[derive(Debug)]
-pub struct AwsSqsBytesReceived {
-    pub byte_size: usize,
-}
-
-#[cfg(feature = "sources-aws_sqs")]
-impl InternalEvent for AwsSqsBytesReceived {
-    fn emit(self) {
-        trace!(
-            message = "Bytes received.",
-            byte_size = %self.byte_size,
-            protocol = "http",
-        );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "http",
-        );
-    }
-}
 
 #[cfg(feature = "sources-aws_sqs")]
 #[derive(Debug)]

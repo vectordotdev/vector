@@ -246,7 +246,10 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+        test_util::{
+            components::{self, assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+        },
         SourceSender,
     };
     use codecs::{
@@ -364,9 +367,10 @@ mod tests {
         rx: impl Stream<Item = Event> + Unpin,
         n: usize,
     ) -> Vec<Event> {
-        let events = spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
-        events
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+            spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
+        })
+        .await
     }
 
     #[tokio::test]
@@ -479,32 +483,34 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_parsing() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(400, send(addr, "{").await); //malformed
-                assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
+            spawn_collect_n(
+                async move {
+                    assert_eq!(400, send(addr, "{").await); //malformed
+                    assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
 
-                assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
-                assert_eq!(200, send(addr, "[{},{},{}]").await);
-            },
-            rx,
-            2,
-        )
+                    assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
+                    assert_eq!(200, send(addr, "[{},{},{}]").await);
+                },
+                rx,
+                2,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         assert!(events
             .remove(1)
@@ -520,29 +526,31 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_values() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
-                assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
-            },
-            rx,
-            2,
-        )
+            spawn_collect_n(
+                async move {
+                    assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
+                    assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
+                },
+                rx,
+                2,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -564,32 +572,34 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_dotted_keys() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
-                assert_eq!(
-                    200,
-                    send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
-                );
-            },
-            rx,
-            2,
-        )
+            spawn_collect_n(
+                async move {
+                    assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
+                    assert_eq!(
+                        200,
+                        send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
+                    );
+                },
+                rx,
+                2,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -607,36 +617,38 @@ mod tests {
 
     #[tokio::test]
     async fn http_ndjson() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    200,
-                    send(addr, r#"[{"key1":"value1"},{"key2":"value2"}]"#).await
-                );
+            spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, r#"[{"key1":"value1"},{"key2":"value2"}]"#).await
+                    );
 
-                assert_eq!(
-                    200,
-                    send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
-                );
-            },
-            rx,
-            4,
-        )
+                    assert_eq!(
+                        200,
+                        send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
+                    );
+                },
+                rx,
+                4,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -674,32 +686,35 @@ mod tests {
 
     #[tokio::test]
     async fn http_headers() {
-        let mut headers = HeaderMap::new();
-        headers.insert("User-Agent", "test_client".parse().unwrap());
-        headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let mut headers = HeaderMap::new();
+            headers.insert("User-Agent", "test_client".parse().unwrap());
+            headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
 
-        let (rx, addr) = source(
-            vec![
-                "User-Agent".to_string(),
-                "Upgrade-Insecure-Requests".to_string(),
-                "AbsentHeader".to_string(),
-            ],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+            let (rx, addr) = source(
+                vec![
+                    "User-Agent".to_string(),
+                    "Upgrade-Insecure-Requests".to_string(),
+                    "AbsentHeader".to_string(),
+                ],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_ok_collect_n(
-            send_with_headers(addr, "{\"key1\":\"value1\"}", headers),
-            rx,
-            1,
-        )
+            spawn_ok_collect_n(
+                send_with_headers(addr, "{\"key1\":\"value1\"}", headers),
+                rx,
+                1,
+            )
+            .await
+        })
         .await;
 
         {
@@ -717,28 +732,31 @@ mod tests {
 
     #[tokio::test]
     async fn http_query() {
-        let (rx, addr) = source(
-            vec![],
-            vec![
-                "source".to_string(),
-                "region".to_string(),
-                "absent".to_string(),
-            ],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![
+                    "source".to_string(),
+                    "region".to_string(),
+                    "absent".to_string(),
+                ],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_ok_collect_n(
-            send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb"),
-            rx,
-            1,
-        )
+            spawn_ok_collect_n(
+                send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb"),
+                rx,
+                1,
+            )
+            .await
+        })
         .await;
 
         {
@@ -756,33 +774,36 @@ mod tests {
 
     #[tokio::test]
     async fn http_gzip_deflate() {
-        let body = "test body";
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let body = "test body";
 
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(body.as_bytes()).unwrap();
-        let body = encoder.finish().unwrap();
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(body.as_bytes()).unwrap();
+            let body = encoder.finish().unwrap();
 
-        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(body.as_slice()).unwrap();
-        let body = encoder.finish().unwrap();
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(body.as_slice()).unwrap();
+            let body = encoder.finish().unwrap();
 
-        let mut headers = HeaderMap::new();
-        headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
+            let mut headers = HeaderMap::new();
+            headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
 
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            None,
-        )
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_ok_collect_n(send_bytes(addr, body, headers), rx, 1).await
+        })
         .await;
-
-        let mut events = spawn_ok_collect_n(send_bytes(addr, body, headers), rx, 1).await;
 
         {
             let event = events.remove(0);
@@ -796,24 +817,27 @@ mod tests {
 
     #[tokio::test]
     async fn http_path() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "vector_http_path",
-            "/event/path",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "vector_http_path",
+                "/event/path",
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_ok_collect_n(
-            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path"),
-            rx,
-            1,
-        )
+            spawn_ok_collect_n(
+                send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path"),
+                rx,
+                1,
+            )
+            .await
+        })
         .await;
 
         {
@@ -828,35 +852,37 @@ mod tests {
 
     #[tokio::test]
     async fn http_path_no_restriction() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "vector_http_path",
-            "/event",
-            false,
-            EventStatus::Delivered,
-            true,
-            None,
-            Some(JsonDeserializerConfig::new().into()),
-        )
-        .await;
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "vector_http_path",
+                "/event",
+                false,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::new().into()),
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    200,
-                    send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path1").await
-                );
-                assert_eq!(
-                    200,
-                    send_with_path(addr, "{\"key2\":\"value2\"}", "/event/path2").await
-                );
-            },
-            rx,
-            2,
-        )
+            spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path1").await
+                    );
+                    assert_eq!(
+                        200,
+                        send_with_path(addr, "{\"key2\":\"value2\"}", "/event/path2").await
+                    );
+                },
+                rx,
+                2,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -899,54 +925,58 @@ mod tests {
 
     #[tokio::test]
     async fn http_delivery_failure() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Rejected,
-            true,
-            None,
-            None,
-        )
-        .await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Rejected,
+                true,
+                None,
+                None,
+            )
+            .await;
 
-        spawn_collect_n(
-            async move {
-                assert_eq!(400, send(addr, "test body\n").await);
-            },
-            rx,
-            1,
-        )
+            spawn_collect_n(
+                async move {
+                    assert_eq!(400, send(addr, "test body\n").await);
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
     }
 
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Rejected,
-            false,
-            None,
-            None,
-        )
-        .await;
+        let events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "/",
+                true,
+                EventStatus::Rejected,
+                false,
+                None,
+                None,
+            )
+            .await;
 
-        let events = spawn_collect_n(
-            async move {
-                assert_eq!(200, send(addr, "test body\n").await);
-            },
-            rx,
-            1,
-        )
+            spawn_collect_n(
+                async move {
+                    assert_eq!(200, send(addr, "test body\n").await);
+                },
+                rx,
+                1,
+            )
+            .await
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
 
         assert_eq!(events.len(), 1);
     }

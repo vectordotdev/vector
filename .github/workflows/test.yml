@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
@@ -22,17 +26,6 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   changes:
       runs-on: ubuntu-20.04
       # Set job outputs to values from filter step
@@ -171,7 +164,7 @@ jobs:
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -298,7 +291,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -357,7 +350,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - changes
       - cross-linux
       - test-misc

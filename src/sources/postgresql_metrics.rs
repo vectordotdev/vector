@@ -30,7 +30,7 @@ use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        BytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
+        EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
         PostgresqlMetricsCollectError, StreamClosedError,
     },
 };
@@ -192,14 +192,17 @@ struct PostgresqlClient {
     config: Config,
     tls_config: Option<PostgresqlMetricsTlsConfig>,
     client: Option<(Client, usize)>,
+    endpoint: String,
 }
 
 impl PostgresqlClient {
-    const fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+    fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+        let endpoint = config_to_endpoint(&config);
         Self {
             config,
             tls_config,
             client: None,
+            endpoint,
         }
     }
 
@@ -228,7 +231,7 @@ impl PostgresqlClient {
                 let (client, connection) =
                     self.config.connect(connector).await.with_context(|_| {
                         ConnectionFailedSnafu {
-                            endpoint: config_to_endpoint(&self.config),
+                            endpoint: &self.endpoint,
                         }
                     })?;
                 tokio::spawn(connection);
@@ -240,7 +243,7 @@ impl PostgresqlClient {
                         .connect(NoTls)
                         .await
                         .with_context(|_| ConnectionFailedSnafu {
-                            endpoint: config_to_endpoint(&self.config),
+                            endpoint: &self.endpoint,
                         })?;
                 tokio::spawn(connection);
                 client
@@ -253,14 +256,14 @@ impl PostgresqlClient {
                 .query_one("SELECT version()", &[])
                 .await
                 .with_context(|_| SelectVersionFailedSnafu {
-                    endpoint: config_to_endpoint(&self.config),
+                    endpoint: &self.endpoint,
                 })?;
             let version = version_row
                 .try_get::<&str, &str>("version")
                 .with_context(|_| SelectVersionFailedSnafu {
-                    endpoint: config_to_endpoint(&self.config),
+                    endpoint: &self.endpoint,
                 })?;
-            debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+            debug!(message = "Connected to server.", endpoint = %self.endpoint, server_version = %version);
         }
 
         // Get server version and check that we support it
@@ -268,13 +271,13 @@ impl PostgresqlClient {
             .query_one("SHOW server_version_num", &[])
             .await
             .with_context(|_| SelectVersionFailedSnafu {
-                endpoint: config_to_endpoint(&self.config),
+                endpoint: &self.endpoint,
             })?;
 
         let version = row
             .try_get::<&str, &str>("server_version_num")
             .with_context(|_| SelectVersionFailedSnafu {
-                endpoint: config_to_endpoint(&self.config),
+                endpoint: &self.endpoint,
             })?;
 
         let version = match version.parse::<usize>() {
@@ -425,6 +428,7 @@ impl DatnameFilter {
 #[derive(Debug)]
 struct PostgresqlMetrics {
     client: PostgresqlClient,
+    endpoint: String,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
     datname_filter: DatnameFilter,
@@ -437,7 +441,10 @@ impl PostgresqlMetrics {
         namespace: Option<String>,
         tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
+        // Takes the raw endpoint, parses it into a configuration, and then we set `endpoint` back to a sanitized
+        // version of the original value, dropping things like username/password, etc.
         let config: Config = endpoint.parse().context(InvalidEndpointSnafu)?;
+        let endpoint = config_to_endpoint(&config);
 
         let hosts = config.get_hosts();
         let host = match hosts.len() {
@@ -455,11 +462,12 @@ impl PostgresqlMetrics {
         };
 
         let mut tags = BTreeMap::new();
-        tags.insert("endpoint".into(), config_to_endpoint(&config));
+        tags.insert("endpoint".into(), endpoint.clone());
         tags.insert("host".into(), host);
 
         Ok(Self {
             client: PostgresqlClient::new(config, tls_config),
+            endpoint,
             namespace,
             tags,
             datname_filter,
@@ -474,7 +482,7 @@ impl PostgresqlMetrics {
             Err(error) => {
                 emit!(PostgresqlMetricsCollectError {
                     error,
-                    endpoint: self.tags.get("endpoint"),
+                    endpoint: &self.endpoint,
                 });
                 Box::new(iter::once(self.create_metric(
                     "up",
@@ -505,9 +513,10 @@ impl PostgresqlMetrics {
                     result.iter().fold((0, 0, 0), |res, (set, size)| {
                         (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
                     });
-                emit!(BytesReceived {
+                emit!(EndpointBytesReceived {
                     byte_size: received_byte_size,
-                    protocol: "tcp"
+                    protocol: "tcp",
+                    endpoint: &self.endpoint,
                 });
                 emit!(EventsReceived { count, byte_size });
                 self.client.set((client, client_version));
@@ -923,7 +932,11 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::trace_init, tls, SourceSender};
+    use crate::{
+        event::Event,
+        test_util::components::{assert_source_compliance, PULL_SOURCE_TAGS},
+        tls, SourceSender,
+    };
     use std::path::PathBuf;
 
     fn pg_host() -> String {
@@ -953,81 +966,83 @@ mod integration_tests {
         include_databases: Option<Vec<String>>,
         exclude_databases: Option<Vec<String>>,
     ) -> Vec<Event> {
-        trace_init();
+        assert_source_compliance(&PULL_SOURCE_TAGS, async move {
+            let config: Config = endpoint.parse().unwrap();
+            let tags_endpoint = config_to_endpoint(&config);
+            let tags_host = match config.get_hosts().get(0).unwrap() {
+                Host::Tcp(host) => host.clone(),
+                #[cfg(unix)]
+                Host::Unix(path) => path.to_string_lossy().to_string(),
+            };
 
-        let config: Config = endpoint.parse().unwrap();
-        let tags_endpoint = config_to_endpoint(&config);
-        let tags_host = match config.get_hosts().get(0).unwrap() {
-            Host::Tcp(host) => host.clone(),
-            #[cfg(unix)]
-            Host::Unix(path) => path.to_string_lossy().to_string(),
-        };
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            PostgresqlMetricsConfig {
-                endpoints: vec![endpoint],
-                tls,
-                include_databases,
-                exclude_databases,
-                ..Default::default()
-            }
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
-
-        let event = time::timeout(time::Duration::from_secs(3), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
-            }
-        }
-        assert!(events.len() > 1);
-
-        // test up metric
-        assert_eq!(
-            events
-                .iter()
-                .map(|e| e.as_metric())
-                .find(|e| e.name() == "up")
+            tokio::spawn(async move {
+                PostgresqlMetricsConfig {
+                    endpoints: vec![endpoint],
+                    tls,
+                    include_databases,
+                    exclude_databases,
+                    ..Default::default()
+                }
+                .build(SourceContext::new_test(sender, None))
+                .await
                 .unwrap()
-                .value(),
-            &gauge!(1)
-        );
+                .await
+                .unwrap()
+            });
 
-        // test namespace and tags
-        for event in &events {
-            let metric = event.as_metric();
+            let event = time::timeout(time::Duration::from_secs(3), recv.next())
+                .await
+                .expect("fetch metrics timeout")
+                .expect("failed to get metrics from a stream");
+            let mut events = vec![event];
+            loop {
+                match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
+            }
 
-            assert_eq!(metric.namespace(), Some("postgresql"));
+            assert!(events.len() > 1);
+
+            // test up metric
             assert_eq!(
-                metric.tags().unwrap().get("endpoint").unwrap(),
-                &tags_endpoint
+                events
+                    .iter()
+                    .map(|e| e.as_metric())
+                    .find(|e| e.name() == "up")
+                    .unwrap()
+                    .value(),
+                &gauge!(1)
             );
-            assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
-        }
 
-        // test metrics from different queries
-        let names = vec![
-            "pg_stat_database_datid",
-            "pg_stat_database_conflicts_confl_tablespace_total",
-            "pg_stat_bgwriter_checkpoints_timed_total",
-        ];
-        for name in names {
-            assert!(events.iter().any(|e| e.as_metric().name() == name));
-        }
+            // test namespace and tags
+            for event in &events {
+                let metric = event.as_metric();
 
-        events
+                assert_eq!(metric.namespace(), Some("postgresql"));
+                assert_eq!(
+                    metric.tags().unwrap().get("endpoint").unwrap(),
+                    &tags_endpoint
+                );
+                assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
+            }
+
+            // test metrics from different queries
+            let names = vec![
+                "pg_stat_database_datid",
+                "pg_stat_database_conflicts_confl_tablespace_total",
+                "pg_stat_bgwriter_checkpoints_timed_total",
+            ];
+            for name in names {
+                assert!(events.iter().any(|e| e.as_metric().name() == name));
+            }
+
+            events
+        })
+        .await
     }
 
     #[tokio::test]

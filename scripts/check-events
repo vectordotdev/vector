@@ -34,9 +34,9 @@ end
 
 # A class to hold error reports and common functionality
 class Event
-  attr_accessor :path
+  attr_accessor :path, :uses
   attr_reader :name, :reports
-  attr_writer :members
+  attr_writer :members, :impl_internal_event
 
   def initialize(name)
     @path = nil
@@ -45,6 +45,8 @@ class Event
     @members = []
     @counters = {}
     @logs = []
+    @uses = 0
+    @impl_internal_event = false
   end
 
   def add_counter(name, tags)
@@ -57,6 +59,10 @@ class Event
 
   def valid?
     @reports.clear
+
+    if @impl_internal_event and @uses == 0
+      @reports.append('Event has no uses.')
+    end
 
     EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
       if @name.end_with? suffix
@@ -170,6 +176,10 @@ Find.find('.') do |path|
   if path.end_with? '.rs'
     text = File.read(path)
 
+    text.scan(/\b(?:emit!|internal_event::emit)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)/) do |event_name,|
+      $all_events[event_name].uses += 1
+    end
+
     # Check log message texts for correct formatting. See below for the
     # full regex
     if path.start_with? 'src/'
@@ -179,14 +189,13 @@ Find.find('.') do |path|
         reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
         reports.append('Message must end with a period.') unless message.match(/\.$/)
         unless reports.empty?
-          puts "#{path}: Errors in message \"#{message}\":"
           reports.each { |report| puts "  #{report}" }
           error_count += 1
         end
       end
     end
 
-    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/')
+    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector-common/src/internal_event/')
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
@@ -198,6 +207,8 @@ Find.find('.') do |path|
 
       # Scan internal event implementation blocks for logs and metrics
       text.scan(/^(\s*)impl(?:<.+?>)? InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) do |_space, event_name, block|
+        $all_events[event_name].impl_internal_event = true
+
         # Scan for counter names and tags
         block.scan(/ counter!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |name, tags|
           tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]

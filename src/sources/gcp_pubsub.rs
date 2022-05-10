@@ -22,8 +22,8 @@ use crate::{
     event::{BatchNotifier, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, Scope, PUBSUB_URL},
     internal_events::{
-        GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
-        HttpClientBytesReceived, StreamClosedError,
+        BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
+        StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -324,10 +324,9 @@ impl PubsubSource {
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
     ) {
-        emit!(HttpClientBytesReceived {
+        emit!(BytesReceived {
             byte_size: response.size_of(),
             protocol: self.uri.scheme().map(Scheme::as_str).unwrap_or("http"),
-            endpoint: &self.endpoint,
         });
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
@@ -423,6 +422,7 @@ mod integration_tests {
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};
+    use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
     use crate::test_util::{self, components, random_string};
     use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
@@ -433,10 +433,13 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
-        let test_data = tester.send_test_events(99, btreemap![]).await;
-        receive_events(&mut rx, test_data).await;
-        tester.shutdown_check(shutdown).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let test_data = tester.send_test_events(99, btreemap![]).await;
+            receive_events(&mut rx, test_data).await;
+            tester.shutdown_check(shutdown).await;
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -453,64 +456,76 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-        let test_data = tester.send_test_events(1, btreemap![]).await;
-        receive_events(&mut rx, test_data).await;
+            let test_data = tester.send_test_events(1, btreemap![]).await;
+            receive_events(&mut rx, test_data).await;
 
-        tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown).await;
 
-        assert!(rx.next().await.is_none());
-        tester.send_test_events(1, btreemap![]).await;
-        assert!(rx.next().await.is_none());
-        // The following assert is there to test that the source isn't
-        // pulling anything out of the subscription after it reports
-        // shutdown. It works when there wasn't anything previously in
-        // the topic, but does not work here despite evidence that the
-        // entire tokio task has exited.
-        // assert_eq!(tester.pull_count(1).await, 1);
+            assert!(rx.next().await.is_none());
+            tester.send_test_events(1, btreemap![]).await;
+            assert!(rx.next().await.is_none());
+            // The following assert is there to test that the source isn't
+            // pulling anything out of the subscription after it reports
+            // shutdown. It works when there wasn't anything previously in
+            // the topic, but does not work here despite evidence that the
+            // entire tokio task has exited.
+            // assert_eq!(tester.pull_count(1).await, 1);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn streams_data() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
-        for _ in 0..10 {
-            let test_data = tester.send_test_events(9, btreemap![]).await;
-            receive_events(&mut rx, test_data).await;
-        }
-        tester.shutdown_check(shutdown).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            for _ in 0..10 {
+                let test_data = tester.send_test_events(9, btreemap![]).await;
+                receive_events(&mut rx, test_data).await;
+            }
+            tester.shutdown_check(shutdown).await;
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn sends_attributes() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
-        let attributes = btreemap![
-            random_string(8) => random_string(88),
-            random_string(8) => random_string(88),
-            random_string(8) => random_string(88),
-        ];
-        let test_data = tester.send_test_events(1, attributes).await;
-        receive_events(&mut rx, test_data).await;
-        tester.shutdown_check(shutdown).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+            let attributes = btreemap![
+                random_string(8) => random_string(88),
+                random_string(8) => random_string(88),
+                random_string(8) => random_string(88),
+            ];
+            let test_data = tester.send_test_events(1, attributes).await;
+            receive_events(&mut rx, test_data).await;
+            tester.shutdown_check(shutdown).await;
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn acks_received() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-        let test_data = tester.send_test_events(1, btreemap![]).await;
-        receive_events(&mut rx, test_data).await;
+            let test_data = tester.send_test_events(1, btreemap![]).await;
+            receive_events(&mut rx, test_data).await;
 
-        tester.shutdown_check(shutdown).await;
+            tester.shutdown_check(shutdown).await;
 
-        // Make sure there are no messages left in the queue
-        assert_eq!(tester.pull_count(10).await, 0);
+            // Make sure there are no messages left in the queue
+            assert_eq!(tester.pull_count(10).await, 0);
 
-        // Wait for the acknowledgement deadline to expire
-        tokio::time::sleep(Duration::from_secs(ACK_DEADLINE + 1)).await;
+            // Wait for the acknowledgement deadline to expire
+            tokio::time::sleep(Duration::from_secs(ACK_DEADLINE + 1)).await;
 
-        // All messages are still acknowledged
-        assert_eq!(tester.pull_count(10).await, 0);
+            // All messages are still acknowledged
+            assert_eq!(tester.pull_count(10).await, 0);
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -519,21 +534,24 @@ mod integration_tests {
     // to verify the events are not acknowledged through the emulator.
     #[ignore]
     async fn does_not_ack_rejected() {
-        let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
 
-        let test_data = tester.send_test_events(1, btreemap![]).await;
-        receive_events(&mut rx, test_data).await;
+            let test_data = tester.send_test_events(1, btreemap![]).await;
+            receive_events(&mut rx, test_data).await;
 
-        tester.shutdown(shutdown).await;
+            tester.shutdown(shutdown).await;
 
-        // Make sure there are no messages left in the queue
-        assert_eq!(tester.pull_count(10).await, 0);
+            // Make sure there are no messages left in the queue
+            assert_eq!(tester.pull_count(10).await, 0);
 
-        // Wait for the acknowledgement deadline to expire
-        tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+            // Wait for the acknowledgement deadline to expire
+            tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
 
-        // All messages are still in the queue
-        assert_eq!(tester.pull_count(10).await, 1);
+            // All messages are still in the queue
+            assert_eq!(tester.pull_count(10).await, 1);
+        })
+        .await;
     }
 
     async fn setup(
