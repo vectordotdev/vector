@@ -16,8 +16,16 @@ use crate::ByteSizeOf;
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
+    /// Convert a `TraceEvent` into a tuple of its components
+    /// # Panics
+    ///
+    /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
-        self.0.into_parts_deprecated()
+        let (value, metadata) = self.0.into_parts();
+        let map = value
+            .into_object()
+            .unwrap_or_else(|| unreachable!("inner fields must be a map"));
+        (map, metadata)
     }
 
     pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {

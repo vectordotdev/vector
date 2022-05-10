@@ -33,8 +33,8 @@ impl VrlTarget {
     pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
             Event::Log(event) => {
-                let (fields, metadata) = event.into_parts_deprecated();
-                VrlTarget::LogEvent(Value::Object(fields), metadata)
+                let (value, metadata) = event.into_parts();
+                VrlTarget::LogEvent(value, metadata)
             }
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in

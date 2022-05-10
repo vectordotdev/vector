@@ -85,10 +85,10 @@ impl Arbitrary for LogEvent {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let (fields, metadata) = self.clone().into_parts_deprecated();
+        let (value, metadata) = self.clone().into_parts();
 
         Box::new(
-            fields
+            value
                 .shrink()
                 .map(move |x| LogEvent::from_map(x, metadata.clone())),
         )
