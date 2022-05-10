@@ -267,6 +267,8 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "type_def")]
+mod type_def;
 #[cfg(feature = "unique")]
 mod unique;
 #[cfg(feature = "unnest")]
@@ -532,6 +534,8 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "type_def")]
+pub use type_def::TypeDef;
 #[cfg(feature = "unique")]
 pub use unique::Unique;
 #[cfg(feature = "unnest")]
@@ -799,6 +803,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "type_def")]
+        Box::new(TypeDef),
         #[cfg(feature = "unique")]
         Box::new(Unique),
         #[cfg(feature = "unnest")]
