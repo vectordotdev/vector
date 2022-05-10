@@ -75,10 +75,9 @@ impl VrlTarget {
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => log
-                .insert(path.clone(), value)
-                .map(|_| ())
-                .map_err(|err| err.to_string()),
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                log.target_insert(path, value)
+            }
             VrlTarget::Metric {
                 ref mut metric,
                 value: metric_value,
@@ -150,18 +149,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
-                log.get(path).map_err(|err| err.to_string())
-            }
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
-                log.get_mut(path).map_err(|err| err.to_string())
-            }
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -173,17 +168,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                if path.is_root() {
-                    Ok(Some({
-                        let mut map = Value::Object(BTreeMap::new());
-                        std::mem::swap(log, &mut map);
-                        map
-                    }))
-                } else {
-                    log.remove(path, compact)
-                        .map(|val| val.map(Into::into))
-                        .map_err(|err| err.to_string())
-                }
+                log.target_remove(path, compact)
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -282,15 +267,20 @@ impl vrl_lib::Target for VrlTarget {
 
 #[derive(Debug, Clone)]
 pub enum VrlImmutableTarget<'a> {
-    LogEvent(&'a LogEvent),
+    LogEvent(&'a Value, &'a EventMetadata),
     Metric { metric: &'a Metric, value: Value },
-    Trace(&'a TraceEvent),
+    Trace(&'a Value, &'a EventMetadata),
 }
 
 impl<'a> VrlImmutableTarget<'a> {
     pub fn new(event: &'a Event, info: &ProgramInfo) -> Self {
         match event {
-            Event::Log(event) => VrlImmutableTarget::LogEvent(event),
+            Event::Log(event) => {
+                let value = event.value();
+                let metadata = event.metadata();
+
+                VrlImmutableTarget::LogEvent(value, metadata)
+            }
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
@@ -299,7 +289,12 @@ impl<'a> VrlImmutableTarget<'a> {
 
                 VrlImmutableTarget::Metric { metric, value }
             }
-            Event::Trace(event) => VrlImmutableTarget::Trace(event),
+            Event::Trace(event) => {
+                let value = event.value();
+                let metadata = event.metadata();
+
+                VrlImmutableTarget::Trace(value, metadata)
+            }
         }
     }
 }
@@ -312,8 +307,9 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlImmutableTarget::LogEvent(log) => Ok(log.lookup(path)),
-            VrlImmutableTarget::Trace(log) => Ok(log.lookup(path)),
+            VrlImmutableTarget::LogEvent(log, _) | VrlImmutableTarget::Trace(log, _) => {
+                log.target_get(path)
+            }
             VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
@@ -332,8 +328,9 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
 
     fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
-            VrlImmutableTarget::LogEvent(event) => event.metadata(),
-            VrlImmutableTarget::Trace(event) => event.metadata(),
+            VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
+                metadata
+            }
             VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
         };
 
