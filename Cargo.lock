@@ -8952,6 +8952,7 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float 3.0.0",
+ "serde_json",
  "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
