@@ -53,6 +53,7 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
     Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
+const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
@@ -630,12 +631,15 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        let mut input_rx = self
+        let input_rx = self
             .input_rx
             .take()
             .expect("can't run runner twice")
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
+
+        let mut input_rx =
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -655,15 +659,21 @@ impl Runner {
                     }
                 }
 
-                input_events = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
-                    match input_events {
-                        Some(events) => {
-                            self.on_events_received(&events);
+                input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                    match input_arrays {
+                        Some(input_arrays) => {
+                            let mut len = 0;
+                            for events in &input_arrays {
+                                self.on_events_received(events);
+                                len += events.len();
+                            }
 
                             let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
+                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             let task = tokio::spawn(async move {
-                                t.transform_all(events, &mut outputs_buf);
+                                for events in input_arrays {
+                                    t.transform_all(events, &mut outputs_buf);
+                                }
                                 outputs_buf
                             }.in_current_span());
                             in_flight.push(task);

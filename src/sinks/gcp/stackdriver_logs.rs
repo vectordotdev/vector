@@ -311,7 +311,11 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    healthcheck_response(
+        response,
+        sink.creds.clone(),
+        HealthcheckError::NotFound.into(),
+    )
 }
 
 impl StackdriverConfig {

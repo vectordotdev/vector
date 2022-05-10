@@ -3,22 +3,6 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct RedisEventsSent {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for RedisEventsSent {
-    fn emit(self) {
-        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-        counter!("component_sent_events_total", self.count as u64);
-        counter!("component_sent_event_bytes_total", self.byte_size as u64);
-        // deprecated
-        counter!("processed_events_total", self.count as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct RedisSendEventError<'a> {
     error: &'a redis::RedisError,
     error_code: String,

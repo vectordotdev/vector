@@ -692,7 +692,7 @@ pub struct S3Bucket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {
     // S3ObjectKeys are URL encoded
@@ -710,13 +710,21 @@ mod urlencoded_string {
     {
         use serde::de::Error;
 
-        serde::de::Deserialize::deserialize(deserializer).and_then(|s| {
-            percent_decode(s)
-                .decode_utf8()
-                .map(Into::into)
-                .map_err(|err| {
-                    D::Error::custom(format!("error url decoding S3 object key: {}", err))
-                })
+        serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
+            let decoded = if s.iter().any(|c| *c == b'+') {
+                // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
+                let s = s
+                    .iter()
+                    .map(|c| if *c == b'+' { b' ' } else { *c })
+                    .collect::<Vec<_>>();
+                percent_decode(&s).decode_utf8().map(Into::into)
+            } else {
+                percent_decode(s).decode_utf8().map(Into::into)
+            };
+
+            decoded.map_err(|err| {
+                D::Error::custom(format!("error url decoding S3 object key: {}", err))
+            })
         })
     }
 
@@ -728,4 +736,23 @@ mod urlencoded_string {
             &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
         )
     }
+}
+
+#[test]
+fn test_key_deserialize() {
+    let value = serde_json::from_str(r#"{"key": "noog+nork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog nork".to_string(),
+        },
+        value
+    );
+
+    let value = serde_json::from_str(r#"{"key": "noog%2bnork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog+nork".to_string(),
+        },
+        value
+    );
 }

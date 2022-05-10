@@ -20,7 +20,7 @@ thiserror = "1"
 test-case = "2"
 
 [build-dependencies]
-lalrpop = { version = "0.19.7", default-features = false }
+lalrpop = { version = "0.19.8", default-features = false }
 
 [features]
 fuzz = ["arbitrary"]

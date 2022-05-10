@@ -93,28 +93,38 @@ impl Expression for Op {
         use ast::Opcode::*;
         use Value::*;
 
-        let lhs = self.lhs.resolve(ctx);
-        let mut rhs = || self.rhs.resolve(ctx);
+        if let Err = self.opcode {
+            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+        } else if let Or = self.opcode {
+            return self
+                .lhs
+                .resolve(ctx)?
+                .try_or(|| self.rhs.resolve(ctx))
+                .map_err(Into::into);
+        } else if let And = self.opcode {
+            return match self.lhs.resolve(ctx)? {
+                Null | Boolean(false) => Ok(false.into()),
+                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+            };
+        };
+
+        let lhs = self.lhs.resolve(ctx)?;
+        let rhs = self.rhs.resolve(ctx)?;
 
         match self.opcode {
-            Mul => lhs?.try_mul(rhs()?),
-            Div => lhs?.try_div(rhs()?),
-            Add => lhs?.try_add(rhs()?),
-            Sub => lhs?.try_sub(rhs()?),
-            Rem => lhs?.try_rem(rhs()?),
-            Or => lhs?.try_or(rhs),
-            And => match lhs? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(rhs()?),
-            },
-            Err => Ok(lhs.or_else(|_| rhs())?),
-            Eq => Ok(lhs?.eq_lossy(&rhs()?).into()),
-            Ne => Ok((!lhs?.eq_lossy(&rhs()?)).into()),
-            Gt => lhs?.try_gt(rhs()?),
-            Ge => lhs?.try_ge(rhs()?),
-            Lt => lhs?.try_lt(rhs()?),
-            Le => lhs?.try_le(rhs()?),
-            Merge => lhs?.try_merge(rhs()?),
+            Mul => lhs.try_mul(rhs),
+            Div => lhs.try_div(rhs),
+            Add => lhs.try_add(rhs),
+            Sub => lhs.try_sub(rhs),
+            Rem => lhs.try_rem(rhs),
+            Eq => Ok(lhs.eq_lossy(&rhs).into()),
+            Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
+            Gt => lhs.try_gt(rhs),
+            Ge => lhs.try_ge(rhs),
+            Lt => lhs.try_lt(rhs),
+            Le => lhs.try_le(rhs),
+            Merge => lhs.try_merge(rhs),
+            And | Or | Err => unreachable!(),
         }
         .map_err(Into::into)
     }

@@ -202,21 +202,29 @@ mod integration_tests {
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
-    use crate::test_util::{collect_n, random_string};
+    use crate::test_util::{
+        collect_n,
+        components::{assert_source_compliance, SOURCE_TAGS},
+        random_string,
+    };
     use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
         let subject = conf.subject.clone();
         let (nc, sub) = create_subscription(&conf).await?;
         let nc_pub = nc.clone();
-
-        let (tx, rx) = SourceSender::new_test();
-        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
-        tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
         let msg = "my message";
-        nc_pub.publish(&subject, msg).await.unwrap();
 
-        let events = collect_n(rx, 1).await;
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
+            let (tx, rx) = SourceSender::new_test();
+            let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
+            tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
+            nc_pub.publish(&subject, msg).await.unwrap();
+
+            collect_n(rx, 1).await
+        })
+        .await;
+
         println!("Received event  {:?}", events[0].as_log());
         assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
         Ok(())

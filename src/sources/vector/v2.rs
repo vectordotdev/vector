@@ -89,7 +89,6 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
         BatchStatus::Delivered => Ok(()),
     }
 }
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -163,6 +162,25 @@ async fn run(
     let stream = listener.accept_stream().map(|result| {
         result.map(|socket| {
             let peer_addr = socket.connect_info().remote_addr;
+            // TODO: Primary downside to this approach is that it's counting the raw bytes on the wire, which
+            // will almost certainly be a much smaller number than the actual number of bytes when
+            // accounting for compression.
+            //
+            // Possible solutions:
+            // - write our own codec that works with `tonic::codec::Codec`, and write our own
+            //   `prost_build::ServiceGenerator` that codegens using it, so that we can capture the size of the body
+            //   after `tonic` decompresses it
+            // - fork `tonic-build` to support overriding `Service::CODEC_PATH` in the builder config (see
+            //   https://github.com/bmwill/tonic/commit/c409121811844494728a9ea8345ed2189855c870 for an example of doing
+            //   this) and try and upstream it; we would still need to write the aforementioned codec, though
+            // - switch to using the compression layer from `tower-http` to handle compression _before_ it hits `tonic`,
+            //   which would then let us insert a layer right after it that would have access to the raw body before it
+            //   gets decoded
+            //
+            // Number #3 is _probably_ easiest because it's "just" normal Tower middleware/layers, and there's already
+            // the layer for handling compression, and it would give us more flexibility around only tracking the bytes
+            // of specific service methods -- i.e. `push_events` -- rather than tracking all bytes that flow over the
+            // gRPC connection, like health checks or any future enhancements that we/tonic adds.
             socket.after_read(move |byte_size| {
                 emit!(TcpBytesReceived {
                     byte_size,
@@ -218,73 +236,78 @@ mod tests {
     use crate::{
         config::SinkContext,
         sinks::vector::v2::VectorConfig as SinkConfig,
-        test_util::{self, components},
+        test_util::{
+            self,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+        },
         SourceSender,
     };
 
     #[tokio::test]
     async fn receive_message() {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = test_util::next_addr();
+            let config = format!(r#"address = "{}""#, addr);
+            let source: VectorConfig = toml::from_str(&config).unwrap();
 
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test();
-        let server = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+            let (tx, rx) = SourceSender::new_test();
+            let server = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+            test_util::wait_for_tcp(addr).await;
 
-        // Ideally, this would be a fully custom agent to send the data,
-        // but the sink side already does such a test and this is good
-        // to ensure interoperability.
-        let config = format!(r#"address = "{}""#, addr);
-        let sink: SinkConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+            // Ideally, this would be a fully custom agent to send the data,
+            // but the sink side already does such a test and this is good
+            // to ensure interoperability.
+            let config = format!(r#"address = "{}""#, addr);
+            let sink: SinkConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
+            let (sink, _) = sink.build(cx).await.unwrap();
 
-        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-        sink.run(stream).await.unwrap();
-        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+            sink.run(stream).await.unwrap();
 
-        let output = test_util::collect_ready(rx).await;
-        assert_event_data_eq!(events, output);
+            let output = test_util::collect_ready(rx).await;
+            assert_event_data_eq!(events, output);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = test_util::next_addr();
+            let config = format!(r#"address = "{}""#, addr);
+            let source: VectorConfig = toml::from_str(&config).unwrap();
 
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test();
-        let server = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+            let (tx, rx) = SourceSender::new_test();
+            let server = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+            test_util::wait_for_tcp(addr).await;
 
-        // Ideally, this would be a fully custom agent to send the data,
-        // but the sink side already does such a test and this is good
-        // to ensure interoperability.
-        let config = format!(
-            r#"address = "{}"
-        compression=true"#,
-            addr
-        );
-        let sink: SinkConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+            // Ideally, this would be a fully custom agent to send the data,
+            // but the sink side already does such a test and this is good
+            // to ensure interoperability.
+            let config = format!(
+                r#"address = "{}"
+            compression=true"#,
+                addr
+            );
+            let sink: SinkConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
+            let (sink, _) = sink.build(cx).await.unwrap();
 
-        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-        sink.run(stream).await.unwrap();
-        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+            sink.run(stream).await.unwrap();
 
-        let output = test_util::collect_ready(rx).await;
-        assert_event_data_eq!(events, output);
+            let output = test_util::collect_ready(rx).await;
+            assert_event_data_eq!(events, output);
+        })
+        .await;
     }
 }

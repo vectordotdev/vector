@@ -31,8 +31,6 @@ mod common;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
-#[cfg(feature = "sinks-console")]
-mod console;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -152,8 +150,6 @@ mod websocket;
 mod file;
 mod windows;
 
-pub mod kubernetes;
-
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
@@ -224,7 +220,6 @@ pub(crate) use self::geoip::*;
     feature = "sources-utils-http-encoding",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
-    feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
 #[cfg(feature = "sources-internal_logs")]
