@@ -25,7 +25,9 @@ impl InternalEvent for EventsReceived {
     }
 }
 
-// Deprecated, use `EventsReceived` once the deprecated counter below is removed.
+// This should have a better name, but this event is deprecated.
+// Use `EventsReceived` once the deprecated counter below is removed.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct OldEventsReceived {
     pub byte_size: usize,
