@@ -12,7 +12,7 @@ use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(super) struct NetworkConfig {
+pub struct NetworkConfig {
     #[serde(default)]
     devices: FilterList,
 }

@@ -11,7 +11,7 @@ use tokio::{pin, select, time::Duration};
 use crate::{
     codecs::Decoder,
     event::BatchNotifier,
-    internal_events::{AwsSqsBytesReceived, SqsMessageDeleteError, StreamClosedError},
+    internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::{self, finalizer::UnorderedFinalizer},
     SourceSender,
@@ -102,7 +102,11 @@ impl SqsSource {
                 .iter()
                 .map(|message| message.body().map(|body| body.len()).unwrap_or(0))
                 .sum();
-            emit!(AwsSqsBytesReceived { byte_size });
+            emit!(EndpointBytesReceived {
+                byte_size,
+                protocol: "http",
+                endpoint: &self.queue_url
+            });
 
             let mut receipts_to_ack = Vec::with_capacity(messages.len());
             let mut events = Vec::with_capacity(messages.len());

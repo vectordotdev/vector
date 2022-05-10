@@ -143,7 +143,11 @@ mod tests {
     use crate::{
         event::{Event, EventStatus},
         log_event,
-        test_util::{collect_ready, next_addr, wait_for_tcp},
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            next_addr, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -355,11 +359,6 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            println!(
-                "test case: ({}, {})",
-                source_record_compression, record_compression
-            );
-
             let (rx, addr) = source(None, Some(source_record_compression), true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
@@ -385,7 +384,7 @@ mod tests {
                     vec![log_event! {
                         "source_type" => Bytes::from("aws_kinesis_firehose"),
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                        "message"=> Bytes::from(expected),
+                        "message" => Bytes::from(expected),
                         "request_id" => REQUEST_ID,
                         "source_arn" => SOURCE_ARN,
                     },]
@@ -402,37 +401,40 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
-        let (rx, addr) = source(None, None, true).await;
+        assert_source_compliance(&SOURCE_TAGS, async move {
+            let (rx, addr) = source(None, None, true).await;
 
-        let timestamp: DateTime<Utc> = Utc::now();
+            let timestamp: DateTime<Utc> = Utc::now();
 
-        let res = spawn_send(
-            addr,
-            timestamp,
-            vec![RECORD.as_bytes()],
-            None,
-            true,
-            Compression::None,
-        )
+            let res = spawn_send(
+                addr,
+                timestamp,
+                vec![RECORD.as_bytes()],
+                None,
+                true,
+                Compression::None,
+            )
+            .await;
+
+            let events = collect_ready(rx).await;
+            let res = res.await.unwrap().unwrap();
+            assert_eq!(200, res.status().as_u16());
+
+            assert_event_data_eq!(
+                events,
+                vec![log_event! {
+                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                    "message"=> RECORD,
+                    "request_id" => REQUEST_ID,
+                    "source_arn" => SOURCE_ARN,
+                },]
+            );
+
+            let response: models::FirehoseResponse = res.json().await.unwrap();
+            assert_eq!(response.request_id, REQUEST_ID);
+        })
         .await;
-
-        let events = collect_ready(rx).await;
-        let res = res.await.unwrap().unwrap();
-        assert_eq!(200, res.status().as_u16());
-
-        assert_event_data_eq!(
-            events,
-            vec![log_event! {
-                "source_type" => Bytes::from("aws_kinesis_firehose"),
-                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                "message"=> RECORD,
-                "request_id" => REQUEST_ID,
-                "source_arn" => SOURCE_ARN,
-            },]
-        );
-
-        let response: models::FirehoseResponse = res.json().await.unwrap();
-        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]

@@ -25,7 +25,7 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 ///
 /// This list should ideally be zero, but might not be if specific features
 /// haven't been released on the "VM" runtime yet.
-static AST_ONLY_TESTS: &[&str] = &[];
+static AST_ONLY_TESTS: &[&str] = &["functions/type_def/return type definition"];
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]

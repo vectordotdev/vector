@@ -8,7 +8,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct AwsEcsMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub http_path: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
@@ -18,15 +18,15 @@ impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
             count = %self.count,
             byte_size = %self.byte_size,
             protocol = "http",
-            http_path = %self.http_path,
+            endpoint = %self.endpoint,
         );
         counter!(
             "component_received_events_total", self.count as u64,
-            "http_path" => self.http_path.to_string(),
+            "endpoint" => self.endpoint.to_string(),
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size as u64,
-            "http_path" => self.http_path.to_string(),
+            "endpoint" => self.endpoint.to_string(),
         );
         // deprecated
         counter!("events_in_total", self.count as u64);
@@ -73,7 +73,7 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-            "endpoint" => self.endpoint.to_owned(),
+            "endpoint" => self.endpoint.to_string(),
         );
     }
 }
@@ -99,7 +99,7 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             "stage" => error_stage::RECEIVING,
             "error_code" => http_error_code(self.code.as_u16()),
             "error_type" => error_type::REQUEST_FAILED,
-            "endpoint" => self.endpoint.to_owned(),
+            "endpoint" => self.endpoint.to_string(),
         );
     }
 }
@@ -126,7 +126,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => hyper_error_code(&self.error),
-            "endpoint" => self.endpoint.to_owned(),
+            "endpoint" => self.endpoint.to_string(),
         );
     }
 }

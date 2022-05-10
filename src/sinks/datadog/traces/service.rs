@@ -9,6 +9,7 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -61,6 +62,7 @@ pub struct TraceApiRequest {
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
     pub uri: Uri,
+    pub uncompressed_size: usize,
 }
 
 impl TraceApiRequest {
@@ -91,6 +93,8 @@ pub struct TraceApiResponse {
     body: Bytes,
     batch_size: usize,
     byte_size: usize,
+    uncompressed_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for TraceApiResponse {
@@ -110,6 +114,13 @@ impl DriverResponse for TraceApiResponse {
             byte_size: self.byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.uncompressed_size,
+            protocol: &self.protocol,
+        })
     }
 }
 
@@ -140,9 +151,12 @@ impl Service<TraceApiRequest> for TraceApiService {
 
     fn call(&mut self, request: TraceApiRequest) -> Self::Future {
         let client = self.client.clone();
+        let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+
         Box::pin(async move {
             let byte_size = request.body.len();
             let batch_size = request.batch_size;
+            let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 
             let response = client.send(http_request).await?;
@@ -157,6 +171,8 @@ impl Service<TraceApiRequest> for TraceApiService {
                 body,
                 batch_size,
                 byte_size,
+                protocol,
+                uncompressed_size,
             })
         })
     }

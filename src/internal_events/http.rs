@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use super::prelude::{error_stage, error_type};
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -44,6 +44,8 @@ impl InternalEvent for HttpEventsReceived<'_> {
             http_path = %self.http_path,
             protocol = %self.protocol,
         );
+
+        histogram!("component_received_events_count", self.count as f64);
         counter!(
             "component_received_events_total", self.count as u64,
             "http_path" => self.http_path.to_string(),

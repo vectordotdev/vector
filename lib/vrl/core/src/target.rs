@@ -44,6 +44,12 @@ pub trait Target: std::fmt::Debug {
     /// See [`Target::insert`] for more details.
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String>;
 
+    /// Get a mutable reference to the value for a given path, or `None` if no
+    /// value is found.
+    ///
+    /// See [`Target::insert`] for more details.
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String>;
+
     /// Remove the given path from the object.
     ///
     /// Returns the removed object, if any.
@@ -75,11 +81,12 @@ impl Target for Value {
         Ok(self.get_by_path(path))
     }
 
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        let value = self.target_get(path)?.cloned();
-        self.remove_by_path(path, compact);
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Ok(self.get_by_path_mut(path))
+    }
 
-        Ok(value)
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        Ok(self.remove_by_path(path, compact))
     }
 }
 

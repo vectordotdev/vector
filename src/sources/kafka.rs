@@ -29,7 +29,7 @@ use crate::{
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
-        BytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
@@ -195,9 +195,11 @@ async fn kafka_source(
                 emit!(KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(BytesReceived {
+                emit!(KafkaBytesReceived {
                     byte_size: msg.payload_len(),
                     protocol: "tcp",
+                    topic: msg.topic(),
+                    partition: msg.partition(),
                 });
 
                 let payload = match msg.payload() {
@@ -231,7 +233,7 @@ async fn kafka_source(
                     }
                 }
 
-                let msg_topic = Bytes::copy_from_slice(msg.topic().as_bytes());
+                let msg_topic = msg.topic().to_string();
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
@@ -252,6 +254,8 @@ async fn kafka_source(
                                 emit!(KafkaEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
+                                    topic: msg_topic.as_str(),
+                                    partition: msg_partition,
                                 });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
@@ -441,7 +445,7 @@ mod integration_test {
     use super::{test::*, *};
     use crate::{
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
+        test_util::{collect_n, components::assert_source_compliance, random_string},
         SourceSender,
     };
 
@@ -510,20 +514,25 @@ mod integration_test {
         )
         .await;
 
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let consumer = create_consumer(&config).unwrap();
-        tokio::spawn(kafka_source(
-            config,
-            consumer,
-            crate::codecs::Decoder::default(),
-            shutdown,
-            tx,
-            acknowledgements,
-        ));
-        let events = collect_n(rx, 10).await;
-        drop(trigger_shutdown);
-        shutdown_done.await;
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let consumer = create_consumer(&config).unwrap();
+            tokio::spawn(kafka_source(
+                config,
+                consumer,
+                crate::codecs::Decoder::default(),
+                shutdown,
+                tx,
+                acknowledgements,
+            ));
+            let events = collect_n(rx, 10).await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
 
         let client: BaseConsumer = client_config(Some(&group_id));
         client.subscribe(&[&topic]).expect("Subscribing failed");

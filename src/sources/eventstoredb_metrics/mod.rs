@@ -48,7 +48,7 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
-            self.endpoint.as_str(),
+            self.endpoint.clone(),
             self.scrape_interval_secs,
             self.default_namespace.clone(),
             cx,
@@ -69,7 +69,7 @@ impl SourceConfig for EventStoreDbConfig {
 }
 
 fn eventstoredb(
-    endpoint: &str,
+    endpoint: String,
     interval: u64,
     namespace: Option<String>,
     mut cx: SourceContext,
@@ -78,7 +78,7 @@ fn eventstoredb(
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
-    let url: Uri = endpoint.parse()?;
+    let url: Uri = endpoint.as_str().parse()?;
 
     Ok(Box::pin(
         async move {
@@ -144,30 +144,20 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, SourceSender};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
-    const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
+    const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://localhost:2113/stats";
 
     #[tokio::test]
     async fn scrape_something() {
-        test_util::trace_init();
         let config = EventStoreDbConfig {
-            endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
+            endpoint: EVENTSTOREDB_SCRAPE_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
             default_namespace: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
         assert!(!events.is_empty());
     }
 }

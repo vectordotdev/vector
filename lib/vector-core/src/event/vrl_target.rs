@@ -148,12 +148,21 @@ impl vrl_lib::Target for VrlTarget {
     }
 
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, path: &LookupBuf) -> std::result::Result<Option<&Value>, String> {
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
             VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                 log.get(path).map_err(|err| err.to_string())
             }
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
+        }
+    }
+
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        match self {
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
+                log.get_mut(path).map_err(|err| err.to_string())
+            }
+            VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
 
@@ -301,14 +310,16 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     }
 
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, path: &LookupBuf) -> std::result::Result<Option<&Value>, String> {
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
             VrlImmutableTarget::LogEvent(log) => Ok(log.lookup(path)),
-
             VrlImmutableTarget::Trace(log) => Ok(log.lookup(path)),
-
             VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
         }
+    }
+
+    fn target_get_mut(&mut self, _path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Err("cannot modify immutable target".to_string())
     }
 
     fn target_remove(
@@ -389,7 +400,40 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
     Ok(None)
 }
 
-/// Pre-compute the `Value` structure of the metric.
+fn target_get_mut_metric<'a>(
+    path: &LookupBuf,
+    value: &'a mut Value,
+) -> Result<Option<&'a mut Value>, String> {
+    if path.is_root() {
+        return Ok(Some(value));
+    }
+
+    let value = value.get_by_path_mut(path);
+
+    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+        match paths.as_slice() {
+            ["name"] | ["kind"] | ["tags", _] => return Ok(value),
+            ["namespace"] | ["timestamp"] | ["tags"] => {
+                if let Some(value) = value {
+                    return Ok(Some(value));
+                }
+            }
+            _ => {
+                return Err(MetricPathError::InvalidPath {
+                    path: &path.to_string(),
+                    expected: VALID_METRIC_PATHS_SET,
+                }
+                .to_string())
+            }
+        }
+    }
+
+    // We only reach this point if we have requested a tag that doesn't exist or an empty
+    // field.
+    Ok(None)
+}
+
+/// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.

@@ -17,7 +17,7 @@ pub use framing::{
 use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use vector_core::{event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while encoding structured events into byte frames.
 #[derive(Debug)]
@@ -93,14 +93,14 @@ impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub fn build(self) -> Framer {
+    pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
                 CharacterDelimitedEncoderConfig {
-                    character_delimited,
+                    character_delimited: character_delimited.clone(),
                 }
                 .build(),
             ),
@@ -214,6 +214,16 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
+        }
+    }
+
+    /// The data type of events that are accepted by this `Serializer`.
+    pub fn input_type(&self) -> DataType {
+        match self {
+            SerializerConfig::Json => JsonSerializerConfig.input_type(),
+            SerializerConfig::Native => NativeSerializerConfig.input_type(),
+            SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
+            SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
         }
     }
 
