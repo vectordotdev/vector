@@ -166,23 +166,6 @@ impl LogEvent {
     }
 
     /// Convert a `LogEvent` into a tuple of its components
-    ///
-    /// # Panics
-    ///
-    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
-    pub fn into_parts_deprecated(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
-        self.fields_mut();
-        (
-            Arc::try_unwrap(self.inner)
-                .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
-                .fields
-                .into_object()
-                .unwrap_or_else(|| unreachable!("inner fields must be a map")),
-            self.metadata,
-        )
-    }
-
-    /// Convert a `LogEvent` into a tuple of its components
     pub fn into_parts(mut self) -> (Value, EventMetadata) {
         self.fields_mut();
 
