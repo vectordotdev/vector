@@ -14,6 +14,7 @@ use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{event::Finalizable, ByteSizeOf};
@@ -30,8 +31,7 @@ use crate::{
     sinks::{
         gcs_common::{
             config::{
-                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass,
-                KeyPrefixTemplateSnafu, BASE_URL,
+                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
             },
             service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
@@ -48,9 +48,16 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    template::Template,
+    template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum GcsHealthcheckError {
+    #[snafu(display("key_prefix template parse error: {}", source))]
+    KeyPrefixTemplate { source: TemplateParseError },
+}
 
 const NAME: &str = "gcp_cloud_storage";
 

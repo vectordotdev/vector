@@ -98,20 +98,24 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state, timezone);
+        let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        let mut values = program
-            .iter()
-            .map(|expr| {
-                expr.resolve(&mut context).map_err(|err| match err {
-                    #[cfg(feature = "expr-abort")]
-                    ExpressionError::Abort { .. } => Terminate::Abort(err),
-                    err @ ExpressionError::Error { .. } => Terminate::Error(err),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let err = |err| match err {
+            #[cfg(feature = "expr-abort")]
+            ExpressionError::Abort { .. } => Terminate::Abort(err),
+            err @ ExpressionError::Error { .. } => Terminate::Error(err),
+        };
 
-        Ok(values.pop().unwrap_or(Value::Null))
+        match program.split_last() {
+            None => Ok(Value::Null),
+            Some((last, other)) => {
+                other
+                    .iter()
+                    .try_for_each(|expr| expr.resolve(&mut ctx).map(|_| ()).map_err(err))?;
+
+                last.resolve(&mut ctx).map_err(err)
+            }
+        }
     }
 
     pub fn compile(

@@ -39,6 +39,7 @@ vector_common = { path = "../../vector-common", default-features = false }
 [dev-dependencies]
 criterion = "0.3"
 indoc = "1"
+serde_json = "1"
 vrl-stdlib = { path = "../stdlib" }
 
 [[bench]]
