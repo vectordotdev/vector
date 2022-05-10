@@ -431,6 +431,25 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn s3_process_message_spaces() {
+        trace_init();
+
+        let key = "key with spaces".to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            Some(key),
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn s3_process_message_special_characters() {
         trace_init();
 
