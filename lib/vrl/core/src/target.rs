@@ -86,10 +86,7 @@ impl Target for Value {
     }
 
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        let value = self.target_get(path)?.cloned();
-        self.remove_by_path(path, compact);
-
-        Ok(value)
+        Ok(self.remove_by_path(path, compact))
     }
 }
 
