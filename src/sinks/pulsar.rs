@@ -14,9 +14,12 @@ use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
-    internal_events::PulsarEncodeEventFailed,
+    internal_events::PulsarEncodeEventError,
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
 };
 
@@ -37,14 +40,14 @@ pub struct PulsarSinkConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AuthConfig {
+struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum Encoding {
+pub(self) enum Encoding {
     Text,
     Json,
     Avro,
@@ -110,12 +113,16 @@ impl SinkConfig for PulsarSinkConfig {
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "pulsar"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -222,11 +229,8 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
-            emit!(&PulsarEncodeEventFailed {
-                error: &*e.to_string()
-            })
-        })?;
+        let message = encode_event(item, &self.encoding, &self.avro_schema)
+            .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
@@ -295,7 +299,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.coerce_to_bytes().to_vec())
             .unwrap_or_default(),
         Encoding::Avro => {
             let value = avro_rs::to_value(log)?;

@@ -1,9 +1,10 @@
 use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
 
-use lookup::LookupBuf;
+use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
+use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
@@ -17,23 +18,36 @@ const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tag
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
-/// An adapter to turn `Event`s into `vrl_core::Target`s.
+/// An adapter to turn `Event`s into `vrl_lib::Target`s.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
-    Metric(Metric),
+    Metric { metric: Metric, value: Value },
+    Trace(Value, EventMetadata),
 }
 
 impl VrlTarget {
-    pub fn new(event: Event) -> Self {
+    pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
             Event::Log(event) => {
                 let (fields, metadata) = event.into_parts();
-                VrlTarget::LogEvent(Value::Map(fields), metadata)
+                VrlTarget::LogEvent(Value::Object(fields), metadata)
             }
-            Event::Metric(event) => VrlTarget::Metric(event),
+            Event::Metric(metric) => {
+                // We pre-generate [`Value`] types for the metric fields accessed in
+                // the event. This allows us to then return references to those
+                // values, even if the field is accessed more than once.
+                let value = precompute_metric_value(&metric, info);
+
+                VrlTarget::Metric { metric, value }
+            }
+            Event::Trace(event) => {
+                let (fields, metadata) = event.into_parts();
+                VrlTarget::Trace(Value::Object(fields), metadata)
+            }
         }
     }
 
@@ -44,23 +58,31 @@ impl VrlTarget {
     pub fn into_events(self) -> impl Iterator<Item = Event> {
         match self {
             VrlTarget::LogEvent(value, metadata) => {
-                Box::new(value_into_log_events(value, metadata)) as Box<dyn Iterator<Item = Event>>
+                Box::new(value_into_logevents(value, metadata).map(Event::Log))
+                    as Box<dyn Iterator<Item = Event>>
             }
-            VrlTarget::Metric(metric) => {
+            VrlTarget::Metric { metric, .. } => {
                 Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
             }
+            VrlTarget::Trace(value, metadata) => Box::new(
+                value_into_logevents(value, metadata)
+                    .map(|log| Event::Trace(TraceEvent::from(log))),
+            ) as Box<dyn Iterator<Item = Event>>,
         }
     }
 }
 
-impl vrl_core::Target for VrlTarget {
-    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
+impl vrl_lib::Target for VrlTarget {
+    fn target_insert(&mut self, path: &LookupBuf, value: vrl_lib::Value) -> Result<(), String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) => log
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => log
                 .insert(path.clone(), value)
                 .map(|_| ())
                 .map_err(|err| err.to_string()),
-            VrlTarget::Metric(ref mut metric) => {
+            VrlTarget::Metric {
+                ref mut metric,
+                value: metric_value,
+            } => {
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
@@ -68,7 +90,7 @@ impl vrl_core::Target for VrlTarget {
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
                     match paths.as_slice() {
                         ["tags"] => {
-                            let value = value.try_object().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_object().map_err(|e| e.to_string())?;
                             for (field, value) in &value {
                                 metric.insert_tag(
                                     field.as_str().to_owned(),
@@ -78,35 +100,29 @@ impl vrl_core::Target for VrlTarget {
                                         .into_owned(),
                                 );
                             }
-                            return Ok(());
                         }
                         ["tags", field] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.insert_tag(
                                 (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
-                            return Ok(());
                         }
                         ["name"] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.name = String::from_utf8_lossy(&value).into_owned();
-                            return Ok(());
                         }
                         ["namespace"] => {
-                            let value = value.try_bytes().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                             metric.series.name.namespace =
                                 Some(String::from_utf8_lossy(&value).into_owned());
-                            return Ok(());
                         }
                         ["timestamp"] => {
-                            let value = value.try_timestamp().map_err(|e| e.to_string())?;
+                            let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
                             metric.data.timestamp = Some(value);
-                            return Ok(());
                         }
                         ["kind"] => {
-                            metric.data.kind = MetricKind::try_from(value)?;
-                            return Ok(());
+                            metric.data.kind = MetricKind::try_from(value.clone())?;
                         }
                         _ => {
                             return Err(MetricPathError::InvalidPath {
@@ -116,6 +132,10 @@ impl vrl_core::Target for VrlTarget {
                             .to_string())
                         }
                     }
+
+                    metric_value.insert_by_path(path, value);
+
+                    return Ok(());
                 }
 
                 Err(MetricPathError::InvalidPath {
@@ -127,89 +147,37 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
+    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) => log
-                .get(path)
-                .map(|val| val.map(|val| val.clone().into()))
-                .map_err(|err| err.to_string()),
-            VrlTarget::Metric(metric) => {
-                if path.is_root() {
-                    let mut map = BTreeMap::<String, vrl_core::Value>::new();
-                    map.insert("name".to_string(), metric.series.name.name.clone().into());
-                    if let Some(ref namespace) = metric.series.name.namespace {
-                        map.insert("namespace".to_string(), namespace.clone().into());
-                    }
-                    if let Some(timestamp) = metric.data.timestamp {
-                        map.insert("timestamp".to_string(), timestamp.into());
-                    }
-                    map.insert("kind".to_string(), metric.data.kind.into());
-                    if let Some(tags) = metric.tags() {
-                        map.insert(
-                            "tags".to_string(),
-                            tags.iter()
-                                .map(|(tag, value)| (tag.clone(), value.clone().into()))
-                                .collect::<BTreeMap<_, _>>()
-                                .into(),
-                        );
-                    }
-                    map.insert("type".to_string(), metric.data.value.clone().into());
-
-                    return Ok(Some(map.into()));
-                }
-
-                for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-                    match paths.as_slice() {
-                        ["name"] => return Ok(Some(metric.name().to_string().into())),
-                        ["namespace"] => match &metric.series.name.namespace {
-                            Some(namespace) => return Ok(Some(namespace.clone().into())),
-                            None => continue,
-                        },
-                        ["timestamp"] => match metric.data.timestamp {
-                            Some(timestamp) => return Ok(Some(timestamp.into())),
-                            None => continue,
-                        },
-                        ["kind"] => return Ok(Some(metric.data.kind.into())),
-                        ["tags"] => {
-                            return Ok(metric.tags().map(|map| {
-                                map.iter()
-                                    .map(|(k, v)| (k.clone(), v.clone().into()))
-                                    .collect::<vrl_core::Value>()
-                            }))
-                        }
-                        ["tags", field] => match metric.tag_value(field) {
-                            Some(value) => return Ok(Some(value.into())),
-                            None => continue,
-                        },
-                        ["type"] => return Ok(Some(metric.data.value.clone().into())),
-                        _ => {
-                            return Err(MetricPathError::InvalidPath {
-                                path: &path.to_string(),
-                                expected: VALID_METRIC_PATHS_GET,
-                            }
-                            .to_string())
-                        }
-                    }
-                }
-                // We only reach this point if we have requested a tag that doesn't exist or an empty
-                // field.
-                Ok(None)
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
+                log.get(path).map_err(|err| err.to_string())
             }
+            VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
-    fn remove(
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        match self {
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
+                log.get_mut(path).map_err(|err| err.to_string())
+            }
+            VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
+        }
+    }
+
+    fn target_remove(
         &mut self,
         path: &LookupBuf,
         compact: bool,
-    ) -> Result<Option<vrl_core::Value>, String> {
+    ) -> Result<Option<vrl_lib::Value>, String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) => {
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
                 if path.is_root() {
                     Ok(Some({
-                        let mut map = Value::Map(BTreeMap::new());
+                        let mut map = Value::Object(BTreeMap::new());
                         std::mem::swap(log, &mut map);
-                        map.into()
+                        map
                     }))
                 } else {
                     log.remove(path, compact)
@@ -217,25 +185,24 @@ impl vrl_core::Target for VrlTarget {
                         .map_err(|err| err.to_string())
                 }
             }
-            VrlTarget::Metric(ref mut metric) => {
+            VrlTarget::Metric {
+                ref mut metric,
+                value,
+            } => {
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
 
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
-                    match paths.as_slice() {
-                        ["namespace"] => {
-                            return Ok(metric.series.name.namespace.take().map(Into::into))
-                        }
-                        ["timestamp"] => return Ok(metric.data.timestamp.take().map(Into::into)),
-                        ["tags"] => {
-                            return Ok(metric.series.tags.take().map(|map| {
-                                map.into_iter()
-                                    .map(|(k, v)| (k, v.into()))
-                                    .collect::<vrl_core::Value>()
-                            }))
-                        }
-                        ["tags", field] => return Ok(metric.remove_tag(field).map(Into::into)),
+                    let removed_value = match paths.as_slice() {
+                        ["namespace"] => metric.series.name.namespace.take().map(Into::into),
+                        ["timestamp"] => metric.data.timestamp.take().map(Into::into),
+                        ["tags"] => metric.series.tags.take().map(|map| {
+                            map.into_iter()
+                                .map(|(k, v)| (k, v.into()))
+                                .collect::<vrl_lib::Value>()
+                        }),
+                        ["tags", field] => metric.remove_tag(field).map(Into::into),
                         _ => {
                             return Err(MetricPathError::InvalidPath {
                                 path: &path.to_string(),
@@ -243,7 +210,11 @@ impl vrl_core::Target for VrlTarget {
                             }
                             .to_string())
                         }
-                    }
+                    };
+
+                    value.remove_by_path(path, false);
+
+                    return Ok(removed_value);
                 }
 
                 Ok(None)
@@ -251,29 +222,29 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn get_metadata(&self, key: &str) -> Result<Option<vrl_core::Value>, String> {
+    fn get_metadata(&self, key: &str) -> Result<Option<vrl_lib::Value>, String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
-            VrlTarget::Metric(metric) => metric.metadata(),
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata(),
         };
 
         match key {
             "datadog_api_key" => Ok(metadata
                 .datadog_api_key()
                 .as_ref()
-                .map(|api_key| vrl_core::Value::from(api_key.to_string()))),
+                .map(|api_key| vrl_lib::Value::from(api_key.to_string()))),
             "splunk_hec_token" => Ok(metadata
                 .splunk_hec_token()
                 .as_ref()
-                .map(|token| vrl_core::Value::from(token.to_string()))),
+                .map(|token| vrl_lib::Value::from(token.to_string()))),
             _ => Err(format!("key {} not available", key)),
         }
     }
 
     fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
-            VrlTarget::Metric(metric) => metric.metadata_mut(),
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
         };
 
         match key {
@@ -291,8 +262,8 @@ impl vrl_core::Target for VrlTarget {
 
     fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
         let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) => metadata,
-            VrlTarget::Metric(metric) => metric.metadata_mut(),
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
         };
 
         match key {
@@ -309,10 +280,262 @@ impl vrl_core::Target for VrlTarget {
     }
 }
 
-impl From<Event> for VrlTarget {
-    fn from(event: Event) -> Self {
-        VrlTarget::new(event)
+#[derive(Debug, Clone)]
+pub enum VrlImmutableTarget<'a> {
+    LogEvent(&'a LogEvent),
+    Metric { metric: &'a Metric, value: Value },
+    Trace(&'a TraceEvent),
+}
+
+impl<'a> VrlImmutableTarget<'a> {
+    pub fn new(event: &'a Event, info: &ProgramInfo) -> Self {
+        match event {
+            Event::Log(event) => VrlImmutableTarget::LogEvent(event),
+            Event::Metric(metric) => {
+                // We pre-generate [`Value`] types for the metric fields accessed in
+                // the event. This allows us to then return references to those
+                // values, even if the field is accessed more than once.
+                let value = precompute_metric_value(metric, info);
+
+                VrlImmutableTarget::Metric { metric, value }
+            }
+            Event::Trace(event) => VrlImmutableTarget::Trace(event),
+        }
     }
+}
+
+impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
+    fn target_insert(&mut self, _path: &LookupBuf, _value: vrl_lib::Value) -> Result<(), String> {
+        Err("cannot modify immutable target".to_string())
+    }
+
+    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        match self {
+            VrlImmutableTarget::LogEvent(log) => Ok(log.lookup(path)),
+            VrlImmutableTarget::Trace(log) => Ok(log.lookup(path)),
+            VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
+        }
+    }
+
+    fn target_get_mut(&mut self, _path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Err("cannot modify immutable target".to_string())
+    }
+
+    fn target_remove(
+        &mut self,
+        _path: &LookupBuf,
+        _compact: bool,
+    ) -> Result<Option<vrl_lib::Value>, String> {
+        Err("cannot modify immutable target".to_string())
+    }
+
+    fn get_metadata(&self, key: &str) -> Result<Option<vrl_lib::Value>, String> {
+        let metadata = match self {
+            VrlImmutableTarget::LogEvent(event) => event.metadata(),
+            VrlImmutableTarget::Trace(event) => event.metadata(),
+            VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
+        };
+
+        match key {
+            "datadog_api_key" => Ok(metadata
+                .datadog_api_key()
+                .as_ref()
+                .map(|api_key| vrl_lib::Value::from(api_key.to_string()))),
+            "splunk_hec_token" => Ok(metadata
+                .splunk_hec_token()
+                .as_ref()
+                .map(|token| vrl_lib::Value::from(token.to_string()))),
+            _ => Err(format!("key {} not available", key)),
+        }
+    }
+
+    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
+        Err("cannot modify immutable target".to_string())
+    }
+
+    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+        Err("cannot modify immutable target".to_string())
+    }
+}
+
+/// Retrieves a value from a the provided metric using the path.
+/// Currently the root path and the following paths are supported:
+/// - name
+/// - namespace
+/// - timestamp
+/// - kind
+/// - tags
+/// - tags.<tagname>
+/// - type
+///
+/// Any other paths result in a `MetricPathError::InvalidPath` being returned.
+fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'a Value>, String> {
+    if path.is_root() {
+        return Ok(Some(value));
+    }
+
+    let value = value.get_by_path(path);
+
+    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+        match paths.as_slice() {
+            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
+            ["namespace"] | ["timestamp"] | ["tags"] => {
+                if let Some(value) = value {
+                    return Ok(Some(value));
+                }
+            }
+            _ => {
+                return Err(MetricPathError::InvalidPath {
+                    path: &path.to_string(),
+                    expected: VALID_METRIC_PATHS_GET,
+                }
+                .to_string())
+            }
+        }
+    }
+
+    // We only reach this point if we have requested a tag that doesn't exist or an empty
+    // field.
+    Ok(None)
+}
+
+fn target_get_mut_metric<'a>(
+    path: &LookupBuf,
+    value: &'a mut Value,
+) -> Result<Option<&'a mut Value>, String> {
+    if path.is_root() {
+        return Ok(Some(value));
+    }
+
+    let value = value.get_by_path_mut(path);
+
+    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+        match paths.as_slice() {
+            ["name"] | ["kind"] | ["tags", _] => return Ok(value),
+            ["namespace"] | ["timestamp"] | ["tags"] => {
+                if let Some(value) = value {
+                    return Ok(Some(value));
+                }
+            }
+            _ => {
+                return Err(MetricPathError::InvalidPath {
+                    path: &path.to_string(),
+                    expected: VALID_METRIC_PATHS_SET,
+                }
+                .to_string())
+            }
+        }
+    }
+
+    // We only reach this point if we have requested a tag that doesn't exist or an empty
+    // field.
+    Ok(None)
+}
+
+/// pre-compute the `Value` structure of the metric.
+///
+/// This structure is partially populated based on the fields accessed by
+/// the VRL program as informed by `ProgramInfo`.
+fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
+    let mut map = BTreeMap::default();
+
+    let mut set_name = false;
+    let mut set_kind = false;
+    let mut set_type = false;
+    let mut set_namespace = false;
+    let mut set_timestamp = false;
+    let mut set_tags = false;
+
+    for path in &info.target_queries {
+        // Accessing a root path requires us to pre-populate all fields.
+        if path.is_root() {
+            if !set_name {
+                map.insert("name".to_owned(), metric.name().to_owned().into());
+            }
+
+            if !set_kind {
+                map.insert("kind".to_owned(), metric.kind().into());
+            }
+
+            if !set_type {
+                map.insert("type".to_owned(), metric.value().clone().into());
+            }
+
+            if !set_namespace {
+                if let Some(namespace) = metric.namespace() {
+                    map.insert("namespace".to_owned(), namespace.to_owned().into());
+                }
+            }
+
+            if !set_timestamp {
+                if let Some(timestamp) = metric.timestamp() {
+                    map.insert("timestamp".to_owned(), timestamp.into());
+                }
+            }
+
+            if !set_tags {
+                if let Some(tags) = metric.tags().cloned() {
+                    map.insert(
+                        "tags".to_owned(),
+                        tags.into_iter()
+                            .map(|(tag, value)| (tag, value.into()))
+                            .collect::<BTreeMap<_, _>>()
+                            .into(),
+                    );
+                }
+            }
+
+            break;
+        }
+
+        // For non-root paths, we contiuously populate the value with the
+        // relevant data.
+        if let Some(SegmentBuf::Field(field)) = path.iter().next() {
+            match field.as_str() {
+                "name" if !set_name => {
+                    set_name = true;
+                    map.insert("name".to_owned(), metric.name().to_owned().into());
+                }
+                "kind" if !set_kind => {
+                    set_kind = true;
+                    map.insert("kind".to_owned(), metric.kind().into());
+                }
+                "type" if !set_type => {
+                    set_type = true;
+                    map.insert("type".to_owned(), metric.value().clone().into());
+                }
+                "namespace" if !set_namespace && metric.namespace().is_some() => {
+                    set_namespace = true;
+                    map.insert(
+                        "namespace".to_owned(),
+                        metric.namespace().unwrap().to_owned().into(),
+                    );
+                }
+                "timestamp" if !set_timestamp && metric.timestamp().is_some() => {
+                    set_timestamp = true;
+                    map.insert("timestamp".to_owned(), metric.timestamp().unwrap().into());
+                }
+                "tags" if !set_tags && metric.tags().is_some() => {
+                    set_tags = true;
+                    map.insert(
+                        "tags".to_owned(),
+                        metric
+                            .tags()
+                            .cloned()
+                            .unwrap()
+                            .into_iter()
+                            .map(|(tag, value)| (tag, value.into()))
+                            .collect::<BTreeMap<_, _>>()
+                            .into(),
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+
+    map.into()
 }
 
 // Turn a `Value` back into `LogEvents`:
@@ -321,23 +544,22 @@ impl From<Event> for VrlTarget {
 //   * If an element is an object, create an event using that as fields.
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
-fn value_into_log_events(value: Value, metadata: EventMetadata) -> impl Iterator<Item = Event> {
+fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
     match value {
-        Value::Map(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
-            object, metadata,
-        )))) as Box<dyn Iterator<Item = Event>>,
+        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
+            as Box<dyn Iterator<Item = LogEvent>>,
         Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Map(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
+            Value::Object(object) => LogEvent::from_parts(object, metadata.clone()),
             v => {
                 let mut log = LogEvent::new_with_metadata(metadata.clone());
                 log.insert(log_schema().message_key(), v);
-                Event::from(log)
+                log
             }
-        })) as Box<dyn Iterator<Item = Event>>,
+        })) as Box<dyn Iterator<Item = LogEvent>>,
         v => {
             let mut log = LogEvent::new_with_metadata(metadata);
             log.insert(log_schema().message_key(), v);
-            Box::new(std::iter::once(Event::from(log))) as Box<dyn Iterator<Item = Event>>
+            Box::new(std::iter::once(log)) as Box<dyn Iterator<Item = LogEvent>>
         }
     }
 }
@@ -355,8 +577,8 @@ enum MetricPathError<'a> {
 mod test {
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
-    use shared::btreemap;
-    use vrl_core::{self, Target};
+    use vector_common::btreemap;
+    use vrl_lib::{self, Target};
 
     use super::{
         super::{metric::MetricTags, MetricValue},
@@ -366,7 +588,7 @@ mod test {
     #[test]
     fn log_get() {
         use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
@@ -407,10 +629,19 @@ mod test {
 
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(vrl_core::Target::get(&target, &path), expect);
+            assert_eq!(
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                expect
+            );
         }
     }
 
@@ -418,7 +649,7 @@ mod test {
     #[test]
     fn log_insert() {
         use lookup::SegmentBuf;
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (
@@ -511,16 +742,25 @@ mod test {
 
         for (object, segments, value, expect, result) in cases {
             let object: BTreeMap<String, Value> = object;
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let expect = LogEvent::from(expect);
-            let value: vrl_core::Value = value;
+            let value: vrl_lib::Value = value;
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                vrl_core::Target::insert(&mut target, &path, value.clone()),
+                vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
-            assert_eq!(vrl_core::Target::get(&target, &path), Ok(Some(value)));
+            assert_eq!(
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                Ok(Some(value))
+            );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
         }
     }
@@ -528,7 +768,7 @@ mod test {
     #[test]
     fn log_remove() {
         use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (
@@ -605,16 +845,25 @@ mod test {
         ];
 
         for (object, segments, compact, expect) in cases {
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let path = LookupBuf::from_segments(segments);
-            let removed = vrl_core::Target::get(&target, &path).unwrap();
+            let removed = vrl_lib::Target::target_get(&target, &path)
+                .unwrap()
+                .cloned();
 
             assert_eq!(
-                vrl_core::Target::remove(&mut target, &path, compact),
+                vrl_lib::Target::target_remove(&mut target, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                vrl_core::Target::get(&target, &LookupBuf::root()),
+                vrl_lib::Target::target_get(&target, &LookupBuf::root())
+                    .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
         }
@@ -622,28 +871,28 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use shared::btreemap;
+        use vector_common::btreemap;
 
         let cases = vec![
             (
-                vrl_core::Value::from(btreemap! {"foo" => "bar"}),
+                vrl_lib::Value::from(btreemap! {"foo" => "bar"}),
                 vec![btreemap! {"foo" => "bar"}],
             ),
-            (vrl_core::Value::from(1), vec![btreemap! {"message" => 1}]),
+            (vrl_lib::Value::from(1), vec![btreemap! {"message" => 1}]),
             (
-                vrl_core::Value::from("2"),
+                vrl_lib::Value::from("2"),
                 vec![btreemap! {"message" => "2"}],
             ),
             (
-                vrl_core::Value::from(true),
+                vrl_lib::Value::from(true),
                 vec![btreemap! {"message" => true}],
             ),
             (
-                vrl_core::Value::from(vec![
-                    vrl_core::Value::from(1),
-                    vrl_core::Value::from("2"),
-                    vrl_core::Value::from(true),
-                    vrl_core::Value::from(btreemap! {"foo" => "bar"}),
+                vrl_lib::Value::from(vec![
+                    vrl_lib::Value::from(1),
+                    vrl_lib::Value::from("2"),
+                    vrl_lib::Value::from(true),
+                    vrl_lib::Value::from(btreemap! {"foo" => "bar"}),
                 ]),
                 vec![
                     btreemap! {"message" => 1},
@@ -656,10 +905,18 @@ mod test {
 
         for (value, expect) in cases {
             let metadata = EventMetadata::default();
-            let mut target =
-                VrlTarget::new(Event::Log(LogEvent::new_with_metadata(metadata.clone())));
+            let info = ProgramInfo {
+                fallible: false,
+                abortable: false,
+                target_queries: vec![],
+                target_assignments: vec![],
+            };
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::new_with_metadata(metadata.clone())),
+                &info,
+            );
 
-            vrl_core::Target::insert(&mut target, &LookupBuf::root(), value).unwrap();
+            vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
                 target.into_events().collect::<Vec<_>>(),
@@ -686,7 +943,20 @@ mod test {
         }))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
-        let target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![
+                "name".into(),
+                "namespace".into(),
+                "timestamp".into(),
+                "kind".into(),
+                "type".into(),
+                "tags".into(),
+            ],
+            target_assignments: vec![],
+        };
+        let target = VrlTarget::new(Event::Metric(metric), &info);
 
         assert_eq!(
             Ok(Some(
@@ -700,7 +970,9 @@ mod test {
                 }
                 .into()
             )),
-            target.get(&LookupBuf::root())
+            target
+                .target_get(&LookupBuf::root())
+                .map(Option::<&Value>::cloned)
         );
     }
 
@@ -719,10 +991,10 @@ mod test {
 
         let cases = vec![
             (
-                "name",                              // Path
-                Some(vrl_core::Value::from("name")), // Current value
-                vrl_core::Value::from("namefoo"),    // New value
-                false,                               // Test deletion
+                "name",                             // Path
+                Some(vrl_lib::Value::from("name")), // Current value
+                vrl_lib::Value::from("namefoo"),    // New value
+                false,                              // Test deletion
             ),
             ("namespace", None, "namespacefoo".into(), true),
             (
@@ -733,25 +1005,45 @@ mod test {
             ),
             (
                 "kind",
-                Some(vrl_core::Value::from("absolute")),
+                Some(vrl_lib::Value::from("absolute")),
                 "incremental".into(),
                 false,
             ),
             ("tags.thing", None, "footag".into(), true),
         ];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![
+                "name".into(),
+                "namespace".into(),
+                "timestamp".into(),
+                "kind".into(),
+            ],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
 
-            assert_eq!(Ok(current), target.get(&path));
-            assert_eq!(Ok(()), target.insert(&path, new.clone()));
-            assert_eq!(Ok(Some(new.clone())), target.get(&path));
+            assert_eq!(
+                Ok(current),
+                target.target_get(&path).map(Option::<&Value>::cloned)
+            );
+            assert_eq!(Ok(()), target.target_insert(&path, new.clone()));
+            assert_eq!(
+                Ok(Some(new.clone())),
+                target.target_get(&path).map(Option::<&Value>::cloned)
+            );
 
             if delete {
-                assert_eq!(Ok(Some(new)), target.remove(&path, true));
-                assert_eq!(Ok(None), target.get(&path));
+                assert_eq!(Ok(Some(new)), target.target_remove(&path, true));
+                assert_eq!(
+                    Ok(None),
+                    target.target_get(&path).map(Option::<&Value>::cloned)
+                );
             }
         }
     }
@@ -775,14 +1067,20 @@ mod test {
 
         let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         assert_eq!(
             Err(format!(
                 "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.get(&LookupBuf::from_str("zork").unwrap())
+            target.target_get(&LookupBuf::from_str("zork").unwrap())
         );
 
         assert_eq!(
@@ -790,7 +1088,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
+            target.target_insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
@@ -798,7 +1096,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.remove(&LookupBuf::from_str("zork").unwrap(), true)
+            target.target_remove(&LookupBuf::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
@@ -806,7 +1104,7 @@ mod test {
                 "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.get(&LookupBuf::from_str("tags.foo.flork").unwrap())
+            target.target_get(&LookupBuf::from_str("tags.foo.flork").unwrap())
         );
     }
 }

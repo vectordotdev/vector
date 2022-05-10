@@ -1,4 +1,3 @@
-use core::array::IntoIter;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
@@ -21,6 +20,12 @@ const HELM_VALUES_EXISTING_CONFIGMAP: &str = indoc! {r#"
     role: "Agent"
     existingConfigMaps:
     - vector-agent-config
+    dataDir: /vector-data-dir
+    service:
+      ports:
+      - name: prom-exporter
+        port: 9090
+        protocol: TCP
 "#};
 
 const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
@@ -492,10 +497,13 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(
                 pod_namespace.clone(),
-                Some(BTreeMap::from_iter(IntoIter::new([
-                    ("label3".to_string(), "foobar".to_string()),
-                    ("label4".to_string(), "fizzbuzz".to_string()),
-                ]))),
+                Some(BTreeMap::from_iter(
+                    [
+                        ("label3".to_string(), "foobar".to_string()),
+                        ("label4".to_string(), "fizzbuzz".to_string()),
+                    ]
+                    .into_iter(),
+                )),
             ),
         )?)
         .await?;
@@ -822,6 +830,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             kubernetes_logs:
               type: kubernetes_logs
               extra_label_selector: "my_custom_negative_label_selector!=my_val"
+              extra_namespace_label_selector: "my_custom_negative_label_selector!=my_val"
               extra_field_selector: "metadata.name!=test-pod-excluded-by-name"
           sinks:
             stdout:

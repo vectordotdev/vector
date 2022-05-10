@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   dnstap:
     build:
@@ -5,10 +7,9 @@ services:
     container_name: vector_dnstap
     hostname: ns.example.com
     volumes:
-      - ${PWD}/tests/data/dnstap/socket:/bind1/etc/bind/socket
-      - ${PWD}/tests/data/dnstap/socket:/bind2/etc/bind/socket
-      - ${PWD}/tests/data/dnstap/socket:/bind3/etc/bind/socket
-
+      - dnstap-sockets:/bind1/etc/bind/socket
+      - dnstap-sockets:/bind2/etc/bind/socket
+      - dnstap-sockets:/bind3/etc/bind/socket
   runner:
     build:
       context: ${PWD}
@@ -18,7 +19,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -31,19 +33,15 @@ services:
       - dnstap
     environment:
       - BIND_SOCKET=/run/bind/socket
+      - RUST_BACKTRACE=1
     volumes:
+      - ${PWD}:/code
       - /var/run/docker.sock:/var/run/docker.sock
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
-      - ${PWD}:/code
+      - dnstap-sockets:/run/bind/socket
 
-networks:
-  public: {}
-  proxy: {}
-
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-
+  dnstap-sockets: {}

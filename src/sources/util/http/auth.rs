@@ -4,7 +4,10 @@ use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use warp::http::HeaderMap;
 
-#[cfg(feature = "sources-utils-http-prelude")]
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-utils-http-auth"
+))]
 use super::error::ErrorMessage;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -39,11 +42,12 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
 
 #[derive(Debug, Clone)]
 pub struct HttpSourceAuth {
-    pub token: Option<String>,
+    #[allow(unused)] // triggered by cargo-hack
+    pub(self) token: Option<String>,
 }
 
-#[cfg(feature = "sources-utils-http-prelude")]
 impl HttpSourceAuth {
+    #[allow(unused)] // triggered by cargo-hack
     pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
         use warp::http::StatusCode;
 

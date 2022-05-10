@@ -17,7 +17,7 @@ For example, let's partition data on AWS S3 by application_id and date. We can a
   key_prefix = "application_id={{ application_id }}/date=%F/"
 ```
 
-Notice that Vector allows direct field references as well as strftime specifiers. If we were to run the following log event though Vector:
+Notice that Vector allows direct field references as well as strftime specifiers. If we were to run the following log event through Vector:
 
 ```json
 {
@@ -101,7 +101,8 @@ Vector doesn't currently support fallback values. [Issue 1692][1692] is open to 
 
 ### Missing fields
 
-If a field is missing, a blank string is inserted in its place. In that case, Vector neither errors nor drops the event nor logs anything.
+If a field is missing, an error is logged and Vector drops the event. The `component_errors_total` internal
+metric is incremented with `error_type` = `template_failed`.
 
 ### Nested fields
 

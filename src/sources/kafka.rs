@@ -6,7 +6,11 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, Stream, StreamExt};
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
+use futures::{Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -15,26 +19,22 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, Output, SourceConfig, SourceContext, SourceDescription,
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
-        BytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 use async_stream::stream;
@@ -79,10 +79,10 @@ pub struct KafkaSourceConfig {
     auth: KafkaAuthConfig,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -138,60 +138,68 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
+            self.clone(),
             consumer,
-            self.key_field.clone(),
-            self.topic_key.clone(),
-            self.partition_key.clone(),
-            self.offset_key.clone(),
-            self.headers_key.clone(),
             decoder,
             cx.shutdown,
             cx.out,
-            acknowledgements.enabled(),
+            acknowledgements,
         )))
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         "kafka"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 async fn kafka_source(
+    config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaStatisticsContext>,
-    key_field: String,
-    topic_key: String,
-    partition_key: String,
-    offset_key: String,
-    headers_key: String,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let shutdown = shutdown.shared();
-    let mut finalizer = acknowledgements
-        .then(|| OrderedFinalizer::new(shutdown.clone(), mark_done(Arc::clone(&consumer))));
+    let mut finalizer = acknowledgements.then(|| {
+        let consumer = Arc::clone(&consumer);
+        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
+            let consumer = Arc::clone(&consumer);
+            async move {
+                if let Err(error) =
+                    consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                {
+                    emit!(KafkaOffsetUpdateError { error });
+                }
+            }
+        })
+    });
     let mut stream = consumer.stream().take_until(shutdown);
     let schema = log_schema();
 
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(&KafkaReadError { error });
+                emit!(KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(&BytesReceived {
-                    byte_size: std::mem::size_of_val(&msg),
+                emit!(KafkaBytesReceived {
+                    byte_size: msg.payload_len(),
                     protocol: "tcp",
+                    topic: msg.topic(),
+                    partition: msg.partition(),
                 });
 
                 let payload = match msg.payload() {
@@ -208,7 +216,7 @@ async fn kafka_source(
 
                 let msg_key = msg
                     .key()
-                    .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
+                    .map(|key| Value::from(Bytes::from(key.to_owned())))
                     .unwrap_or(Value::Null);
 
                 let mut headers_map = BTreeMap::new();
@@ -225,27 +233,29 @@ async fn kafka_source(
                     }
                 }
 
-                let msg_topic = Bytes::copy_from_slice(msg.topic().as_bytes());
+                let msg_topic = msg.topic().to_string();
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
-                let key_field = &key_field;
-                let topic_key = &topic_key;
-                let partition_key = &partition_key;
-                let offset_key = &offset_key;
-                let headers_key = &headers_key;
+                let key_field = config.key_field.as_str();
+                let topic_key = config.topic_key.as_str();
+                let partition_key = config.partition_key.as_str();
+                let offset_key = config.offset_key.as_str();
+                let headers_key = config.headers_key.as_str();
 
                 let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
                 let mut stream = FramedRead::new(payload, decoder.clone());
                 let (count, _) = stream.size_hint();
                 let mut stream = stream! {
-                    loop {
-                        match stream.next().await {
-                            Some(Ok((events, byte_size))) => {
-                                emit!(&KafkaEventsReceived {
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok((events, _byte_size)) => {
+                                emit!(KafkaEventsReceived {
                                     count: events.len(),
-                                    byte_size,
+                                    byte_size: events.size_of(),
+                                    topic: msg_topic.as_str(),
+                                    partition: msg_partition,
                                 });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
@@ -261,14 +271,13 @@ async fn kafka_source(
                                     yield event;
                                 }
                             },
-                            Some(Err(error)) => {
-                                // Error is logged by `crate::codecs::Decoder`, no further handling
+                            Err(error) => {
+                                // Error is logged by `codecs::Decoder`, no further handling
                                 // is needed here.
                                 if !error.can_continue() {
                                     break;
                                 }
                             }
-                            None => break,
                         }
                     }
                 }
@@ -278,9 +287,9 @@ async fn kafka_source(
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
-                        match out.send_all(&mut stream).await {
+                        match out.send_event_stream(&mut stream).await {
                             Err(error) => {
-                                emit!(&StreamClosedError { error, count });
+                                emit!(StreamClosedError { error, count });
                             }
                             Ok(_) => {
                                 // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
@@ -290,15 +299,15 @@ async fn kafka_source(
                             }
                         }
                     }
-                    None => match out.send_all(&mut stream).await {
+                    None => match out.send_event_stream(&mut stream).await {
                         Err(error) => {
-                            emit!(&StreamClosedError { error, count });
+                            emit!(StreamClosedError { error, count });
                         }
                         Ok(_) => {
                             if let Err(error) =
                                 consumer.store_offset(msg.topic(), msg.partition(), msg.offset())
                             {
-                                emit!(&KafkaOffsetUpdateError { error });
+                                emit!(KafkaOffsetUpdateError { error });
                             }
                         }
                     },
@@ -323,14 +332,6 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
             topic: msg.topic().into(),
             partition: msg.partition(),
             offset: msg.offset(),
-        }
-    }
-}
-
-fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
-    move |entry| {
-        if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-            emit!(&KafkaOffsetUpdateError { error });
         }
     }
 }
@@ -377,7 +378,13 @@ fn create_consumer(
 mod test {
     use super::*;
 
-    pub(super) const BOOTSTRAP_SERVER: &str = "localhost:9091";
+    pub fn kafka_host() -> String {
+        std::env::var("KAFKA_HOST").unwrap_or_else(|_| "localhost".into())
+    }
+
+    pub fn kafka_address(port: u16) -> String {
+        format!("{}:{}", kafka_host(), port)
+    }
 
     #[test]
     fn generate_config() {
@@ -386,7 +393,7 @@ mod test {
 
     pub(super) fn make_config(topic: &str, group: &str) -> KafkaSourceConfig {
         KafkaSourceConfig {
-            bootstrap_servers: BOOTSTRAP_SERVER.into(),
+            bootstrap_servers: kafka_address(9091),
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
@@ -438,13 +445,13 @@ mod integration_test {
     use super::{test::*, *};
     use crate::{
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
+        test_util::{collect_n, components::assert_source_compliance, random_string},
         SourceSender,
     };
 
     fn client_config<T: FromClientConfig>(group: Option<&str>) -> T {
         let mut client = ClientConfig::new();
-        client.set("bootstrap.servers", BOOTSTRAP_SERVER);
+        client.set("bootstrap.servers", kafka_address(9091));
         client.set("produce.offset.report", "true");
         client.set("message.timeout.ms", "5000");
         client.set("auto.commit.interval.ms", "1");
@@ -507,23 +514,25 @@ mod integration_test {
         )
         .await;
 
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        tokio::spawn(kafka_source(
-            create_consumer(&config).unwrap(),
-            config.key_field,
-            config.topic_key,
-            config.partition_key,
-            config.offset_key,
-            config.headers_key,
-            codecs::Decoder::default(),
-            shutdown,
-            tx,
-            acknowledgements,
-        ));
-        let events = collect_n(rx, 10).await;
-        drop(trigger_shutdown);
-        shutdown_done.await;
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let consumer = create_consumer(&config).unwrap();
+            tokio::spawn(kafka_source(
+                config,
+                consumer,
+                crate::codecs::Decoder::default(),
+                shutdown,
+                tx,
+                acknowledgements,
+            ));
+            let events = collect_n(rx, 10).await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
 
         let client: BaseConsumer = client_config(Some(&group_id));
         client.subscribe(&[&topic]).expect("Subscribing failed");

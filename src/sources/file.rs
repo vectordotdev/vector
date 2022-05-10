@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,12 +9,12 @@ use file_source::{
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    FutureExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::task::spawn_blocking;
+use tracing::{Instrument, Span};
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
 use crate::{
@@ -23,14 +23,13 @@ use crate::{
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, Event, LogEvent},
+    event::{BatchNotifier, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    trace::{current_span, Instrument},
     SourceSender,
 };
 
@@ -83,7 +82,7 @@ pub struct FileConfig {
     pub glob_minimum_cooldown_ms: u64,
     // Deprecated name
     #[serde(alias = "fingerprinting")]
-    pub fingerprint: FingerprintConfig,
+    fingerprint: FingerprintConfig,
     pub ignore_not_found: bool,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
@@ -234,14 +233,14 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            acknowledgements.enabled(),
+            acknowledgements,
         ))
     }
 
@@ -251,6 +250,10 @@ impl SourceConfig for FileConfig {
 
     fn source_type(&self) -> &'static str {
         "file"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -323,11 +326,11 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     let checkpoints = checkpointer.view();
-    let shutdown = shutdown.shared();
     let finalizer = acknowledgements.then(|| {
         let checkpoints = checkpointer.view();
         OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            checkpoints.update(entry.file_id, entry.offset)
+            let checkpoints = Arc::clone(&checkpoints);
+            async move { checkpoints.update(entry.file_id, entry.offset) }
         })
     });
 
@@ -342,7 +345,7 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(&FileBytesReceived {
+                emit!(FileBytesReceived {
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
@@ -374,7 +377,7 @@ pub fn file_source(
 
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
-        let span = current_span();
+        let span = Span::current();
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
@@ -392,13 +395,17 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
+        tokio::spawn(async move {
+            out.send_event_stream(&mut messages)
+                .instrument(span.or_current())
+                .await
+        });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(&FileOpen { count: 0 });
+            emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -457,8 +464,8 @@ fn create_event(
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
-) -> Event {
-    emit!(&FileEventsReceived {
+) -> LogEvent {
+    emit!(FileEventsReceived {
         count: 1,
         file: &file,
         byte_size: line.len(),
@@ -470,14 +477,14 @@ fn create_event(
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
-        event.insert(file_key.clone(), file);
+        event.insert(file_key.as_str(), file);
     }
 
     if let Some(hostname) = &hostname {
         event.insert(host_key, hostname.clone());
     }
 
-    event.into()
+    event
 }
 
 #[cfg(test)]
@@ -497,10 +504,10 @@ mod tests {
     use super::*;
     use crate::{
         config::Config,
-        event::{EventStatus, Value},
+        event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::components::{self, SOURCE_TESTS},
+        test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
 
     #[test]
@@ -635,8 +642,7 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
 
-        let event = create_event(line, file, &host_key, &hostname, &file_key);
-        let log = event.into_log();
+        let log = create_event(line, file, &host_key, &hostname, &file_key);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
@@ -697,7 +703,7 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    // https://github.com/timberio/vector/issues/8363
+    // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
         let n = 5;
@@ -1465,7 +1471,7 @@ mod tests {
         );
     }
 
-    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    // Ignoring on mac: https://github.com/vectordotdev/vector/issues/8373
     #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {
@@ -1657,32 +1663,33 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        components::init_test();
+        assert_source_compliance(&FILE_SOURCE_TAGS, async move {
+            let (tx, rx) = if acking_mode == Acks {
+                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                (tx, rx.boxed())
+            } else {
+                let (tx, rx) = SourceSender::new_test();
+                (tx, rx.boxed())
+            };
 
-        let (tx, rx) = if acking_mode == Acks {
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-            (tx, rx.boxed())
-        } else {
-            let (tx, rx) = SourceSender::new_test();
-            (tx, rx.boxed())
-        };
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let data_dir = config.data_dir.clone().unwrap();
+            let acks = !matches!(acking_mode, NoAcks);
 
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let data_dir = config.data_dir.clone().unwrap();
-        let acks = !matches!(acking_mode, NoAcks);
+            tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
-        tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
+            inner.await;
 
-        inner.await;
+            drop(trigger_shutdown);
 
-        drop(trigger_shutdown);
+            let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            if wait_shutdown {
+                shutdown_done.await;
+            }
 
-        let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-        if wait_shutdown {
-            shutdown_done.await;
-        }
-        SOURCE_TESTS.assert(&["file"]);
-        result
+            result
+        })
+        .await
     }
 
     fn extract_messages_string(received: Vec<Event>) -> Vec<String> {

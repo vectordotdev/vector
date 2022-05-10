@@ -9,8 +9,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut};
-use clap::{App, Arg};
-use futures::{stream, SinkExt, StreamExt};
+use clap::{Arg, Command};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
@@ -22,7 +21,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, BufferType, Bufferable, WhenFull,
+    Acker, BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 
@@ -45,6 +44,12 @@ impl VariableMessage {
 impl ByteSizeOf for VariableMessage {
     fn allocated_bytes(&self) -> usize {
         self.payload.len()
+    }
+}
+
+impl EventCount for VariableMessage {
+    fn event_count(&self) -> usize {
+        1
     }
 }
 
@@ -116,14 +121,14 @@ struct Configuration {
 
 impl Configuration {
     pub fn from_cli() -> Result<Self, String> {
-        let matches = App::new("buffer-perf")
+        let matches = Command::new("buffer-perf")
             .about("Runner for performance testing of buffers")
             .arg(
                 Arg::new("buffer_type")
                     .help("Sets the buffer type to use")
                     .short('t')
                     .long("buffer-type")
-                    .possible_values(&["disk-v1", "disk-v2", "in-memory-v1", "in-memory-v2"])
+                    .possible_values(&["disk-v1", "disk-v2", "in-memory"])
                     .default_value("disk-v2"),
             )
             .arg(
@@ -223,29 +228,19 @@ where
 {
     let data_dir = PathBuf::from("/tmp/vector");
     let id = format!("{}-buffer-perf-testing", buffer_type);
-    let max_size_events = 500;
-    let max_size_bytes = 32 * 1024 * 1024 * 1024;
+    let max_size_events = std::num::NonZeroUsize::new(500).unwrap();
+    let max_size_bytes = std::num::NonZeroU64::new(32 * 1024 * 1024 * 1024).unwrap();
     let when_full = WhenFull::Block;
 
     let mut builder = TopologyBuilder::default();
 
     let variant = match buffer_type {
-        "in-memory-v1" => {
-            info!(
-                "[buffer-perf] creating in-memory v1 buffer with max_events={}, in blocking mode",
-                max_size_events
-            );
-            BufferType::MemoryV1 {
-                max_events: max_size_events,
-                when_full,
-            }
-        }
-        "in-memory-v2" => {
+        "in-memory" => {
             info!(
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
-            BufferType::MemoryV2 {
+            BufferType::Memory {
                 max_events: max_size_events,
                 when_full,
             }
@@ -281,7 +276,7 @@ where
         .expect("should not fail to to add variant to builder");
 
     builder
-        .build(Span::none())
+        .build(String::from("buffer_perf"), Span::none())
         .await
         .expect("build should not fail")
 }
@@ -334,12 +329,14 @@ async fn main() {
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
     let writer_task = async move {
+        let tx_start = Instant::now();
+
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle().cloned();
 
         let mut remaining = write_total_records;
         while remaining > 0 {
-            let tx_start = Instant::now();
+            let write_start = Instant::now();
 
             let records_written = match write_batch_size {
                 0 => unreachable!(),
@@ -350,12 +347,10 @@ async fn main() {
                 }
                 n => {
                     let count = cmp::min(n, remaining);
-                    let mut record_chunk = (&mut records).take(count).map(Ok);
-                    let mut record_chunk_iter = stream::iter(&mut record_chunk);
-                    writer
-                        .send_all(&mut record_chunk_iter)
-                        .await
-                        .expect("failed to write record");
+                    let record_chunk = (&mut records).take(count);
+                    for record in record_chunk {
+                        writer.send(record).await.expect("failed to write record");
+                    }
                     count
                 }
             };
@@ -366,23 +361,29 @@ async fn main() {
 
             writer.flush().await.expect("flush should not fail");
 
-            let elapsed = tx_start.elapsed().as_nanos() as u64;
+            let elapsed = write_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
             writer_position.fetch_add(records_written, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
-        writer_tx.send(tx_histo).expect("should not fail");
+        let total_tx_dur = tx_start.elapsed();
+
+        writer_tx
+            .send((total_tx_dur, tx_histo))
+            .expect("should not fail");
     };
     tokio::spawn(writer_task);
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
     let reader_task = async move {
+        let rx_start = Instant::now();
+
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
         for _ in 0..read_total_records {
-            let rx_start = Instant::now();
+            let read_start = Instant::now();
 
             match reader.next().await {
                 Some(_) => acker.ack(1),
@@ -392,13 +393,16 @@ async fn main() {
                 }
             }
 
-            let elapsed = rx_start.elapsed().as_nanos() as u64;
+            let elapsed = read_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
 
             reader_position.fetch_add(1, Ordering::Relaxed);
         }
+        let total_rx_dur = rx_start.elapsed();
 
-        reader_tx.send(rx_histo).expect("should not fail");
+        reader_tx
+            .send((total_rx_dur, rx_histo))
+            .expect("should not fail");
     };
     tokio::spawn(reader_task);
 
@@ -447,10 +451,10 @@ async fn main() {
 
     info!("[buffer-perf] writer summary:");
 
-    let writer_histo = writer_result.unwrap();
-    let write_rps = write_pos as f64 / total_time.as_secs_f64();
+    let (writer_dur, writer_histo) = writer_result.unwrap();
+    let write_rps = write_pos as f64 / writer_dur.as_secs_f64();
 
-    info!("  -> records per second: {}", write_rps as u64);
+    info!("  -> records written per second: {}", write_rps as u64);
     info!("  -> tx latency histo:");
     info!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
@@ -461,10 +465,10 @@ async fn main() {
 
     info!("[buffer-perf] reader summary:");
 
-    let reader_histo = reader_result.unwrap();
-    let read_rps = read_pos as f64 / total_time.as_secs_f64();
+    let (reader_dur, reader_histo) = reader_result.unwrap();
+    let read_rps = read_pos as f64 / reader_dur.as_secs_f64();
 
-    info!("  -> records per second: {}", read_rps as u64);
+    info!("  -> records read per second: {}", read_rps as u64);
     info!("  -> rx latency histo:");
     info!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {

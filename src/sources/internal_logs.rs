@@ -2,20 +2,22 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
+    internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    trace, SourceSender,
+    trace::TraceSubscription,
+    SourceSender,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
-    host_key: Option<String>,
-    pid_key: Option<String>,
+    pub host_key: Option<String>,
+    pub pid_key: Option<String>,
 }
 
 inventory::submit! {
@@ -35,7 +37,15 @@ impl SourceConfig for InternalLogsConfig {
             .to_owned();
         let pid_key = self.pid_key.as_deref().unwrap_or("pid").to_owned();
 
-        Ok(Box::pin(run(host_key, pid_key, cx.out, cx.shutdown)))
+        let subscription = TraceSubscription::subscribe();
+
+        Ok(Box::pin(run(
+            host_key,
+            pid_key,
+            subscription,
+            cx.out,
+            cx.shutdown,
+        )))
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -45,45 +55,50 @@ impl SourceConfig for InternalLogsConfig {
     fn source_type(&self) -> &'static str {
         "internal_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 async fn run(
     host_key: String,
     pid_key: String,
+    mut subscription: TraceSubscription,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
-    let subscription = trace::subscribe();
-
-    // chain the logs emitted before the source started first
-    let mut rx = stream::iter(subscription.buffer)
-        .map(Ok)
-        .chain(tokio_stream::wrappers::BroadcastStream::new(
-            subscription.receiver,
-        ))
+    // Chain any log events that were captured during early buffering to the front,
+    // and then continue with the normal stream of internal log events.
+    let buffered_events = subscription.buffered_events().await;
+    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+        .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
-    while let Some(res) = rx.next().await {
-        match res {
-            Ok(mut log) => {
-                if let Ok(hostname) = &hostname {
-                    log.insert(host_key.clone(), hostname.to_owned());
-                }
-                log.insert(pid_key.clone(), pid);
-                log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
-                log.try_insert(log_schema().timestamp_key(), Utc::now());
-                if let Err(error) = out.send(Event::from(log)).await {
-                    error!(message = "Error sending log.", %error);
-                    return Err(());
-                }
-            }
-            Err(BroadcastStreamRecvError::Lagged(_)) => (),
+    while let Some(mut log) = rx.next().await {
+        let byte_size = log.size_of();
+        // This event doesn't emit any log
+        emit!(InternalLogsBytesReceived { byte_size });
+        emit!(InternalLogsEventsReceived {
+            count: 1,
+            byte_size,
+        });
+        if let Ok(hostname) = &hostname {
+            log.insert(host_key.as_str(), hostname.to_owned());
+        }
+        log.insert(pid_key.as_str(), pid);
+        log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
+        log.try_insert(log_schema().timestamp_key(), Utc::now());
+        if let Err(error) = out.send_event(Event::from(log)).await {
+            // this wont trigger any infinite loop considering it stops the component
+            emit!(StreamClosedError { error, count: 1 });
+            return Err(());
         }
     }
 
@@ -92,11 +107,12 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use futures::Stream;
     use tokio::time::{sleep, Duration};
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, source_sender::ReceiverStream, test_util::collect_ready, trace};
+    use crate::{event::Event, test_util::collect_ready, trace};
 
     #[test]
     fn generates_config() {
@@ -145,16 +161,16 @@ mod tests {
         }
     }
 
-    async fn start_source() -> ReceiverStream<Event> {
+    async fn start_source() -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()
-            .build(SourceContext::new_test(tx))
+            .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
         tokio::spawn(source);
         sleep(Duration::from_millis(1)).await;
-        trace::stop_buffering();
+        trace::stop_early_buffering();
         rx
     }
 }

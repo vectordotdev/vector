@@ -23,6 +23,21 @@ releases: "0.18.0": {
 		"The new `reroute_dropped` feature of `remap` always creates the `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.",
 		"The `headers_key` option for the `kafka` sink was inadvertantly changed to `headers_field`. Fixed in v0.19.0.",
 		"If `--config-dir` is used, Vector incorrectly tries to load files with unknown extensions. Fixed in v0.19.0.",
+		"""
+			`encoding.only_fields` failed to deserialize correctly for sinks that used fixed encodings (i.e. those that don't have `encoding.codec`). Fixed in v0.19.2. As a workaround, you can split the paths up in your configuration like:
+
+			```toml
+			encoding.only_fields = ["message", "foo.bar"]
+			```
+
+			to
+
+			```toml
+			encoding.only_fields = [["message"], ["foo", "bar"]]
+			```
+
+			You will need to convert it back to its original representation when upgrading to >= v0.19.2.
+			""",
 	]
 
 	changelog: [

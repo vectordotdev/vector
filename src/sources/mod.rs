@@ -26,6 +26,8 @@ pub mod exec;
 pub mod file;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
+#[cfg(feature = "sources-gcp_pubsub")]
+pub mod gcp_pubsub;
 #[cfg(feature = "sources-heroku_logs")]
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
@@ -54,6 +56,8 @@ pub mod nginx_metrics;
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sources-redis")]
+pub mod redis;
 #[cfg(feature = "sources-socket")]
 pub mod socket;
 #[cfg(feature = "sources-splunk_hec")]

@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
-    num::NonZeroU64,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -20,21 +19,21 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
-    config::{log_schema, LogSchema},
+    config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, Finalizable},
     ByteSizeOf,
 };
 
 use super::util::{
-    batch::BatchError,
     encoding::{Encoder, StandardEncodings},
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
-    serde::to_string,
+    serde::json::to_string,
     sinks::{
         azure_common::{
             self,
@@ -42,7 +41,6 @@ use crate::{
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
-        gcp::{GcpAuthConfig, GcpCredentials},
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
@@ -61,7 +59,7 @@ use crate::{
         VectorSink,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
@@ -76,7 +74,7 @@ pub struct DatadogArchivesDefaultBatchSettings;
 impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(100_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(900) };
+    const TIMEOUT_SECS: f64 = 900.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -93,9 +91,13 @@ pub struct DatadogArchivesSinkConfig {
     pub azure_blob: Option<AzureBlobConfig>,
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
-    pub tls: Option<TlsOptions>,
-    #[serde(default, skip_serializing)]
-    batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
+    tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -150,7 +152,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             gcp_cloud_storage: None,
             tls: None,
             azure_blob: None,
-            batch: BatchConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -162,8 +164,6 @@ enum ConfigError {
     UnsupportedService { service: String },
     #[snafu(display("Unsupported storage class: {}", storage_class))]
     UnsupportedStorageClass { storage_class: String },
-    #[snafu(display("Invalid batch configuration: {}", source))]
-    InvalidBatchConfiguration { source: BatchError },
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
@@ -176,11 +176,13 @@ impl DatadogArchivesSinkConfig {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let service = create_service(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let service =
+                    create_service(&s3_config.region, &s3_config.auth, &cx.proxy, &self.tls)
+                        .await?;
                 let client = service.client();
                 let svc = self
                     .build_s3_sink(&s3_config.options, service, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((
                     svc,
                     s3_common::config::build_healthcheck(self.bucket.clone(), client)?,
@@ -197,7 +199,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let svc = self
                     .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
                 Ok((svc, healthcheck))
@@ -222,7 +224,7 @@ impl DatadogArchivesSinkConfig {
                 )?;
                 let sink = self
                     .build_gcs_sink(client, base_url, creds, cx)
-                    .map_err(|error| format!("{}", error))?;
+                    .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
 
@@ -239,7 +241,7 @@ impl DatadogArchivesSinkConfig {
         cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
-        // thus no need in the the higher number of outcoming requests
+        // thus no need of the higher number of outcoming requests
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
@@ -254,10 +256,9 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
@@ -283,10 +284,9 @@ impl DatadogArchivesSinkConfig {
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -340,10 +340,9 @@ impl DatadogArchivesSinkConfig {
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
 
-        let batcher_settings = self
-            .batch
+        let batcher_settings = BatchConfig::<DatadogArchivesDefaultBatchSettings>::default()
             .into_batcher_settings()
-            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+            .expect("invalid batch settings");
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
         let request_builder = DatadogAzureRequestBuilder {
@@ -404,7 +403,7 @@ impl Default for DatadogArchivesEncoding {
     fn default() -> Self {
         Self {
             inner: StandardEncodings::Ndjson,
-            reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
+            reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
             log_schema: log_schema(),
@@ -447,7 +446,7 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                 .map(|v| v.to_owned())
                 .collect();
             for path in custom_attributes {
-                if let Some(value) = log_event.remove(&path) {
+                if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);
                 }
             }
@@ -692,12 +691,16 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Ok(sink_and_healthcheck)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -919,7 +922,7 @@ mod tests {
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
-        // check the the second batch has a different UUID
+        // check that the second batch has a different UUID
         let log2 = Event::new_empty_log();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
@@ -957,7 +960,7 @@ mod tests {
                 azure_blob: None,
                 gcp_cloud_storage: None,
                 tls: None,
-                batch: BatchConfig::default(),
+                acknowledgements: Default::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

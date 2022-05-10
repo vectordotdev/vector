@@ -161,6 +161,38 @@ impl components_query::ComponentsQueryComponentsEdgesNodeOn {
                 .unwrap_or(0),
         }
     }
+
+    pub fn outputs(&self) -> Vec<(String, i64)> {
+        match self {
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
+                .outputs
+                .iter()
+                .map(|o| {
+                    (
+                        o.output_id.clone(),
+                        o.sent_events_total
+                            .as_ref()
+                            .map(|p| p.sent_events_total as i64)
+                            .unwrap_or(0),
+                    )
+                })
+                .collect(),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
+                .outputs
+                .iter()
+                .map(|o| {
+                    (
+                        o.output_id.clone(),
+                        o.sent_events_total
+                            .as_ref()
+                            .map(|p| p.sent_events_total as i64)
+                            .unwrap_or(0),
+                    )
+                })
+                .collect(),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(_) => vec![],
+        }
+    }
 }
 
 impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {

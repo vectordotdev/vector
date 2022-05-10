@@ -5,7 +5,8 @@ weight: 2
 ---
 
 {{< requirement title="Minimum Kubernetes version" >}}
-Vector must be installed on Kubernetes version **1.15** or higher.
+Vector must be installed on Kubernetes version **1.15** or higher. Vector is
+tested with Kubernetes versions **1.19** or higher.
 {{< /requirement >}}
 
 [Kubernetes], also known as **k8s**, is an open source container orchestration system for automating application deployment, scaling, and management. This page covers installing and managing Vector on the Kubernetes platform.
@@ -98,7 +99,7 @@ kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 
 ##### Prepare your kustomization file
 
-This example configuration deploys Vector as an Aggragator, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
+This example configuration deploys Vector as an Aggregator, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
@@ -181,6 +182,7 @@ Vector provides rich filtering options for Kubernetes log collection:
 * The `exclude_paths_glob_patterns` option enables you to exclude Kubernetes log files by filename and path.
 * The `extra_field_selector` option specifies the field selector to filter Pods with, to be used in addition to the built-in `Node` filter.
 * The `extra_label_selector` option specifies the label selector filter Pods with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
+* The `extra_namespace_label_selector` option specifies the label selector filter Namespaces with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
 
 ### Kubernetes API access control
 

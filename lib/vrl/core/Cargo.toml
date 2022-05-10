@@ -1,17 +1,18 @@
 [package]
-name = "vrl"
+name = "vrl-core"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
 [dependencies]
-compiler = { package = "vrl-compiler", path = "../compiler" }
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
-parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
-shared = { path = "../../shared", default-features = false }
-bytes = "1.1.0"
-indoc = "1"
-ordered-float = "2"
-thiserror = "1"
+value = { path = "../../value" }
+diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+]
+expr-abort = []

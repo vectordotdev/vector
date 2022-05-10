@@ -13,6 +13,11 @@ use nom::{
 };
 use vrl::{prelude::*, Value};
 
+fn parse_ruby_hash(value: Value) -> Resolved {
+    let input = value.try_bytes_utf8_lossy()?;
+    parse(&input)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRubyHash;
 
@@ -40,8 +45,8 @@ impl Function for ParseRubyHash {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -55,6 +60,11 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
+
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+        let value = args.required("value");
+        parse_ruby_hash(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,23 +75,21 @@ struct ParseRubyHashFn {
 impl Expression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let input = value.try_bytes_utf8_lossy()?;
-        parse(&input)
+        parse_ruby_hash(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        type_def()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }
 
-fn kinds() -> Kind {
-    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Object
-}
-
-fn type_def() -> TypeDef {
-    TypeDef::new()
-        .fallible()
-        .add_object::<(), Kind>(map! { (): kinds() })
+fn inner_kinds() -> Kind {
+    Kind::null()
+        | Kind::bytes()
+        | Kind::float()
+        | Kind::boolean()
+        | Kind::array(Collection::any())
+        | Kind::object(Collection::any())
 }
 
 trait HashParseError<T>: ParseError<T> + ContextError<T> + FromExternalError<T, ParseIntError> {}
@@ -244,6 +252,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
             parse_nil,
             parse_hash,
             parse_array,
+            map(parse_colon_key, Value::from),
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
@@ -283,6 +292,16 @@ mod tests {
     #[test]
     fn test_parse_arrow_empty_array() {
         parse("{ :array => [] }").unwrap();
+    }
+
+    #[test]
+    fn test_parse_symbol_value() {
+        let result = parse(r#"{ "key" => :foo }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("key").unwrap();
+        assert!(value.is_bytes());
+        assert_eq!(value.as_bytes().unwrap(), ":foo");
     }
 
     #[test]
@@ -400,7 +419,7 @@ mod tests {
                     testBool: true
                 }
             })),
-            tdef: type_def(),
+            tdef: TypeDef::object(Collection::from_unknown(inner_kinds())).fallible(),
         }
     ];
 }

@@ -1,5 +1,6 @@
 use std::task::{Context, Poll};
 
+use bytes::Bytes;
 use futures::{
     future,
     future::{BoxFuture, Ready},
@@ -7,6 +8,7 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
+use vector_common::internal_event::BytesSent;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
@@ -19,9 +21,11 @@ use crate::{
 };
 
 pub struct DatadogEventsResponse {
-    pub event_status: EventStatus,
+    pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
     pub event_byte_size: usize,
+    raw_byte_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -36,16 +40,30 @@ impl DriverResponse for DatadogEventsResponse {
             output: None,
         }
     }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.raw_byte_size,
+            protocol: &self.protocol,
+        })
+    }
 }
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
+    protocol: String,
     batch_http_service:
-        HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
+        HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {
-    pub fn new(endpoint: String, default_api_key: String, http_client: HttpClient<Body>) -> Self {
+    pub fn new(
+        endpoint: http::Uri,
+        default_api_key: String,
+        http_client: HttpClient<Body>,
+    ) -> Self {
+        let protocol = endpoint.scheme_str().unwrap_or("http").to_string();
+
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
             let req: DatadogEventsRequest = req;
 
@@ -54,7 +72,7 @@ impl DatadogEventsService {
                 None => default_api_key.as_str(),
             };
 
-            let request = Request::post(endpoint.as_str())
+            let request = Request::post(&endpoint)
                 .header("Content-Type", "application/json")
                 .header("DD-API-KEY", api_key)
                 .header("Content-Length", req.body.len())
@@ -62,7 +80,11 @@ impl DatadogEventsService {
                 .map_err(|x| x.into());
             future::ready(request)
         });
-        Self { batch_http_service }
+
+        Self {
+            batch_http_service,
+            protocol,
+        }
     }
 }
 
@@ -77,10 +99,12 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
 
     fn call(&mut self, req: DatadogEventsRequest) -> Self::Future {
         let mut http_service = self.batch_http_service.clone();
+        let protocol = self.protocol.clone();
 
         Box::pin(async move {
             http_service.ready().await?;
             let event_byte_size = req.metadata.event_byte_size;
+            let raw_byte_size = req.body.len();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered
@@ -93,6 +117,8 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
                 event_status,
                 http_status: http_response.status(),
                 event_byte_size,
+                raw_byte_size,
+                protocol,
             })
         })
     }

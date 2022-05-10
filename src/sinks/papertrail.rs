@@ -1,28 +1,47 @@
-use bytes::Bytes;
+use bytes::{BufMut, BytesMut};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    codecs::Encoder,
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
         tcp::TcpSinkConfig,
         Encoding, UriSerde,
     },
     tcp::TcpKeepaliveConfig,
     template::Template,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncodingMigrator;
+
+impl EncodingConfigMigrator for EncodingMigrator {
+    type Codec = Encoding;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Json => JsonSerializerConfig::new().into(),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct PapertrailConfig {
+pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
+    #[serde(flatten)]
+    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
     process: Option<Template>,
 }
@@ -61,86 +80,114 @@ impl SinkConfig for PapertrailConfig {
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let address = format!("{}:{}", host, port);
-        let tls = Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled));
+        let tls = Some(
+            self.tls
+                .clone()
+                .unwrap_or_else(TlsEnableableConfig::enabled),
+        );
 
         let pid = std::process::id();
-        let encoding = self.encoding.clone();
         let process = self.process.clone();
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        sink_config.build(cx, move |event| {
-            Some(encode_event(event, pid, &process, &encoding))
-        })
+        let encoding = self.encoding.clone();
+        let transformer = encoding.transformer();
+        let serializer = encoding.encoding();
+        let encoder = Encoder::<()>::new(serializer);
+
+        sink_config.build(
+            cx,
+            Transformer::default(),
+            PapertrailEncoder {
+                pid,
+                process,
+                transformer,
+                encoder,
+            },
+        )
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "papertrail"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
 }
 
-fn encode_event(
-    mut event: Event,
+#[derive(Debug, Clone)]
+struct PapertrailEncoder {
     pid: u32,
-    process: &Option<Template>,
-    encoding: &EncodingConfig<Encoding>,
-) -> Bytes {
-    let host = event
-        .as_mut_log()
-        .remove(log_schema().host_key())
-        .map(|host| host.to_string_lossy());
+    process: Option<Template>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
+}
 
-    let process = process
-        .as_ref()
-        .and_then(|t| {
-            t.render_string(&event)
-                .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
-                        error,
-                        field: Some("process"),
-                        drop_event: false,
+impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
+    type Error = codecs::encoding::Error;
+
+    fn encode(
+        &mut self,
+        mut event: Event,
+        buffer: &mut bytes::BytesMut,
+    ) -> Result<(), Self::Error> {
+        let host = event
+            .as_mut_log()
+            .remove(log_schema().host_key())
+            .map(|host| host.to_string_lossy());
+
+        let process = self
+            .process
+            .as_ref()
+            .and_then(|t| {
+                t.render_string(&event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("process"),
+                            drop_event: false,
+                        })
                     })
-                })
-                .ok()
-        })
-        .unwrap_or_else(|| String::from("vector"));
+                    .ok()
+            })
+            .unwrap_or_else(|| String::from("vector"));
 
-    let formatter = Formatter3164 {
-        facility: Facility::LOG_USER,
-        hostname: host,
-        process,
-        pid,
-    };
+        let formatter = Formatter3164 {
+            facility: Facility::LOG_USER,
+            hostname: host,
+            process,
+            pid: self.pid,
+        };
 
-    let mut s: Vec<u8> = Vec::new();
+        self.transformer.transform(&mut event);
 
-    encoding.apply_rules(&mut event);
-    let log = event.into_log();
+        let mut bytes = BytesMut::new();
+        self.encoder.encode(event, &mut bytes)?;
 
-    let message = match encoding.codec() {
-        Encoding::Json => serde_json::to_string(&log).unwrap(),
-        Encoding::Text => log
-            .get(log_schema().message_key())
-            .map(|v| v.to_string_lossy())
-            .unwrap_or_default(),
-    };
+        let message = String::from_utf8_lossy(&bytes);
 
-    formatter
-        .format(&mut s, Severity::LOG_INFO, message)
-        .unwrap();
+        formatter
+            .format(&mut buffer.writer(), Severity::LOG_INFO, message)
+            .map_err(|error| Self::Error::SerializingError(format!("{}", error).into()))?;
 
-    s.push(b'\n');
+        buffer.put_u8(b'\n');
 
-    Bytes::from(s)
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use bytes::BytesMut;
+    use codecs::JsonSerializer;
     use std::convert::TryFrom;
+    use tokio_util::codec::Encoder as _;
 
     use super::*;
 
@@ -155,21 +202,18 @@ mod tests {
         evt.as_mut_log().insert("magic", "key");
         evt.as_mut_log().insert("process", "foo");
 
-        let bytes = encode_event(
-            evt,
-            0,
-            &Some(Template::try_from("{{ process }}").unwrap()),
-            &EncodingConfig {
-                codec: Encoding::Json,
-                schema: None,
-                only_fields: None,
-                except_fields: Some(vec!["magic".into()]),
-                timestamp_format: None,
-            },
-        );
+        let mut encoder = PapertrailEncoder {
+            pid: 0,
+            process: Some(Template::try_from("{{ process }}").unwrap()),
+            transformer: Transformer::new(None, Some(vec!["magic".into()]), None).unwrap(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+        };
 
-        let msg =
-            bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);
+        let mut bytes = BytesMut::new();
+        encoder.encode(evt, &mut bytes).unwrap();
+        let bytes = bytes.freeze();
+
+        let msg = bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len());
         let value: serde_json::Value = serde_json::from_slice(&msg).unwrap();
         let value = value.as_object().unwrap();
 

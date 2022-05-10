@@ -35,6 +35,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_buffers::topology::channel::LimitedReceiver;
 use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
 
 use crate::{
@@ -124,7 +125,7 @@ pub fn trace_init() {
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
@@ -132,8 +133,11 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
     lines: impl IntoIterator<Item = I>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
+
     let mut sink = FramedWrite::new(stream, encoder);
 
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
@@ -142,7 +146,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     let stream = sink.get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub async fn send_lines_tls(
@@ -150,8 +154,10 @@ pub async fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
     ca: impl Into<Option<&Path>>,
-) -> Result<(), Infallible> {
+) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
+
+    let local_addr = stream.local_addr().unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
     if let Some(ca) = ca.into() {
@@ -177,7 +183,7 @@ pub async fn send_lines_tls(
     let stream = sink.get_mut().get_mut();
     stream.shutdown().await.unwrap();
 
-    Ok(())
+    Ok(local_addr)
 }
 
 pub fn temp_file() -> PathBuf {
@@ -284,7 +290,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    std::iter::repeat(()).map(move |_| random_string(len))
+    iter::repeat_with(move || random_string(len))
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
@@ -299,7 +305,7 @@ pub fn random_maps(
     max_size: usize,
     field_len: usize,
 ) -> impl Iterator<Item = HashMap<String, String>> {
-    iter::repeat(()).map(move |_| random_map(max_size, field_len))
+    iter::repeat_with(move || random_map(max_size, field_len))
 }
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
@@ -310,7 +316,7 @@ where
 }
 
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
         let e = stream.next().await.unwrap();
@@ -335,6 +341,25 @@ where
     }
 }
 
+pub async fn collect_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>) -> Vec<T> {
+    let mut items = Vec::new();
+    while let Some(item) = rx.next().await {
+        items.push(item);
+    }
+    items
+}
+
+pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n: usize) -> Vec<T> {
+    let mut items = Vec::new();
+    while items.len() < n {
+        match rx.next().await {
+            Some(item) => items.push(item),
+            None => break,
+        }
+    }
+    items
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -350,20 +375,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
     MultiGzDecoder::new(&gzip_bytes[..])
-        .read_to_string(&mut output)
-        .unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
-}
-
-#[cfg(feature = "sources-aws_s3")]
-pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!(message = "Reading zst file.", path = %path.as_ref().display());
-    let mut file = File::open(path).unwrap();
-    let mut zst_bytes = Vec::new();
-    file.read_to_end(&mut zst_bytes).unwrap();
-    let mut output = String::new();
-    zstd::stream::Decoder::new(&zst_bytes[..])
-        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
@@ -507,6 +518,23 @@ impl<T: Send + 'static> CountReceiver<T> {
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+
+    pub fn receive_items_stream<S, F, Fut>(make_stream: F) -> CountReceiver<T>
+    where
+        S: Stream<Item = T> + Send + 'static,
+        F: FnOnce(oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut + Send + 'static,
+        Fut: Future<Output = S> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire, connected| async move {
+            let stream = make_stream(tripwire, connected).await;
+            stream
+                .inspect(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                })
+                .collect::<Vec<T>>()
+                .await
+        })
     }
 }
 

@@ -1,9 +1,11 @@
+version: "3"
+
 services:
   gcloud-pubsub:
     image: messagebird/gcloud-pubsub-emulator
     environment:
       - PUBSUB_PROJECT1=testproject,topic1:subscription1
-
+      - PUBSUB_PROJECT2=sourceproject,topic2:subscription2
   runner:
     build:
       context: ${PWD}
@@ -13,7 +15,8 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
@@ -31,8 +34,6 @@ services:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
   cargogit: {}
   cargoregistry: {}
-

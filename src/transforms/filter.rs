@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
     internal_events::FilterEventDiscarded,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -45,12 +48,12 @@ impl TransformConfig for FilterConfig {
         )))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -66,12 +69,20 @@ impl TransformConfig for FilterConfig {
 #[derivative(Debug)]
 pub struct Filter {
     #[derivative(Debug = "ignore")]
-    condition: Box<dyn Condition>,
+    condition: Condition,
+    last_emission: Instant,
+    emissions_max_delay: Duration,
+    emissions_deferred: u64,
 }
 
 impl Filter {
-    pub fn new(condition: Box<dyn Condition>) -> Self {
-        Self { condition }
+    pub fn new(condition: Condition) -> Self {
+        Self {
+            condition,
+            last_emission: Instant::now(),
+            emissions_max_delay: Duration::new(2, 0),
+            emissions_deferred: 0,
+        }
     }
 }
 
@@ -79,8 +90,14 @@ impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
+        } else if self.last_emission.elapsed() >= self.emissions_max_delay {
+            emit!(FilterEventDiscarded {
+                total: self.emissions_deferred,
+            });
+            self.emissions_deferred = 0;
+            self.last_emission = Instant::now();
         } else {
-            emit!(&FilterEventDiscarded);
+            self.emissions_deferred += 1;
         }
     }
 }
@@ -101,9 +118,7 @@ mod test {
 
     #[test]
     fn passes_metadata() {
-        let mut filter = Filter {
-            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
-        };
+        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
         let event = Event::from("message");
         let metadata = event.metadata().clone();
         let result = transform_one(&mut filter, event).unwrap();

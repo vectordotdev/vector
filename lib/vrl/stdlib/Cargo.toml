@@ -1,17 +1,20 @@
 [package]
 name = "vrl-stdlib"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl = { path = "../core" }
-lookup_lib = {package = "lookup", path = "../../lookup" }
-datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+vrl = { path = "../vrl" }
+value = { path = "../../value", default-features = false }
+
 datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
+datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
+vector_common = { path = "../../vector-common", default-features = false, optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -22,32 +25,45 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.8.0", default-features = false, optional = true}
-lazy_static = { version = "1", optional = true }
+indexmap = { version = "~1.8.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
+once_cell = { version = "1.10", optional = true }
+rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
 sha-1 = { version = "0.10", optional = true }
-sha-2 = { package = "sha2", version = "0.9", optional = true }
-sha-3 = { package = "sha3", version = "0.9", optional = true }
-shared = { path = "../../shared", default-features = false, optional = true }
+sha-2 = { package = "sha2", version = "0.10", optional = true }
+sha-3 = { package = "sha3", version = "0.10", optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.16", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
-uuid = { version = "0.8", features = ["v4"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
-uaparser = { version = "0.5.0", optional = true }
-utf8-width = { version = "0.1.5", optional = true }
+uaparser = { version = "0.5.1", optional = true }
+utf8-width = { version = "0.1.6", optional = true }
+
+# Cryptography
+aes = { version = "0.8.1", optional = true }
+
+# Cryptography - Block Modes
+ctr = { version = "0.9.1", optional = true }
+cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
+cfb-mode = { version = "0.8.1", optional = true }
+ofb = { version = "0.6.1", optional = true }
+
 
 [dev-dependencies]
 anyhow = "1"
-criterion = "0.3"
 chrono-tz = "0.6"
+criterion = "0.3"
+tracing-test = "0.1"
+value = { path = "../../value", features = ["test"]}
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [features]
 default = [
@@ -61,6 +77,7 @@ default = [
     "contains",
     "decode_base64",
     "decode_percent",
+    "decrypt",
     "del",
     "downcase",
     "encode_base64",
@@ -68,12 +85,14 @@ default = [
     "encode_key_value",
     "encode_logfmt",
     "encode_percent",
+    "encrypt",
     "ends_with",
     "exists",
     "find",
     "flatten",
     "float",
     "floor",
+    "for_each",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -86,10 +105,13 @@ default = [
     "ip_cidr_contains",
     "ip_subnet",
     "ip_ntoa",
+    "ip_ntop",
+    "ip_pton",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_array",
     "is_boolean",
+    "is_empty",
     "is_float",
     "is_integer",
     "is_null",
@@ -101,6 +123,8 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -137,6 +161,7 @@ default = [
     "parse_user_agent",
     "parse_xml",
     "push",
+    "random_bytes",
     "redact",
     "remove",
     "replace",
@@ -152,6 +177,7 @@ default = [
     "string",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "strlen",
     "tally",
     "tally_value",
     "tag_types_externally",
@@ -176,31 +202,35 @@ default = [
 append = []
 array = []
 assert = []
-assert_eq = []
+assert_eq = ["vector_common/conversion"]
 boolean = []
 ceil = []
 compact = []
 contains = []
+cryptography = ["aes", "ctr", "cbc", "cfb-mode", "ofb"]
 decode_base64 = ["base64"]
 decode_percent = ["percent-encoding"]
+decrypt = ["cryptography", "random_bytes", "encrypt"]
 del = []
 downcase = []
 encode_base64 = ["base64"]
-encode_json = ["serde_json"]
-encode_key_value = ["shared/encoding"]
+encode_json = ["serde_json", "value/json", "chrono", "regex"]
+encode_key_value = ["vector_common/encoding", "value/json"]
 encode_logfmt = ["encode_key_value"]
 encode_percent = ["percent-encoding"]
+encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []
-find = []
+find = ["regex"]
 find_table_row = []
 flatten = []
 float = []
 floor = []
+for_each = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
-get = []
+get = ["lookup_lib"]
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
@@ -208,90 +238,97 @@ integer = []
 ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
 ip_ntoa = []
-ip_subnet = ["lazy_static", "regex"]
+ip_ntop = []
+ip_pton = ["bytes"]
+ip_subnet = ["once_cell", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 is_array = []
 is_boolean = []
+is_empty = []
 is_float = []
 is_integer = []
 is_null = []
 is_nullish = []
 is_object = []
-is_regex = []
+is_regex = ["regex"]
 is_string = []
-is_timestamp = []
+is_timestamp = ["chrono"]
 join = []
 length = []
-log = ["tracing"]
+log = ["tracing", "value/json"]
+map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "datadog-filter", "lazy_static", "regex"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "once_cell", "regex", "lookup_lib"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 object = []
-parse_apache_log = ["chrono", "lazy_static", "regex", "shared/conversion"]
+parse_apache_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_aws_alb_log = ["nom"]
-parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
+parse_aws_cloudwatch_log_subscription_message = ["serde_json", "vector_common/aws_cloudwatch_logs_subscription", "chrono"]
 parse_aws_vpc_flow_log = []
-parse_common_log = ["chrono", "lazy_static", "regex", "shared/conversion"]
+parse_common_log = ["chrono", "once_cell", "regex", "vector_common/conversion"]
 parse_csv = ["csv"]
-parse_duration = ["rust_decimal", "lazy_static", "regex"]
-parse_glog = ["chrono", "lazy_static", "regex"]
+parse_duration = ["rust_decimal", "once_cell", "regex"]
+parse_glog = ["chrono", "once_cell", "regex"]
 parse_grok = ["grok"]
 parse_groks = ["grok", "datadog-grok"]
 parse_int = []
-parse_json = ["serde_json"]
+parse_json = ["serde_json", "value/json"]
 parse_key_value = ["nom"]
-parse_klog = ["chrono", "lazy_static", "regex"]
-parse_linux_authorization = ["parse_syslog", "chrono", "shared/conversion"]
+parse_klog = ["chrono", "once_cell", "regex"]
+parse_linux_authorization = ["parse_syslog", "chrono", "vector_common/conversion"]
 parse_logfmt = ["parse_key_value"]
-parse_nginx_log = ["chrono", "regex", "lazy_static", "shared/conversion"]
+parse_nginx_log = ["chrono", "regex", "once_cell", "vector_common/conversion"]
 parse_query_string = ["url"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
 parse_ruby_hash = ["nom"]
-parse_syslog = ["syslog_loose", "chrono", "shared/conversion"]
-parse_timestamp = ["shared/conversion"]
-parse_tokens = ["shared/tokenize"]
+parse_syslog = ["syslog_loose", "chrono", "vector_common/conversion"]
+parse_timestamp = ["vector_common/conversion", "chrono"]
+parse_tokens = ["vector_common/tokenize"]
 parse_url = ["url"]
-parse_user_agent = ["woothee","uaparser","lazy_static"]
-parse_xml = ["roxmltree", "lazy_static", "regex"]
+parse_user_agent = ["woothee","uaparser","once_cell"]
+parse_xml = ["roxmltree", "once_cell", "regex"]
 push = []
-redact = ["lazy_static", "regex"]
-remove = ["shared/btreemap"]
-replace = []
+random_bytes = ["rand"]
+redact = ["once_cell", "regex"]
+remove = ["lookup_lib"]
+replace = ["regex"]
 reverse_dns = ["dns-lookup"]
 round = []
-set = ["shared/btreemap"]
+set = ["lookup_lib"]
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
 slice = []
-split = []
+split = ["regex"]
 starts_with = ["utf8-width"]
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
-tag_types_externally = ["shared/btreemap"]
+strlen = []
+tag_types_externally = ["chrono", "regex"]
 tally = []
 tally_value = []
 timestamp = []
-to_bool = ["shared/conversion"]
-to_float = ["shared/conversion"]
-to_int = ["shared/conversion"]
+to_bool = ["vector_common/conversion"]
+to_float = ["vector_common/conversion", "chrono"]
+to_int = ["vector_common/conversion", "chrono"]
 to_regex = ["tracing", "regex"]
 to_string = ["chrono"]
 to_syslog_facility = []
 to_syslog_level = []
 to_syslog_severity = []
-to_timestamp = ["shared/conversion", "chrono"]
+to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
 truncate = []
 unique = ["indexmap"]
-unnest = []
+unnest = ["lookup_lib"]
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
 
@@ -301,4 +338,4 @@ bench = false
 [[bench]]
 name = "benches"
 harness = false
-test = true
+required-features = ["default"]

@@ -8,8 +8,8 @@ use vector_core::{sink::StreamSink, transform::Transform};
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{
-        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
-        TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        TransformConfig, TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -18,12 +18,12 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
     transforms::{metric_to_log::MetricToLogConfig, OutputBuffer},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HumioMetricsConfig {
+struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
     token: String,
@@ -45,7 +45,13 @@ pub struct HumioMetricsConfig {
     request: TowerRequestConfig,
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
     // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -95,6 +101,7 @@ impl SinkConfig for HumioMetricsConfig {
             batch: self.batch,
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
+            acknowledgements: Default::default(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -107,12 +114,16 @@ impl SinkConfig for HumioMetricsConfig {
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "humio_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 

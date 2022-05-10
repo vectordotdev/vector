@@ -221,6 +221,11 @@ where
     fn on_id_change(&self, old: &span::Id, new: &span::Id, ctx: Context<'_, S>) {
         self.inner.on_id_change(old, new, ctx);
     }
+
+    #[inline]
+    fn on_layer(&mut self, subscriber: &mut S) {
+        self.inner.on_layer(subscriber);
+    }
 }
 
 impl<S, L> RateLimitedLayer<S, L>

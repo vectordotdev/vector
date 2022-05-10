@@ -3,10 +3,10 @@ use std::{collections::BTreeMap, time::Instant};
 use chrono::Utc;
 use futures::{
     future::{join_all, try_join_all},
-    stream, StreamExt,
+    StreamExt,
 };
 use mongodb::{
-    bson::{self, doc, from_document},
+    bson::{self, doc, from_document, Bson, Document},
     error::Error as MongoError,
     options::ClientOptions,
     Client,
@@ -15,16 +15,14 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
-        MongoDbMetricsRequestError,
+        EndpointBytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
@@ -126,18 +124,16 @@ impl SourceConfig for MongoDbMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
-                emit!(&MongoDbMetricsCollectCompleted {
+                let count = metrics.len();
+                emit!(MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics)
-                    .map(stream::iter)
-                    .flatten()
-                    .map(Event::Metric);
+                let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending mongodb metrics.", %error);
+                if let Err(error) = cx.out.send_batch(metrics).await {
+                    emit!(StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -152,6 +148,10 @@ impl SourceConfig for MongoDbMetricsConfig {
 
     fn source_type(&self) -> &'static str {
         "mongodb_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -240,11 +240,11 @@ impl MongoDbMetrics {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(&MongoDbMetricsRequestError {
+                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(&MongoDbMetricsBsonParseError {
+                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -256,9 +256,10 @@ impl MongoDbMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
-        emit!(&MongoDbMetricsEventsReceived {
+        emit!(MongoDbMetricsEventsReceived {
+            byte_size: metrics.size_of(),
             count: metrics.len(),
-            uri: &self.endpoint,
+            endpoint: &self.endpoint,
         });
 
         metrics
@@ -277,6 +278,12 @@ impl MongoDbMetrics {
             .run_command(command, None)
             .await
             .map_err(CollectError::Mongo)?;
+        let byte_size = document_size(&doc);
+        emit!(EndpointBytesReceived {
+            byte_size,
+            protocol: "tcp",
+            endpoint: &self.endpoint,
+        });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
         // asserts_total
@@ -957,6 +964,38 @@ impl MongoDbMetrics {
     }
 }
 
+fn bson_size(value: &Bson) -> usize {
+    match value {
+        Bson::Double(value) => value.size_of(),
+        Bson::String(value) => value.size_of(),
+        Bson::Array(value) => value.iter().map(bson_size).sum(),
+        Bson::Document(value) => document_size(value),
+        Bson::Boolean(_) => std::mem::size_of::<bool>(),
+        Bson::RegularExpression(value) => value.pattern.size_of(),
+        Bson::JavaScriptCode(value) => value.size_of(),
+        Bson::JavaScriptCodeWithScope(value) => value.code.size_of() + document_size(&value.scope),
+        Bson::Int32(value) => value.size_of(),
+        Bson::Int64(value) => value.size_of(),
+        Bson::Timestamp(value) => value.time.size_of() + value.increment.size_of(),
+        Bson::Binary(value) => value.bytes.size_of(),
+        Bson::ObjectId(value) => value.bytes().size_of(),
+        Bson::DateTime(_) => std::mem::size_of::<i64>(),
+        Bson::Symbol(value) => value.size_of(),
+        Bson::Decimal128(value) => value.bytes().size_of(),
+        Bson::DbPointer(_) => {
+            // DbPointer parts are not public and cannot be evaludated
+            0
+        }
+        Bson::Null | Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
+    }
+}
+
+fn document_size(doc: &Document) -> usize {
+    doc.into_iter()
+        .map(|(key, value)| key.size_of() + bson_size(value))
+        .sum()
+}
+
 /// Remove credentials from endpoint.
 /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
 /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
@@ -1041,7 +1080,13 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
 
     use super::*;
-    use crate::{test_util::trace_init, SourceSender};
+    use crate::{
+        test_util::{
+            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            trace_init,
+        },
+        SourceSender,
+    };
 
     fn primary_mongo_address() -> String {
         std::env::var("PRIMARY_MONGODB_ADDRESS")
@@ -1061,53 +1106,60 @@ mod integration_tests {
     }
 
     async fn test_instance(endpoint: String) {
-        let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
-        let namespace = "vector_mongodb";
+        assert_source_compliance(&PULL_SOURCE_TAGS, async {
+            let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
+            let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = SourceSender::new_test();
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let endpoints = vec![endpoint.clone()];
-        tokio::spawn(async move {
-            MongoDbMetricsConfig {
-                endpoints,
-                scrape_interval_secs: 15,
-                namespace: namespace.to_owned(),
+            let endpoints = vec![endpoint.clone()];
+            tokio::spawn(async move {
+                MongoDbMetricsConfig {
+                    endpoints,
+                    scrape_interval_secs: 15,
+                    namespace: namespace.to_owned(),
+                }
+                .build(SourceContext::new_test(sender, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+            });
+
+            // TODO: We should have a simpler/cleaner method for this sort of collection, where we're essentially waiting
+            // for a burst of events, and want to debounce ourselves in terms of stopping collection once all events in the
+            // burst have been collected. This code here isn't bad or anything... I've just noticed now that we do it in a
+            // few places, and we could solve it in a cleaner way, most likely.
+            let event = timeout(Duration::from_secs(30), recv.next())
+                .await
+                .expect("fetch metrics timeout")
+                .expect("failed to get metrics from a stream");
+            let mut events = vec![event];
+            loop {
+                match timeout(Duration::from_millis(10), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
             }
-            .build(SourceContext::new_test(sender))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
 
-        let event = timeout(Duration::from_secs(30), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match timeout(Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
+            let clean_endpoint = remove_creds(&endpoint);
+
+            assert!(events.len() > 100);
+            for event in events {
+                let metric = event.into_metric();
+                // validate namespace
+                assert!(metric.namespace() == Some(namespace));
+                // validate timestamp
+                let timestamp = metric.timestamp().expect("existed timestamp");
+                assert!((timestamp - Utc::now()).num_seconds() < 1);
+                // validate basic tags
+                let tags = metric.tags().expect("existed tags");
+                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
+                assert_eq!(tags.get("host"), Some(&host));
             }
-        }
-
-        let clean_endpoint = remove_creds(&endpoint);
-
-        assert!(events.len() > 100);
-        for event in events {
-            let metric = event.into_metric();
-            // validate namespace
-            assert!(metric.namespace() == Some(namespace));
-            // validate timestamp
-            let timestamp = metric.timestamp().expect("existed timestamp");
-            assert!((timestamp - Utc::now()).num_seconds() < 1);
-            // validate basic tags
-            let tags = metric.tags().expect("existed tags");
-            assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
-            assert_eq!(tags.get("host"), Some(&host));
-        }
+        })
+        .await;
     }
 
     #[tokio::test]

@@ -1,6 +1,12 @@
 use bytes::Bytes;
 use vrl::prelude::*;
 
+fn uuid_v4() -> Resolved {
+    let mut buf = [0; 36];
+    let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
+    Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct UuidV4;
 
@@ -19,11 +25,15 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
+    }
+
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+        uuid_v4()
     }
 }
 
@@ -32,26 +42,23 @@ struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        let mut buf = [0; 36];
-        let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
-
-        Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+        uuid_v4()
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use shared::TimeZone;
+    use vector_common::TimeZone;
 
     use super::*;
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },
-        want: TypeDef::new().infallible().bytes(),
+        want: TypeDef::bytes().infallible(),
     }];
 
     #[test]

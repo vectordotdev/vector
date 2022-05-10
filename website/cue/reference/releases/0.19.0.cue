@@ -29,7 +29,11 @@ releases: "0.19.0": {
 
 	known_issues: [
 		"A regression was introduced that changed the name of the data directory for sinks using a disk buffer. This means, when upgrading from `v0.18.0`, if there was any data in existing disk buffers, it will not be sent. Vector's starting with clean or empty disk buffers are unaffected. Fixed in v0.19.1. See [#10430](https://github.com/vectordotdev/vector/issues/10430) for more details.",
-		"Presence of `framing.character_delimited.delimiter` in configs causes Vector to fail to start with `invalid type: string`. Fixed in 0.19.1.",
+		"Presence of `framing.character_delimited.delimiter` in configs causes Vector to fail to start with `invalid type: string`. Fixed in v0.19.1.",
+		"When using `decoding.codec` on sources, invalid data will cause the source to cease processing. Fixed in v0.19.2.",
+		"`encoding.only_fields` failed to deserialize correctly for sinks that used fixed encodings (i.e. those that don't have `encoding.codec`). Fixed in v0.19.2.",
+		"Buffers using `when_full` of `block` were incorrectly counting `buffer_events_total` by including discarded events. Fixed in v0.19.2.",
+		"Transforms neglect to tag logs and metrics with their component span tags (like `component_id`). Fixed in v0.19.2.",
 	]
 
 	description: """

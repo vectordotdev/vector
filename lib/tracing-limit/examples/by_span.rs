@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate tracing;
-
-use tracing::Dispatch;
+use tracing::{info, info_span, trace, Dispatch};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -15,7 +12,7 @@ fn main() {
     let dispatch = Dispatch::new(subscriber);
 
     tracing::dispatcher::with_default(&dispatch, || {
-        for i in 0..40 {
+        for i in 0..40usize {
             trace!("This field is not rate limited!");
             for key in &["foo", "bar"] {
                 for line_number in &[1, 2] {

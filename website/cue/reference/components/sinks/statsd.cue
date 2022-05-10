@@ -6,8 +6,8 @@ components: sinks: statsd: {
 	classes: sinks.socket.classes
 
 	features: {
-		buffer:      sinks.socket.features.buffer
-		healthcheck: sinks.socket.features.healthcheck
+		acknowledgements: sinks.socket.features.acknowledgements
+		healthcheck:      sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
 			encoding: enabled: false
@@ -43,6 +43,7 @@ components: sinks: statsd: {
 			set:          true
 			summary:      false
 		}
+		traces: false
 	}
 
 	configuration: sinks.socket.configuration & {

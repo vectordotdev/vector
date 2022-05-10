@@ -1,120 +1,102 @@
-use std::{any::Any, collections::HashMap};
+use anymap::AnyMap;
+use std::collections::{hash_map::Entry, HashMap};
 
-use crate::{expression::assignment, parser::ast::Ident, TypeDef, Value};
+use value::Kind;
 
-/// The state held by the compiler.
-///
-/// This state allows the compiler to track certain invariants during
-/// compilation, which in turn drives our progressive type checking system.
-#[derive(Default)]
-pub struct Compiler {
-    /// stored external target type definition
-    target: Option<assignment::Details>,
+use crate::{parser::ast::Ident, type_def::Details, Value};
 
-    /// stored internal variable type definitions
-    variables: HashMap<Ident, assignment::Details>,
-
-    /// context passed between the client program and a VRL function.
-    external_context: Option<Box<dyn Any>>,
-
-    /// On request, the compiler can store its state in this field, which can
-    /// later be used to revert the compiler state to the previously stored
-    /// state.
-    ///
-    /// This is used by the compiler to try and parse part of an expression, but
-    /// back out of it if only part of the expression could be parsed. We still
-    /// want the parser to continue parsing, and so it can swap the failed
-    /// expression with a "no-op" one, but has to have a way for the compiler to
-    /// forget any state it started tracking while parsing the old, defunct
-    /// expression.
-    snapshot: Option<Box<Self>>,
+/// Local environment, limited to a given scope.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct LocalEnv {
+    pub(crate) bindings: HashMap<Ident, Details>,
 }
 
-impl Compiler {
-    pub fn new() -> Self {
-        Default::default()
+impl LocalEnv {
+    pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
+        self.bindings.keys()
     }
 
-    /// Creates a new compiler that starts with an initial given typedef.
-    pub fn new_with_type_def(type_def: TypeDef) -> Self {
+    pub(crate) fn variable(&self, ident: &Ident) -> Option<&Details> {
+        self.bindings.get(ident)
+    }
+
+    #[cfg(any(feature = "expr-assignment", feature = "expr-function_call"))]
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: Details) {
+        self.bindings.insert(ident, details);
+    }
+
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<Details> {
+        self.bindings.remove(ident)
+    }
+
+    /// Merge state present in both `self` and `other`.
+    pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings.into_iter() {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = other_details;
+            }
+        }
+
+        self
+    }
+}
+
+/// A lexical scope within the program.
+#[derive(Debug)]
+pub struct ExternalEnv {
+    /// The external target of the program.
+    target: Option<Details>,
+
+    /// Custom context injected by the external environment
+    custom: AnyMap,
+}
+
+impl Default for ExternalEnv {
+    fn default() -> Self {
         Self {
-            target: Some(assignment::Details {
-                type_def,
+            custom: AnyMap::new(),
+            target: None,
+        }
+    }
+}
+
+impl ExternalEnv {
+    /// Creates a new external environment that starts with an initial given
+    /// [`Kind`].
+    pub fn new_with_kind(kind: Kind) -> Self {
+        Self {
+            target: Some(Details {
+                type_def: kind.into(),
                 value: None,
             }),
             ..Default::default()
         }
     }
 
-    pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
-        self.variables.keys()
-    }
-
-    pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
-        self.variables.get(ident)
-    }
-
-    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
-        self.variables.insert(ident, details);
-    }
-
-    pub(crate) fn target(&self) -> Option<&assignment::Details> {
+    pub(crate) fn target(&self) -> Option<&Details> {
         self.target.as_ref()
     }
 
-    pub(crate) fn update_target(&mut self, details: assignment::Details) {
+    pub fn target_kind(&self) -> Option<&Kind> {
+        self.target().map(|details| details.type_def.kind())
+    }
+
+    #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
+    pub(crate) fn update_target(&mut self, details: Details) {
         self.target = Some(details);
     }
 
-    /// Take a snapshot of the current state of the compiler.
-    ///
-    /// This overwrites any existing snapshot currently stored.
-    pub(crate) fn snapshot(&mut self) {
-        let target = self.target.clone();
-        let variables = self.variables.clone();
-
-        let snapshot = Self {
-            target,
-            variables,
-            external_context: None,
-            snapshot: None,
-        };
-
-        self.snapshot = Some(Box::new(snapshot));
-    }
-
-    /// Roll back the compiler state to a previously stored snapshot.
-    pub(crate) fn rollback(&mut self) {
-        if let Some(mut snapshot) = self.snapshot.take() {
-            let context = snapshot.external_context.take();
-            *self = *snapshot;
-            self.external_context = context;
-        }
-    }
-
-    /// Returns the root typedef for the paths (not the variables) of the object.
-    pub fn target_type_def(&self) -> Option<&TypeDef> {
-        self.target.as_ref().map(|assignment| &assignment.type_def)
-    }
-
     /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context(&mut self, data: Option<Box<dyn Any>>) {
-        self.external_context = data;
+    pub fn set_external_context<T: 'static>(&mut self, data: T) {
+        self.custom.insert::<T>(data);
     }
 
-    /// Retrieves the first data of the required type from the external context.
-    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context
-            .as_ref()
-            .and_then(|data| data.downcast_ref::<T>())
-    }
-
-    /// Retrieves a mutable reference to the first data of the required type from
-    /// the external context.
-    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context
-            .as_mut()
-            .and_then(|data| data.downcast_mut::<T>())
+    /// Swap the existing external contexts with new ones, returning the old ones.
+    #[must_use]
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
+        std::mem::replace(&mut self.custom, ctx)
     }
 }
 
@@ -144,5 +126,19 @@ impl Runtime {
 
     pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
         self.variables.insert(ident, value);
+    }
+
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) {
+        self.variables.remove(ident);
+    }
+
+    pub(crate) fn swap_variable(&mut self, ident: Ident, value: Value) -> Option<Value> {
+        match self.variables.entry(ident) {
+            Entry::Occupied(mut v) => Some(std::mem::replace(v.get_mut(), value)),
+            Entry::Vacant(v) => {
+                v.insert(value);
+                None
+            }
+        }
     }
 }

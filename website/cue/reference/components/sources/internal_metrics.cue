@@ -18,6 +18,7 @@ components: sources: internal_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.vector
@@ -48,8 +49,8 @@ components: sources: internal_metrics: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
 			required:    false
-			type: uint: {
-				default: 2
+			type: float: {
+				default: 2.0
 				unit:    "seconds"
 			}
 		}
@@ -62,30 +63,25 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category:    "Context"
-						common:      false
+						category: "Context"
+						common:   false
 						description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-				Set to "" to suppress this key.
-				"""
-						required:    false
+							If set, will add a tag using the provided key name with a value of the current the current host.
+							"""
+						required: false
 						type: string: {
-							default: "host"
+							default: null
 						}
 					}
 					pid_key: {
 						category: "Context"
 						common:   false
 						description: """
-					The key name added to each event representing the current process ID.
-
-					Set to "" to suppress this key.
-					"""
+							If set, will add a tag using the provided key name with a value of the current the current process ID.
+							"""
 						required: false
 						type: string: {
-							default: "pid"
+							default: null
 						}
 					}
 				}
@@ -98,12 +94,12 @@ components: sources: internal_metrics: {
 		_internal_metrics_tags: {
 			pid: {
 				description: "The process ID of the Vector instance."
-				required:    true
+				required:    false
 				examples: ["4232"]
 			}
 			host: {
 				description: "The hostname of the system Vector is running on."
-				required:    true
+				required:    false
 				examples: [_values.local_host]
 			}
 		}
@@ -516,7 +512,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_received_bytes_total: {
-			description:       "The number of raw bytes accepted by this component from source origins."
+			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
@@ -1166,12 +1162,15 @@ components: sources: internal_metrics: {
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
+				"kafka_offset_update":         "The comsumer offset update failed."
+				"kafka_read":                  "The message from Kafka was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
+				"stream_closed":               "The downstream was closed, forwarding the event(s) failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."

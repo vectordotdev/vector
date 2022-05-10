@@ -2,26 +2,24 @@ use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, stream, StreamExt, TryFutureExt};
+use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
-        NginxMetricsStubStatusParseError,
+        EndpointBytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
+        NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 pub mod parser;
@@ -63,11 +61,11 @@ struct NginxMetricsConfig {
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
     namespace: String,
-    tls: Option<TlsOptions>,
+    tls: Option<TlsConfig>,
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(super) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -106,18 +104,16 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                emit!(&NginxMetricsCollectCompleted {
+                let count = metrics.len();
+                emit!(NginxMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics)
-                    .map(stream::iter)
-                    .flatten()
-                    .map(Event::Metric);
+                let metrics = metrics.into_iter().flatten();
 
-                if let Err(error) = cx.out.send_all(&mut stream).await {
-                    error!(message = "Error sending mongodb metrics.", %error);
+                if let Err(error) = cx.out.send_batch(metrics).await {
+                    emit!(StreamClosedError { error, count });
                     return Err(());
                 }
             }
@@ -132,6 +128,10 @@ impl SourceConfig for NginxMetricsConfig {
 
     fn source_type(&self) -> &'static str {
         "nginx_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -178,11 +178,14 @@ impl NginxMetrics {
             Err(()) => (0.0, vec![]),
         };
 
+        let byte_size = metrics.size_of();
+
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
-        emit!(&NginxMetricsEventsReceived {
+        emit!(NginxMetricsEventsReceived {
             count: metrics.len(),
-            uri: &self.endpoint
+            byte_size,
+            endpoint: &self.endpoint
         });
 
         metrics
@@ -190,15 +193,20 @@ impl NginxMetrics {
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
         let response = self.get_nginx_response().await.map_err(|error| {
-            emit!(&NginxMetricsRequestError {
+            emit!(NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
             })
         })?;
+        emit!(EndpointBytesReceived {
+            byte_size: response.len(),
+            protocol: "http",
+            endpoint: &self.endpoint,
+        });
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {
-                emit!(&NginxMetricsStubStatusParseError {
+                emit!(NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
                 })
@@ -250,7 +258,11 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{config::ProxyConfig, test_util::trace_init, SourceSender};
+    use crate::{
+        config::ProxyConfig,
+        test_util::components::{run_and_assert_source_compliance_advanced, HTTP_PULL_SOURCE_TAGS},
+    };
+    use tokio::time::Duration;
 
     fn nginx_proxy_address() -> String {
         std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())
@@ -265,41 +277,24 @@ mod integration_tests {
     }
 
     async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
-        trace_init();
+        let config = NginxMetricsConfig {
+            endpoints: vec![endpoint],
+            scrape_interval_secs: 15,
+            namespace: "vector_nginx".to_owned(),
+            tls: None,
+            auth,
+        };
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        let mut ctx = SourceContext::new_test(sender);
-        ctx.proxy = proxy;
-
-        tokio::spawn(async move {
-            NginxMetricsConfig {
-                endpoints: vec![endpoint],
-                scrape_interval_secs: 15,
-                namespace: "vector_nginx".to_owned(),
-                tls: None,
-                auth,
-            }
-            .build(ctx)
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
-
-        let event = time::timeout(time::Duration::from_secs(3), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
-            }
-        }
-
+        let events = run_and_assert_source_compliance_advanced(
+            config,
+            move |context: &mut SourceContext| {
+                context.proxy = proxy;
+            },
+            Some(Duration::from_secs(3)),
+            None,
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert_eq!(events.len(), 8);
     }
 

@@ -8,12 +8,12 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use shared::btreemap;
 use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
+use vector_common::btreemap;
 
 use super::{filter_result_sync, FilterList, HostMetrics};
 use crate::event::metric::Metric;
@@ -23,7 +23,7 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
-pub(super) struct CGroupsConfig {
+pub(crate) struct CGroupsConfig {
     #[derivative(Default(value = "100"))]
     levels: usize,
     pub(super) base: Option<PathBuf>,

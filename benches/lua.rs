@@ -15,7 +15,7 @@ use vector::{
 fn bench_add_fields(c: &mut Criterion) {
     let event = Event::new_empty_log();
 
-    let key = "the key";
+    let key = "the_key";
     let value = "this is the value";
 
     let mut group = c.benchmark_group("lua/add_fields");
@@ -185,7 +185,7 @@ fn bench_field_filter(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
     targets = bench_add_fields, bench_field_filter
 );

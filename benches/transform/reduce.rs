@@ -64,7 +64,7 @@ fn reduce(c: &mut Criterion) {
                         (Box::new(reduce), Box::pin(param.input.clone()))
                     },
                     |(reduce, input)| async {
-                        let output = reduce.transform(input);
+                        let output = reduce.transform_events(input);
                         consume(output)
                     },
                     BatchSize::SmallInput,

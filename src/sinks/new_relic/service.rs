@@ -1,5 +1,6 @@
 use super::{NewRelicCredentials, NewRelicSinkError};
 use crate::{http::HttpClient, sinks::util::Compression};
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
@@ -25,7 +26,7 @@ pub struct NewRelicApiRequest {
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
     pub compression: Compression,
 }
 

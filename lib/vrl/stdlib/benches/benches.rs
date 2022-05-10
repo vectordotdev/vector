@@ -1,13 +1,13 @@
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use vector_common::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/pull/6408
+    // https://github.com/vectordotdev/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
     targets = array,
               assert,
@@ -18,6 +18,7 @@ criterion_group!(
               contains,
               decode_base64,
               decode_percent,
+              decrypt,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
@@ -26,6 +27,7 @@ criterion_group!(
               encode_json,
               encode_logfmt,
               encode_percent,
+              encrypt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -44,11 +46,14 @@ criterion_group!(
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
+              ip_ntop,
+              ip_pton,
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
               is_array,
               is_boolean,
+              is_empty,
               is_float,
               is_integer,
               is_null,
@@ -110,6 +115,7 @@ criterion_group!(
               string,
               strip_ansi_escape_codes,
               strip_whitespace,
+              strlen,
               tally,
               tally_value,
               timestamp,
@@ -129,9 +135,27 @@ criterion_group!(
               //unnest
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
-              upcase
+              upcase,
 );
 criterion_main!(benches);
+
+bench_function! {
+    encrypt => vrl_stdlib::Encrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), plaintext: value!("plaintext"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf")),
+    }
+}
+
+bench_function! {
+    decrypt => vrl_stdlib::Decrypt;
+
+    test {
+        args: func_args![algorithm: value!("AES-128-OFB"), ciphertext: value!(b"\x05\x10\xace\xb2(\xf5\x92\xaf"), key: value!("1234567890123456"), iv: value!("1234567890123456") ],
+        want: Ok(value!("plaintext")),
+    }
+}
 
 bench_function! {
     append => vrl_stdlib::Append;
@@ -563,6 +587,34 @@ bench_function! {
 }
 
 bench_function! {
+    ip_ntop => vrl_stdlib::IpNtop;
+
+    ipv4 {
+        args: func_args![value: "1.2.3.4"],
+        want: Ok(value!("\x01\x02\x03\x04")),
+    }
+
+    ipv6 {
+        args: func_args![value: "102:304:506:708:90a:b0c:d0e:f10"],
+        want: Ok(value!("\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")),
+    }
+}
+
+bench_function! {
+    ip_pton => vrl_stdlib::IpPton;
+
+    ipv4 {
+        args: func_args![value: "\x01\x02\x03\x04"],
+        want: Ok(value!("1.2.3.4")),
+    }
+
+    ipv6 {
+        args: func_args![value: "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"],
+        want: Ok(value!("102:304:506:708:90a:b0c:d0e:f10")),
+    }
+}
+
+bench_function! {
     ip_subnet => vrl_stdlib::IpSubnet;
 
     ipv4_mask {
@@ -639,6 +691,35 @@ bench_function! {
     boolean {
         args: func_args![value: true],
         want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_empty => vrl_stdlib::IsEmpty;
+
+    empty_array {
+        args: func_args![value: value!([])],
+        want: Ok(true),
+    }
+
+    non_empty_array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    empty_object {
+        args: func_args![value: value!({})],
+        want: Ok(true),
+    }
+
+    non_empty_object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+
+    string {
+        args: func_args![value: "foo"],
+        want: Ok(false),
     }
 }
 
@@ -1337,6 +1418,26 @@ bench_function! {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({key: "value"})),
     }
+
+    map_max_depth {
+        args: func_args![value: r#"{"key": "value"}"#, max_depth: 10],
+        want: Ok(value!({key: "value"})),
+    }
+
+    nested {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
+
+    nested_max_depth_1 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 1],
+        want: Ok(value!({"1":"{\"2\":{\"3\":{\"4\":{\"5\":{\"6\":\"end\"}}}}}"})),
+    }
+
+    nested_max_depth_10 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 10],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
 }
 
 bench_function! {
@@ -1993,6 +2094,15 @@ bench_function! {
             value:" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000}"
         ],
         want: Ok("❤❤ hi there ❤❤")
+    }
+}
+
+bench_function! {
+    strlen => vrl_stdlib::Strlen;
+
+    literal {
+        args: func_args![value: "ñandú"],
+        want: Ok(5)
     }
 }
 

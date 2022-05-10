@@ -1,17 +1,19 @@
 use std::{fmt, net::SocketAddr};
 
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
+use tracing::Span;
 use warp::Filter;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    codecs::DecodingConfig,
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
+        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub mod errors;
@@ -23,12 +25,12 @@ mod models;
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     record_compression: Option<Compression>,
     #[serde(default = "default_framing_message_based")]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn DeserializerConfig>,
+    decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -57,14 +59,14 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            acknowledgements.enabled(),
+            acknowledgements,
             cx.out,
         );
 
@@ -73,7 +75,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(svc.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -85,7 +87,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -94,6 +96,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -130,14 +136,18 @@ mod tests {
     use flate2::read::GzEncoder;
     use futures::Stream;
     use pretty_assertions::assert_eq;
-    use shared::assert_event_data_eq;
     use tokio::time::{sleep, Duration};
+    use vector_common::assert_event_data_eq;
 
     use super::*;
     use crate::{
         event::{Event, EventStatus},
         log_event,
-        test_util::{collect_ready, next_addr, wait_for_tcp},
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            next_addr, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -180,7 +190,7 @@ mod tests {
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let cx = SourceContext::new_test(sender);
+        let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -349,11 +359,6 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            println!(
-                "test case: ({}, {})",
-                source_record_compression, record_compression
-            );
-
             let (rx, addr) = source(None, Some(source_record_compression), true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
@@ -379,7 +384,7 @@ mod tests {
                     vec![log_event! {
                         "source_type" => Bytes::from("aws_kinesis_firehose"),
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                        "message"=> Bytes::from(expected),
+                        "message" => Bytes::from(expected),
                         "request_id" => REQUEST_ID,
                         "source_arn" => SOURCE_ARN,
                     },]
@@ -396,37 +401,40 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
-        let (rx, addr) = source(None, None, true).await;
+        assert_source_compliance(&SOURCE_TAGS, async move {
+            let (rx, addr) = source(None, None, true).await;
 
-        let timestamp: DateTime<Utc> = Utc::now();
+            let timestamp: DateTime<Utc> = Utc::now();
 
-        let res = spawn_send(
-            addr,
-            timestamp,
-            vec![RECORD.as_bytes()],
-            None,
-            true,
-            Compression::None,
-        )
+            let res = spawn_send(
+                addr,
+                timestamp,
+                vec![RECORD.as_bytes()],
+                None,
+                true,
+                Compression::None,
+            )
+            .await;
+
+            let events = collect_ready(rx).await;
+            let res = res.await.unwrap().unwrap();
+            assert_eq!(200, res.status().as_u16());
+
+            assert_event_data_eq!(
+                events,
+                vec![log_event! {
+                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                    "message"=> RECORD,
+                    "request_id" => REQUEST_ID,
+                    "source_arn" => SOURCE_ARN,
+                },]
+            );
+
+            let response: models::FirehoseResponse = res.json().await.unwrap();
+            assert_eq!(response.request_id, REQUEST_ID);
+        })
         .await;
-
-        let events = collect_ready(rx).await;
-        let res = res.await.unwrap().unwrap();
-        assert_eq!(200, res.status().as_u16());
-
-        assert_event_data_eq!(
-            events,
-            vec![log_event! {
-                "source_type" => Bytes::from("aws_kinesis_firehose"),
-                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                "message"=> RECORD,
-                "request_id" => REQUEST_ID,
-                "source_arn" => SOURCE_ARN,
-            },]
-        );
-
-        let response: models::FirehoseResponse = res.json().await.unwrap();
-        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]

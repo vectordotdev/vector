@@ -1,4 +1,7 @@
-use std::{num::NonZeroU16, path::PathBuf};
+use std::{
+    num::{NonZeroU16, NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -9,7 +12,7 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
+    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
     Bufferable, WhenFull,
 };
 
@@ -26,22 +29,18 @@ const ALPHABET: [&str; 27] = [
 // emitting metrics for such buffers.
 #[derive(Debug, Clone)]
 pub enum Variant {
-    MemoryV1 {
-        max_events: usize,
-        when_full: WhenFull,
-    },
-    MemoryV2 {
-        max_events: usize,
+    Memory {
+        max_events: NonZeroUsize,
         when_full: WhenFull,
     },
     DiskV1 {
-        max_size: u64,
+        max_size: NonZeroU64,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
     },
     DiskV2 {
-        max_size: u64,
+        max_size: NonZeroU64,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
@@ -55,19 +54,12 @@ impl Variant {
     {
         let mut builder = TopologyBuilder::default();
         match self {
-            Variant::MemoryV1 {
+            Variant::Memory {
                 max_events,
                 when_full,
                 ..
             } => {
-                builder.stage(MemoryV1Buffer::new(*max_events), *when_full);
-            }
-            Variant::MemoryV2 {
-                max_events,
-                when_full,
-                ..
-            } => {
-                builder.stage(MemoryV2Buffer::new(*max_events), *when_full);
+                builder.stage(MemoryBuffer::new(*max_events), *when_full);
             }
             Variant::DiskV1 {
                 max_size,
@@ -94,7 +86,7 @@ impl Variant {
         };
 
         let (sender, receiver, _acker) = builder
-            .build(Span::none())
+            .build(String::from("benches"), Span::none())
             .await
             .expect("topology build should not fail");
 
@@ -124,61 +116,48 @@ impl Arbitrary for Id {
 #[cfg(test)]
 impl Arbitrary for Variant {
     fn arbitrary(g: &mut Gen) -> Self {
-        let idx = usize::arbitrary(g) % 4;
+        let idx = usize::arbitrary(g) % 3;
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
         let max_events = NonZeroU16::arbitrary(g)
-            .get()
             .try_into()
             .expect("we don't support 16-bit platforms");
-        let max_size = u64::from(NonZeroU16::arbitrary(g).get());
+        let max_size = NonZeroU16::arbitrary(g)
+            .try_into()
+            .expect("we don't support 16-bit platforms");
+
         let when_full = WhenFull::arbitrary(g);
 
         match idx {
-            0 => Variant::MemoryV1 {
+            0 => Variant::Memory {
                 max_events,
                 when_full,
             },
-            1 => Variant::MemoryV2 {
-                max_events,
-                when_full,
-            },
-            2 => Variant::DiskV1 {
+            1 => Variant::DiskV1 {
                 max_size,
                 when_full,
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
-            3 => Variant::DiskV2 {
+            2 => Variant::DiskV2 {
                 max_size,
                 when_full,
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
-            _ => unreachable!("idx divisor should be 4"),
+            _ => unreachable!("idx divisor should be 3"),
         }
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
-            Variant::MemoryV1 {
+            Variant::Memory {
                 max_events,
                 when_full,
                 ..
             } => {
                 let when_full = *when_full;
-                Box::new(max_events.shrink().map(move |me| Variant::MemoryV1 {
-                    max_events: me,
-                    when_full,
-                }))
-            }
-            Variant::MemoryV2 {
-                max_events,
-                when_full,
-                ..
-            } => {
-                let when_full = *when_full;
-                Box::new(max_events.shrink().map(move |me| Variant::MemoryV2 {
+                Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
                 }))

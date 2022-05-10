@@ -1,2 +1,1 @@
-mod common;
-mod model;
+pub mod common;

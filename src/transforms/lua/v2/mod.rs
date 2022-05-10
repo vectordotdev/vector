@@ -6,9 +6,10 @@ pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 use crate::{
-    config::{self, DataType, Output, CONFIG_PATHS},
+    config::{self, DataType, Input, Output, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
+    schema,
     transforms::Transform,
 };
 
@@ -70,6 +71,7 @@ fn default_config_paths() -> Vec<PathBuf> {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 struct HooksConfig {
     init: Option<String>,
     process: String,
@@ -93,12 +95,12 @@ impl LuaConfig {
         Lua::new(self).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Any
+    pub fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
     pub const fn transform_type(&self) -> &'static str {
@@ -227,7 +229,7 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            emit!(&LuaGcTriggered {
+            emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
             let _ = self
@@ -266,7 +268,7 @@ impl RuntimeTransform for Lua {
                     .call((event, wrap_emit_fn(scope, emit_fn)?))
             })
             .context(RuntimeErrorHooksProcessSnafu)
-            .map_err(|e| emit!(&LuaBuildError { error: e }));
+            .map_err(|e| emit!(LuaBuildError { error: e }));
 
         self.attempt_gc();
     }
@@ -555,7 +557,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(output.as_log()["number"], Value::from(3.14159));
         Ok(())
     }
 
@@ -740,7 +742,7 @@ mod tests {
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["new field"], "new value".into());
+        assert_eq!(output.as_log()["\"new field\""], "new value".into());
         Ok(())
     }
 

@@ -79,6 +79,7 @@ scopes:
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
   - apt platform # Anything `apt` platform related
+  - arm platform # Anything `arm` platform related
   - arm64 platform # Anything `arm64` platform related
   - centos platform # Anything `centos` platform related
   - debian platform # Anything `debian` platform related
@@ -129,9 +130,10 @@ scopes:
   - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
+  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
-  - generator source # Anything `generator` source related
+  - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
@@ -146,6 +148,7 @@ scopes:
   - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
+  - redis source # Anything `redis` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
   - statsd source # Anything `statsd` source related
@@ -207,6 +210,7 @@ scopes:
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related
+  - gcp_stackdriver_metrics sink # Anything `gcp_stackdriver_metrics` sink related
   - honeycomb sink # Anything `honeycomb` sink related
   - http sink # Anything `http` sink related
   - humio_logs sink # Anything `humio_logs` sink related
@@ -217,6 +221,7 @@ scopes:
   - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
+  - new_relic sink # Anything `new_relic` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related

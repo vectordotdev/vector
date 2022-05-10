@@ -100,7 +100,7 @@ impl Test {
         }
     }
 
-    pub fn from_example(func: &'static str, example: &Example) -> Self {
+    pub fn from_example(func: impl ToString, example: &Example) -> Self {
         let object = Value::Object(BTreeMap::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
@@ -109,7 +109,7 @@ impl Test {
 
         Self {
             name: example.title.to_owned(),
-            category: format!("functions/{}", func),
+            category: format!("functions/{}", func.to_string()),
             error: None,
             source: example.source.to_owned(),
             object,
@@ -144,5 +144,5 @@ fn test_name(path: &Path) -> String {
         .unwrap()
         .1
         .trim_end_matches(".vrl")
-        .replace("_", " ")
+        .replace('_', " ")
 }

@@ -15,6 +15,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -34,7 +35,6 @@ components: sources: aws_kinesis_firehose: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}}
@@ -79,7 +79,7 @@ components: sources: aws_kinesis_firehose: {
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		record_compression: {
 			common:      true
 			description: """
@@ -221,9 +221,15 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
+		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
+		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:      components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
-		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
 		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
 		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
 		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total

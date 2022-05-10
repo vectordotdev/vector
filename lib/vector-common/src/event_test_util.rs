@@ -1,9 +1,9 @@
 use std::{cell::RefCell, collections::HashSet};
 
-thread_local!(
+thread_local! {
     /// A buffer for recording internal events emitted by a single test.
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
-);
+}
 
 #[must_use]
 pub fn contains_name(name: &str) -> bool {
@@ -14,10 +14,10 @@ pub fn clear_recorded_events() {
     EVENTS_RECORDED.with(|er| er.borrow_mut().clear());
 }
 
+#[allow(clippy::print_stdout)]
 pub fn debug_print_events() {
     EVENTS_RECORDED.with(|events| {
         for event in events.borrow().iter() {
-            #![allow(clippy::print_stdout)] // that is the purpose of this function
             println!("{}", event);
         }
     });

@@ -1,7 +1,9 @@
 use std::{fmt, iter::Peekable, str::CharIndices};
 
-use diagnostic::{DiagnosticError, Label, Span};
+use diagnostic::{DiagnosticMessage, Label, Span};
 use ordered_float::NotNan;
+
+use crate::template_string::{StringSegment, TemplateString};
 
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
@@ -43,7 +45,7 @@ pub enum Error {
     UnexpectedParseError(String),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 
@@ -224,7 +226,8 @@ pub enum Token<S> {
     Operator(S),
 
     // literals
-    StringLiteral(StringLiteral<S>),
+    StringLiteral(StringLiteralToken<S>),
+    RawStringLiteral(RawStringLiteralToken<S>),
     IntegerLiteral(i64),
     FloatLiteral(NotNan<f64>),
     RegexLiteral(S),
@@ -232,9 +235,6 @@ pub enum Token<S> {
 
     // Reserved for future use.
     ReservedIdentifier(S),
-
-    // A token used by the internal parser unit tests.
-    InternalTest(S),
 
     InvalidToken(char),
 
@@ -260,6 +260,7 @@ pub enum Token<S> {
     SemiColon,
     Underscore,
     Escape,
+    Arrow,
 
     Equals,
     MergeEquals,
@@ -303,24 +304,24 @@ pub enum Token<S> {
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
         use self::Token::*;
+
         match self {
             Identifier(s) => Identifier(f(s)),
             PathField(s) => PathField(f(s)),
             FunctionCall(s) => FunctionCall(f(s)),
             Operator(s) => Operator(f(s)),
 
-            StringLiteral(s) => StringLiteral(match s {
-                self::StringLiteral::Escaped(s) => self::StringLiteral::Escaped(f(s)),
-                self::StringLiteral::Raw(s) => self::StringLiteral::Raw(f(s)),
-            }),
+            StringLiteral(StringLiteralToken(s)) => StringLiteral(StringLiteralToken(f(s))),
+            RawStringLiteral(RawStringLiteralToken(s)) => {
+                RawStringLiteral(RawStringLiteralToken(f(s)))
+            }
+
             IntegerLiteral(s) => IntegerLiteral(s),
             FloatLiteral(s) => FloatLiteral(s),
             RegexLiteral(s) => RegexLiteral(f(s)),
             TimestampLiteral(s) => TimestampLiteral(f(s)),
 
             ReservedIdentifier(s) => ReservedIdentifier(f(s)),
-
-            InternalTest(s) => InternalTest(f(s)),
 
             InvalidToken(s) => InvalidToken(s),
 
@@ -345,6 +346,7 @@ impl<S> Token<S> {
             SemiColon => SemiColon,
             Underscore => Underscore,
             Escape => Escape,
+            Arrow => Arrow,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -370,12 +372,12 @@ where
             FunctionCall(_) => "FunctionCall",
             Operator(_) => "Operator",
             StringLiteral(_) => "StringLiteral",
+            RawStringLiteral(_) => "RawStringLiteral",
             IntegerLiteral(_) => "IntegerLiteral",
             FloatLiteral(_) => "FloatLiteral",
             RegexLiteral(_) => "RegexLiteral",
             TimestampLiteral(_) => "TimestampLiteral",
             ReservedIdentifier(_) => "ReservedIdentifier",
-            InternalTest(_) => "InternalTest",
             InvalidToken(_) => "InvalidToken",
 
             Else => "Else",
@@ -399,6 +401,7 @@ where
             SemiColon => "SemiColon",
             Underscore => "Underscore",
             Escape => "Escape",
+            Arrow => "Arrow",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
@@ -442,17 +445,90 @@ impl<'input> Token<&'input str> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum StringLiteral<S> {
-    Escaped(S),
-    Raw(S),
+pub struct StringLiteralToken<S>(pub S);
+
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub struct RawStringLiteralToken<S>(pub S);
+
+impl StringLiteralToken<&str> {
+    /// Takes the string and splits it into segments of literals and templates.
+    /// A templated section is delimited by `{{..}}`. ``{{` can be escaped using
+    /// `\{{...\}}`.
+    pub fn template(&self, span: Span) -> TemplateString {
+        let mut segments = Vec::new();
+
+        let chars = self.0.chars().collect::<Vec<_>>();
+        let mut template = false;
+        let mut current = String::new();
+
+        let mut pos = 0;
+        while pos < chars.len() {
+            match chars[pos] {
+                '}' if template && chars.get(pos + 1) == Some(&'}') => {
+                    // Handle closing template `}}`.
+                    if !current.is_empty() {
+                        let seg = std::mem::take(&mut current);
+                        segments.push(StringSegment::Template(
+                            seg.trim().to_string(),
+                            Span::new(pos - seg.chars().count() - 1, pos + 3) + span.start(),
+                        ));
+                    }
+                    template = false;
+                    pos += 2;
+                }
+                '\\' if !template
+                    && chars.get(pos + 1) == Some(&'{')
+                    && chars.get(pos + 2) == Some(&'{') =>
+                {
+                    // Handle open escape `/{{`.
+                    current.push_str(r#"{{"#);
+                    pos += 3;
+                }
+                '\\' if !template
+                    && chars.get(pos + 1) == Some(&'}')
+                    && chars.get(pos + 2) == Some(&'}') =>
+                {
+                    // Handle close escape `\}}`
+                    current.push_str(r#"}}"#);
+                    pos += 3;
+                }
+                '{' if !template && chars.get(pos + 1) == Some(&'{') => {
+                    // Handle start of template.
+                    if !current.is_empty() {
+                        let seg = std::mem::take(&mut current);
+                        segments.push(StringSegment::Literal(
+                            unescape_string_literal(&seg),
+                            Span::new(pos - seg.chars().count() + 1, pos + 1) + span.start(),
+                        ));
+                    }
+                    template = true;
+                    pos += 2;
+                }
+                chr => {
+                    current.push(chr);
+                    pos += 1;
+                }
+            }
+        }
+
+        if !template && !current.is_empty() {
+            segments.push(StringSegment::Literal(
+                unescape_string_literal(&current),
+                Span::new(pos - current.chars().count() + 1, pos + 1) + span.start(),
+            ));
+        }
+
+        TemplateString(segments)
+    }
+
+    pub fn unescape(&self) -> String {
+        unescape_string_literal(self.0)
+    }
 }
 
-impl StringLiteral<&str> {
+impl RawStringLiteralToken<&str> {
     pub fn unescape(&self) -> String {
-        match self {
-            StringLiteral::Escaped(s) => unescape_string_literal(s),
-            StringLiteral::Raw(s) => s.to_string(),
-        }
+        self.0.to_string()
     }
 }
 
@@ -516,12 +592,13 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Ok(self.token(start, Underscore)))
                     }
 
-                    '?' if self.test_peek(char::is_alphabetic) => {
-                        Some(Ok(self.internal_test(start)))
-                    }
-
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
                         Some(Ok(self.token(start, Bang)))
+                    }
+
+                    '-' if self.test_peek(|ch| ch == '>') => {
+                        let _ = self.bump();
+                        Some(Ok(self.token(start, Arrow)))
                     }
 
                     '#' => {
@@ -774,6 +851,21 @@ impl<'input> Lexer<'input> {
                         };
 
                         let ch = match &self.input[pos..] {
+                            s if s.starts_with('#') => {
+                                for (_, chr) in chars.by_ref() {
+                                    if chr == '\n' {
+                                        break;
+                                    }
+                                }
+                                match chars.peek().map(|(_, ch)| ch) {
+                                    Some(ch) => *ch,
+                                    None => {
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of comment.".to_string(),
+                                        ));
+                                    }
+                                }
+                            }
                             s if s.starts_with('"') => {
                                 let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
@@ -911,7 +1003,7 @@ impl<'input> Lexer<'input> {
                 Some((content_end, '"')) => {
                     let end = self.next_index();
                     let slice = self.slice(content_start, content_end);
-                    let token = Token::StringLiteral(StringLiteral::Escaped(slice));
+                    let token = Token::StringLiteral(StringLiteralToken(slice));
                     return Ok((start, token, end));
                 }
                 _ => break,
@@ -926,7 +1018,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn raw_string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
-        self.quoted_literal(start, |c| Token::StringLiteral(StringLiteral::Raw(c)))
+        self.quoted_literal(start, |c| Token::RawStringLiteral(RawStringLiteralToken(c)))
     }
 
     fn timestamp_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
@@ -947,7 +1039,7 @@ impl<'input> Lexer<'input> {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
-                match float.replace("_", "").parse() {
+                match float.replace('_', "").parse() {
                     Ok(float) => {
                         let float = NotNan::new(float).unwrap();
                         Ok((start, Token::FloatLiteral(float), end))
@@ -959,7 +1051,7 @@ impl<'input> Lexer<'input> {
                     }),
                 }
             }
-            None | Some(_) => match int.replace("_", "").parse() {
+            None | Some(_) => match int.replace('_', "").parse() {
                 Ok(int) => Ok((start, Token::IntegerLiteral(int), end)),
                 Err(err) => Err(Error::NumericLiteral {
                     start,
@@ -993,13 +1085,6 @@ impl<'input> Lexer<'input> {
         };
 
         (start, token, end)
-    }
-
-    fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
-        self.bump();
-        let (end, test) = self.take_while(start, char::is_alphabetic);
-
-        (start, Token::InternalTest(test), end)
     }
 
     fn quoted_literal(
@@ -1104,6 +1189,8 @@ impl<'input> Lexer<'input> {
             Some((_, 'n')) => Ok(()),
             Some((_, 'r')) => Ok(()),
             Some((_, 't')) => Ok(()),
+            Some((_, '{')) => Ok(()),
+            Some((_, '}')) => Ok(()),
             Some((start, ch)) => Err(Error::EscapeChar {
                 start,
                 ch: Some(ch),
@@ -1168,6 +1255,7 @@ fn unescape_string_literal(mut s: &str) -> String {
                 b'n' => '\n',
                 b'r' => '\r',
                 b't' => '\t',
+                b'{' => '{',
                 _ => unimplemented!("invalid escape"),
             };
 
@@ -1185,7 +1273,7 @@ fn unescape_string_literal(mut s: &str) -> String {
 mod test {
     #![allow(clippy::print_stdout)] // tests
 
-    use super::{StringLiteral, *};
+    use super::*;
     use crate::lex::Token::*;
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
@@ -1241,31 +1329,38 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn string_literals() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteralToken as S;
+        use StringLiteral as L;
 
         test(
             data(r#"foo "bar\"\n" baz "" "\t" "\"\"""#),
             vec![
                 (r#"~~~                             "#, Identifier("foo")),
-                (r#"    ~~~~~~~~~                   "#, L(S::Escaped("bar\\\"\\n"))),
+                (r#"    ~~~~~~~~~                   "#, L(S("bar\\\"\\n"))),
                 (r#"              ~~~               "#, Identifier("baz")),
-                (r#"                  ~~            "#, L(S::Escaped(""))),
-                (r#"                     ~~~~       "#, L(S::Escaped("\\t"))),
-                (r#"                          ~~~~~~"#, L(S::Escaped(r#"\"\""#))),
+                (r#"                  ~~            "#, L(S(""))),
+                (r#"                     ~~~~       "#, L(S("\\t"))),
+                (r#"                          ~~~~~~"#, L(S(r#"\"\""#))),
             ],
         );
-        assert_eq!(StringLiteral::Escaped(r#"\"\""#).unescape(), r#""""#);
+        assert_eq!(TemplateString(vec![StringSegment::Literal(r#""""#.to_string(), Span::new(1, 5))]), StringLiteralToken(r#"\"\""#).template(Span::new(0, 6)));
     }
 
     #[test]
-    #[rustfmt::skip]
     fn multiline_string_literals() {
-        let mut lexer = lexer(r#""foo \
-                                  bar""#);
+        let mut lexer = lexer(
+            r#""foo \
+                bar""#,
+        );
 
         match lexer.next() {
-            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!("foo bar", s.unescape()),
+            Some(Ok((_, StringLiteral(s), _))) => assert_eq!(
+                TemplateString(vec![StringSegment::Literal(
+                    "foo bar".to_string(),
+                    Span::new(1, 26)
+                )]),
+                s.template(Span::new(0, 26))
+            ),
             _ => panic!("Not a string literal"),
         }
     }
@@ -1329,13 +1424,13 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn raw_string_literals() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteralToken as S;
+        use RawStringLiteral as R;
 
         test(
             data(r#"s'a "bc" \n \'d'"#),
             vec![
-                (r#"~~~~~~~~~~~~~~~~"#, L(S::Raw(r#"a "bc" \n \'d"#))),
+                (r#"~~~~~~~~~~~~~~~~"#, R(S(r#"a "bc" \n \'d"#))),
             ],
         );
     }
@@ -1493,8 +1588,8 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn nested_queries() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteralToken as S;
+        use StringLiteral as L;
 
         test(
             data(r#"[.foo].bar { "foo": [2][0] }"#),
@@ -1510,7 +1605,7 @@ mod test {
                 (r#"       ~~~                  "#, Identifier("bar")),
                 (r#"         ~                  "#, RQuery),
                 (r#"           ~                "#, LBrace),
-                (r#"             ~~~~~          "#, L(S::Escaped("foo"))),
+                (r#"             ~~~~~          "#, L(S("foo"))),
                 (r#"                  ~         "#, Colon),
                 (r#"                    ~       "#, LQuery),
                 (r#"                    ~       "#, LBracket),
@@ -1546,8 +1641,8 @@ mod test {
 
     #[test]
     fn complex_query_1() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteral as L;
+        use StringLiteralToken as S;
 
         test(
             data(r#".a.(b | c  )."d\"e"[2 ][ 1]"#),
@@ -1562,7 +1657,7 @@ mod test {
                 (r#"        ~                  "#, Identifier("c")),
                 (r#"           ~               "#, RParen),
                 (r#"            ~              "#, Dot),
-                (r#"             ~~~~~~        "#, L(S::Escaped("d\\\"e"))),
+                (r#"             ~~~~~~        "#, L(S("d\\\"e"))),
                 (r#"                   ~       "#, LBracket),
                 (r#"                    ~      "#, IntegerLiteral(2)),
                 (r#"                      ~    "#, RBracket),
@@ -1576,20 +1671,20 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn complex_query_2() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteralToken as S;
+        use StringLiteral as L;
 
         test(
             data(r#"{ "a": parse_json!("{ \"b\": 0 }").c }"#),
             vec![
                 (r#"~                                     "#, LBrace),
-                (r#"  ~~~                                 "#, L(S::Escaped("a"))),
+                (r#"  ~~~                                 "#, L(S("a"))),
                 (r#"     ~                                "#, Colon),
                 (r#"       ~                              "#, LQuery),
                 (r#"       ~~~~~~~~~~                     "#, FunctionCall("parse_json")),
                 (r#"                 ~                    "#, Bang),
                 (r#"                  ~                   "#, LParen),
-                (r#"                   ~~~~~~~~~~~~~~     "#, L(S::Escaped("{ \\\"b\\\": 0 }"))),
+                (r#"                   ~~~~~~~~~~~~~~     "#, L(S("{ \\\"b\\\": 0 }"))),
                 (r#"                                 ~    "#, RParen),
                 (r#"                                  ~   "#, Dot),
                 (r#"                                   ~  "#, Identifier("c")),
@@ -1602,23 +1697,25 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn query_with_literals() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteralToken as S;
+        use RawStringLiteralToken as RS;
+        use StringLiteral as L;
+        use RawStringLiteral as R;
 
         test(
             data(r#"{ "a": r'b?c', "d": s'"e"\'f', "g": t'1.0T0' }.h"#),
             vec![
                 (r#"~                                               "#, LQuery),
                 (r#"~                                               "#, LBrace),
-                (r#"  ~~~                                           "#, L(S::Escaped("a"))),
+                (r#"  ~~~                                           "#, L(S("a"))),
                 (r#"     ~                                          "#, Colon),
                 (r#"       ~~~~~~                                   "#, RegexLiteral("b?c")),
                 (r#"             ~                                  "#, Comma),
-                (r#"               ~~~                              "#, L(S::Escaped("d"))),
+                (r#"               ~~~                              "#, L(S("d"))),
                 (r#"                  ~                             "#, Colon),
-                (r#"                    ~~~~~~~~~                   "#, L(S::Raw("\"e\"\\\'f"))),
+                (r#"                    ~~~~~~~~~                   "#, R(RS("\"e\"\\\'f"))),
                 (r#"                             ~                  "#, Comma),
-                (r#"                               ~~~              "#, L(S::Escaped("g"))),
+                (r#"                               ~~~              "#, L(S("g"))),
                 (r#"                                  ~             "#, Colon),
                 (r#"                                    ~~~~~~~~    "#, TimestampLiteral("1.0T0")),
                 (r#"                                             ~  "#, RBrace),
@@ -1651,17 +1748,17 @@ mod test {
 
     #[test]
     fn object_queries() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteral as L;
+        use StringLiteralToken as S;
 
         test(
             data(r#"{ "foo": "bar" }.foo"#),
             vec![
                 (r#"~                   "#, LQuery),
                 (r#"~                   "#, LBrace),
-                (r#"  ~~~~~             "#, L(S::Escaped("foo"))),
+                (r#"  ~~~~~             "#, L(S("foo"))),
                 (r#"       ~            "#, Colon),
-                (r#"         ~~~~~      "#, L(S::Escaped("bar"))),
+                (r#"         ~~~~~      "#, L(S("bar"))),
                 (r#"               ~    "#, RBrace),
                 (r#"                ~   "#, Dot),
                 (r#"                 ~~~"#, Identifier("foo")),
@@ -1692,8 +1789,8 @@ mod test {
 
     #[test]
     fn function_call_queries() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteral as L;
+        use StringLiteralToken as S;
 
         test(
             data(r#"foo(ab: "c")[2].d"#),
@@ -1703,7 +1800,7 @@ mod test {
                 (r#"   ~             "#, LParen),
                 (r#"    ~~           "#, Identifier("ab")),
                 (r#"      ~          "#, Colon),
-                (r#"        ~~~      "#, L(S::Escaped("c"))),
+                (r#"        ~~~      "#, L(S("c"))),
                 (r#"           ~     "#, RParen),
                 (r#"            ~    "#, LBracket),
                 (r#"             ~   "#, IntegerLiteral(2)),
@@ -1791,15 +1888,15 @@ mod test {
     #[test]
     #[rustfmt::skip]
     fn quoted_path_queries() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteralToken as S;
+        use StringLiteral as L;
 
         test(
             data(r#"."parent.key.with.special characters".child"#),
             vec![
                 (r#"~                                          "#, LQuery),
                 (r#"~                                          "#, Dot),
-                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S::Escaped("parent.key.with.special characters"))),
+                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S("parent.key.with.special characters"))),
                 (r#"                                     ~     "#, Dot),
                 (r#"                                      ~~~~~"#, Identifier("child")),
                 (r#"                                          ~"#, RQuery),
@@ -1829,15 +1926,15 @@ mod test {
 
     #[test]
     fn queries_nested_delims() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use StringLiteral as L;
+        use StringLiteralToken as S;
 
         test(
             data(r#"{ "foo": [true] }.foo[0]"#),
             vec![
                 (r#"~                       "#, LQuery),
                 (r#"~                       "#, LBrace),
-                (r#"  ~~~~~                 "#, L(S::Escaped("foo"))),
+                (r#"  ~~~~~                 "#, L(S("foo"))),
                 (r#"       ~                "#, Colon),
                 (r#"         ~              "#, LBracket),
                 (r#"          ~~~~          "#, True),
@@ -1872,15 +1969,15 @@ mod test {
 
     #[test]
     fn multi_byte_character_1() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteral as R;
+        use RawStringLiteralToken as RS;
 
         test(
             data("a * s'漢字' * a"),
             vec![
                 ("~                ", Identifier("a")),
                 ("  ~              ", Operator("*")),
-                ("    ~~~~~~~~~    ", L(S::Raw("漢字"))),
+                ("    ~~~~~~~~~    ", R(RS("漢字"))),
                 ("              ~  ", Operator("*")),
                 ("                ~", Identifier("a")),
             ],
@@ -1889,17 +1986,103 @@ mod test {
 
     #[test]
     fn multi_byte_character_2() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
+        use RawStringLiteral as R;
+        use RawStringLiteralToken as RS;
 
         test(
             data("a * s'¡' * a"),
             vec![
                 ("~            ", Identifier("a")),
                 ("  ~          ", Operator("*")),
-                ("    ~~~~~    ", L(S::Raw("¡"))),
+                ("    ~~~~~    ", R(RS("¡"))),
                 ("          ~  ", Operator("*")),
                 ("            ~", Identifier("a")),
+            ],
+        );
+    }
+
+    #[test]
+    fn comment_in_block() {
+        test(
+            data("if x {\n   # It's an apostrophe.\n   3\n}"),
+            vec![
+                ("~~                                    ", If),
+                ("   ~                                  ", Identifier("x")),
+                ("     ~                                ", LBrace),
+                ("      ~                               ", Newline),
+                ("                               ~      ", Newline),
+                ("                                   ~  ", IntegerLiteral(3)),
+                ("                                    ~ ", Newline),
+                ("                                     ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn unescape_string_literal() {
+        let string = StringLiteralToken("zork {{ zonk }} zoog");
+        assert_eq!(
+            TemplateString(vec![
+                StringSegment::Literal("zork ".to_string(), Span::new(1, 6)),
+                StringSegment::Template("zonk".to_string(), Span::new(6, 16)),
+                StringSegment::Literal(" zoog".to_string(), Span::new(16, 21)),
+            ]),
+            string.template(Span::new(0, 22))
+        );
+    }
+
+    #[test]
+    fn function_closure_no_arg() {
+        test(
+            data("foo() -> || {}"),
+            vec![
+                ("~~~           ", FunctionCall("foo")),
+                ("   ~          ", LParen),
+                ("    ~         ", RParen),
+                ("      ~~      ", Arrow),
+                ("         ~~   ", Operator("||")),
+                ("            ~ ", LBrace),
+                ("             ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_closure_single_arg() {
+        test(
+            data("foo() -> |idx| { idx }"),
+            vec![
+                ("~~~                   ", FunctionCall("foo")),
+                ("   ~                  ", LParen),
+                ("    ~                 ", RParen),
+                ("      ~~              ", Arrow),
+                ("         ~            ", Operator("|")),
+                ("          ~~~         ", Identifier("idx")),
+                ("             ~        ", Operator("|")),
+                ("               ~      ", LBrace),
+                ("                 ~~~  ", Identifier("idx")),
+                ("                     ~", RBrace),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_closure_args() {
+        test(
+            data("foo() -> |i, v| { v }"),
+            vec![
+                ("~~~                  ", FunctionCall("foo")),
+                ("   ~                 ", LParen),
+                ("    ~                ", RParen),
+                ("      ~~             ", Arrow),
+                ("         ~           ", Operator("|")),
+                ("          ~          ", Identifier("i")),
+                ("           ~         ", Comma),
+                ("             ~       ", Identifier("v")),
+                ("              ~      ", Operator("|")),
+                ("                ~    ", LBrace),
+                ("                  ~  ", Identifier("v")),
+                ("                    ~", RBrace),
             ],
         );
     }

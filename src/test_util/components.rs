@@ -7,17 +7,30 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use std::env;
+use std::{env, time::Duration};
 
 use futures::{stream, SinkExt, Stream, StreamExt};
-use lazy_static::lazy_static;
+use futures_util::Future;
+use once_cell::sync::Lazy;
+use tokio::{pin, select, time::sleep};
 use vector_core::event_test_util;
 
 use crate::{
+    config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
     metrics::{self, Controller},
     sinks::VectorSink,
+    SourceSender,
 };
+
+/// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
+pub const SOURCE_TAGS: [&str; 1] = ["protocol"];
+
+/// The standard set of tags for sources that have their data pushed in from an external source.
+pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+/// The standard set of tags for sources that pull their data from an external source.
+pub const PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
@@ -25,8 +38,19 @@ pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 /// The standard set of tags for sources that accept connections over HTTP.
 pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
 
-/// The standard set of tags for all `TcpSource`-based sources.
-pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+/// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`.
+pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+
+/// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`, but
+/// specifically sources that experience high cardinality i.e. many many clients, where emitting metrics with the peer
+/// address as a tag would represent too high of a cost to pay.
+pub const SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
+
+/// The standard set of tags for all generic socket-based sources that poll connections i.e. Redis.
+pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
+
+/// The standard set of tags for all sources that read a file.
+pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
 /// The standard set of tags for all sinks that write a file.
 pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
@@ -47,45 +71,41 @@ pub struct ComponentTests {
     untagged_counters: &'static [&'static str],
 }
 
-lazy_static! {
-    /// The component test specification for all sources
-    pub static ref SOURCE_TESTS: ComponentTests = ComponentTests {
-        events: &["BytesReceived", "EventsReceived", "EventsSent"],
-        tagged_counters: &[
-            "component_received_bytes_total",
-        ],
-        untagged_counters: &[
-            "component_received_events_total",
-            "component_received_event_bytes_total",
-            "component_sent_events_total",
-            "component_sent_event_bytes_total",
-        ],
-    };
-    /// The component test specification for all sinks
-    pub static ref SINK_TESTS: ComponentTests = ComponentTests {
+/// The component test specification for all sources
+pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["BytesReceived", "EventsReceived", "EventsSent"],
+    tagged_counters: &["component_received_bytes_total"],
+    untagged_counters: &[
+        "component_received_events_total",
+        "component_received_event_bytes_total",
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+});
+/// The component test specification for all sinks
+pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+    ComponentTests {
         events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
-        tagged_counters: &[
-            "component_sent_bytes_total",
-        ],
+        tagged_counters: &["component_sent_bytes_total"],
         untagged_counters: &[
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
-    };
-    /// The component test specification for components with multiple outputs
-    pub static ref COMPONENT_MULTIPLE_OUTPUTS_TESTS: ComponentTests = ComponentTests {
-        events: &["EventsSent"],
-        tagged_counters: &[
-            "component_sent_events_total",
-            "component_sent_event_bytes_total",
-        ],
-        untagged_counters: &[
-        ],
-    };
-}
+    }
+});
+/// The component test specification for components with multiple outputs
+pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["EventsSent"],
+    tagged_counters: &[
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+    untagged_counters: &[],
+});
 
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed
+    #[track_caller]
     pub fn assert(&self, tags: &[&str]) {
         let mut test = ComponentTester::new();
         test.emitted_all_events(self.events);
@@ -93,8 +113,8 @@ impl ComponentTests {
         test.emitted_all_counters(self.untagged_counters, &[]);
         if !test.errors.is_empty() {
             panic!(
-                "Failed to assert compliance, errors:\n    {}\n",
-                test.errors.join("\n    ")
+                "Failed to assert compliance, errors:\n{}\n",
+                test.errors.join("\n")
             );
         }
     }
@@ -146,15 +166,41 @@ impl ComponentTester {
     fn emitted_all_counters(&mut self, names: &[&str], tags: &[&str]) {
         let tag_suffix = (!tags.is_empty())
             .then(|| format!("{{{}}}", tags.join(",")))
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
+
         for name in names {
             if !self.metrics.iter().any(|m| {
                 matches!(m.value(), MetricValue::Counter { .. })
                     && m.name() == *name
                     && has_tags(m, tags)
             }) {
-                self.errors
-                    .push(format!("Missing metric named {}{}", name, tag_suffix));
+                // If we didn't find a direct match, see if any other metrics exist which are counters of the same name,
+                // which could represent metrics being emitted but without the correct tag(s).
+                let partial_matches = self
+                    .metrics
+                    .iter()
+                    .filter(|m| {
+                        matches!(m.value(), MetricValue::Counter { .. })
+                            && m.name() == *name
+                            && !has_tags(m, tags)
+                    })
+                    .map(|m| {
+                        let tags = m
+                            .tags()
+                            .map(|t| {
+                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
+                                format!("{{{}}}", tag_keys.join(","))
+                            })
+                            .unwrap_or_default();
+                        format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
+                    })
+                    .collect::<Vec<_>>();
+                let partial = partial_matches.join("");
+
+                self.errors.push(format!(
+                    "  - Missing metric `{}{}`{}",
+                    name, tag_suffix, partial
+                ));
             }
         }
     }
@@ -162,10 +208,111 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if !event_test_util::contains_name(name) {
-                self.errors.push(format!("Missing emitted event {}", name));
+                self.errors
+                    .push(format!("  - Missing emitted event `{}`", name));
             }
         }
     }
+}
+
+/// Convenience wrapper for running source tests
+pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    SOURCE_TESTS.assert(tags);
+
+    result
+}
+
+pub async fn run_and_assert_source_compliance<SC>(
+    source: SC,
+    timeout: Duration,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    run_and_assert_source_compliance_advanced(source, |_| {}, Some(timeout), None, tags).await
+}
+
+pub async fn run_and_assert_source_compliance_n<SC>(
+    source: SC,
+    event_count: usize,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    run_and_assert_source_compliance_advanced(source, |_| {}, None, Some(event_count), tags).await
+}
+
+pub async fn run_and_assert_source_compliance_advanced<SC>(
+    source: SC,
+    setup: impl FnOnce(&mut SourceContext),
+    timeout: Option<Duration>,
+    event_count: Option<usize>,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    assert_source_compliance(tags, async move {
+        // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
+        let (tx, mut rx) = SourceSender::new_test();
+        let mut context = SourceContext::new_test(tx, None);
+
+        setup(&mut context);
+
+        let mut source = source
+            .build(context)
+            .await
+            .expect("source should not fail to build");
+
+        // If a timeout was given, use that, otherwise, use an infinitely long one.
+        let source_timeout = sleep(timeout.unwrap_or_else(|| Duration::from_nanos(u64::MAX)));
+        pin!(source_timeout);
+
+        let mut events = Vec::new();
+
+        // Try and drive both our timeout and the source itself, while collecting any events that the source sends out in
+        // the meantime.  We store these locally and return them all at the end.
+        loop {
+            // If an event count was given, and we've hit it, break out of the loop.
+            if let Some(count) = event_count {
+                if events.len() == count {
+                    break;
+                }
+            }
+
+            select! {
+                _ = &mut source_timeout => break,
+                Some(event) = rx.next() => events.push(event),
+                _ = &mut source => break,
+            }
+        }
+
+        drop(source);
+
+        // Drain any remaining events that we didn't get to before our timeout.
+        //
+        // If an event count was given, break out if we've reached the limit. Otherwise, just drain the remaining events
+        // until no more are left, which avoids timing issues with missing events that came in right when the timeout
+        // fired.
+        while let Some(event) = rx.next().await {
+            if let Some(count) = event_count {
+                if events.len() == count {
+                    break;
+                }
+            }
+
+            events.push(event);
+        }
+
+        events
+    })
+    .await
 }
 
 /// Convenience wrapper for running sink tests

@@ -1,35 +1,55 @@
 [package]
 name = "vrl-compiler"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+  "expr-assignment",
+  "expr-function_call",
+  "expr-if_statement",
+  "expr-literal",
+  "expr-op",
+  "expr-query",
+  "expr-unary",
+]
+expr-abort = ["core/expr-abort"]
+expr-assignment = ["expr-op"]
+expr-function_call = []
+expr-if_statement = []
+expr-literal = []
+expr-op = []
+expr-query = []
+expr-unary = []
+
 [dependencies]
+core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
+vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
+value = { path = "../../value" }
 
-bitflags = "1"
-bytes = "1.1.0"
-chrono = "0.4"
-dyn-clone = "1.0.4"
-lalrpop-util = "0.19"
-ordered-float = "2"
-paste = "1"
-regex = "1"
-serde = "1"
-thiserror = "1"
-tracing = "0.1"
-serde_json = { version = "1", default-features = false, features = ["std"] }
+bytes = { version = "1.1.0", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dyn-clone = { version = "1.0.5", default-features = false }
+lalrpop-util = { version = "0.19", default-features = false }
+ordered-float = { version = "3", default-features = false }
+paste = { version = "1", default-features = false }
+regex = { version = "1", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive"] }
+thiserror ={ version =  "1", default-features = false }
+anymap = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"
 indoc = "1"
-shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
+vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"
 harness = false
-test = true

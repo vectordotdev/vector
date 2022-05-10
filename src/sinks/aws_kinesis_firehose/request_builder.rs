@@ -1,20 +1,19 @@
+use aws_sdk_firehose::model::Record;
+use aws_sdk_firehose::types::Blob;
 use std::io;
 
 use bytes::Bytes;
-use rusoto_firehose::Record;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{
-        encoding::{EncodingConfig, StandardEncodings},
-        Compression, RequestBuilder,
-    },
+    sinks::util::{encoding::Transformer, Compression, RequestBuilder},
 };
 
 pub struct KinesisRequestBuilder {
-    pub compression: Compression,
-    pub encoder: EncodingConfig<StandardEncodings>,
+    pub(super) compression: Compression,
+    pub(super) encoder: (Transformer, Encoder<()>),
 }
 
 pub struct Metadata {
@@ -43,8 +42,14 @@ impl Finalizable for KinesisRequest {
 
 impl KinesisRequest {
     fn encoded_length(&self) -> usize {
+        let data_len = self
+            .record
+            .data
+            .as_ref()
+            .map(|x| x.as_ref().len())
+            .unwrap_or(0);
         // data is simply base64 encoded, quoted, and comma separated
-        (self.record.data.len() + 2) / 3 * 4 + 3
+        (data_len + 2) / 3 * 4 + 3
     }
 }
 
@@ -64,7 +69,7 @@ impl ByteSizeOf for KinesisRequest {
 impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
     type Events = Event;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
     type Request = KinesisRequest;
     type Error = io::Error;
@@ -87,7 +92,7 @@ impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
         KinesisRequest {
-            record: Record { data },
+            record: Record::builder().data(Blob::new(data.as_ref())).build(),
             finalizers: metadata.finalizers,
             event_byte_size: metadata.event_byte_size,
         }

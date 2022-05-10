@@ -6,21 +6,21 @@ components: sinks: new_relic_logs: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
 		stateful: false
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_bytes:    1_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -58,7 +58,11 @@ components: sinks: new_relic_logs: {
 
 	support: {
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				This transform has been deprecated. Please use the [`new_relic` sink](\(urls.vector_new_relic_sink)) instead.
+				""",
+		]
 		notices: []
 	}
 
@@ -99,6 +103,7 @@ components: sinks: new_relic_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: components.sinks.http.telemetry

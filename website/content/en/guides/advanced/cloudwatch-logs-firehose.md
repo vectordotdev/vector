@@ -4,7 +4,7 @@ description: Use CloudWatch Log subscriptions and Kinesis Firehose to robustly c
 authors: ["jszwedko"]
 domains: ["sources", "transforms"]
 transforms: ["aws_cloudwatch_logs_subscription_parser"]
-weight: 4
+weight: 2
 tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 ---
 
@@ -239,7 +239,7 @@ EOF
 
 ## Create stream
 
-With the the S3 bucket and IAM role in place, we can create our delivery stream.
+With the S3 bucket and IAM role in place, we can create our delivery stream.
 
 ```bash
 $ aws firehose create-delivery-stream --delivery-stream-name ${FIREHOSE_DELIVERY_STREAM} \

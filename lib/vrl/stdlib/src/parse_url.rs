@@ -63,10 +63,23 @@ impl Function for ParseUrl {
         ]
     }
 
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        let string = value.try_bytes_utf8_lossy()?;
+        let default_known_ports = arguments
+            .optional("default_known_ports")
+            .map(|val| val.as_boolean().unwrap_or(false))
+            .unwrap_or(false);
+
+        Url::parse(&string)
+            .map_err(|e| format!("unable to parse url: {}", e).into())
+            .map(|url| url_to_value(url, default_known_ports))
+    }
+
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -99,8 +112,8 @@ impl Expression for ParseUrlFn {
             .map(|url| url_to_value(url, default_known_ports))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object(type_def())
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
@@ -140,19 +153,20 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
         .collect::<Value>()
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "scheme": Kind::Bytes,
-        "username": Kind::Bytes,
-        "password": Kind::Bytes,
-        "path": Kind::Bytes | Kind::Null,
-        "host": Kind::Bytes,
-        "port": Kind::Integer | Kind::Null,
-        "fragment": Kind::Bytes | Kind::Null,
-        "query": TypeDef::new().object::<(), Kind>(map! {
-            (): Kind::Bytes,
-        }),
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("scheme".into(), Kind::bytes()),
+        ("username".into(), Kind::bytes()),
+        ("password".into(), Kind::bytes()),
+        ("path".into(), Kind::bytes().or_null()),
+        ("host".into(), Kind::bytes()),
+        ("port".into(), Kind::integer().or_null()),
+        ("fragment".into(), Kind::bytes().or_null()),
+        (
+            "query".into(),
+            Kind::object(Collection::from_unknown(Kind::bytes())),
+        ),
+    ])
 }
 
 #[cfg(test)]
@@ -174,7 +188,7 @@ mod tests {
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         default_port_specified {
@@ -189,7 +203,7 @@ mod tests {
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         default_port {
@@ -199,12 +213,12 @@ mod tests {
                 host: "vector.dev",
                 password: "",
                 path: "/",
-                port: 443,
+                port: 443_i64,
                 query: {},
                 scheme: "https",
                 username: "",
             })),
-            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

@@ -1,0 +1,23 @@
+{{ $link := .link | default "./" }}
+
+{{ $text_color := .text_color | default "dark" }}
+{{ $text_color_hover := .text_color_hover | default "dark" }}
+{{ $bg_color := .bg_color | default "gray-200" }}
+{{ $bg_color_hover := .bg_color_hover | default "primary" }}
+
+{{ $text := .text | default "Sign Up" }}
+{{ $typography := .typography | default "text-xs md:text-sm font-semibold uppercase" }}
+
+{{ $padding := .padding | default "py-3 md:py-4 md:px-5" }}
+{{ $additional_classes := .additional_classes | default "" }}
+
+{{/*  toggleModal defined in partial "modal.html"  */}}
+<a href="{{ $link }}">
+    <button
+        onclick="toggleModal({{.form_id}})"
+        class="{{ $padding }} text-{{ $text_color }} bg-{{ $bg_color }} inline-flex justify-center items-center w-full border border-{{ $text_color }} hover:text-{{ $text_color_hover }} hover:border-{{ $text_color_hover }} hover:bg-{{ $bg_color_hover }} rounded md:w-max md:m-auto select-none {{ $additional_classes }}">
+        <span class="inline-block {{ $typography }}">
+            {{ $text }}
+        </span>
+    </button>
+</a>

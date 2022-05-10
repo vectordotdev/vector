@@ -66,7 +66,7 @@ impl Decoder {
         }
 
         if total_had_errors {
-            emit!(&DecoderMalformedReplacement {
+            emit!(DecoderMalformedReplacement {
                 from_encoding: self.inner.encoding().name()
             });
         }
@@ -87,7 +87,7 @@ impl Decoder {
             .get(..BOM_UTF8_LEN)
             .map_or(false, |start| start == BOM_UTF8)
         {
-            emit!(&DecoderBomRemoval {
+            emit!(DecoderBomRemoval {
                 from_encoding: self.inner.encoding().name()
             });
             output.slice(BOM_UTF8_LEN..)
@@ -174,7 +174,7 @@ impl Encoder {
         }
 
         if total_had_errors {
-            emit!(&EncoderUnmappableReplacement {
+            emit!(EncoderUnmappableReplacement {
                 to_encoding: self.inner.encoding().name()
             });
         }
@@ -198,11 +198,11 @@ mod tests {
 
     // test UTF_16LE data
     const fn test_data_utf16le_123() -> &'static [u8] {
-        b"1\02\03\0"
+        b"1\x002\x003\x00"
     }
 
     const fn test_data_utf16le_crlf() -> &'static [u8] {
-        b"\r\0\n\0"
+        b"\r\x00\n\x00"
     }
 
     const fn test_data_utf16le_vector_devanagari() -> &'static [u8] {
@@ -211,11 +211,11 @@ mod tests {
 
     // test UTF_16BE data
     const fn test_data_utf16be_123() -> &'static [u8] {
-        b"\01\02\03"
+        b"\x001\x002\x003"
     }
 
     const fn test_data_utf16be_crlf() -> &'static [u8] {
-        b"\0\r\0\n"
+        b"\x00\r\x00\n"
     }
 
     const fn test_data_utf16be_vector_devanagari() -> &'static [u8] {

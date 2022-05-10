@@ -4,15 +4,10 @@ components: sources: kafka: {
 	title: "Kafka"
 
 	features: {
+		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: false
-				can_verify_hostname:    false
-				enabled_default:        false
-			}
+			tls: enabled:        false
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
@@ -38,7 +33,7 @@ components: sources: kafka: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		auto_offset_reset: {
 			common:      false
 			description: """

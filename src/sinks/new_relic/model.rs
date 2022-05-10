@@ -1,6 +1,7 @@
 use super::NewRelicSinkError;
 use crate::event::{Event, MetricValue, Value};
 use chrono::{DateTime, Utc};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
 
@@ -59,14 +60,22 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     MetricValue::Gauge { value } => {
                         metric_array.push((
                             Value::from(metric.name().to_owned()),
-                            Value::from(*value),
+                            Value::from(
+                                NotNan::new(*value).map_err(|_| {
+                                    NewRelicSinkError::new("NaN value not supported")
+                                })?,
+                            ),
                             Value::from(metric.timestamp()),
                         ));
                     }
                     MetricValue::Counter { value } => {
                         metric_array.push((
                             Value::from(metric.name().to_owned()),
-                            Value::from(*value),
+                            Value::from(
+                                NotNan::new(*value).map_err(|_| {
+                                    NewRelicSinkError::new("NaN value not supported")
+                                })?,
+                            ),
                             Value::from(metric.timestamp()),
                         ));
                     }
@@ -118,8 +127,13 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                                     event_model.insert(k, Value::from(s));
                                 }
                                 serde_json::Value::Number(n) => {
-                                    if n.is_f64() {
-                                        event_model.insert(k, Value::from(n.as_f64()));
+                                    if let Some(f) = n.as_f64() {
+                                        event_model.insert(
+                                            k,
+                                            Value::from(NotNan::new(f).map_err(|_| {
+                                                NewRelicSinkError::new("NaN value not supported")
+                                            })?),
+                                        );
                                     } else {
                                         event_model.insert(k, Value::from(n.as_i64()));
                                     }

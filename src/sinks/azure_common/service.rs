@@ -8,16 +8,18 @@ use azure_core::HttpError;
 use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
-    internal_events::azure_blob::{AzureBlobErrorResponse, AzureBlobEventSent, AzureBlobHttpError},
+    internal_events::azure_blob::{
+        AzureBlobEventsSent, AzureBlobHttpError, AzureBlobResponseError,
+    },
     sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
 };
 
 #[derive(Clone)]
-pub struct AzureBlobService {
-    pub client: Arc<ContainerClient>,
+pub(crate) struct AzureBlobService {
+    pub(self) client: Arc<ContainerClient>,
 }
 
 impl AzureBlobService {
@@ -54,20 +56,20 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
                         Some(HttpError::StatusCode { status, .. }) => {
-                            emit!(&AzureBlobErrorResponse { code: *status })
+                            emit!(AzureBlobResponseError::from(*status))
                         }
-                        _ => emit!(&AzureBlobHttpError {
+                        _ => emit!(AzureBlobHttpError {
                             error: reason.to_string()
                         }),
                     };
                 })
                 .inspect_ok(|result| {
-                    emit!(&AzureBlobEventSent {
+                    emit!(AzureBlobEventsSent {
                         request_id: result.request_id,
                         byte_size
                     })
                 })
-                .instrument(info_span!("request"))
+                .instrument(info_span!("request").or_current())
                 .await;
 
             result.map(|inner| AzureBlobResponse {

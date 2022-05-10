@@ -5,26 +5,29 @@ use vector_core::transform::SyncTransform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{
-        DataType, GenerateConfig, Output, TransformConfig, TransformContext, TransformDescription,
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::Event,
-    internal_events::RouteEventDiscarded,
+    schema,
     transforms::Transform,
 };
 
 //------------------------------------------------------------------------------
 
+pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
+
 #[derive(Clone)]
 pub struct Route {
-    conditions: IndexMap<String, Box<dyn Condition>>,
+    conditions: Vec<(String, Condition)>,
 }
 
 impl Route {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
-        let mut conditions = IndexMap::new();
+        let mut conditions = Vec::with_capacity(config.route.len());
         for (output_name, condition) in config.route.iter() {
             let condition = condition.build(&context.enrichment_tables)?;
-            conditions.insert(output_name.clone(), condition);
+            conditions.push((output_name.clone(), condition));
         }
         Ok(Self { conditions })
     }
@@ -36,14 +39,16 @@ impl SyncTransform for Route {
         event: Event,
         output: &mut vector_core::transform::TransformOutputsBuf,
     ) {
-        for (output_name, condition) in self.conditions.iter() {
+        let mut check_failed: usize = 0;
+        for (output_name, condition) in &self.conditions {
             if condition.check(&event) {
                 output.push_named(output_name, event.clone());
             } else {
-                emit!(&RouteEventDiscarded {
-                    output: output_name.as_ref()
-                });
+                check_failed += 1;
             }
+        }
+        if check_failed == self.conditions.len() {
+            output.push_named(UNMATCHED_ROUTE, event);
         }
     }
 }
@@ -56,6 +61,13 @@ pub struct RouteConfig {
     // Deprecated name
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,
+}
+
+#[cfg(feature = "transforms-pipelines")]
+impl RouteConfig {
+    pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
+        Self { route }
+    }
 }
 
 inventory::submit! {
@@ -83,19 +95,36 @@ impl TransformConfig for RouteConfig {
         Ok(Transform::synchronous(route))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.route
+    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+        if self.route.contains_key(UNMATCHED_ROUTE) {
+            Err(vec![format!(
+                "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
+            )])
+        } else {
+            Ok(())
+        }
+    }
+
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        let mut result: Vec<Output> = self
+            .route
             .keys()
-            .map(|output_name| Output::from((output_name, DataType::Any)))
-            .collect()
+            .map(|output_name| Output::default(DataType::all()).with_port(output_name))
+            .collect();
+        result.push(Output::default(DataType::all()).with_port(UNMATCHED_ROUTE));
+        result
     }
 
     fn transform_type(&self) -> &'static str {
         "route"
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 }
 
@@ -110,12 +139,12 @@ impl TransformConfig for RouteCompatConfig {
         self.0.build(context).await
     }
 
-    fn input_type(&self) -> DataType {
-        self.0.input_type()
+    fn input(&self) -> Input {
+        self.0.input()
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+        self.0.outputs(merged_definition)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -167,7 +196,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\""}}}"#
+            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
         );
     }
 
@@ -191,7 +220,7 @@ mod test {
 
     #[test]
     fn route_pass_all_route_conditions() {
-        let output_names = vec!["first", "second", "third"];
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
         let event = Event::try_from(
             serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
         )
@@ -214,22 +243,28 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
                 .collect(),
             1,
         );
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
-            assert_eq!(events.len(), 1);
-            assert_eq!(events.pop().unwrap(), event);
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
+            if output_name == UNMATCHED_ROUTE {
+                assert!(events.is_empty());
+            } else {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            }
         }
     }
 
     #[test]
     fn route_pass_one_route_condition() {
-        let output_names = vec!["first", "second", "third"];
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
         let event = Event::try_from(serde_json::json!({"message": "hello world"})).unwrap();
         let config = toml::from_str::<RouteConfig>(
             r#"
@@ -249,15 +284,57 @@ mod test {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
-                .map(|output_name| Output::from((output_name.to_owned(), DataType::Any)))
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
                 .collect(),
             1,
         );
 
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
-            let mut events = outputs.drain_named(output_name).collect::<Vec<_>>();
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            }
+            assert_eq!(events.len(), 0);
+        }
+    }
+
+    #[test]
+    fn route_pass_no_route_condition() {
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
+        let event = Event::try_from(serde_json::json!({"message": "NOPE"})).unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| {
+                    Output::default(DataType::all()).with_port(output_name.to_owned())
+                })
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
+            if output_name == UNMATCHED_ROUTE {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
             }

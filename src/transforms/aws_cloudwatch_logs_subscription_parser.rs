@@ -1,18 +1,19 @@
 use std::iter;
 
 use serde::{Deserialize, Serialize};
-use shared::aws_cloudwatch_logs_subscription::{
+use vector_common::aws_cloudwatch_logs_subscription::{
     AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
 };
 
 use super::Transform;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Output, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::Event,
-    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
+    internal_events::AwsCloudwatchLogsSubscriptionParserError,
+    schema,
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -36,11 +37,11 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         ))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -60,7 +61,7 @@ impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct AwsCloudwatchLogsSubscriptionParser {
+pub(super) struct AwsCloudwatchLogsSubscriptionParser {
     field: String,
 }
 
@@ -81,13 +82,11 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
         let log = event.as_log();
 
         let message = log
-            .get(&self.field)
-            .map(|s| s.as_bytes())
+            .get(self.field.as_str())
+            .map(|s| s.coerce_to_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&to_parse)
-                    .map_err(|error| {
-                        emit!(&AwsCloudwatchLogsSubscriptionParserFailedParse { error })
-                    })
+                    .map_err(|error| emit!(AwsCloudwatchLogsSubscriptionParserError { error }))
                     .ok()
             });
 
@@ -184,7 +183,7 @@ mod test {
 
         parser.transform(&mut output, event);
 
-        shared::assert_event_data_eq!(
+        vector_common::assert_event_data_eq!(
             output,
             vec![
                 log_event! {

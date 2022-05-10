@@ -109,7 +109,7 @@ Overview for the current state of sinks regarding encoding:
 |`datadog_logs`| `EncodingConfigFixed<DatadogLogsJsonEncoding>` | ✔︎ | Doesn't provide options to encode the event payload separately from the protocol
 |`datadog_events`| - | ✗ | -
 |`datadog_archives`| - | ✗ | Uses custom `DatadogArchivesEncoding`, which has a field `inner: StandardEncodings` which is not user-configurable
-|`elasticsearch`| `EncodingConfigFixed<ElasticSearchEncoder>` | ✔︎ | Reshapes event internally and implements custom `ElasticSearchEncoder` to serialize for the Elasticsearch protocol
+|`elasticsearch`| `EncodingConfigFixed<ElasticsearchEncoder>` | ✔︎ | Reshapes event internally and implements custom `ElasticsearchEncoder` to serialize for the Elasticsearch protocol
 |`file`| `EncodingConfig<Encoding { Text, Ndjson }>` | ✔︎ | `Text` reads `message_key()`
 |`gcp`| `EncodingConfig<StandardEncodings>` | ✔︎ | Enveloped in HTTP request via `sinks::util::request_builder::RequestBuild`. Sets HTTP request header depending on encoding config
 |`honeycomb`| - | ✗ | Embeds event as JSON under a `data` key. Enveloped in HTTP request
@@ -124,7 +124,7 @@ Overview for the current state of sinks regarding encoding:
 |`papertrail`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | `Text` reads `message_key()`. Serializes event using syslog and sends buffer via TCP
 |`pulsar`| `EncodingConfig<Encoding { Text, Json, Avro }>` | ✔︎ | `Text` reads `message_key()`, `Avro` expects another dedicated key for the serialization schema. Serialized buffer is sent to Pulsar producer
 |`redis`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | `Text` reads `message_key()`. Encoded message is serialized to buffer
-|`sematext`| `EncodingConfigFixed<ElasticSearchEncoder>` | ✔︎ | Wrapper, see `elasticsearch` for more information
+|`sematext`| `EncodingConfigFixed<ElasticsearchEncoder>` | ✔︎ | Wrapper, see `elasticsearch` for more information
 |`socket`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | `Text` reads `message_key()`
 |`splunk_hec`| `EncodingConfig<HecLogsEncoder { Json, Text }>` | ✔︎ | Encoding is used to create a message according to the Splunk HEC protocol. There is no separate control over encoding the payload itself
 |`vector`| - | - | -

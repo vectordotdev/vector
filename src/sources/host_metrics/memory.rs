@@ -6,7 +6,7 @@ use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
 use heim::memory::os::SwapExt;
 use heim::units::information::byte;
-use shared::btreemap;
+use vector_common::btreemap;
 
 use super::HostMetrics;
 use crate::event::metric::Metric;

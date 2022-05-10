@@ -8,8 +8,9 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{self, discriminant::Discriminant, merge_state::LogEventMergeState, Event},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -59,11 +60,11 @@ impl TransformConfig for MergeConfig {
         Ok(Transform::event_task(Merge::from(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -96,7 +97,10 @@ impl Merge {
 
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
-        if event.remove(&self.partial_event_marker_field).is_some() {
+        if event
+            .remove(self.partial_event_marker_field.as_str())
+            .is_some()
+        {
             // We got a partial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
@@ -217,7 +221,7 @@ mod test {
 
         let make_event = |message, stream| {
             let mut event = LogEvent::from(message);
-            event.insert(stream_discriminant_field.clone(), stream);
+            event.insert(stream_discriminant_field.as_str(), stream);
             event
         };
 

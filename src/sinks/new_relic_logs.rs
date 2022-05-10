@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -7,7 +5,9 @@ use snafu::Snafu;
 
 use super::util::SinkBatchSettings;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -44,7 +44,7 @@ pub struct NewRelicLogsDefaultBatchSettings;
 impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
@@ -65,6 +65,12 @@ pub struct NewRelicLogsConfig {
 
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -104,12 +110,16 @@ impl SinkConfig for NewRelicLogsConfig {
         http_conf.build(cx).await
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "new_relic_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -123,6 +133,7 @@ impl NewRelicLogsConfig {
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -153,10 +164,13 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
+            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone())
+                .into_encoding()
+                .into(),
             batch: batch_settings.into(),
             request,
             tls: None,
+            acknowledgements: self.acknowledgements,
         })
     }
 }
@@ -166,6 +180,7 @@ mod tests {
     use std::io::BufRead;
 
     use bytes::Buf;
+    use codecs::encoding::Serializer;
     use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;
@@ -174,10 +189,7 @@ mod tests {
     use crate::{
         config::SinkConfig,
         event::Event,
-        sinks::util::{
-            encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
-            test::build_test_server, Concurrency,
-        },
+        sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
         test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
 
@@ -207,11 +219,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(http_config.request.tower.concurrency, Concurrency::None);
         assert_eq!(
@@ -238,11 +253,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
             http_config.request.tower.concurrency,
@@ -276,11 +294,14 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri.uri),
+            http_config.uri.uri.to_string(),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert!(matches!(
+            http_config.encoding.encoding().1,
+            Serializer::Json(_)
+        ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));
         assert_eq!(
             http_config.request.tower.concurrency,

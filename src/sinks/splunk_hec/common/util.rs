@@ -1,5 +1,6 @@
-use std::{num::NonZeroU64, sync::Arc};
+use std::sync::Arc;
 
+use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -9,14 +10,14 @@ use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 use super::{request::HecRequest, service::HttpRequestBuilder};
 use crate::{
     http::HttpClient,
-    internal_events::TemplateRenderingFailed,
+    internal_events::TemplateRenderingError,
     sinks::{
         self,
         util::{http::HttpBatchService, SinkBatchSettings},
         UriParseSnafu,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -25,7 +26,7 @@ pub struct SplunkHecDefaultBatchSettings;
 impl SinkBatchSettings for SplunkHecDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Snafu)]
@@ -37,7 +38,7 @@ pub enum HealthcheckError {
 }
 
 pub fn create_client(
-    tls: &Option<TlsOptions>,
+    tls: &Option<TlsConfig>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
@@ -47,10 +48,10 @@ pub fn create_client(
 pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
-) -> HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest> {
+) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
     HttpBatchService::new(client, move |req: HecRequest| {
         let request_builder = Arc::clone(&http_request_builder);
-        let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+        let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
             Box::pin(async move {
                 request_builder.build_request(
                     req.body,
@@ -100,7 +101,7 @@ pub fn render_template_string<'a>(
     template
         .render_string(event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(TemplateRenderingError {
                 error,
                 field: Some(field_name),
                 drop_event: false
@@ -111,6 +112,7 @@ pub fn render_template_string<'a>(
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
     use http::{HeaderValue, Uri};
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{
@@ -205,7 +207,7 @@ mod tests {
         let endpoint = "http://localhost:8888";
         let token = "token";
         let compression = Compression::None;
-        let events = "events".as_bytes().to_vec();
+        let events = Bytes::from("events");
         let http_request_builder =
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
@@ -238,7 +240,7 @@ mod tests {
         let endpoint = "http://localhost:8888";
         let token = "token";
         let compression = Compression::gzip_default();
-        let events = "events".as_bytes().to_vec();
+        let events = Bytes::from("events");
         let http_request_builder =
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
@@ -274,7 +276,7 @@ mod tests {
         let endpoint = "invalid";
         let token = "token";
         let compression = Compression::gzip_default();
-        let events = "events".as_bytes().to_vec();
+        let events = Bytes::from("events");
         let http_request_builder =
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 

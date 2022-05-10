@@ -6,13 +6,13 @@ use heim::net::os::linux::IoCountersExt;
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use serde::{Deserialize, Serialize};
-use shared::btreemap;
+use vector_common::btreemap;
 
 use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(super) struct NetworkConfig {
+pub struct NetworkConfig {
     #[serde(default)]
     devices: FilterList,
 }

@@ -7,7 +7,9 @@ use tonic::body::BoxBody;
 use tower::ServiceBuilder;
 
 use crate::{
-    config::{GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions,
+    },
     proto::vector as proto,
     sinks::{
         util::{
@@ -21,7 +23,7 @@ use crate::{
         },
         Healthcheck, VectorSink as VectorSinkType,
     },
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -29,11 +31,19 @@ use crate::{
 pub struct VectorConfig {
     address: String,
     #[serde(default)]
+    compression: bool,
+    #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -45,9 +55,11 @@ impl GenerateConfig for VectorConfig {
 fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
         address: address.to_owned(),
+        compression: false,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
     }
 }
 
@@ -67,12 +79,12 @@ impl VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri);
+        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
-        let service = VectorService::new(client, uri);
+        let service = VectorService::new(client, uri, self.compression);
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.into_batcher_settings()?;
-        //
+
         let service = ServiceBuilder::new()
             .settings(request_settings, VectorGrpcRetryLogic)
             .service(service);

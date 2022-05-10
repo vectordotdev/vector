@@ -1,12 +1,13 @@
-use std::{error, fmt};
+use std::{error, fmt, num::NonZeroUsize};
 
 use bytes::{Buf, BufMut};
 
 use super::builder::TopologyBuilder;
 use crate::{
+    buffer_usage_data::BufferUsageHandle,
     encoding::FixedEncodable,
     topology::channel::{BufferReceiver, BufferSender},
-    Bufferable, WhenFull,
+    Bufferable, EventCount, WhenFull,
 };
 
 // Silly implementation of `Encodable` to fulfill `Bufferable` for our test buffer code.
@@ -35,6 +36,12 @@ impl FixedEncodable for u64 {
     }
 }
 
+impl EventCount for u64 {
+    fn event_count(&self) -> usize {
+        1
+    }
+}
+
 #[derive(Debug)]
 pub struct BasicError(pub(crate) String);
 
@@ -55,21 +62,39 @@ pub async fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
-) -> (BufferSender<u64>, BufferReceiver<u64>) {
-    match mode {
+) -> (BufferSender<u64>, BufferReceiver<u64>, BufferUsageHandle) {
+    let handle = BufferUsageHandle::noop(mode);
+    let (tx, rx) = match mode {
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");
-            let (overflow_sender, overflow_receiver) =
-                TopologyBuilder::memory_v2(capacity, overflow_mode).await;
-            let (mut base_sender, mut base_receiver) =
-                TopologyBuilder::memory_v2(capacity, WhenFull::Overflow).await;
+            let (overflow_sender, overflow_receiver) = TopologyBuilder::standalone_memory_test(
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+                overflow_mode,
+                handle.clone(),
+            )
+            .await;
+            let (mut base_sender, mut base_receiver) = TopologyBuilder::standalone_memory_test(
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+                WhenFull::Overflow,
+                handle.clone(),
+            )
+            .await;
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => TopologyBuilder::memory_v2(capacity, m).await,
-    }
+        m => {
+            TopologyBuilder::standalone_memory_test(
+                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+                m,
+                handle.clone(),
+            )
+            .await
+        }
+    };
+
+    (tx, rx, handle)
 }
 
 /// Gets the current capacity of the underlying base channel of the given sender.

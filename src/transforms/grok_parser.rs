@@ -2,16 +2,19 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use grok::Pattern;
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use vector_common::TimeZone;
 
 use crate::{
     config::{
-        log_schema, DataType, Output, TransformConfig, TransformContext, TransformDescription,
+        log_schema, DataType, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
-    event::{Event, PathComponent, PathIter, Value},
-    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
+    event::{Event, Value},
+    internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -68,11 +71,11 @@ impl TransformConfig for GrokParserConfig {
             .context(InvalidGrokSnafu)?)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -94,7 +97,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent<'static>>>,
+    paths: HashMap<String, OwnedPath>,
 }
 
 impl Clone for GrokParser {
@@ -114,7 +117,7 @@ impl Clone for GrokParser {
 impl FunctionTransform for GrokParser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = event.into_log();
-        let value = event.get(&self.field).map(|s| s.to_string_lossy());
+        let value = event.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {
@@ -124,29 +127,27 @@ impl FunctionTransform for GrokParser {
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
+                                event.insert(path, value);
                             } else {
-                                let path = PathIter::new(name)
-                                    .map(|component| component.into_static())
-                                    .collect::<Vec<_>>();
+                                let path = parse_path(name);
                                 self.paths.insert(name.to_string(), path.clone());
-                                event.insert_path(path, value);
+                                event.insert(&path, value);
                             }
                         }
-                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(ParserConversionError { name, error }),
                     }
                 }
 
                 if drop_field {
-                    event.remove(&self.field);
+                    event.remove(self.field.as_str());
                 }
             } else {
-                emit!(&GrokParserFailedMatch {
+                emit!(ParserMatchError {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(&GrokParserMissingField {
+            emit!(ParserMissingFieldError {
                 field: self.field.as_ref()
             });
         }
@@ -195,7 +196,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
