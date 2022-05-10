@@ -147,7 +147,7 @@ impl SourceConfig for PubsubConfig {
         } else {
             self.auth.make_credentials(Scope::PubSub).await?
         }
-        .map(|credentials| MetadataValue::from_str(&credentials.make_token()))
+        .map(|credentials| MetadataValue::try_from(&credentials.make_token()))
         .transpose()
         .context(MetadataSnafu)?;
 
