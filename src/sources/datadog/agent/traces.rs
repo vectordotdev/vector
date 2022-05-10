@@ -141,7 +141,7 @@ fn handle_dd_trace_payload_v1v2(
         |traces| {
             (!traces.is_empty())
                 .then(|| traces)
-                .ok_or("no traces decoded".into())
+                .ok_or_else(|| "no traces decoded".into())
         },
     ).or_else(|e| {
         debug!("Failed to decode traces, attempting to decode the received payload with the older format: {}.", e);

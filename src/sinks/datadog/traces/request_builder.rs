@@ -224,8 +224,8 @@ impl DatadogTracesEncoder {
             // We only send tags at the Trace level
             tags: BTreeMap::new(),
             agent_version: key.agent_version.clone().unwrap_or_else(|| "".into()),
-            target_tps: key.target_tps.clone().map(|tps| tps as f64).unwrap_or(0f64),
-            error_tps: key.error_tps.clone().map(|tps| tps as f64).unwrap_or(0f64),
+            target_tps: key.target_tps.map(|tps| tps as f64).unwrap_or(0f64),
+            error_tps: key.error_tps.map(|tps| tps as f64).unwrap_or(0f64),
         }
     }
 
