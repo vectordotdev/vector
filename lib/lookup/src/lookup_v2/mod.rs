@@ -6,6 +6,16 @@ use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
+/// Syntactic sugar for creating a pre-parsed path.
+///
+/// Example: `path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
+#[macro_export]
+macro_rules! path {
+    ($($segment:expr),*) => {{
+           &[$(lookup::lookup_v2::BorrowedSegment::from($segment),)*]
+    }};
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
@@ -117,12 +127,33 @@ pub fn parse_path(path: &str) -> OwnedPath {
     OwnedPath { segments }
 }
 
+#[derive(Clone)]
+pub struct PathConcat<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<'a, A: Path<'a>, B: Path<'a>> Path<'a> for PathConcat<A, B> {
+    type Iter = std::iter::Chain<A::Iter, B::Iter>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.a.segment_iter().chain(self.b.segment_iter())
+    }
+}
+
 /// A path is simply the data describing how to look up a value.
 /// This should only be implemented for types that are very cheap to clone, such as references.
 pub trait Path<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>>;
 
     fn segment_iter(&self) -> Self::Iter;
+
+    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
+        PathConcat {
+            a: self.clone(),
+            b: path,
+        }
+    }
 }
 
 impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
@@ -159,24 +190,24 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.as_slice().iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b [BorrowedSegment<'a>] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
@@ -188,6 +219,18 @@ impl<'a> Path<'a> for &'a str {
 
     fn segment_iter(&self) -> Self::Iter {
         JitPath::new(self).segment_iter()
+    }
+}
+
+impl<'a> From<&'a str> for BorrowedSegment<'a> {
+    fn from(field: &'a str) -> Self {
+        BorrowedSegment::field(field)
+    }
+}
+
+impl From<usize> for BorrowedSegment<'_> {
+    fn from(index: usize) -> Self {
+        BorrowedSegment::index(index)
     }
 }
 

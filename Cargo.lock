@@ -4028,9 +4028,9 @@ dependencies = [
 
 [[package]]
 name = "lalrpop"
-version = "0.19.7"
+version = "0.19.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "852b75a095da6b69da8c5557731c3afd06525d4f655a4fc1c799e2ec8bc4dce4"
+checksum = "b30455341b0e18f276fa64540aff54deafb54c589de6aca68659c63dd2d5d823"
 dependencies = [
  "ascii-canvas",
  "atty",
@@ -4039,7 +4039,7 @@ dependencies = [
  "ena",
  "itertools",
  "lalrpop-util",
- "petgraph 0.5.1",
+ "petgraph 0.6.0",
  "pico-args",
  "regex",
  "regex-syntax",
@@ -7654,9 +7654,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.18.1"
+version = "1.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dce653fb475565de9f6fb0614b28bca8df2c430c0cf84bcd9c843f15de5414cc"
+checksum = "4903bf0427cf68dddd5aa6a93220756f8be0c34fcfa9f5e6191e103e15a31395"
 dependencies = [
  "bytes 1.1.0",
  "libc",
@@ -8952,6 +8952,7 @@ dependencies = [
  "indoc",
  "lookup",
  "ordered-float 3.0.0",
+ "serde_json",
  "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
