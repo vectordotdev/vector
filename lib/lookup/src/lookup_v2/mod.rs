@@ -4,6 +4,10 @@ use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use self::jit::{JitLookup, JitPath};
+
 /// Syntactic sugar for creating a pre-parsed path.
 ///
 /// Example: `path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
