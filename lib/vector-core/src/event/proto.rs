@@ -86,13 +86,18 @@ impl From<Trace> for Event {
 
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
-        let fields = log
-            .fields
-            .into_iter()
-            .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-            .collect::<BTreeMap<_, _>>();
+        if let Some(value) = log.value {
+            Self::from(decode_value(value).unwrap_or(().into()))
+        } else {
+            // This is for backwards compatibility. Only `value` should be set
+            let fields = log
+                .fields
+                .into_iter()
+                .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
+                .collect::<BTreeMap<_, _>>();
 
-        Self::from(fields)
+            Self::from(fields)
+        }
     }
 }
 
@@ -209,13 +214,11 @@ impl From<event::TraceEvent> for Trace {
 
 impl From<event::LogEvent> for WithMetadata<Log> {
     fn from(log_event: event::LogEvent) -> Self {
-        let (fields, metadata) = log_event.into_parts_deprecated();
-        let fields = fields
-            .into_iter()
-            .map(|(k, v)| (k, encode_value(v)))
-            .collect::<BTreeMap<_, _>>();
-
-        let data = Log { fields };
+        let (value, metadata) = log_event.into_parts();
+        let data = Log {
+            fields: BTreeMap::new(),
+            value: Some(encode_value(value)),
+        };
         Self { data, metadata }
     }
 }

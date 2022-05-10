@@ -394,23 +394,24 @@ impl From<String> for LogEvent {
     }
 }
 
+impl From<Value> for LogEvent {
+    fn from(value: Value) -> Self {
+        Self::from_parts(value, EventMetadata::default())
+    }
+}
+
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
-        LogEvent {
-            inner: Arc::new(Inner::from(Value::Object(map))),
-            metadata: EventMetadata::default(),
-        }
+        Self::from_parts(Value::Object(map), EventMetadata::default())
     }
 }
 
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
-        LogEvent {
-            inner: Arc::new(Inner::from(Value::Object(
-                map.into_iter().collect::<BTreeMap<_, _>>(),
-            ))),
-            metadata: EventMetadata::default(),
-        }
+        Self::from_parts(
+            Value::Object(map.into_iter().collect::<BTreeMap<_, _>>()),
+            EventMetadata::default(),
+        )
     }
 }
 
