@@ -90,7 +90,7 @@ impl Arbitrary for LogEvent {
         Box::new(
             value
                 .shrink()
-                .map(move |x| LogEvent::from_map(x, metadata.clone())),
+                .map(move |x| LogEvent::from_parts(x, metadata.clone())),
         )
     }
 }

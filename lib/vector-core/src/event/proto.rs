@@ -215,10 +215,34 @@ impl From<event::TraceEvent> for Trace {
 impl From<event::LogEvent> for WithMetadata<Log> {
     fn from(log_event: event::LogEvent) -> Self {
         let (value, metadata) = log_event.into_parts();
-        let data = Log {
-            fields: BTreeMap::new(),
-            value: Some(encode_value(value)),
+
+        // Due to the backwards compatibility requirement by the
+        // "event_can_go_from_raw_prost_to_eventarray_encodable" test, "fields" must not
+        // be empty, since that will decode as an empty array. A "dummy" value is placed
+        // in fields instead which is ignored during decoding. To reduce encoding bloat
+        // from a dummy value, it is only used when the root value type is not an object.
+        // Once this backwards compatibility is no longer required, "fields" can
+        // be entirely removed from the Log object
+
+        let data = if let ::value::Value::Object(fields) = value {
+            // using only "fields" to prevent having to use the dummy value
+            Log {
+                fields: fields
+                    .into_iter()
+                    .map(|(k, v)| (k, encode_value(v)))
+                    .collect::<BTreeMap<_, _>>(),
+                value: None,
+            }
+        } else {
+            let mut dummy = BTreeMap::new();
+            // must insert at least 1 field, otherwise it is emitted entirely
+            dummy.insert(".".to_owned(), encode_value(::value::Value::Null));
+            Log {
+                fields: dummy,
+                value: Some(encode_value(value)),
+            }
         };
+
         Self { data, metadata }
     }
 }

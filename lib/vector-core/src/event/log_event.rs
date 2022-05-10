@@ -166,6 +166,23 @@ impl LogEvent {
     }
 
     /// Convert a `LogEvent` into a tuple of its components
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
+    pub fn into_parts_deprecated(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
+        self.fields_mut();
+        (
+            Arc::try_unwrap(self.inner)
+                .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
+                .fields
+                .into_object()
+                .unwrap_or_else(|| unreachable!("inner fields must be a map")),
+            self.metadata,
+        )
+    }
+
+    /// Convert a `LogEvent` into a tuple of its components
     pub fn into_parts(mut self) -> (Value, EventMetadata) {
         self.fields_mut();
 
@@ -529,6 +546,7 @@ impl tracing::field::Visit for MakeLogEvent {
 mod test {
     use super::*;
     use crate::test_util::open_fixture;
+    use lookup::path;
     use vrl_lib::value;
 
     // The following two tests assert that renaming a key has no effect if the
@@ -661,7 +679,7 @@ mod test {
         log.try_insert("foo.bar", "foo");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get_flat("foo.bar"), None);
+        assert_eq!(log.get(path!("foo.bar")), None);
     }
 
     #[test]
