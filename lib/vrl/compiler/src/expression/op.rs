@@ -101,6 +101,11 @@ impl Expression for Op {
                 .resolve(ctx)?
                 .try_or(|| self.rhs.resolve(ctx))
                 .map_err(Into::into);
+        } else if let And = self.opcode {
+            return match self.lhs.resolve(ctx)? {
+                Null | Boolean(false) => Ok(false.into()),
+                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+            };
         };
 
         let lhs = self.lhs.resolve(ctx)?;
@@ -112,10 +117,6 @@ impl Expression for Op {
             Add => lhs.try_add(rhs),
             Sub => lhs.try_sub(rhs),
             Rem => lhs.try_rem(rhs),
-            And => match lhs {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(rhs),
-            },
             Eq => Ok(lhs.eq_lossy(&rhs).into()),
             Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
             Gt => lhs.try_gt(rhs),
@@ -123,7 +124,7 @@ impl Expression for Op {
             Lt => lhs.try_lt(rhs),
             Le => lhs.try_le(rhs),
             Merge => lhs.try_merge(rhs),
-            Or | Err => unreachable!(),
+            And | Or | Err => unreachable!(),
         }
         .map_err(Into::into)
     }
