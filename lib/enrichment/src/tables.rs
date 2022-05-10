@@ -272,8 +272,8 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
+    use value::Value;
     use vector_common::btreemap;
-    use vrl::Value;
 
     use super::*;
     use crate::test_util::DummyEnrichmentTable;

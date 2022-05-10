@@ -283,6 +283,6 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "result" })), got);
+        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
     }
 }

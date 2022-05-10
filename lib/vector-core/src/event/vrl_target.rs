@@ -18,7 +18,7 @@ const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tag
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
-/// An adapter to turn `Event`s into `::value::Target`s.
+/// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
@@ -575,10 +575,10 @@ enum MetricPathError<'a> {
 
 #[cfg(test)]
 mod test {
-    use ::value::{self, Target};
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
     use vector_common::btreemap;
+    use vrl_lib::Target;
 
     use super::{
         super::{metric::MetricTags, MetricValue},
@@ -639,7 +639,7 @@ mod test {
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                ::value::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 expect
             );
         }
@@ -754,11 +754,11 @@ mod test {
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                ::value::Target::target_insert(&mut target, &path, value.clone()),
+                vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
             assert_eq!(
-                ::value::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
+                vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
             assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
@@ -853,16 +853,16 @@ mod test {
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let path = LookupBuf::from_segments(segments);
-            let removed = ::value::Target::target_get(&target, &path)
+            let removed = vrl_lib::Target::target_get(&target, &path)
                 .unwrap()
                 .cloned();
 
             assert_eq!(
-                ::value::Target::target_remove(&mut target, &path, compact),
+                vrl_lib::Target::target_remove(&mut target, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                ::value::Target::target_get(&target, &LookupBuf::root())
+                vrl_lib::Target::target_get(&target, &LookupBuf::root())
                     .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
@@ -916,7 +916,7 @@ mod test {
                 &info,
             );
 
-            ::value::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
+            ::vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
                 target.into_events().collect::<Vec<_>>(),
