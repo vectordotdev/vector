@@ -211,11 +211,6 @@ impl LogEvent {
             .and_then(|path| self.inner.fields.get_by_path(path))
     }
 
-    #[deprecated]
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.as_map().get(key.as_ref())
-    }
-
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
         self.fields_mut().get_mut_by_path_v2(path)
     }
@@ -673,7 +668,7 @@ mod test {
         log.try_insert("foo.bar", "bar");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get_flat("foo.bar"), None);
+        assert_eq!(log.get(path!("foo.bar")), None);
     }
 
     #[test]
@@ -682,7 +677,7 @@ mod test {
 
         log.try_insert_flat("foo", "foo");
 
-        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
@@ -692,7 +687,7 @@ mod test {
 
         log.try_insert_flat("foo", "bar");
 
-        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
@@ -701,7 +696,7 @@ mod test {
 
         log.try_insert_flat("foo.bar", "foo");
 
-        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 
@@ -712,7 +707,7 @@ mod test {
 
         log.try_insert_flat("foo.bar", "bar");
 
-        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 

@@ -232,6 +232,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
+    use lookup::path;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
     use flate2::{
@@ -604,7 +605,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get_flat("dotted.key").unwrap(), &Value::from("value"));
+            assert_eq!(log.get(path!("dotted.key")).unwrap(), &Value::from("value"));
         }
         {
             let event = events.remove(0);
