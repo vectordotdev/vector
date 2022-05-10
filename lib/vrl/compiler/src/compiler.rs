@@ -48,7 +48,11 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let expressions = self.compile_root_exprs(ast, external);
+        let mut expressions = self.compile_root_exprs(ast, external);
+
+        if expressions.is_empty() {
+            expressions.push(Expr::Noop(Noop));
+        }
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
