@@ -67,11 +67,7 @@ impl Predicate {
 
 impl Expression for Predicate {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.inner
-            .iter()
-            .map(|expr| expr.resolve(ctx))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
+        todo!()
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

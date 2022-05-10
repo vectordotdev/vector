@@ -92,18 +92,20 @@ impl Expression for Query {
                     .ok()
                     .flatten()
                     .cloned()
-                    .unwrap_or(Value::Null))
+                    .map(Into::into)
+                    .unwrap_or_else(|| Value::Null.into()))
             }
             Internal(variable) => variable.resolve(ctx)?,
             FunctionCall(call) => call.resolve(ctx)?,
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::target_get(&value, &self.path)
+        Ok(crate::Target::target_get(value.as_ref(), &self.path)
             .ok()
             .flatten()
             .cloned()
-            .unwrap_or(Value::Null))
+            .map(Into::into)
+            .unwrap_or_else(|| Value::Null.into()))
     }
 
     fn as_value(&self) -> Option<Value> {
