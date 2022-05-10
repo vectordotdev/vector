@@ -4383,35 +4383,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55586aa936c35f34ba8aa5d97356d554311206e1ce1f9e68fe7b07288e5ad827"
 dependencies = [
  "ahash",
- "metrics-macros 0.4.1",
-]
-
-[[package]]
-name = "metrics"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e52eb6380b6d2a10eb3434aec0885374490f5b82c8aaf5cd487a183c98be834"
-dependencies = [
- "ahash",
- "metrics-macros 0.5.1",
-]
-
-[[package]]
-name = "metrics-exporter-prometheus"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b93b470b04c005178058e18ac8bb2eb3fda562cf87af5ea05ba8d44190d458c"
-dependencies = [
- "hyper",
- "indexmap",
- "ipnet",
- "metrics 0.18.1",
- "metrics-util 0.12.0",
- "parking_lot 0.11.2",
- "quanta",
- "thiserror",
- "tokio",
- "tracing 0.1.34",
+ "metrics-macros",
 ]
 
 [[package]]
@@ -4428,17 +4400,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "metrics-macros"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49e30813093f757be5cf21e50389a24dc7dbb22c49f23b7e8f51d69b508a5ffa"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "metrics-tracing-context"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4446,8 +4407,8 @@ checksum = "7927d28bccc322a3f48fc445bffe7cb491ab8a43ea28f7c5f75bc16fc4e5d6bd"
 dependencies = [
  "itoa 0.4.8",
  "lockfree-object-pool",
- "metrics 0.17.1",
- "metrics-util 0.10.2",
+ "metrics",
+ "metrics-util",
  "once_cell",
  "tracing 0.1.34",
  "tracing-core 0.1.26",
@@ -4468,29 +4429,12 @@ dependencies = [
  "dashmap 4.0.2",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics 0.17.1",
+ "metrics",
  "num_cpus",
  "ordered-float 2.10.0",
  "parking_lot 0.11.2",
  "quanta",
  "radix_trie",
- "sketches-ddsketch",
-]
-
-[[package]]
-name = "metrics-util"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "107a38013e91c04ddf31826b0d0dcc2e0d4ebedded8234cc0dc2b7bbd0c121e8"
-dependencies = [
- "atomic-shim",
- "crossbeam-epoch",
- "crossbeam-utils",
- "hashbrown 0.11.2",
- "metrics 0.18.1",
- "num_cpus",
- "parking_lot 0.11.2",
- "quanta",
  "sketches-ddsketch",
 ]
 
@@ -8695,7 +8639,7 @@ dependencies = [
  "lru",
  "maxminddb",
  "md-5",
- "metrics 0.17.1",
+ "metrics",
  "metrics-tracing-context",
  "mlua",
  "mongodb",
@@ -8863,10 +8807,9 @@ dependencies = [
  "hdrhistogram",
  "leveldb",
  "memmap2",
- "metrics 0.17.1",
- "metrics-exporter-prometheus",
+ "metrics",
  "metrics-tracing-context",
- "metrics-util 0.10.2",
+ "metrics-util",
  "num-traits",
  "once_cell",
  "parking_lot 0.12.0",
@@ -8896,7 +8839,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "derivative",
- "metrics 0.17.1",
+ "metrics",
  "nom 7.1.1",
  "ordered-float 3.0.0",
  "serde",
@@ -8946,9 +8889,9 @@ dependencies = [
  "hyper-proxy",
  "indexmap",
  "lookup",
- "metrics 0.17.1",
+ "metrics",
  "metrics-tracing-context",
- "metrics-util 0.10.2",
+ "metrics-util",
  "mlua",
  "ndarray",
  "ndarray-stats",

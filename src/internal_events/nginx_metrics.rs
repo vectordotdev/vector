@@ -10,7 +10,7 @@ use crate::sources::nginx_metrics::parser::ParseError;
 pub struct NginxMetricsEventsReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub uri: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
@@ -19,20 +19,20 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
             message = "Events received.",
             byte_size = %self.byte_size,
             count = %self.count,
-            uri = self.uri,
+            endpoint = self.endpoint,
         );
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated
         counter!(
             "events_in_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
     }
 }

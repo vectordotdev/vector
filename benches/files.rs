@@ -79,7 +79,6 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
             |(rt, topology, input)| {
                 rt.block_on(async move {
                     let mut sink = FramedWrite::new(input, BytesCodec::new());
-                    //.sink_map_err(|e| panic!("{:?}", e));
                     let raw_lines = random_lines(line_size).take(num_lines).map(|mut line| {
                         line.push('\n');
                         Bytes::from(line)

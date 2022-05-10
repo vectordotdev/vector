@@ -572,7 +572,10 @@ mod test {
     use super::*;
     use crate::{
         event::EventStatus,
-        test_util::{next_addr, spawn_collect_n, wait_for_tcp},
+        test_util::{
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, spawn_collect_n, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -592,27 +595,30 @@ mod test {
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
-        let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
-        let source = LogstashConfig {
-            address: address.into(),
-            tls: None,
-            keepalive: None,
-            receive_buffer_bytes: None,
-            acknowledgements: true.into(),
-            connection_limit: None,
-        }
-        .build(SourceContext::new_test(sender, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
-        wait_for_tcp(address).await;
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (sender, recv) = SourceSender::new_test_finalize(status);
+            let address = next_addr();
+            let source = LogstashConfig {
+                address: address.into(),
+                tls: None,
+                keepalive: None,
+                receive_buffer_bytes: None,
+                acknowledgements: true.into(),
+                connection_limit: None,
+            }
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+            tokio::spawn(source);
+            wait_for_tcp(address).await;
 
-        let events = spawn_collect_n(
-            send_req(address, &[("message", "Hello, world!")], sends_ack),
-            recv,
-            1,
-        )
+            spawn_collect_n(
+                send_req(address, &[("message", "Hello, world!")], sends_ack),
+                recv,
+                1,
+            )
+            .await
+        })
         .await;
 
         assert_eq!(events.len(), 1);
@@ -674,7 +680,11 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         event::EventStatus,
-        test_util::{collect_n, trace_init, wait_for_tcp},
+        test_util::{
+            collect_n,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            wait_for_tcp,
+        },
         tls::TlsConfig,
         SourceSender,
     };
@@ -685,13 +695,14 @@ mod integration_tests {
 
     #[tokio::test]
     async fn beats_heartbeat() {
-        trace_init();
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let out = source(heartbeat_address(), None).await;
 
-        let out = source(heartbeat_address(), None).await;
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
+            timeout(Duration::from_secs(60), collect_n(out, 1))
+                .await
+                .unwrap()
+        })
+        .await;
 
         assert!(!events.is_empty());
 
@@ -711,24 +722,25 @@ mod integration_tests {
 
     #[tokio::test]
     async fn logstash() {
-        trace_init();
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let out = source(
+                logstash_address(),
+                Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        crt_file: Some("tests/data/host.docker.internal.crt".into()),
+                        key_file: Some("tests/data/host.docker.internal.key".into()),
+                        ..Default::default()
+                    },
+                }),
+            )
+            .await;
 
-        let out = source(
-            logstash_address(),
-            Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                    key_file: Some("tests/data/host.docker.internal.key".into()),
-                    ..Default::default()
-                },
-            }),
-        )
+            timeout(Duration::from_secs(60), collect_n(out, 1))
+                .await
+                .unwrap()
+        })
         .await;
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
 
         assert!(!events.is_empty());
 

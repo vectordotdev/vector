@@ -400,7 +400,10 @@ mod integration_tests {
         event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
+        test_util::{
+            collect_n, components::assert_source_compliance, lines_from_gzip_file, random_lines,
+            trace_init,
+        },
         SourceSender,
     };
 
@@ -596,31 +599,32 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
-        let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        assert_source_compliance(&["protocol"], async move {
+            let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        let s3 = s3_client().await;
-        let sqs = sqs_client().await;
+            let s3 = s3_client().await;
+            let sqs = sqs_client().await;
 
-        let queue = create_queue(&sqs).await;
-        let bucket = create_bucket(&s3).await;
+            let queue = create_queue(&sqs).await;
+            let bucket = create_bucket(&s3).await;
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let config = config(&queue, multiline);
+            let config = config(&queue, multiline);
 
-        s3.put_object()
-            .bucket(bucket.clone())
-            .key(key.clone())
-            .body(ByteStream::from(payload))
-            .set_content_type(content_type.map(|t| t.to_owned()))
-            .set_content_encoding(content_encoding.map(|t| t.to_owned()))
-            .send()
-            .await
-            .expect("Could not put object");
+            s3.put_object()
+                .bucket(bucket.clone())
+                .key(key.clone())
+                .body(ByteStream::from(payload))
+                .set_content_type(content_type.map(|t| t.to_owned()))
+                .set_content_encoding(content_encoding.map(|t| t.to_owned()))
+                .send()
+                .await
+                .expect("Could not put object");
 
-        let sqs_client = sqs_client().await;
+            let sqs_client = sqs_client().await;
 
-        let mut s3_event: S3Event = serde_json::from_str(
+            let mut s3_event: S3Event = serde_json::from_str(
             r#"
 {
    "Records":[
@@ -661,50 +665,51 @@ mod integration_tests {
    ]
 }
         "#,
-        )
-        .unwrap();
-
-        s3_event.records[0].s3.bucket.name = bucket.clone();
-        s3_event.records[0].s3.object.key = key.clone();
-
-        // send SQS message (this is usually sent by S3 itself when an object is uploaded)
-        // This does not automatically work with localstack and the AWS SDK, so this is done manually
-        let _send_message_output = sqs_client
-            .send_message()
-            .queue_url(queue.clone())
-            .message_body(serde_json::to_string(&s3_event).unwrap())
-            .send()
-            .await
+            )
             .unwrap();
 
-        let (tx, rx) = SourceSender::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx, None);
-        let source = config.build(cx).await.unwrap();
-        tokio::spawn(async move { source.await.unwrap() });
+            s3_event.records[0].s3.bucket.name = bucket.clone();
+            s3_event.records[0].s3.object.key = key.clone();
 
-        let events = collect_n(rx, expected_lines.len()).await;
+            // send SQS message (this is usually sent by S3 itself when an object is uploaded)
+            // This does not automatically work with localstack and the AWS SDK, so this is done manually
+            let _send_message_output = sqs_client
+                .send_message()
+                .queue_url(queue.clone())
+                .message_body(serde_json::to_string(&s3_event).unwrap())
+                .send()
+                .await
+                .unwrap();
 
-        assert_eq!(expected_lines.len(), events.len());
-        for (i, event) in events.iter().enumerate() {
-            let message = expected_lines[i].as_str();
+            let (tx, rx) = SourceSender::new_test_finalize(status);
+            let cx = SourceContext::new_test(tx, None);
+            let source = config.build(cx).await.unwrap();
+            tokio::spawn(async move { source.await.unwrap() });
 
-            let log = event.as_log();
-            assert_eq!(log["message"], message.into());
-            assert_eq!(log["bucket"], bucket.clone().into());
-            assert_eq!(log["object"], key.clone().into());
-            assert_eq!(log["region"], "us-east-1".into());
-        }
+            let events = collect_n(rx, expected_lines.len()).await;
 
-        // Make sure the SQS message is deleted
-        match status {
-            Errored => {
-                // need to wait up to the visibility timeout before it will be counted again
-                assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+            assert_eq!(expected_lines.len(), events.len());
+            for (i, event) in events.iter().enumerate() {
+                let message = expected_lines[i].as_str();
+
+                let log = event.as_log();
+                assert_eq!(log["message"], message.into());
+                assert_eq!(log["bucket"], bucket.clone().into());
+                assert_eq!(log["object"], key.clone().into());
+                assert_eq!(log["region"], "us-east-1".into());
             }
-            _ => {
-                assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
-            }
-        };
+
+            // Make sure the SQS message is deleted
+            match status {
+                Errored => {
+                    // need to wait up to the visibility timeout before it will be counted again
+                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+                }
+                _ => {
+                    assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
+                }
+            };
+        }).await;
     }
 
     /// creates a new SQS queue

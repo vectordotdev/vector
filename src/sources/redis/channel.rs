@@ -1,7 +1,6 @@
-use super::handle_line;
+use super::{handle_line, ConnectionInfo};
 use crate::{
-    codecs, internal_events::RedisReceiveEventError, shutdown::ShutdownSignal, sources::Source,
-    SourceSender,
+    codecs, config::SourceContext, internal_events::RedisReceiveEventError, sources::Source,
 };
 use futures_util::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -16,33 +15,41 @@ enum BuildError {
 
 pub async fn subscribe(
     client: redis::Client,
+    connection_info: ConnectionInfo,
     key: String,
     redis_key: Option<String>,
     decoder: codecs::Decoder,
-    shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    cx: SourceContext,
 ) -> crate::Result<Source> {
-    trace!(message = "Get redis async connection.");
     let conn = client
         .get_async_connection()
         .await
         .context(ConnectionSnafu {})?;
-    trace!(message = "Got redis async connection.");
+    trace!(endpoint = %connection_info.endpoint.as_str(), "Connected.");
+
     let mut pubsub_conn = conn.into_pubsub();
-    trace!(message = "Subscribing to channel.", key = %key);
     pubsub_conn
         .subscribe(&key)
         .await
         .context(SubscribeSnafu {})?;
-    trace!(message = "Subscribed to channel.", key = %key);
-    let fut = async move {
-        let mut pubsub_stream = pubsub_conn.on_message().take_until(shutdown.clone());
+    trace!(endpoint = %connection_info.endpoint.as_str(), channel = %key, "Subscribed to channel.");
+
+    Ok(Box::pin(async move {
+        let shutdown = cx.shutdown;
+        let mut tx = cx.out;
+        let mut pubsub_stream = pubsub_conn.on_message().take_until(shutdown);
         while let Some(msg) = pubsub_stream.next().await {
             match msg.get_payload::<String>() {
                 Ok(line) => {
-                    if let Err(()) =
-                        handle_line(line, &key, redis_key.as_deref(), decoder.clone(), &mut out)
-                            .await
+                    if let Err(()) = handle_line(
+                        &connection_info,
+                        line,
+                        &key,
+                        redis_key.as_deref(),
+                        decoder.clone(),
+                        &mut tx,
+                    )
+                    .await
                     {
                         break;
                     }
@@ -51,6 +58,5 @@ pub async fn subscribe(
             }
         }
         Ok(())
-    };
-    Ok(Box::pin(fut))
+    }))
 }

@@ -11,7 +11,7 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
+        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, BytesReceived,
         StreamClosedError,
     },
     shutdown::ShutdownSignal,
@@ -148,10 +148,9 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(HttpBytesReceived {
+                        emit!(BytesReceived {
                             byte_size: body.len(),
                             protocol: "http",
-                            http_path: uri.path(),
                         });
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
@@ -160,7 +159,7 @@ async fn aws_ecs_metrics(
                                 emit!(AwsEcsMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count,
-                                    http_path: uri.path(),
+                                    endpoint: uri.path(),
                                 });
 
                                 if let Err(error) = out.send_batch(metrics).await {
@@ -209,12 +208,15 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Response, Server,
     };
-    use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
 
     use super::*;
     use crate::{
         event::MetricValue,
-        test_util::{collect_ready, next_addr, wait_for_tcp},
+        test_util::{
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            next_addr, wait_for_tcp,
+        },
         Error,
     };
 
@@ -528,23 +530,18 @@ mod test {
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = SourceSender::new_test();
-
-        let source = AwsEcsMetricsSourceConfig {
+        let config = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{}", in_addr),
             version: Version::V4,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
-        }
-        .build(SourceContext::new_test(tx, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
+        };
 
-        sleep(Duration::from_secs(1)).await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
+        assert!(!events.is_empty());
 
-        let metrics = collect_ready(rx)
-            .await
+        let metrics = events
             .into_iter()
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
@@ -575,10 +572,10 @@ mod test {
 #[cfg(feature = "aws-ecs-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::collect_ready;
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
     fn ecs_address() -> String {
         std::env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
@@ -589,24 +586,16 @@ mod integration_tests {
     }
 
     async fn scrape_metrics(endpoint: String, version: Version) {
-        let (tx, rx) = SourceSender::new_test();
-
-        let source = AwsEcsMetricsSourceConfig {
+        let config = AwsEcsMetricsSourceConfig {
             endpoint,
             version,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
-        }
-        .build(SourceContext::new_test(tx, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
+        };
 
-        sleep(Duration::from_secs(5)).await;
-
-        let metrics = collect_ready(rx).await;
-
-        assert!(!metrics.is_empty());
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+        assert!(!events.is_empty());
     }
 
     #[tokio::test]

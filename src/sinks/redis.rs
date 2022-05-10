@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_common::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -19,7 +20,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{RedisEventsSent, RedisSendEventError, TemplateRenderingError},
+    internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
@@ -364,7 +365,11 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(RedisEventsSent { count, byte_size });
+                        emit!(EventsSent {
+                            count,
+                            byte_size,
+                            output: None
+                        });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }

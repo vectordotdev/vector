@@ -507,7 +507,7 @@ mod tests {
         event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::components::{self, SOURCE_TESTS},
+        test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
     };
 
     #[test]
@@ -1663,32 +1663,33 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        components::init_test();
+        assert_source_compliance(&FILE_SOURCE_TAGS, async move {
+            let (tx, rx) = if acking_mode == Acks {
+                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                (tx, rx.boxed())
+            } else {
+                let (tx, rx) = SourceSender::new_test();
+                (tx, rx.boxed())
+            };
 
-        let (tx, rx) = if acking_mode == Acks {
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-            (tx, rx.boxed())
-        } else {
-            let (tx, rx) = SourceSender::new_test();
-            (tx, rx.boxed())
-        };
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+            let data_dir = config.data_dir.clone().unwrap();
+            let acks = !matches!(acking_mode, NoAcks);
 
-        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-        let data_dir = config.data_dir.clone().unwrap();
-        let acks = !matches!(acking_mode, NoAcks);
+            tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
-        tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
+            inner.await;
 
-        inner.await;
+            drop(trigger_shutdown);
 
-        drop(trigger_shutdown);
+            let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            if wait_shutdown {
+                shutdown_done.await;
+            }
 
-        let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-        if wait_shutdown {
-            shutdown_done.await;
-        }
-        SOURCE_TESTS.assert(&["file"]);
-        result
+            result
+        })
+        .await
     }
 
     fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
