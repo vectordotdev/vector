@@ -403,3 +403,15 @@ impl From<bool> for Value {
         Self::Boolean(value)
     }
 }
+
+impl<'a> From<Value> for Cow<'a, Value> {
+    fn from(value: Value) -> Self {
+        Cow::Owned(value)
+    }
+}
+
+impl<'a> From<&'a Value> for Cow<'a, Value> {
+    fn from(value: &'a Value) -> Self {
+        Cow::Borrowed(value)
+    }
+}

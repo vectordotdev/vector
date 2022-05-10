@@ -32,9 +32,10 @@ impl Expression for Object {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
-            .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
+            .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v.into_owned())))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(Value::Object)
+            .map(Into::into)
     }
 
     fn as_value(&self) -> Option<Value> {

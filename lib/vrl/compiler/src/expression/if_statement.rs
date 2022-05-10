@@ -41,7 +41,7 @@ impl Expression for IfStatement {
                 .alternative
                 .as_ref()
                 .map(|block| block.resolve(ctx))
-                .unwrap_or(Ok(Value::Null)),
+                .unwrap_or(Ok(Value::Null.into())),
         }
     }
 

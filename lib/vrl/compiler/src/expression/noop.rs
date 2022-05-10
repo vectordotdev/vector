@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use value::Value;
 
@@ -14,7 +14,7 @@ pub struct Noop;
 
 impl Expression for Noop {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(Value::Null)
+        Ok(Cow::Owned(Value::Null))
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {

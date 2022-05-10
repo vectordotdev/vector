@@ -361,7 +361,7 @@ impl ArgumentList {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 #[cfg(feature = "expr-literal")]
-                Expr::Literal(crate::expression::Literal::Regex(regex)) => Ok((*regex).clone()),
+                Expr::Literal(crate::expression::Literal::Regex(_, regex)) => Ok((*regex).clone()),
                 expr => Err(Error::UnexpectedExpression {
                     keyword,
                     expected: "regex",

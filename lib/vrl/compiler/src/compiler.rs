@@ -138,8 +138,7 @@ impl<'a> Compiler<'a> {
     #[cfg(feature = "expr-literal")]
     fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
         use ast::Literal::*;
-        use bytes::Bytes;
-        use chrono::{TimeZone, Utc};
+        use chrono::{DateTime, TimeZone, Utc};
         use literal::ErrorVariant::*;
         use ordered_float::NotNan;
 
@@ -148,7 +147,7 @@ impl<'a> Compiler<'a> {
         let literal = match lit {
             String(template) => {
                 if let Some(v) = template.as_literal_string() {
-                    Ok(Literal::String(Bytes::from(v.to_string())))
+                    Ok(Literal::from(v))
                 } else {
                     // Rewrite the template into an expression and compile that block.
                     return self.compile_expr(
@@ -157,17 +156,17 @@ impl<'a> Compiler<'a> {
                     );
                 }
             }
-            RawString(v) => Ok(Literal::String(Bytes::from(v))),
-            Integer(v) => Ok(Literal::Integer(v)),
-            Float(v) => Ok(Literal::Float(v)),
-            Boolean(v) => Ok(Literal::Boolean(v)),
+            RawString(v) => Ok(Literal::from(v)),
+            Integer(v) => Ok(Literal::from(v)),
+            Float(v) => Ok(Literal::from(v)),
+            Boolean(v) => Ok(Literal::from(v)),
             Regex(v) => regex::Regex::new(&v)
                 .map_err(|err| literal::Error::from((span, err)))
-                .map(|r| Literal::Regex(r.into())),
+                .map(|r| Literal::from(r)),
             // TODO: support more formats (similar to Vector's `Convert` logic)
             Timestamp(v) => v
-                .parse()
-                .map(Literal::Timestamp)
+                .parse::<DateTime<Utc>>()
+                .map(|v| Literal::from(v))
                 .map_err(|err| literal::Error::from((span, err))),
             Null => Ok(Literal::Null),
         };

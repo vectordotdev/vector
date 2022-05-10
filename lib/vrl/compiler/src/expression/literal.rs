@@ -1,7 +1,7 @@
 use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Utc};
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
 use regex::Regex;
@@ -16,12 +16,12 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    String(Bytes),
-    Integer(i64),
-    Float(NotNan<f64>),
-    Boolean(bool),
-    Regex(ValueRegex),
-    Timestamp(DateTime<Utc>),
+    String(Value, Bytes),
+    Integer(Value, i64),
+    Float(Value, NotNan<f64>),
+    Boolean(Value, bool),
+    Regex(Value, ValueRegex),
+    Timestamp(Value, DateTime<Utc>),
     Null,
 }
 
@@ -36,12 +36,12 @@ impl Literal {
         use Literal::*;
 
         match self {
-            String(v) => Value::Bytes(v.clone()),
-            Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.to_owned()),
-            Boolean(v) => Value::Boolean(*v),
-            Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.to_owned()),
+            String(v, _)
+            | Integer(v, _)
+            | Float(v, _)
+            | Boolean(v, _)
+            | Regex(v, _)
+            | Timestamp(v, _) => v.clone(),
             Null => Value::Null,
         }
     }
@@ -49,7 +49,17 @@ impl Literal {
 
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(self.to_value())
+        use Literal::*;
+
+        Ok(match self {
+            String(v, _)
+            | Integer(v, _)
+            | Float(v, _)
+            | Boolean(v, _)
+            | Regex(v, _)
+            | Timestamp(v, _) => v.into(),
+            Null => Value::Null.into(),
+        })
     }
 
     fn as_value(&self) -> Option<Value> {
@@ -60,12 +70,12 @@ impl Expression for Literal {
         use Literal::*;
 
         let type_def = match self {
-            String(_) => TypeDef::bytes(),
-            Integer(_) => TypeDef::integer(),
-            Float(_) => TypeDef::float(),
-            Boolean(_) => TypeDef::boolean(),
-            Regex(_) => TypeDef::regex(),
-            Timestamp(_) => TypeDef::timestamp(),
+            String(_, _) => TypeDef::bytes(),
+            Integer(_, _) => TypeDef::integer(),
+            Float(_, _) => TypeDef::float(),
+            Boolean(_, _) => TypeDef::boolean(),
+            Regex(_, _) => TypeDef::regex(),
+            Timestamp(_, _) => TypeDef::timestamp(),
             Null => TypeDef::null(),
         };
 
@@ -90,12 +100,12 @@ impl fmt::Display for Literal {
         use Literal::*;
 
         match self {
-            String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(v)),
-            Integer(v) => v.fmt(f),
-            Float(v) => v.fmt(f),
-            Boolean(v) => v.fmt(f),
-            Regex(v) => v.fmt(f),
-            Timestamp(v) => write!(f, "t'{}'", v.to_rfc3339_opts(SecondsFormat::AutoSi, true)),
+            String(v, _)
+            | Integer(v, _)
+            | Float(v, _)
+            | Boolean(v, _)
+            | Regex(v, _)
+            | Timestamp(v, _) => v.fmt(f),
             Null => f.write_str("null"),
         }
     }
@@ -105,7 +115,7 @@ impl fmt::Display for Literal {
 
 impl From<Bytes> for Literal {
     fn from(v: Bytes) -> Self {
-        Literal::String(v)
+        Literal::String(v.clone().into(), v)
     }
 }
 
@@ -123,69 +133,69 @@ impl From<Vec<u8>> for Literal {
 
 impl From<&[u8]> for Literal {
     fn from(v: &[u8]) -> Self {
-        Literal::String(Bytes::copy_from_slice(v))
+        Bytes::copy_from_slice(v).into()
     }
 }
 
 impl From<String> for Literal {
     fn from(v: String) -> Self {
-        Literal::String(v.into())
+        Bytes::from(v).into()
     }
 }
 
 impl From<&str> for Literal {
     fn from(v: &str) -> Self {
-        Literal::String(Bytes::copy_from_slice(v.as_bytes()))
+        v.as_bytes().into()
     }
 }
 
 // Literal::Integer ------------------------------------------------------------
 
+impl From<i64> for Literal {
+    fn from(v: i64) -> Self {
+        Literal::Integer(v.into(), v)
+    }
+}
+
 impl From<i8> for Literal {
     fn from(v: i8) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
 impl From<i16> for Literal {
     fn from(v: i16) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
 impl From<i32> for Literal {
     fn from(v: i32) -> Self {
-        Literal::Integer(v as i64)
-    }
-}
-
-impl From<i64> for Literal {
-    fn from(v: i64) -> Self {
-        Literal::Integer(v)
+        (v as i64).into()
     }
 }
 
 impl From<u16> for Literal {
     fn from(v: u16) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
 impl From<u32> for Literal {
     fn from(v: u32) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
 impl From<u64> for Literal {
     fn from(v: u64) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
 impl From<usize> for Literal {
     fn from(v: usize) -> Self {
-        Literal::Integer(v as i64)
+        (v as i64).into()
     }
 }
 
@@ -193,7 +203,7 @@ impl From<usize> for Literal {
 
 impl From<NotNan<f64>> for Literal {
     fn from(v: NotNan<f64>) -> Self {
-        Literal::Float(v)
+        Literal::Float(v.into(), v)
     }
 }
 
@@ -201,10 +211,12 @@ impl TryFrom<f64> for Literal {
     type Error = Error;
 
     fn try_from(v: f64) -> Result<Self, Self::Error> {
-        Ok(Literal::Float(NotNan::new(v).map_err(|_| Error {
-            span: Span::default(),
-            variant: ErrorVariant::NanFloat,
-        })?))
+        NotNan::new(v)
+            .map_err(|_| Error {
+                span: Span::default(),
+                variant: ErrorVariant::NanFloat,
+            })
+            .map(Into::into)
     }
 }
 
@@ -212,7 +224,7 @@ impl TryFrom<f64> for Literal {
 
 impl From<bool> for Literal {
     fn from(v: bool) -> Self {
-        Literal::Boolean(v)
+        Literal::Boolean(v.into(), v)
     }
 }
 
@@ -220,13 +232,13 @@ impl From<bool> for Literal {
 
 impl From<Regex> for Literal {
     fn from(regex: Regex) -> Self {
-        Literal::Regex(ValueRegex::new(regex))
+        ValueRegex::new(regex).into()
     }
 }
 
 impl From<ValueRegex> for Literal {
     fn from(regex: ValueRegex) -> Self {
-        Literal::Regex(regex)
+        Literal::Regex(regex.clone().into(), regex)
     }
 }
 
@@ -251,7 +263,7 @@ impl<T: Into<Literal>> From<Option<T>> for Literal {
 
 impl From<DateTime<Utc>> for Literal {
     fn from(dt: DateTime<Utc>) -> Self {
-        Literal::Timestamp(dt)
+        Literal::Timestamp(dt.clone().into(), dt)
     }
 }
 

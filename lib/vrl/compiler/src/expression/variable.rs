@@ -54,7 +54,8 @@ impl Expression for Variable {
             .state()
             .variable(&self.ident)
             .cloned()
-            .unwrap_or(Value::Null))
+            .unwrap_or(Value::Null)
+            .into())
     }
 
     fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {

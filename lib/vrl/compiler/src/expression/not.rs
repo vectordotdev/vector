@@ -1,6 +1,7 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use value::Value;
 
 use crate::value::VrlValueConvert;
 use crate::{
@@ -46,7 +47,7 @@ impl Not {
 
 impl Expression for Not {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
+        Ok(Value::from(!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

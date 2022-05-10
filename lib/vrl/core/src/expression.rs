@@ -1,7 +1,9 @@
+use std::borrow::Cow;
+
 use diagnostic::{DiagnosticMessage, Label, Note};
 use value::Value;
 
-pub type Resolved = Result<Value, ExpressionError>;
+pub type Resolved<'a> = Result<Cow<'a, Value>, ExpressionError>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionError {

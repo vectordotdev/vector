@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt};
+use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
@@ -396,7 +396,7 @@ where
         let value = match self {
             Single { target, expr } => {
                 let value = expr.resolve(ctx)?;
-                target.insert(value.clone(), ctx);
+                target.insert(value.into_owned(), ctx);
                 value
             }
             Infallible {
@@ -406,7 +406,7 @@ where
                 default,
             } => match expr.resolve(ctx) {
                 Ok(value) => {
-                    ok.insert(value.clone(), ctx);
+                    ok.insert(value.into_owned(), ctx);
                     err.insert(Value::Null, ctx);
                     value
                 }
@@ -414,7 +414,7 @@ where
                     ok.insert(default.clone(), ctx);
                     let value = Value::from(error.to_string());
                     err.insert(value.clone(), ctx);
-                    value
+                    Cow::Owned(value)
                 }
             },
         };

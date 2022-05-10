@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, ops::Deref};
+use std::{borrow::Cow, collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
 
@@ -32,9 +32,10 @@ impl Expression for Array {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .collect::<Result<Vec<_>, _>>()
             .map(Value::Array)
+            .map(Into::into)
     }
 
     fn as_value(&self) -> Option<Value> {
