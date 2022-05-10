@@ -211,6 +211,7 @@ impl LogEvent {
             .and_then(|path| self.inner.fields.get_by_path(path))
     }
 
+    #[deprecated]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.as_map().get(key.as_ref())
     }
