@@ -42,11 +42,13 @@ impl Expression for Block {
         //
         // This also means we don't need to make any changes to the VM runtime,
         // as it uses the same compiler as this AST runtime.
-        self.inner
+        let (last, other) = self.inner.split_last().expect("at least one expression");
+
+        other
             .iter()
-            .map(|expr| expr.resolve(ctx))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
+
+        last.resolve(ctx)
     }
 
     fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
