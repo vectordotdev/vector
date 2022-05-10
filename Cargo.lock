@@ -5754,7 +5754,7 @@ dependencies = [
  "nom 7.1.1",
  "num_enum",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "snafu",
  "vector_common",
@@ -5832,9 +5832,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "120fbe7988713f39d780a58cf1a7ef0d7ef66c6d87e5aa3438940c05357929f4"
+checksum = "65a1118354442de7feb8a2a76f3d80ef01426bd45542c8c1fdffca41a758f846"
 dependencies = [
  "bytes 1.1.0",
  "cfg-if 1.0.0",
@@ -7806,9 +7806,21 @@ dependencies = [
  "futures-util",
  "log",
  "pin-project",
- "rustls 0.19.1",
  "tokio",
- "tungstenite",
+ "tungstenite 0.14.0",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06cda1232a49558c46f8a504d5b93101d42c0bf7f911f12a105ba48168f821ae"
+dependencies = [
+ "futures-util",
+ "log",
+ "rustls 0.20.4",
+ "tokio",
+ "tungstenite 0.17.2",
 ]
 
 [[package]]
@@ -7851,9 +7863,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30fb54bf1e446f44d870d260d99957e7d11fb9d0a0f5bd1a662ad1411cc103f9"
+checksum = "5be9d60db39854b30b835107500cf0aca0b0d14d6e1c3de124217c23a29c2ddb"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -7873,7 +7885,7 @@ dependencies = [
  "prost 0.10.3",
  "prost-derive 0.10.1",
  "rustls-native-certs 0.6.2",
- "rustls-pemfile 0.3.0",
+ "rustls-pemfile 1.0.0",
  "tokio",
  "tokio-rustls 0.23.3",
  "tokio-stream",
@@ -7893,7 +7905,7 @@ checksum = "d9263bf4c9bfaae7317c1c2faf7f18491d2fe476f70c414b73bf5d445b00ffa1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "quote",
  "syn",
 ]
@@ -8293,6 +8305,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tungstenite"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d96a2dea40e7570482f28eb57afbe42d97551905da6a9400acc5c328d24004f5"
+dependencies = [
+ "base64 0.13.0",
+ "byteorder",
+ "bytes 1.1.0",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.8.5",
+ "sha-1 0.10.0",
+ "thiserror",
+ "url",
+ "utf-8",
+]
+
+[[package]]
 name = "twox-hash"
 version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8663,7 +8694,7 @@ dependencies = [
  "prometheus-parser",
  "proptest",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "pulsar",
  "quickcheck",
@@ -8704,7 +8735,7 @@ dependencies = [
  "tokio-postgres",
  "tokio-stream",
  "tokio-test",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.17.1",
  "tokio-util 0.7.1",
  "toml",
  "tonic",
@@ -8751,7 +8782,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.17.1",
  "url",
  "uuid 1.0.0",
 ]
@@ -8903,7 +8934,7 @@ dependencies = [
  "pretty_assertions",
  "proptest",
  "prost 0.10.3",
- "prost-build 0.10.1",
+ "prost-build 0.10.3",
  "prost-types 0.10.1",
  "quickcheck",
  "rand 0.8.5",
@@ -9188,7 +9219,7 @@ dependencies = [
  "serde_urlencoded 0.7.1",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
+ "tokio-tungstenite 0.15.0",
  "tokio-util 0.6.9",
  "tower-service",
  "tracing 0.1.34",
