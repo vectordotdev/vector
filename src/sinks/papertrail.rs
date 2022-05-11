@@ -91,9 +91,8 @@ impl SinkConfig for PapertrailConfig {
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        let encoding = self.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
