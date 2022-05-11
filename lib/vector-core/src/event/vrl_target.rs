@@ -142,7 +142,7 @@ impl VrlTarget {
                     TargetEvents::One(log.into())
                 }
             },
-            VrlTarget::Metric { metric, .. } => return TargetEvents::One(Event::Metric(metric)),
+            VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
     }
 }
