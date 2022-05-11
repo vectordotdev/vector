@@ -1,3 +1,4 @@
+use ::value::Value;
 use rand::{thread_rng, RngCore};
 use vrl::prelude::*;
 

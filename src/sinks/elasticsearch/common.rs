@@ -1,11 +1,11 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
+
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
 use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
 use aws_types::region::Region;
 use bytes::Bytes;
-use std::collections::HashMap;
-use std::time::SystemTime;
-
 use http::{StatusCode, Uri};
 use snafu::ResultExt;
 

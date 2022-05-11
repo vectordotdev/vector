@@ -37,7 +37,7 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    internal_events::{BytesReceived, JournaldInvalidRecordError, OldEventsReceived},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sources::util::finalizer::OrderedFinalizer,
@@ -394,7 +394,7 @@ impl<'a> Batch<'a> {
         }
 
         if !self.events.is_empty() {
-            emit!(JournaldEventsReceived {
+            emit!(OldEventsReceived {
                 count: self.events.len(),
                 byte_size: self.events.size_of(),
             });

@@ -1,6 +1,7 @@
-use bytes::Bytes;
 use std::net::IpAddr;
 
+use ::value::Value;
+use bytes::Bytes;
 use vrl::prelude::*;
 
 fn ip_pton(value: Value) -> Resolved {

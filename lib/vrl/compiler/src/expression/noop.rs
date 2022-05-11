@@ -1,10 +1,12 @@
 use std::fmt;
 
+use value::Value;
+
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
     vm::{OpCode, Vm},
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

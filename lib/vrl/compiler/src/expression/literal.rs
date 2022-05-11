@@ -5,13 +5,13 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
 use regex::Regex;
-use value::ValueRegex;
+use value::{Value, ValueRegex};
 
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use vrl::Value;
+use value::Value;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -46,7 +46,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl::Value>, String>;
+    ) -> Result<BTreeMap<String, Value>, String>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -57,7 +57,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl::Value>>, String>;
+    ) -> Result<Vec<BTreeMap<String, Value>>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.

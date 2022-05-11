@@ -13,6 +13,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
+use vector_core::config::proxy::ProxyConfig;
 
 use super::{
     load_source_from_paths, process_paths, ComponentKey, Config, ConfigPath, OutputId, SinkOuter,
@@ -33,7 +34,6 @@ use crate::{
     },
     transforms::remap::RemapConfig,
 };
-use vector_core::config::proxy::ProxyConfig;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
@@ -633,16 +633,15 @@ mod test {
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
+    use super::{
+        report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
+        PipelinesVersionPayload,
+    };
     use crate::{
         app::Application,
         cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
-    };
-
-    use super::{
-        report_serialized_config_to_datadog, PipelinesAuth, PipelinesStrFields,
-        PipelinesVersionPayload,
     };
 
     const fn get_pipelines_auth() -> PipelinesAuth<'static> {

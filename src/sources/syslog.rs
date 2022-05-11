@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
@@ -15,6 +14,7 @@ use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 
+use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{

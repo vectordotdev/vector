@@ -1,3 +1,4 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 

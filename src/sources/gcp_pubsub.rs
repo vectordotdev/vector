@@ -236,7 +236,7 @@ impl PubsubSource {
             connection,
             |mut req: Request<()>| {
                 if let Some(credentials) = &self.credentials {
-                    let authorization = MetadataValue::from_str(&credentials.make_token())
+                    let authorization = MetadataValue::try_from(&credentials.make_token())
                         .map_err(|_| {
                             Status::new(
                                 Code::FailedPrecondition,

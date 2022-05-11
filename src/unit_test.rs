@@ -1,8 +1,9 @@
-use crate::config::{self, UnitTestResult};
 use std::path::PathBuf;
 
 use clap::Parser;
 use colored::*;
+
+use crate::config::{self, UnitTestResult};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]

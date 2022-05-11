@@ -1,19 +1,19 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use crate::internal_events::prelude::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
-    use super::*;
-    use crate::sources::aws_s3::sqs::ProcessingError;
     use aws_sdk_sqs::model::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
     };
+
+    use super::*;
+    use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
     pub struct SqsMessageReceiveError<'a, E> {
@@ -142,28 +142,6 @@ mod s3 {
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
             counter!("sqs_message_delete_batch_failed_total", 1);
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct SqsS3EventsReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for SqsS3EventsReceived {
-    fn emit(self) {
-        trace!(
-            message = "Events received.",
-            count = 1,
-            byte_size = %self.byte_size,
-        );
-        counter!("component_received_events_total", 1);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        // deprecated
-        counter!("events_in_total", 1);
     }
 }
 

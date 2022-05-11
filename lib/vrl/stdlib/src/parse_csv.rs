@@ -1,3 +1,4 @@
+use ::value::Value;
 use csv::ReaderBuilder;
 use vrl::prelude::*;
 

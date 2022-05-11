@@ -1,9 +1,11 @@
-use super::NewRelicSinkError;
-use crate::event::{Event, MetricValue, Value};
+use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
+
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
+
+use super::NewRelicSinkError;
+use crate::event::{Event, MetricValue, Value};
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {

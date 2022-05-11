@@ -1,5 +1,13 @@
 use std::{cmp, future::ready, panic, sync::Arc};
 
+use aws_sdk_s3::error::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
+use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::output::DeleteMessageBatchOutput;
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_client::SdkError;
+use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::FramingError, CharacterDelimitedDecoder};
@@ -12,24 +20,15 @@ use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_core::ByteSizeOf;
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
-use aws_smithy_client::SdkError;
-use aws_types::region::Region;
-
 use crate::tls::TlsConfig;
 use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        BytesReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        BytesReceived, OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        SqsS3EventsReceived, StreamClosedError,
+        StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -486,7 +485,8 @@ impl IngestorProcess {
                 }
             }
 
-            emit!(SqsS3EventsReceived {
+            emit!(OldEventsReceived {
+                count: 1,
                 byte_size: log.size_of()
             });
 

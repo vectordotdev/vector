@@ -1,12 +1,11 @@
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
+use super::{Output, OutputThroughput};
 use crate::{
     config::ComponentKey,
     event::{Metric, MetricValue},
 };
-
-use super::{Output, OutputThroughput};
 
 pub struct SentEventsTotal(Metric);
 

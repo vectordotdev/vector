@@ -1,5 +1,6 @@
-use bytes::Bytes;
 use std::io;
+
+use bytes::Bytes;
 
 use super::{encoding::Encoder, Compression, Compressor};
 

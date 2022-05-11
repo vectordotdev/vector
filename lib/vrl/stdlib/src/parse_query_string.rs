@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use url::form_urlencoded;
 use vrl::prelude::*;
 

@@ -1,12 +1,13 @@
 //! Intercept [`watcher::Event`]'s.
 
+use std::{hash::Hash, time::Duration};
+
 use futures::StreamExt;
 use futures_util::Stream;
 use kube::{
     runtime::{reflector::store, watcher},
     Resource,
 };
-use std::{hash::Hash, time::Duration};
 use tokio::pin;
 use tokio_util::time::DelayQueue;
 
@@ -76,7 +77,8 @@ pub async fn custom_reflector<K, W>(
 
 #[cfg(test)]
 mod tests {
-    use super::custom_reflector;
+    use std::time::Duration;
+
     use futures::channel::mpsc;
     use futures_util::SinkExt;
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -84,7 +86,8 @@ mod tests {
         reflector::{store, ObjectRef},
         watcher,
     };
-    use std::time::Duration;
+
+    use super::custom_reflector;
 
     #[tokio::test]
     async fn applied_should_add_object() {

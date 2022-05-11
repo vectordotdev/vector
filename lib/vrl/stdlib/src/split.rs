@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn split(value: Value, limit: Value, pattern: Value) -> Resolved {

@@ -1,7 +1,6 @@
 //! All types related to nesting a [`Kind`] into a path.
 
 use std::collections::BTreeMap;
-
 use std::fmt::Display;
 
 use lookup::{Lookup, Segment};

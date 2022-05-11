@@ -419,19 +419,19 @@ async fn tap_handler(
     feature = "transforms-remap",
 ))]
 mod tests {
-    use crate::api::schema::events::{create_events_stream, log, metric};
-    use crate::config::{Config, OutputId};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use futures::StreamExt;
     use tokio::sync::watch;
 
     use super::*;
     use crate::api::schema::events::output::OutputEventsPayload;
+    use crate::api::schema::events::{create_events_stream, log, metric};
+    use crate::config::{Config, OutputId};
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
     use crate::test_util::start_topology;
+    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use crate::transforms::remap::RemapConfig;
-    use futures::StreamExt;
 
     #[test]
     /// Patterns should accept globbing.

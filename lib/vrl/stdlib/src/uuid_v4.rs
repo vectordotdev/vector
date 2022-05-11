@@ -52,6 +52,7 @@ impl Expression for UuidV4Fn {
 
 #[cfg(test)]
 mod tests {
+    use ::value::Value;
     use vector_common::TimeZone;
 
     use super::*;

@@ -1,11 +1,11 @@
-use aws_types::credentials::SharedCredentialsProvider;
-use aws_types::region::Region;
 use std::{
     collections::HashMap,
     sync::Arc,
     task::{Context, Poll},
 };
 
+use aws_types::credentials::SharedCredentialsProvider;
+use aws_types::region::Region;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};

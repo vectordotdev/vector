@@ -1,11 +1,11 @@
-use super::{load_builder_from_paths, load_source_from_paths, process_paths};
-
-use crate::cli::handle_config_errors;
-use crate::config;
+use std::path::PathBuf;
 
 use clap::Parser;
 use serde_json::Value;
-use std::path::PathBuf;
+
+use super::{load_builder_from_paths, load_source_from_paths, process_paths};
+use crate::cli::handle_config_errors;
+use crate::config;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(rename_all = "kebab-case")]
@@ -144,8 +144,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::merge_json;
     use serde_json::json;
+
+    use super::merge_json;
 
     #[test]
     fn test_array_override() {

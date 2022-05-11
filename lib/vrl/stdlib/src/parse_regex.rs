@@ -1,3 +1,4 @@
+use ::value::Value;
 use regex::Regex;
 use vrl::{function::Error, prelude::*};
 
@@ -150,8 +151,9 @@ impl Expression for ParseRegexFn {
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         find => ParseRegex;

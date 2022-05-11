@@ -34,33 +34,57 @@ end
 
 # A class to hold error reports and common functionality
 class Event
-  attr_accessor :path, :uses
+  attr_accessor :path, :uses, :impl_internal_event
   attr_reader :name, :reports
-  attr_writer :members, :impl_internal_event
+  attr_writer :members
 
   def initialize(name)
     @path = nil
     @name = name
     @reports = []
-    @members = []
+    @members = {}
     @counters = {}
+    @metrics = {}
     @logs = []
     @uses = 0
     @impl_internal_event = false
   end
 
-  def add_counter(name, tags)
-    @counters[name] = tags
+  def add_metric(type, name, tags)
+    @metrics["#{type}:#{name}"] = tags
+    if type == 'counter'
+      @counters[name] = tags
+    end
   end
 
   def add_log(type, message, parameters)
     @logs.append([type, message, parameters])
   end
 
+  # The event signature is used to check for duplicates and is
+  # composed from the member names and their types, the metric types,
+  # names, and their tags, and the log messages and parameters. If no
+  # metrics and no logs are defined for the event, the signature is
+  # `nil` to skip duplicate checking.
+  def signature
+    if @metrics.length == 0 and @logs.length == 0
+      nil
+    else
+      members = @members.map { |name, type| "#{name}:#{type}" }.sort.join(':')
+      metrics = @metrics.map do |name, value|
+        tags = value.keys.sort.join(',')
+        "#{name}(#{tags})"
+      end
+      metrics = metrics.sort.join(';')
+      logs = @logs.sort.join(';')
+      "#{members}[#{logs}][#{metrics}]"
+    end
+  end
+
   def valid?
     @reports.clear
 
-    if @impl_internal_event and @uses == 0
+    if @uses == 0
       @reports.append('Event has no uses.')
     end
 
@@ -200,8 +224,8 @@ Find.find('.') do |path|
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path
         if members
-          member_names = members.scan(/ ([A-Za-z0-9_]+): /).map { |member,| member }
-          $all_events[struct_name].members = member_names
+          members = members.scan(/ ([A-Za-z0-9_]+): +(.+?),/).map { |member, type| [member, type] }
+          $all_events[struct_name].members = members.to_h
         end
       end
 
@@ -210,9 +234,9 @@ Find.find('.') do |path|
         $all_events[event_name].impl_internal_event = true
 
         # Scan for counter names and tags
-        block.scan(/ counter!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |name, tags|
+        block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |type, name, tags|
           tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
-          $all_events[event_name].add_counter(name, tags)
+          $all_events[event_name].add_metric(type, name, tags)
         end
 
         # Scan for log outputs and their parameters
@@ -235,10 +259,26 @@ Find.find('.') do |path|
   end
 end
 
-$all_events.each_value do |event|
-  unless event.valid?
-    puts "#{event.path}: Errors in event #{event.name}:"
-    event.reports.each { |report| puts "    #{report}" }
+$duplicates = Hash::new { |hash, key| hash[key] = [] }
+
+$all_events.each do |name, event|
+  if event.impl_internal_event
+    signature = event.signature
+    if signature
+      $duplicates[event.signature].append(name)
+    end
+    unless event.valid?
+      puts "#{event.path}: Errors in event #{event.name}:"
+      event.reports.each { |report| puts "    #{report}" }
+      error_count += 1
+    end
+  end
+end
+
+$duplicates.each do |signature, dupes|
+  if dupes.length > 1
+    dupes = dupes.join(', ')
+    puts "Duplicate events detected: #{dupes}"
     error_count += 1
   end
 end

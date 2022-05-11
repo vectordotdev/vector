@@ -105,6 +105,18 @@
 //! ```
 mod config;
 
+use std::{collections::HashSet, fmt::Debug};
+
+use config::EventTypeConfig;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use vector_core::{
+    config::{ComponentKey, DataType, Input, Output},
+    transform::{
+        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
+    },
+};
+
 use crate::{
     conditions::is_log::IsLogConfig,
     conditions::is_metric::IsMetricConfig,
@@ -112,16 +124,6 @@ use crate::{
     config::{GenerateConfig, TransformDescription},
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
-};
-use config::EventTypeConfig;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt::Debug};
-use vector_core::{
-    config::{ComponentKey, DataType, Input, Output},
-    transform::{
-        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
-    },
 };
 
 //------------------------------------------------------------------------------

@@ -65,11 +65,6 @@ mod with_default;
 
 use std::{fmt::Debug, io};
 
-use crate::{
-    event::{Event, LogEvent, MaybeAsLogMut, Value},
-    Result,
-};
-
 pub use adapter::{
     EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
     EncodingConfigWithFramingMigrator, Transformer,
@@ -87,6 +82,11 @@ use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
+
+use crate::{
+    event::{Event, LogEvent, MaybeAsLogMut, Value},
+    Result,
+};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
