@@ -114,7 +114,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -1460,7 +1460,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -2770,7 +2770,7 @@ del(.custom.data.user_agent)
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3254,7 +3254,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3537,7 +3537,7 @@ if (err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3975,7 +3975,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''

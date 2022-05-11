@@ -102,22 +102,11 @@ impl Runtime {
 
         let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        let err = |err| match err {
+        program.resolve(&mut ctx).map_err(|err| match err {
             #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),
-        };
-
-        match program.split_last() {
-            None => Ok(Value::Null),
-            Some((last, other)) => {
-                other
-                    .iter()
-                    .try_for_each(|expr| expr.resolve(&mut ctx).map(|_| ()).map_err(err))?;
-
-                last.resolve(&mut ctx).map_err(err)
-            }
-        }
+        })
     }
 
     pub fn compile(
@@ -129,9 +118,7 @@ impl Runtime {
         let mut local = LocalEnv::default();
         let mut vm = Vm::new(Arc::new(fns));
 
-        for expr in program.iter() {
-            expr.compile_to_vm(&mut vm, (&mut local, external))?;
-        }
+        program.compile_to_vm(&mut vm, (&mut local, external))?;
 
         vm.write_opcode(OpCode::Return);
 

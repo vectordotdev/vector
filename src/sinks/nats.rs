@@ -106,7 +106,7 @@ impl SinkConfig for NatsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -149,9 +149,8 @@ pub struct NatsSink {
 impl NatsSink {
     async fn new(config: NatsSinkConfig, acker: Acker) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
-        let encoding = config.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(NatsSink {

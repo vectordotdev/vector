@@ -18,7 +18,7 @@ pub struct Block {
     /// This allows any expressions within the block to mutate the local
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
-    local_env: LocalEnv,
+    pub(crate) local_env: LocalEnv,
 }
 
 impl Block {

@@ -146,28 +146,6 @@ mod s3 {
 }
 
 #[derive(Debug)]
-pub struct SqsS3EventsReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for SqsS3EventsReceived {
-    fn emit(self) {
-        trace!(
-            message = "Events received.",
-            count = 1,
-            byte_size = %self.byte_size,
-        );
-        counter!("component_received_events_total", 1);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        // deprecated
-        counter!("events_in_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct SqsMessageReceiveSucceeded {
     pub count: usize,
 }
