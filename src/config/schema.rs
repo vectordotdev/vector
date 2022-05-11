@@ -1,6 +1,6 @@
-pub(crate) use crate::schema::Definition;
-
 use serde::{Deserialize, Serialize};
+
+pub(crate) use crate::schema::Definition;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
 #[serde(default, deny_unknown_fields)]

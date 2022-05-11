@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn tally_value(array: Value, value: Value) -> Resolved {

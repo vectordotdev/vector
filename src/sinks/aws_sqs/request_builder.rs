@@ -1,5 +1,4 @@
 use bytes::Bytes;
-
 use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 

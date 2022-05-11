@@ -2440,6 +2440,7 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
+ "value",
  "vector_common",
  "vrl",
 ]
@@ -8784,6 +8785,7 @@ name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
  "lookup",
+ "value",
  "vrl",
 ]
 
@@ -8953,6 +8955,7 @@ dependencies = [
  "lookup",
  "ordered-float 3.0.0",
  "serde_json",
+ "value",
  "vector_common",
  "vrl-compiler",
  "vrl-diagnostic",
@@ -8973,6 +8976,7 @@ dependencies = [
  "rustyline",
  "serde_json",
  "thiserror",
+ "value",
  "vector_common",
  "vrl",
  "vrl-stdlib",
@@ -9103,6 +9107,7 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber 0.3.11",
+ "value",
  "vector_common",
  "vrl",
  "vrl-stdlib",

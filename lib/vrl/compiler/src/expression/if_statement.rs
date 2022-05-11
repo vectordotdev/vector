@@ -1,11 +1,13 @@
 use std::fmt;
 
+use value::Value;
+
 use crate::{
     expression::{Block, Expr, Noop, Predicate, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

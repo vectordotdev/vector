@@ -276,6 +276,8 @@ impl<T: Bufferable> Default for TopologyBuilder<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use tracing::Span;
 
     use super::TopologyBuilder;
@@ -284,8 +286,6 @@ mod tests {
         variants::MemoryBuffer,
         WhenFull,
     };
-
-    use std::num::NonZeroUsize;
 
     #[tokio::test]
     async fn single_stage_topology_block() {

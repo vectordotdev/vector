@@ -1,7 +1,8 @@
-use crate::tls::TlsEnableableConfig;
 use nkeys::error::Error as NKeysError;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+
+use crate::tls::TlsEnableableConfig;
 
 #[derive(Debug, Snafu)]
 pub enum NatsConfigError {

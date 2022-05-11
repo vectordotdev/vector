@@ -184,9 +184,10 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use bytes::BytesMut;
     use codecs::JsonSerializer;
-    use std::convert::TryFrom;
     use tokio_util::codec::Encoder as _;
 
     use super::*;

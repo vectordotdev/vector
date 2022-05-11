@@ -1,7 +1,7 @@
-use aws_sdk_kinesis::model::PutRecordsRequestEntry;
-use aws_sdk_kinesis::types::Blob;
 use std::io;
 
+use aws_sdk_kinesis::model::PutRecordsRequestEntry;
+use aws_sdk_kinesis::types::Blob;
 use bytes::Bytes;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 

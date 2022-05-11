@@ -1,3 +1,4 @@
+use ::value::Value;
 use tracing::warn;
 use vrl::prelude::*;
 

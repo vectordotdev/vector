@@ -1,7 +1,8 @@
-use crate::value::Value;
 use mlua::prelude::LuaResult;
 use mlua::{FromLua, Lua, ToLua, Value as LuaValue};
 use ordered_float::NotNan;
+
+use crate::value::Value;
 
 impl<'a> ToLua<'a> for Value {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua

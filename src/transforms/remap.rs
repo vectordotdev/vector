@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -7,7 +8,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::sync::Arc;
 use value::Kind;
 use vector_common::TimeZone;
 use vrl::{
@@ -210,7 +210,7 @@ pub trait VrlRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate>;
+    ) -> std::result::Result<value::Value, Terminate>;
 }
 
 #[derive(Debug)]
@@ -234,7 +234,7 @@ impl VrlRunner for VmRunner {
         target: &mut VrlTarget,
         _: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate> {
+    ) -> std::result::Result<value::Value, Terminate> {
         self.runtime.run_vm(&self.vm, target, timezone)
     }
 }
@@ -258,7 +258,7 @@ impl VrlRunner for AstRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate> {
+    ) -> std::result::Result<value::Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
@@ -393,7 +393,7 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }

@@ -6,6 +6,7 @@ mod test_enrichment;
 use std::str::FromStr;
 use std::time::Instant;
 
+use ::value::Value;
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
@@ -14,7 +15,7 @@ use glob::glob;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
 use vrl::VrlRuntime;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]

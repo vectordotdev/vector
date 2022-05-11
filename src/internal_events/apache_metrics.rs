@@ -1,9 +1,9 @@
 use std::time::Instant;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type, http_error_code};
 use crate::sources::apache_metrics;
 
 #[derive(Debug)]

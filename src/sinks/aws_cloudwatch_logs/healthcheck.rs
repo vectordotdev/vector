@@ -1,7 +1,6 @@
 use aws_sdk_cloudwatchlogs::error::DescribeLogGroupsError;
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-
 use snafu::Snafu;
 
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;

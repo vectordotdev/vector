@@ -1,13 +1,15 @@
+use std::{error::Error, fmt, sync::Arc};
+
 use compiler::{
     state::{ExternalEnv, LocalEnv},
     vm::{OpCode, Vm},
     ExpressionError, Function,
 };
 use lookup::LookupBuf;
-use std::{error::Error, fmt, sync::Arc};
+use value::Value;
 use vector_common::TimeZone;
 
-use crate::{state, Context, Program, Target, Value};
+use crate::{state, Context, Program, Target};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 

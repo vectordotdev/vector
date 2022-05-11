@@ -113,7 +113,7 @@ lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value", optional = true }
+value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
@@ -465,7 +465,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls"]
 sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "value"]
+sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["fakedata"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
@@ -577,7 +577,7 @@ transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
 transforms-regex_parser = []
-transforms-remap = ["value"]
+transforms-remap = []
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []
