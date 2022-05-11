@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
+use futures::stream;
 use vector_common::encode_logfmt;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
@@ -284,7 +285,7 @@ async fn many_tenants() {
         log.insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
     }
 
-    assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
@@ -455,7 +456,7 @@ async fn test_out_of_order_events(
     config.batch.max_bytes = Some(4_000_000);
 
     let (sink, _) = config.build(cx).await.unwrap();
-    assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 

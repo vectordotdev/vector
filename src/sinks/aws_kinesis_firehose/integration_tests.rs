@@ -3,7 +3,7 @@
 
 use aws_sdk_elasticsearch::Client as EsClient;
 use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
-use futures::{StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 

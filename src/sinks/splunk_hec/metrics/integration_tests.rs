@@ -130,7 +130,7 @@ async fn splunk_insert_multiple_counter_metrics() {
         events.push(get_counter(Arc::clone(&batch)))
     }
     drop(batch);
-    let events = events.into_iter().map(Into::into);
+
     assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -157,7 +157,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
         events.push(get_gauge(Arc::clone(&batch)))
     }
     drop(batch);
-    let events = events.into_iter().map(Into::into);
+
     assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

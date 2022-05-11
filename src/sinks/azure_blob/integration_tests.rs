@@ -123,7 +123,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     let sink = config.to_sink();
     let (lines, events) = random_lines_with_stream(100, 10, None);
 
-    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);

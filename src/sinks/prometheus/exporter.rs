@@ -1069,7 +1069,7 @@ mod integration_tests {
         let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1107,9 +1107,9 @@ mod integration_tests {
 
         // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait for the Prometheus server to scrape them, and then query it to ensure both metrics
         // have their correct set size value.
@@ -1133,7 +1133,7 @@ mod integration_tests {
         time::sleep(time::Duration::from_secs(3)).await;
 
         let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Again, wait for the Prometheus server to scrape the metrics, and then query it again.
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1162,9 +1162,9 @@ mod integration_tests {
 
         // metrics that will not be updated for a full flush period and therefore should expire
         let (name1, event) = tests::create_metric_set(None, vec!["42"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_gauge(None, 100.0);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the sink to process the events
         time::sleep(time::Duration::from_secs(1)).await;
@@ -1178,7 +1178,7 @@ mod integration_tests {
         for _ in 0..7 {
             // Update the first metric, ensuring it doesn't expire
             let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
-            tx.send(event.into()).expect("Failed to send.");
+            tx.send(event).expect("Failed to send.");
 
             // Wait a bit for time to pass
             time::sleep(time::Duration::from_secs(1)).await;

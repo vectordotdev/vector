@@ -20,7 +20,10 @@ use crate::{
         util::{BatchConfig, Compression},
         HealthcheckError,
     },
-    test_util::{random_events_with_stream, random_string, trace_init},
+    test_util::{
+        components::{assert_sink_compliance, assert_sink_compliance_with_event, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    },
     tls::{self, TlsConfig},
 };
 
