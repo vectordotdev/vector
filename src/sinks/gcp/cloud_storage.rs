@@ -1,3 +1,4 @@
+// TODO: no integration test to satisfy `assert_sink_compliance`
 use std::{
     collections::HashMap,
     convert::TryFrom,

@@ -519,6 +519,7 @@ impl StreamSink<Event> for PrometheusExporter {
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
+    use futures::stream;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
@@ -531,7 +532,10 @@ mod tests {
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
-        test_util::{next_addr, random_string, trace_init},
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            next_addr, random_string, trace_init,
+        },
         tls::MaybeTlsSettings,
     };
 
@@ -595,10 +599,11 @@ mod tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = Box::pin(UnboundedReceiverStream::new(rx));
+        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
 
         for event in events {
-            tx.send(event.into()).expect("Failed to send event.");
+            tx.send(event).expect("Failed to send event.");
         }
 
         time::sleep(time::Duration::from_millis(100)).await;
@@ -619,7 +624,12 @@ mod tests {
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        String::from_utf8(bytes.to_vec()).unwrap()
+        let result = String::from_utf8(bytes.to_vec()).unwrap();
+
+        drop(tx);
+        sink_handle.await.unwrap();
+
+        result
     }
 
     async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
@@ -681,7 +691,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         let m1 = Metric::new(
             "absolute",
@@ -708,9 +718,12 @@ mod tests {
 
         let metrics_handle = Arc::clone(&sink.metrics);
 
-        sink.run(Box::pin(futures::stream::iter(metrics)))
-            .await
-            .unwrap();
+        assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::iter(metrics),
+            &SINK_TAGS,
+        )
+        .await;
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -744,7 +757,7 @@ mod tests {
         let buckets = config.buckets.clone();
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -820,9 +833,12 @@ mod tests {
             .cloned()
             .map(Event::Metric)
             .collect::<Vec<_>>();
-        sink.run(Box::pin(futures::stream::iter(events)))
-            .await
-            .unwrap();
+        assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::iter(events),
+            &SINK_TAGS,
+        )
+        .await;
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -863,7 +879,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -936,9 +952,13 @@ mod tests {
             .cloned()
             .map(Event::Metric)
             .collect::<Vec<_>>();
-        sink.run(Box::pin(futures::stream::iter(events)))
-            .await
-            .unwrap();
+
+        assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::iter(events),
+            &SINK_TAGS,
+        )
+        .await;
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -969,7 +989,14 @@ mod integration_tests {
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
     use super::*;
-    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
+    use crate::{
+        config::ProxyConfig,
+        http::HttpClient,
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            trace_init,
+        },
+    };
 
     fn sink_exporter_address() -> String {
         std::env::var("SINK_EXPORTER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
@@ -1038,7 +1065,8 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event.into()).expect("Failed to send.");
@@ -1061,6 +1089,9 @@ mod integration_tests {
         );
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 
     async fn reset_on_flush_period() {
@@ -1071,7 +1102,8 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
 
         // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -1112,6 +1144,9 @@ mod integration_tests {
             result["data"]["result"][0]["value"][1],
             Value::String("2".into())
         );
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 
     async fn expire_on_flush_period() {
@@ -1122,7 +1157,8 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
 
         // metrics that will not be updated for a full flush period and therefore should expire
         let (name1, event) = tests::create_metric_set(None, vec!["42"]);
@@ -1152,5 +1188,8 @@ mod integration_tests {
         let body = fetch_exporter_body().await;
         assert!(body.contains(&name1));
         assert!(!body.contains(&name2));
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 }

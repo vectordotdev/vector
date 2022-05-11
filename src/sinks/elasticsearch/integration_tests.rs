@@ -148,7 +148,7 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    sink.run_events(vec![input_event.into()]).await.unwrap();
+    assert_sink_compliance_with_event(sink, input_event, &HTTP_SINK_TAGS).await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -383,7 +383,7 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut events| {
+        let events = events.map(move |mut events| {
             if doit {
                 events.for_each_log(|log| {
                     log.insert("_type", 1);
@@ -391,11 +391,11 @@ async fn run_insert_tests_with_config(
             }
             doit = true;
             events
-        }))
-        .await
-        .expect("Sending events failed");
+        });
+
+        assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     } else {
-        sink.run(events).await.expect("Sending events failed");
+        assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));

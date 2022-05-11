@@ -1,3 +1,5 @@
+// TODO: no integration tests? :sadface: need to add `assert_sink_compliance`
+
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{

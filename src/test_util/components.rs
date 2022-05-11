@@ -10,7 +10,7 @@
 use std::{env, time::Duration};
 
 use futures::{stream, SinkExt, Stream, StreamExt};
-use futures_util::Future;
+use futures_util::{future::ready, Future};
 use once_cell::sync::Lazy;
 use tokio::{pin, select, time::sleep};
 use vector_core::event_test_util;
@@ -51,6 +51,9 @@ pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
 
 /// The standard set of tags for all sources that read a file.
 pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
+
+/// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
+pub const SINK_TAGS: [&str; 1] = ["protocol"];
 
 /// The standard set of tags for all sinks that write a file.
 pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
@@ -98,9 +101,11 @@ pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
 /// The component test specification for all sinks
 pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     ComponentTests {
-        events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
+        events: &["BytesSent", "EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
         tagged_counters: &["component_sent_bytes_total"],
         untagged_counters: &[
+            "component_received_events_total",
+            "component_received_event_bytes_total",
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
@@ -340,30 +345,22 @@ pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
 }
 
 /// Convenience wrapper for running sink tests
-pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
+pub async fn assert_sink_compliance<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
-    S: Stream<Item = EventArray> + Send,
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
 {
     init_test();
-    sink.run(events).await.expect("Running sink failed");
-    SINK_TESTS.assert(tags);
-}
 
-/// Convenience wrapper for running sink tests with a stream of `Event`
-pub async fn run_sink_events<S>(sink: VectorSink, events: S, tags: &[&str])
-where
-    S: Stream<Item = Event> + Send,
-{
-    init_test();
     let events = events.map(Into::into);
     sink.run(events).await.expect("Running sink failed");
+
     SINK_TESTS.assert(tags);
 }
 
 /// Convenience wrapper for running a sink with a single event
-pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
-    init_test();
-    run_sink(sink, stream::once(std::future::ready(event.into())), tags).await
+pub async fn assert_sink_compliance_with_event(sink: VectorSink, event: Event, tags: &[&str]) {
+    assert_sink_compliance(sink, stream::once(ready(event)), tags).await
 }
 
 /// Convenience wrapper for running sinks with `send_all`

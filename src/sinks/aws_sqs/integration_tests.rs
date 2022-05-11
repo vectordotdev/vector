@@ -66,7 +66,7 @@ async fn sqs_send_message_batch() {
     let sink = VectorSink::from_event_streamsink(sink);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-    sink.run(events).await.unwrap();
+    assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(1)).await;
 

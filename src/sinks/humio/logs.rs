@@ -154,7 +154,10 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::Compression,
-        test_util::{components, components::HTTP_SINK_TAGS, random_string},
+        test_util::{
+            components::{assert_sink_compliance_with_event, HTTP_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn humio_address() -> String {
@@ -182,7 +185,7 @@ mod integration_tests {
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
         log.insert(log_schema().timestamp_key(), ts);
 
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -221,7 +224,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -256,7 +259,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -279,7 +282,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

@@ -23,8 +23,8 @@ use crate::{
         },
     },
     test_util::{
-        components, components::AWS_SINK_TAGS, random_events_with_stream, random_string,
-        wait_for_duration,
+        components::{assert_sink_compliance, AWS_SINK_TAGS},
+        random_events_with_stream, random_string, wait_for_duration,
     },
 };
 
@@ -71,11 +71,9 @@ async fn firehose_put_records() {
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
-    components::init_test();
-    sink.0.run(events.map(Into::into)).await.unwrap();
+    assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(5)).await;
-    components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {

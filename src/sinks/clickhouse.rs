@@ -318,7 +318,7 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         sinks::util::encoding::TimestampFormat,
         test_util::{
-            components::{self, HTTP_SINK_TAGS},
+            components::{assert_sink_compliance_with_event, HTTP_SINK_TAGS},
             random_string, trace_init,
         },
     };
@@ -364,7 +364,7 @@ mod integration_tests {
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -408,7 +408,7 @@ mod integration_tests {
         let (mut input_event, mut receiver) = make_event();
         input_event.as_mut_log().insert("unknown", "mysteries");
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -459,7 +459,7 @@ mod integration_tests {
 
         let (mut input_event, _receiver) = make_event();
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -516,7 +516,7 @@ timestamp_format = "unix""#,
 
         let (mut input_event, _receiver) = make_event();
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);

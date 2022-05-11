@@ -1,3 +1,5 @@
+// TODO: no integration test to satisfy `assert_sink_compliance`
+
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};

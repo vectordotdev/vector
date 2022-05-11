@@ -1,3 +1,6 @@
+// TODO: no integration tests so no good place to test `assert_sink_compliance` but technically it would be happening at
+// the impl level i.e. azure blob vs s3 sink, etc, so as long as those are good, the datalog_archives sink is also good
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,

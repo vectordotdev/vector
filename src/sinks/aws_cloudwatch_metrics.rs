@@ -517,7 +517,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{metric::StatisticKind, Event, MetricKind},
-        test_util::random_string,
+        test_util::{
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn cloudwatch_address() -> String {
@@ -600,7 +603,7 @@ mod integration_tests {
         }
 
         let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
     }
 
     #[tokio::test]
@@ -629,6 +632,6 @@ mod integration_tests {
         events.shuffle(&mut rand::thread_rng());
 
         let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
     }
 }

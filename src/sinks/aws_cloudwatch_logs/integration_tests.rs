@@ -23,7 +23,10 @@ use crate::{
         BatchConfig,
     },
     template::Template,
-    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+    test_util::{
+        components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        random_lines, random_lines_with_stream, random_string, trace_init,
+    },
 };
 
 const GROUP_NAME: &str = "vector-cw";
@@ -60,7 +63,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -126,7 +129,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
         events
     });
-    let _ = sink.run(events).await.unwrap();
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -204,7 +207,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     lines.push(add_event(Duration::days(-1)));
     lines.push(add_event(Duration::days(-13)));
 
-    sink.run_events(events).await.unwrap();
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -254,7 +257,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -309,8 +312,10 @@ async fn cloudwatch_insert_log_event_batched() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    let stream = sink.into_stream(); //.send_all(&mut events).await.unwrap();
+    let stream = sink.into_stream();
     stream.run(events.map(Into::into).boxed()).await.unwrap();
+    // TODO: variant of assert method to run within async block? but also... does this test matter? it would sort of
+    // imply any non-stream-style sink is not batching at all which seems unlikely to actually be the case.
 
     let response = create_client_test()
         .await
@@ -372,7 +377,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
             event
         })
         .collect::<Vec<_>>();
-    sink.run_events(events).await.unwrap();
+    assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     let response = create_client_test()
         .await

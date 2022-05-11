@@ -23,7 +23,10 @@ use crate::{
         },
         VectorSink,
     },
-    test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
+    test_util::{
+        components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        random_events_with_stream, random_lines, random_lines_with_stream,
+    },
 };
 
 #[tokio::test]
@@ -70,7 +73,7 @@ async fn azure_blob_insert_lines_into_blob() {
     let sink = config.to_sink();
     let (lines, input) = random_lines_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -92,7 +95,7 @@ async fn azure_blob_insert_json_into_blob() {
     let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -106,7 +109,6 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(expected, blob_lines);
 }
 
-#[ignore]
 #[tokio::test]
 // This test will fail with Azurite blob emulator because of this issue:
 // https://github.com/Azure/Azurite/issues/629
@@ -121,7 +123,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     let sink = config.to_sink();
     let (lines, events) = random_lines_with_stream(100, 10, None);
 
-    sink.run(events).await.expect("Failed to run sink");
+    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -150,7 +152,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -185,7 +187,7 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
     };
 
     let sink = config.to_sink();
-    sink.run(input).await.expect("Failed to run sink");
+    assert_sink_compliance(sink, input, &HTTP_SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 3);

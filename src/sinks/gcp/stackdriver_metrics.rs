@@ -1,3 +1,4 @@
+// TODO: no integration test to satisfy `assert_sink_compliance`
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
