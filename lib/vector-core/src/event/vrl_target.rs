@@ -38,7 +38,7 @@ pub enum TargetEvents {
 pub struct TargetIter<T> {
     iter: std::vec::IntoIter<Value>,
     metadata: EventMetadata,
-    _pahton: PhantomData<T>,
+    _marker: PhantomData<T>,
 }
 
 impl Iterator for TargetIter<LogEvent> {
@@ -115,7 +115,7 @@ impl VrlTarget {
                 Value::Array(values) => TargetEvents::Logs(TargetIter {
                     iter: values.into_iter(),
                     metadata,
-                    _pahton: PhantomData,
+                    _marker: PhantomData,
                 }),
 
                 v => {
@@ -133,7 +133,7 @@ impl VrlTarget {
                 Value::Array(values) => TargetEvents::Traces(TargetIter {
                     iter: values.into_iter(),
                     metadata,
-                    _pahton: PhantomData,
+                    _marker: PhantomData,
                 }),
 
                 v => {
