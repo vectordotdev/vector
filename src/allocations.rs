@@ -110,19 +110,19 @@ impl AllocationGroupEntry {
         self.deallocations.fetch_add(1, Ordering::Relaxed);
     }
 
-    fn allocated_bytes(&self) -> &Arc<AtomicU64> {
+    const fn allocated_bytes(&self) -> &Arc<AtomicU64> {
         &self.allocated_bytes
     }
 
-    fn deallocated_bytes(&self) -> &Arc<AtomicU64> {
+    const fn deallocated_bytes(&self) -> &Arc<AtomicU64> {
         &self.deallocated_bytes
     }
 
-    fn allocations(&self) -> &Arc<AtomicU64> {
+    const fn allocations(&self) -> &Arc<AtomicU64> {
         &self.allocations
     }
 
-    fn deallocations(&self) -> &Arc<AtomicU64> {
+    const fn deallocations(&self) -> &Arc<AtomicU64> {
         &self.deallocations
     }
 }
@@ -148,7 +148,7 @@ impl AllocationTracker for Tracker {
 }
 
 /// Initializes allocation tracking.
-/// 
+///
 /// This sets the global allocation tracker to our custom tracker implementation, spawns a background thread which
 /// handles registering allocation groups by attaching their atomic counters to our internal metrics backend, and then
 /// finally enables tracking which causes (de)allocation events to begin flowing.
@@ -156,18 +156,18 @@ pub fn init_allocation_tracking() {
     let _ = AllocationRegistry::set_global_tracker(Tracker {})
         .expect("no other global tracker should be set yet");
 
-    thread::spawn(|| process_registration_events());
+    thread::spawn(process_registration_events);
 
     AllocationRegistry::enable_tracking();
 }
 
 /// Acquires an allocation group token.
-/// 
+///
 /// This creates an allocation group which allows callers to enter/exit the allocation group context, associating all
 /// (de)allocations within the context with that group.  That token can (and typically is) associated with a
 /// /// `tracing::Span` such that the context is entered and exited as the span is entered and exited. This allows
 /// ensuring that we track all (de)allocations when the span is active.
-/// 
+///
 /// # Tags
 ///
 /// The provided `tags` are used for the metrics that get registered and attached to the allocation group. No tags from
@@ -267,16 +267,6 @@ fn process_registration_events() {
         loop {
             let event = registration_events.pop();
 
-            let allocated_key = Key::from_parts("component_allocated_bytes_total", &event.tags);
-            let allocated_handle =
-                Handle::Counter(Arc::clone(event.group_entry.allocated_bytes()).into());
-            controller.register_handle(allocated_key, allocated_handle);
-
-            let deallocated_key = Key::from_parts("component_deallocated_bytes_total", &event.tags);
-            let deallocated_handle =
-                Handle::Counter(Arc::clone(event.group_entry.deallocated_bytes()).into());
-            controller.register_handle(deallocated_key, deallocated_handle);
-
             register_allocation_group_counter(
                 controller,
                 &event,
@@ -315,5 +305,5 @@ fn register_allocation_group_counter<F>(
 {
     let key = Key::from_parts(name, &event.tags);
     let handle = Handle::Counter(Arc::clone(get_handle(&event.group_entry)).into());
-    controller.register_handle(key, handle);
+    controller.register_handle(&key, handle);
 }

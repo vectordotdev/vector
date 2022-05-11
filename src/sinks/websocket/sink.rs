@@ -88,7 +88,7 @@ impl WebSocketConnector {
             .ok_or(WsError::Url(UrlError::NoHostName))?
             .to_string();
         let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or_else(|| match mode {
+        let port = request.uri().port_u16().unwrap_or(match mode {
             UriMode::Tls => 443,
             UriMode::Plain => 80,
         });

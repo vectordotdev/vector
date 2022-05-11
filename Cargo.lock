@@ -8211,7 +8211,9 @@ dependencies = [
 
 [[package]]
 name = "tracking-allocator"
-version = "0.1.2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f19b306fff919bd694a5697baea716827778043b56d5309397d74d4ad1842e"
 dependencies = [
  "tracing 0.1.34",
  "tracing-subscriber 0.3.11",

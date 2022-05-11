@@ -129,12 +129,13 @@ impl Controller {
         CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
-    pub fn register_handle(&self, key: Key, handle: Handle) {
+    /// Manually registers a metric in the registry.
+    pub fn register_handle(&self, key: &Key, handle: Handle) {
         self.recorder.with_registry(|registry| {
             let kind = handle.kind();
 
-            registry.op(kind, &key, |_| {}, || handle);
-        })
+            registry.op(kind, key, |_| {}, || handle);
+        });
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric

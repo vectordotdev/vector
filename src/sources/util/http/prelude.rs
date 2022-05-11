@@ -41,6 +41,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::unnecessary_to_owned)]
     fn run(
         self,
         address: SocketAddr,
