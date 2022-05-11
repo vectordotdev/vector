@@ -124,9 +124,6 @@ impl VrlTarget {
                     TargetEvents::One(log.into())
                 }
             },
-            // TargetEvents::One(LogEvent::from_value(value, metadata).into())
-            VrlTarget::Metric { metric, .. } => return TargetEvents::One(Event::Metric(metric)),
-            _ => todo!(),
             VrlTarget::Trace(value, metadata) => match value {
                 value @ Value::Object(_) => {
                     let log = LogEvent::from_value(value, metadata);
@@ -145,6 +142,7 @@ impl VrlTarget {
                     TargetEvents::One(log.into())
                 }
             },
+            VrlTarget::Metric { metric, .. } => return TargetEvents::One(Event::Metric(metric)),
         }
     }
 }

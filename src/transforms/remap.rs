@@ -431,7 +431,9 @@ where
                 TargetEvents::One(event) => {
                     push_default(event, output, &self.default_schema_definition)
                 }
-                TargetEvents::Logs(events) | TargetEvents::Traces(events) => events
+                TargetEvents::Logs(events) => events
+                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
+                TargetEvents::Traces(events) => events
                     .for_each(|event| push_default(event, output, &self.default_schema_definition)),
             },
             Err(reason) => {
