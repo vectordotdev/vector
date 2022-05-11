@@ -11,7 +11,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -136,7 +136,7 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(NatsEventsReceived {
+                    emit!(OldEventsReceived {
                         byte_size: events.size_of(),
                         count
                     });

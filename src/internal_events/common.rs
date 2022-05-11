@@ -1,6 +1,8 @@
-use metrics::counter;
-pub use vector_core::internal_event::EventsReceived;
+use std::time::Instant;
+
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
 use super::prelude::{error_stage, error_type};
 
@@ -120,5 +122,44 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
+    }
+}
+
+#[derive(Debug)]
+pub struct FieldOverwritten<'a> {
+    pub(crate) field: &'a str,
+}
+
+impl<'a> InternalEvent for FieldOverwritten<'a> {
+    fn emit(self) {
+        debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
+    }
+}
+
+#[derive(Debug)]
+pub struct RequestCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for RequestCompleted {
+    fn emit(self) {
+        debug!(message = "Request completed.");
+        counter!("requests_completed_total", 1);
+        histogram!("request_duration_seconds", self.end - self.start);
+    }
+}
+
+#[derive(Debug)]
+pub struct CollectionCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for CollectionCompleted {
+    fn emit(self) {
+        debug!(message = "Collection completed.");
+        counter!("collect_completed_total", 1);
+        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
