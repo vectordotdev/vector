@@ -1,7 +1,5 @@
 use metrics::counter;
-use std::time::Instant;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type, http_error_code};

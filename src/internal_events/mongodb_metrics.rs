@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;

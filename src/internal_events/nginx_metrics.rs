@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
