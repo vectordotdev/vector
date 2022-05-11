@@ -290,7 +290,7 @@ metadata
 
 #### Syslog / Vector namespace
 
-event (the "data" key was elided)
+event
 
 ```json
 {
@@ -327,7 +327,7 @@ metadata
 
 #### Socket source (mode=udp) / syslog codec / Vector namespace
 
-event (the "data" key was elided)
+event
 
 ```json
 {
