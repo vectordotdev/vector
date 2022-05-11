@@ -283,7 +283,7 @@ strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
+tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
