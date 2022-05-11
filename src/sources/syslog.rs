@@ -585,6 +585,7 @@ mod test {
             event
                 .as_log()
                 .all_fields()
+                .unwrap()
                 .find(|(key, _)| (&key[..]).starts_with("empty"))
                 == None
         }

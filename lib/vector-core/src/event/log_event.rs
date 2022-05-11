@@ -12,6 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
+use itertools::Either;
 use lookup::path;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
@@ -166,6 +167,10 @@ impl LogEvent {
         &mut result.fields
     }
 
+    pub fn value(&self) -> &Value {
+        &self.inner.fields
+    }
+
     /// Convert a `LogEvent` into a tuple of its components
     pub fn into_parts(mut self) -> (Value, EventMetadata) {
         self.fields_mut();
@@ -260,14 +265,29 @@ impl LogEvent {
         }
     }
 
-    pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        util::log::all_fields(self.as_map_deprecated())
+    pub fn all_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
+        if let Some(map) = self.as_map() {
+            Some(util::log::all_fields(map))
+        } else {
+            None
+        }
+    }
+
+    /// Returns an iterator of all fields if the value is an Object. Otherwise,
+    /// a single field is returned with a "message" key
+    pub fn convert_to_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
+        if let Some(map) = self.as_map() {
+            util::log::all_fields(map)
+        } else {
+            util::log::all_fields_non_object_root(self.value())
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         self.as_map_deprecated().is_empty()
     }
 
+    #[deprecated]
     pub fn as_map_deprecated(&self) -> &BTreeMap<String, Value> {
         match &self.inner.fields {
             Value::Object(map) => map,

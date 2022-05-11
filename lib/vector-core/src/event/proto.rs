@@ -235,7 +235,8 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             }
         } else {
             let mut dummy = BTreeMap::new();
-            // must insert at least 1 field, otherwise it is emitted entirely
+            // must insert at least 1 field, otherwise it is emitted entirely.
+            // this value is ignored in the decoding step (since value is provided)
             dummy.insert(".".to_owned(), encode_value(::value::Value::Null));
             Log {
                 fields: dummy,

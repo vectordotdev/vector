@@ -705,7 +705,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get(log_schema().timestamp_key()).is_some());
 
-            assert_eq!(8, log.all_fields().count());
+            assert_eq!(8, log.all_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }

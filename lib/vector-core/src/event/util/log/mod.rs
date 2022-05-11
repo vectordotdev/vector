@@ -3,7 +3,7 @@ mod insert;
 mod keys;
 mod remove;
 
-pub use all_fields::all_fields;
+pub use all_fields::{all_fields, all_fields_non_object_root};
 pub use insert::insert;
 pub use keys::keys;
 pub use remove::remove;

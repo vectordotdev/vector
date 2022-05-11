@@ -83,6 +83,7 @@ use codecs::encoding::Framer;
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
@@ -201,14 +202,26 @@ pub trait EncodingConfiguration {
         if let Some(timestamp_format) = &self.timestamp_format() {
             match timestamp_format {
                 TimestampFormat::Unix => {
-                    let mut unix_timestamps = Vec::new();
-                    for (k, v) in log.all_fields() {
-                        if let Value::Timestamp(ts) = v {
-                            unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                    if log.value().is_object() {
+                        let mut unix_timestamps = Vec::new();
+                        for (k, v) in log.all_fields().expect("must be an object") {
+                            if let Value::Timestamp(ts) = v {
+                                unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                            }
                         }
-                    }
-                    for (k, v) in unix_timestamps {
-                        log.insert(k.as_str(), v);
+                        for (k, v) in unix_timestamps {
+                            log.insert(k.as_str(), v);
+                        }
+                    } else {
+                        // root is not an object
+                        let timestamp = if let Value::Timestamp(ts) = log.value() {
+                            Some(ts.timestamp())
+                        } else {
+                            None
+                        };
+                        if let Some(ts) = timestamp {
+                            log.insert(path!(), Value::Integer(ts));
+                        }
                     }
                 }
                 // RFC3339 is the default serialization of a timestamp.

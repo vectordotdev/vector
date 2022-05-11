@@ -224,7 +224,10 @@ mod tests {
             "bytes": "4263",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -272,7 +275,10 @@ mod tests {
             "message": r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -319,7 +325,10 @@ mod tests {
             "bytes": 4263,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -338,6 +347,9 @@ mod tests {
             "message": "42",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 }
