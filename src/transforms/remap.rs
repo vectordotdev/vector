@@ -21,7 +21,7 @@ use crate::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{Event, VrlTarget},
+    event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
@@ -427,11 +427,15 @@ where
         let result = self.run_vrl(&mut target);
 
         match result {
-            Ok(_) => {
-                for event in target.into_events() {
-                    push_default(event, output, &self.default_schema_definition);
+            Ok(_) => match target.into_events() {
+                TargetEvents::One(event) => {
+                    push_default(event, output, &self.default_schema_definition)
                 }
-            }
+                TargetEvents::Logs(events) => events
+                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
+                TargetEvents::Traces(events) => events
+                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
+            },
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
