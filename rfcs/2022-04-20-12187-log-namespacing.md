@@ -6,7 +6,6 @@ The event data should be restructured to prevent collisions, and in general make
 
 ## Goals
 
-
 1. The schema / type should be known in all cases when using the "Vector" namespace
 2. The "Global Log Schema" should be ignored
 3. Users can opt in to the new namespace on a per-source basis (as well as globally)
@@ -36,8 +35,8 @@ is the "key_field" and "headers_key" in the kafka source.
 
 Many transforms / sinks rely on the "Global Log Schema" to get/modify info such as the timestamp. Since the log
 schema should be customizable per source, that means the transforms and sinks need to know which log namespace
-is being used by each log. In order to accomplish this, the `log_namespace` event metadata field will be set to
-`vector` if the new namespace is being used.
+is being used by each log. The existence of the read-only "vector" namespace in metadata can be used to
+determine which namespace is being used.
 
 
 
@@ -46,8 +45,9 @@ is being used by each log. In order to accomplish this, the `log_namespace` even
 #### Data
 
 This is the main content of a log.  It will be placed at the root of the event.
-What is considered the "main content" here is not very well-defined, but should generally be what most people would expect
-to receive from the source. It is not necessarily the "log message" itself.
+It is not necessarily the "log message" itself. For sources that have a known "schema", such
+as syslog or the datadog agent, the fields from that schema will be placed on the root. Otherwise, it will be
+just the decoded message content placed on the root.
 
 A good example is the "Datadog Agent" source. The root is the fields received by the Datadog agent. The log content is
 nested.
@@ -61,24 +61,25 @@ An example of this is the "socket" source, with the "bytes" codec.
 
 #### Metadata
 
-This is any useful data that is not placed on the event. This will be stored in event metadata. Some improvements will be needed to
-event metadata to make this easier to use, as described below. This currently contains fields such as `datadog_api_key`.
-Other "vector" metadata such as `ingest_timestamp` and `source_type` will be added here, as well as additional metadata from
-sources, such as `key` and `headers` from the `kafka` source.
+This is any useful data from the source that is not placed on the event. This will be stored in event metadata.
+
+Vector metadata, such as `ingest_timestamp` and `source_type` will be added here nested under the `vector` namespace.
+
+Source metadata will be name-spaced using the name of the source type.
+
+#### Secret Metadata
+
+Secrets such as the `datadog_api_key` and `splunk_hec_token` will be placed in their own container to make it more
+difficult to accidentally access / leak. VRL functions will be provided to access secrets, similar to the existing
+`get_metadata_field` / `set_metadata_field` today.
+
 
 ### Codecs
 
-#### Bytes
+#### Bytes / Json
 
-With the "Legacy" namespace, this codec decodes the input as-is, and places it under a "message" key (configurable with global log schema).
-With the "Vector" namespace, this will be placed under the "data" key. If there is no additional metadata stored
-on the event, then it will be placed on the root instead. The placement will be decided for each source independently.
+Decoded data will be placed either at the root or nested depending on the source.
 
-#### Json
-
-With the "Legacy" namespace, this codec decodes the input as-is, and places it under a "message" key (configurable with global log schema).
-With the "Vector" namespace, this will be placed under the "data" key. If there is no additional metadata stored
-on the event, then it will be placed on the root instead. The placement will be decided for each source independently.
 
 #### Syslog
 
@@ -90,12 +91,13 @@ and no support is being added here.
 
 When these are used in the "Vector" source, the behavior will not change, and events will be passed through as-is.
 
-### Event Metadata
+### Metadata
 
-There are 3 sources of information that will be stored in Event Metadata.
-1. Vector "internal" metadata such as `datadog_api_key`, so it can be read/set by users. This data already exists.
-2. Vector metadata such as `ingest_timestamp`, and `source_type` which are set for every source.
-3. Source metadata which will vary for each source.
+There are 3 sources of information that will be stored in Metadata.
+1. Vector "internal" metadata such as `datadog_api_key`, so it can be read/set by users. This data already exists, but will
+be moved to its own "secret" metadata.
+2. Vector metadata such as `ingest_timestamp`, and `source_type` which are set for every source. These will be nested under `vector'
+3. Source metadata which will vary for each source. This will be nested under the source type.
 
 There is currently minimal support for event metadata. Several changes will need to be made.
 
@@ -104,21 +106,23 @@ Changes needed immediately:
 - Support arbitrarily nested values
 - Functions that access metadata (`get_metadata_field`, `remove_metadata_field`, and `set_metadata_field`) should support full paths as keys, and return
   the `any` type instead of just `string`. This is technically a breaking change.
+- Add a separate "secret" metadata.
 
 With these changes, using metadata can still be a bit annoying since the returned type will always be `any`, even if the
 value is set and read in the same VRL program.
 
-Future changes (out of scope for now):
+### Future enhancements
 
-- Add a special path syntax to reference metadata instead of using functions.
+- Add a special path syntax to reference metadata (and secrets) instead of using functions.
 - Expand schema support to metadata
 - Expand semantic meaning to metadata
-
+- Allow sources to be configured to pull in additional data into the event (from the metadata)
+- Allow sinks to be configured to pull in additional data from metadata
+- Persist metadata in disk buffers. Sinks will require metadata to be able to differentiate between namespaces.
 
 ### Implementation
 
 A proof of concept for the Datadog Agent Logs source is being worked on alongside this RFC: [12218](https://github.com/vectordotdev/vector/pull/12218)
-
 
 ### Examples
 
@@ -150,11 +154,16 @@ metadata
 
 ```json
 {
-  "log_namespace": "vector",
-  "source_type": "datadog_agent",
-  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z",
+  "vector": {
+    "source_type": "datadog_agent",
+    "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
+  }
+}
+```
 
-  // These are existing fields in event metadata that may be on any event
+secrets (this will look similar for all sources, so it is emitted on the remaining examples)
+```json
+{
   "datadog_api_key": "2o86gyhufa2ugyf4",
   "splunk_hec_token": "386ygfhawnfud6rjftg"
 }
@@ -182,9 +191,10 @@ metadata
 
 ```json
 {
-  "log_namespace": "vector",
-  "source_type": "datadog_agent",
-  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
+  "vector": {
+    "source_type": "datadog_agent",
+    "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
+  }
 }
 ```
 
@@ -209,18 +219,22 @@ metadata
 
 ```json
 {
-  "key": "the key of the message"
-  // headers were originally nested under a configurable "headers_key". This is using a static value.
-  "headers": {
-    "header-a-key": "header-a-value",
-    "header-b-key": "header-b-value",
+  "kafka": {
+    "key": "the key of the message"
+    // headers were originally nested under a configurable "headers_key". This is using a static value.
+    "headers": {
+      "header-a-key": "header-a-value",
+      "header-b-key": "header-b-value"
+    }
+    "topic": "name of topic",
+    "partition": 3,
+    "offset": 1829448,
+  },
+  "vector": {
+    "log_namespace": "vector",
+    "source_type": "kafka",
+    "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
   }
-  "log_namespace": "vector",
-  "topic": "name of topic",
-  "partition": 3,
-  "offset": 1829448,
-  "source_type": "kafka",
-  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
 ```
 
@@ -238,33 +252,36 @@ metadata
 
 ```json
 {
-  "log_namespace": "vector",
-  "file": "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log",
-  "container_image": "gcr.io/k8s-minikube/storage-provisioner:v3",
-  "container_name": "storage-provisioner",
-  "namespace_labels": {
-    "kubernetes.io/metadata.name": "kube-system"
+  "kubernetes_logs": {
+    "file": "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log",
+    "container_image": "gcr.io/k8s-minikube/storage-provisioner:v3",
+    "container_name": "storage-provisioner",
+    "namespace_labels": {
+      "kubernetes.io/metadata.name": "kube-system"
+    },
+    "pod_annotations": {
+      "prometheus.io/scrape": "false"
+    },
+    "pod_ip": "192.168.1.1",
+    "pod_ips": [
+      "192.168.1.1",
+      "::1"
+    ],
+    "pod_labels": {
+      "addonmanager.kubernetes.io/mode": "Reconcile",
+      "gcp-auth-skip-secret": "true",
+      "integration-test": "storage-provisioner"
+    },
+    "pod_name": "storage-provisioner",
+    "pod_namespace": "kube-system",
+    "pod_node_name": "minikube",
+    "pod_uid": "93bde4d0-9731-4785-a80e-cd27ba8ad7c2",
+    "stream": "stderr"
   },
-  "pod_annotations": {
-    "prometheus.io/scrape": "false"
-  },
-  "pod_ip": "192.168.1.1",
-  "pod_ips": [
-    "192.168.1.1",
-    "::1"
-  ],
-  "pod_labels": {
-    "addonmanager.kubernetes.io/mode": "Reconcile",
-    "gcp-auth-skip-secret": "true",
-    "integration-test": "storage-provisioner"
-  },
-  "pod_name": "storage-provisioner",
-  "pod_namespace": "kube-system",
-  "pod_node_name": "minikube",
-  "pod_uid": "93bde4d0-9731-4785-a80e-cd27ba8ad7c2",
-  "stream": "stderr",
-  "source_type": "kubernetes_logs",
-  "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  "vector": {
+    "source_type": "kubernetes_logs",
+    "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  }
 }
 ```
 
@@ -295,11 +312,14 @@ metadata
 
 ```json
 {
-  "log_namespace": "vector",
-  "source_ip": "127.0.0.1",
-  "hostname": "localhost",
-  "source_type": "syslog",
-  "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  "syslog": {
+    "source_ip": "127.0.0.1",
+    "hostname": "localhost"
+  },
+  "vector": {
+    "source_type": "syslog",
+    "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  }
 }
 ```
 
@@ -325,11 +345,14 @@ metadata
 
 ```json
 {
-  "log_namespace": "vector",
-  "source_ip": "192.168.0.1",
-  "hostname": "localhost",
-  "source_type": "socket",
-  "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  "socket": {
+    "source_ip": "192.168.0.1",
+    "hostname": "localhost"
+  },
+  "vector": {
+    "source_type": "socket",
+    "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
+  }
 }
 ```
 
@@ -350,18 +373,21 @@ metadata
 
 ```json
 {
-  "path": "/foo/bar",
-  // headers and query params were previously placed directly on the root. This needs to be nested to avoid potential naming conflicts.
-  "headers": {
-    "Content-Type": "application/json"
+  "http": {
+    "path": "/foo/bar",
+    // headers and query params were previously placed directly on the root. This needs to be nested to avoid potential naming conflicts.
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query_params": {
+      "page": 14,
+      "size": 3
+    }
   },
-  "query_params": {
-    "page": 14,
-    "size": 3
+  "vector": {
+    "source_type": "http",
+    "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
   }
-  "log_namespace": "vector",
-  "source_type": "http",
-  "ingest_timestamp": "2020-10-15T11:01:46.499555308Z"
 }
 ```
 
@@ -388,26 +414,23 @@ metadata (only from the 2nd kafka source)
 
 ```json
 {
-  "key": "the key of the message (from the 2nd kafka source)"
-  "headers": {
-    "header-a-key": "header-a-value (from the 2nd kafka source)",
-    "header-b-key": "header-b-value (from the 2nd kafka source)"
+  "kafka": {
+    "key": "the key of the message (from the 2nd kafka source)"
+    "headers": {
+      "header-a-key": "header-a-value (from the 2nd kafka source)",
+      "header-b-key": "header-b-value (from the 2nd kafka source)"
+    }
+    "topic": "name of topic",
+    "partition": 3,
+    "offset": 1829448
+  },
+  "vector": {
+    "source_type": "kafka",
+    "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
   }
-  "log_namespace": "vector",
-  "topic": "name of topic",
-  "partition": 3,
-  "offset": 1829448,
-  "source_type": "kafka",
-  "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
 }
 ```
 
-## Outstanding Questions / Alternatives
-
-### Additional nesting in event metadata
-
-There's now 3 sources of information for the event metadata. It might be confusing to users where the data is coming
-from (Vector vs source). Additional nesting could make this more clear, at the expense of things being a bit more nested.
 
 
 ## Prior Art
