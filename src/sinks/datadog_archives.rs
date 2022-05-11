@@ -441,7 +441,7 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
 
             let mut attributes = BTreeMap::new();
             let custom_attributes: Vec<String> = log_event
-                .as_map()
+                .as_map_deprecated()
                 .keys()
                 .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
                 .map(|v| v.to_owned())

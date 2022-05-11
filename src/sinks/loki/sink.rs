@@ -227,9 +227,8 @@ impl EventEncoder {
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
 
-            Encoding::Logfmt => {
-                encode_logfmt::to_string(log.as_map()).expect("Logfmt encoding should never fail.")
-            }
+            Encoding::Logfmt => encode_logfmt::to_string(log.as_map_deprecated())
+                .expect("Logfmt encoding should never fail."),
         };
 
         // If no labels are provided we set our own default

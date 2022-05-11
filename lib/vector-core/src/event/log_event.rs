@@ -217,7 +217,8 @@ impl LogEvent {
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
-        util::log::contains(self.as_map(), path)
+        self.inner.fields.get_by_path_v2(path).is_some()
+        // util::log::contains(self.as_map_deprecated(), path)
     }
 
     pub fn insert<'a>(
@@ -260,17 +261,24 @@ impl LogEvent {
     }
 
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        util::log::all_fields(self.as_map())
+        util::log::all_fields(self.as_map_deprecated())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.as_map().is_empty()
+        self.as_map_deprecated().is_empty()
     }
 
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+    pub fn as_map_deprecated(&self) -> &BTreeMap<String, Value> {
         match &self.inner.fields {
             Value::Object(map) => map,
             _ => unreachable!(),
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match &self.inner.fields {
+            Value::Object(map) => Some(map),
+            _ => None,
         }
     }
 
@@ -419,7 +427,7 @@ impl Serialize for LogEvent {
     where
         S: Serializer,
     {
-        serializer.collect_map(self.as_map().iter())
+        serializer.collect_map(self.as_map_deprecated().iter())
     }
 }
 
