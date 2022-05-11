@@ -634,6 +634,15 @@ mod test {
         *,
     };
 
+    impl TargetEvents {
+        fn as_logs(self) -> TargetIter<LogEvent> {
+            match self {
+                Self::Logs(logs) => logs,
+                _ => panic!("not logs"),
+            }
+        }
+    }
+
     #[test]
     fn log_get() {
         use lookup::{FieldBuf, SegmentBuf};
@@ -810,7 +819,10 @@ mod test {
                 vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
-            assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
+            assert_eq!(
+                target.into_events().as_logs().next().unwrap(),
+                Event::Log(expect)
+            );
         }
     }
 
@@ -968,7 +980,11 @@ mod test {
             ::vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
-                target.into_events().collect::<Vec<_>>(),
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                },
                 expect
                     .into_iter()
                     .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
