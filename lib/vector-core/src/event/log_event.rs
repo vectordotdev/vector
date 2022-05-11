@@ -235,33 +235,6 @@ impl LogEvent {
         }
     }
 
-    // /// Rename a key in place without reference to pathing
-    // ///
-    // /// The function will rename a key in place without reference to any path
-    // /// information in the key, much as if you were to call [`remove`] and then
-    // /// [`insert_flat`].
-    // ///
-    // /// This function is a no-op if `from_key` and `to_key` are identical. If
-    // /// `to_key` already exists in the structure its value will be overwritten
-    // /// silently.
-    // #[inline]
-    // #[deprecated]
-    // #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
-    // pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
-    // where
-    //     K: AsRef<str> + Into<String> + PartialEq + Display,
-    // {
-    //     if from_key != to_key {
-    //         if let Some(val) = self
-    //             .fields_mut()
-    //             .as_object_mut_unwrap()
-    //             .remove(from_key.as_ref())
-    //         {
-    //             self.insert_flat(to_key, val);
-    //         }
-    //     }
-    // }
-
     /// Rename a key
     ///
     /// If `to_key` already exists in the structure its value will be overwritten.
@@ -271,27 +244,6 @@ impl LogEvent {
         }
     }
 
-    // /// Insert a key in place without reference to pathing
-    // ///
-    // /// This function will insert a key in place without reference to any
-    // /// pathing information in the key. It will insert over the top of any value
-    // /// that exists in the map already.
-    // pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    // where
-    //     K: Into<String> + Display,
-    //     V: Into<Value> + Debug,
-    // {
-    //     self.as_map_mut().insert(key.into(), value.into())
-    // }
-
-    // deprecated - using this means the schema is unknown
-    // pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-    //     let key = key.as_ref();
-    //     if !self.as_map().contains_key(key) {
-    //         self.insert(path!(key), value);
-    //     }
-    // }
-
     pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
         self.remove_prune(path, false)
     }
@@ -300,10 +252,10 @@ impl LogEvent {
         util::log::remove(self.fields_mut(), path, prune)
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
+    pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {
         match &self.inner.fields {
-            Value::Object(map) => util::log::keys(map),
-            _ => unreachable!(),
+            Value::Object(map) => Some(util::log::keys(map)),
+            _ => None,
         }
     }
 

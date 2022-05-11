@@ -245,9 +245,11 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_function(mlua::MetaMethod::Pairs, |lua, event: LuaEvent| {
             let state = lua.create_table()?;
             {
-                let keys = lua.create_table_from(event.inner.as_log().keys().map(|k| (k, true)))?;
+                if let Some(keys) = event.inner.as_log().keys() {
+                    let keys = lua.create_table_from(keys.map(|k| (k, true)))?;
+                    state.raw_set("keys", keys)?;
+                }
                 state.raw_set("event", event)?;
-                state.raw_set("keys", keys)?;
             }
             let function =
                 lua.create_function(|lua, (state, prev): (mlua::Table, Option<String>)| {

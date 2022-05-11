@@ -168,15 +168,17 @@ pub trait EncodingConfiguration {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = &self.only_fields() {
-            let mut to_remove = log
-                .keys()
-                .filter(|field| {
-                    let field_path = parse_path(field);
-                    !only_fields
-                        .iter()
-                        .any(|only| field_path.segments.starts_with(&only.segments[..]))
-                })
-                .collect::<Vec<_>>();
+            let mut to_remove = match log.keys() {
+                Some(keys) => keys
+                    .filter(|field| {
+                        let field_path = parse_path(field);
+                        !only_fields
+                            .iter()
+                            .any(|only| field_path.segments.starts_with(&only.segments[..]))
+                    })
+                    .collect::<Vec<_>>(),
+                None => vec![],
+            };
 
             // reverse sort so that we delete array elements at the end first rather than
             // the start so that any `nulls` at the end are dropped and empty arrays are
