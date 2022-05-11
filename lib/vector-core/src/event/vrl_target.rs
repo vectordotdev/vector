@@ -634,15 +634,6 @@ mod test {
         *,
     };
 
-    impl TargetEvents {
-        fn as_logs(self) -> TargetIter<LogEvent> {
-            match self {
-                Self::Logs(logs) => logs,
-                _ => panic!("not logs"),
-            }
-        }
-    }
-
     #[test]
     fn log_get() {
         use lookup::{FieldBuf, SegmentBuf};
@@ -820,7 +811,13 @@ mod test {
                 Ok(Some(value))
             );
             assert_eq!(
-                target.into_events().as_logs().next().unwrap(),
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                }
+                .next()
+                .unwrap(),
                 Event::Log(expect)
             );
         }
