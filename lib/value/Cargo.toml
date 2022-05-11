@@ -32,6 +32,6 @@ test = []
 arbitrary = ["quickcheck"]
 
 [dev-dependencies]
-indoc = { version = "1.0.4", default-features = false }
+indoc = { version = "1.0.6", default-features = false }
 quickcheck = "1.0.3"
 lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }

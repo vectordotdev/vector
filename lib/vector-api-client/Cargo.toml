@@ -32,4 +32,4 @@ tokio-tungstenite = { version = "0.17.1", default-features = false, features = [
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }
 url = { version = "2.2.2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-indoc = { version = "1.0.4", default-features = false }
+indoc = { version = "1.0.6", default-features = false }
