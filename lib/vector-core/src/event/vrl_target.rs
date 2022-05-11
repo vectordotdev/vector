@@ -816,7 +816,8 @@ mod test {
                     TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
                     TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
                 }
-                .next()
+                .first()
+                .cloned()
                 .unwrap(),
                 Event::Log(expect)
             );
