@@ -21,16 +21,16 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation_tracking")))]
+#[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracking")))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(all(feature = "tikv-jemallocator", feature = "allocation_tracking"))]
+#[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracking"))]
 #[global_allocator]
 static ALLOC: tracking_allocator::Allocator<tikv_jemallocator::Jemalloc> =
     tracking_allocator::Allocator::from_allocator(tikv_jemallocator::Jemalloc);
 
-#[cfg(feature = "allocation_tracking")]
+#[cfg(feature = "allocation-tracking")]
 pub mod allocations;
 
 #[macro_use]

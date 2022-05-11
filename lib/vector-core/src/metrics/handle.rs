@@ -7,6 +7,7 @@ use std::{
 };
 
 use metrics::GaugeValue;
+use metrics_util::MetricKind;
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -44,14 +45,14 @@ impl AtomicF64 {
 
 #[derive(Clone, Debug)]
 pub enum Handle {
-    Gauge(Arc<Gauge>),
-    Counter(Arc<Counter>),
-    Histogram(Arc<Histogram>),
+    Gauge(Gauge),
+    Counter(Counter),
+    Histogram(Histogram),
 }
 
 impl Handle {
     pub(crate) fn counter() -> Self {
-        Handle::Counter(Arc::new(Counter::new()))
+        Handle::Counter(Counter::new())
     }
 
     pub(crate) fn increment_counter(&self, value: u64) {
@@ -62,7 +63,7 @@ impl Handle {
     }
 
     pub(crate) fn gauge() -> Self {
-        Handle::Gauge(Arc::new(Gauge::new()))
+        Handle::Gauge(Gauge::new())
     }
 
     pub(crate) fn update_gauge(&self, value: GaugeValue) {
@@ -73,7 +74,7 @@ impl Handle {
     }
 
     pub(crate) fn histogram() -> Self {
-        Handle::Histogram(Arc::new(Histogram::new()))
+        Handle::Histogram(Histogram::new())
     }
 
     pub(crate) fn record_histogram(&self, value: f64) {
@@ -82,26 +83,34 @@ impl Handle {
             _ => unreachable!(),
         };
     }
+
+    pub(crate) fn kind(&self) -> MetricKind {
+        match self {
+            Self::Counter(_) => MetricKind::Counter,
+            Self::Gauge(_) => MetricKind::Gauge,
+            Self::Histogram(_) => MetricKind::Histogram,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Histogram {
-    buckets: Box<[(f64, AtomicU32); 20]>,
-    count: AtomicU32,
-    sum: AtomicF64,
+    buckets: Arc<[(f64, AtomicU32); 20]>,
+    count: Arc<AtomicU32>,
+    sum: Arc<AtomicF64>,
 }
 
 impl Histogram {
     pub(crate) fn new() -> Self {
         // Box to avoid having this large array inline to the structure, blowing
-        // out cache coherence.
+        // out cache coherence, as well as makingthe overall struct cloneable.
         //
         // The sequence here is based on powers of two. Other sequences are more
         // suitable for different distributions but since our present use case
         // is mostly non-negative and measures smallish latencies we cluster
         // around but never quite get to zero with an increasingly coarse
         // long-tail.
-        let buckets = Box::new([
+        let buckets = Arc::new([
             (0.015_625, AtomicU32::new(0)),
             (0.03125, AtomicU32::new(0)),
             (0.0625, AtomicU32::new(0)),
@@ -125,8 +134,8 @@ impl Histogram {
         ]);
         Self {
             buckets,
-            count: AtomicU32::new(0),
-            sum: AtomicF64::new(0.0),
+            count: Arc::new(AtomicU32::new(0)),
+            sum: Arc::new(AtomicF64::new(0.0)),
         }
     }
 
@@ -173,21 +182,21 @@ impl<'a> Iterator for BucketIter<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Counter {
-    inner: AtomicU64,
+    inner: Arc<AtomicU64>,
 }
 
 impl Counter {
     pub(crate) fn with_count(count: u64) -> Self {
         Self {
-            inner: AtomicU64::new(count),
+            inner: Arc::new(AtomicU64::new(count)),
         }
     }
 
     pub(crate) fn new() -> Self {
         Self {
-            inner: AtomicU64::new(0),
+            inner: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -200,15 +209,21 @@ impl Counter {
     }
 }
 
-#[derive(Debug)]
+impl From<Arc<AtomicU64>> for Counter {
+    fn from(inner: Arc<AtomicU64>) -> Self {
+        Self { inner }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Gauge {
-    inner: AtomicF64,
+    inner: Arc<AtomicF64>,
 }
 
 impl Gauge {
     pub(crate) fn new() -> Self {
         Self {
-            inner: AtomicF64::new(0.0),
+            inner: Arc::new(AtomicF64::new(0.0)),
         }
     }
 
@@ -228,6 +243,12 @@ impl Gauge {
 
     pub fn gauge(&self) -> f64 {
         self.inner.load(Ordering::Relaxed)
+    }
+}
+
+impl From<Arc<AtomicF64>> for Gauge {
+    fn from(inner: Arc<AtomicF64>) -> Self {
+        Self { inner }
     }
 }
 

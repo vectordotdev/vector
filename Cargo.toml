@@ -281,6 +281,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
+thingbuf = { git = "https://github.com/tobz/thingbuf.git", default-features = false, features = ["std", "static"], optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
@@ -374,7 +375,8 @@ target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables"
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator", "tracking-allocator"]
+unix = ["tikv-jemallocator", "allocation-tracking"]
+allocation-tracking = ["thingbuf", "tracking-allocator"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.

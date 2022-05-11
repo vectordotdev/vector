@@ -18,6 +18,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    filter::LevelFilter,
     layer::{Context, SubscriberExt},
     util::SubscriberInitExt,
     Layer,
@@ -56,8 +57,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
 
-    let metrics_layer = metrics_layer_enabled()
-        .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
+    let metrics_layer =
+        metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -72,8 +73,9 @@ pub fn init(color: bool, json: bool, levels: &str) {
         subscriber.with(console_layer)
     };
 
-    #[cfg(feature = "allocation_tracking")]
-    let subscriber = subscriber.with(tracking_allocator::AllocationLayer::new());
+    #[cfg(feature = "allocation-tracking")]
+    let subscriber =
+        subscriber.with(tracking_allocator::AllocationLayer::new().with_filter(LevelFilter::ERROR));
 
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);

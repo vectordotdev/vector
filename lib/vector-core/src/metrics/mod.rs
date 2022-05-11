@@ -3,8 +3,6 @@ mod handle;
 mod label_filter;
 mod recorder;
 
-use std::sync::Arc;
-
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked};
@@ -131,6 +129,14 @@ impl Controller {
         CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
+    pub fn register_handle(&self, key: Key, handle: Handle) {
+        self.recorder.with_registry(|registry| {
+            let kind = handle.kind();
+
+            registry.op(kind, &key, |_| {}, || handle);
+        })
+    }
+
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
     pub fn capture_metrics(&self) -> Vec<Metric> {
@@ -163,7 +169,7 @@ impl Controller {
             }
         }
 
-        let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
+        let handle = Handle::Counter(Counter::with_count(metrics.len() as u64 + 1));
         metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
 
         metrics

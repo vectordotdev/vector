@@ -3,12 +3,9 @@ use vector::app::Application;
 
 #[cfg(unix)]
 fn main() {
-    println!("Hello");
-    #[cfg(feature = "allocation_tracking")]
-    {
-        // Configure our tracking allocator.
-        vector::allocations::init_allocation_tracking();
-    }
+    // Configure our tracking allocator.
+    #[cfg(feature = "allocation-tracking")]
+    vector::allocations::init_allocation_tracking();
 
     let app = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
