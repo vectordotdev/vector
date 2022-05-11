@@ -126,7 +126,11 @@ impl LogEvent {
     }
 
     pub fn value_mut(&mut self) -> &mut Value {
-        Arc::make_mut(&mut self.inner).as_value_mut()
+        let result = Arc::make_mut(&mut self.inner);
+        // We MUST invalidate the inner size cache when making a
+        // mutable copy, since the _next_ action will modify the data.
+        result.invalidate();
+        &mut result.fields
     }
 
     pub fn metadata(&self) -> &EventMetadata {
@@ -165,21 +169,13 @@ impl LogEvent {
         Self { inner, metadata }
     }
 
-    fn fields_mut(&mut self) -> &mut Value {
-        let result = Arc::make_mut(&mut self.inner);
-        // We MUST invalidate the inner size cache when making a
-        // mutable copy, since the _next_ action will modify the data.
-        result.invalidate();
-        &mut result.fields
-    }
-
     /// Convert a `LogEvent` into a tuple of its components
     ///
     /// # Panics
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
     pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
-        self.fields_mut();
+        self.value_mut();
         (
             Arc::try_unwrap(self.inner)
                 .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
@@ -215,7 +211,7 @@ impl LogEvent {
     }
 
     pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
-        self.fields_mut().get_by_path_mut(path)
+        self.value_mut().get_by_path_mut(path)
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
@@ -230,7 +226,7 @@ impl LogEvent {
     }
 
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
-        self.fields_mut().get_mut_by_path_v2(path)
+        self.value_mut().get_mut_by_path_v2(path)
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
@@ -268,7 +264,7 @@ impl LogEvent {
     {
         if from_key != to_key {
             if let Some(val) = self
-                .fields_mut()
+                .value_mut()
                 .as_object_mut_unwrap()
                 .remove(from_key.as_ref())
             {
@@ -302,7 +298,7 @@ impl LogEvent {
     }
 
     pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
-        util::log::remove(self.fields_mut(), path, prune)
+        util::log::remove(self.value_mut(), path, prune)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
@@ -328,7 +324,7 @@ impl LogEvent {
     }
 
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match self.fields_mut() {
+        match self.value_mut() {
             Value::Object(ref mut map) => map,
             _ => unreachable!(),
         }
