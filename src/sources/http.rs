@@ -234,6 +234,10 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 mod tests {
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
+    use codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        BytesDecoderConfig, JsonDeserializerConfig,
+    };
     use flate2::{
         write::{GzEncoder, ZlibEncoder},
         Compression,
@@ -251,10 +255,6 @@ mod tests {
             next_addr, spawn_collect_n, trace_init, wait_for_tcp,
         },
         SourceSender,
-    };
-    use codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        BytesDecoderConfig, JsonDeserializerConfig,
     };
 
     #[test]

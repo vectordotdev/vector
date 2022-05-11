@@ -1,5 +1,7 @@
+use value::Value;
+
 use super::{argument_list::VmArgument, machine::Instruction, OpCode, Vm, VmFunctionClosure};
-use crate::{ExpressionError, Value};
+use crate::ExpressionError;
 
 /// `VmState` contains the mutable state used to run the Vm.
 pub(crate) struct VmState<'a> {

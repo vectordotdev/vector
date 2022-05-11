@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use chrono::{TimeZone as _, Utc};
 use vector_common::{conversion::Conversion, TimeZone};
 use vrl::{function::Error, prelude::*};

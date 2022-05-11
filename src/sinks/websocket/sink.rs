@@ -1,3 +1,11 @@
+use std::{
+    fmt::Debug,
+    io,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+
 use async_trait::async_trait;
 use futures::{
     future::{self},
@@ -7,13 +15,6 @@ use futures::{
     Sink, Stream, StreamExt,
 };
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt::Debug,
-    io,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
     client_async_with_config,
@@ -351,9 +352,10 @@ fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> O
 
 #[cfg(all(test, feature = "sources-utils-tls"))]
 mod tests {
+    use std::net::SocketAddr;
+
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
-    use std::net::SocketAddr;
     use tokio::time::timeout;
     use tokio_tungstenite::{
         accept_async,
@@ -363,6 +365,7 @@ mod tests {
         },
     };
 
+    use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
         event::{Event, Value as EventValue},
@@ -370,8 +373,6 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
         tls::{self, TlsConfig, TlsEnableableConfig},
     };
-
-    use super::*;
 
     #[test]
     fn encodes_raw_logs() {

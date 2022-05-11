@@ -1,6 +1,8 @@
-use crate::Value;
-use chrono::SecondsFormat;
 use std::{fmt, string::ToString};
+
+use chrono::SecondsFormat;
+
+use crate::Value;
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

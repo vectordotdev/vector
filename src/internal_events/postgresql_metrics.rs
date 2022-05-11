@@ -1,6 +1,9 @@
-use super::prelude::{error_stage, error_type};
+use std::time::Instant;
+
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectError<'a> {

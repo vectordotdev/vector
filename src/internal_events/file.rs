@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {

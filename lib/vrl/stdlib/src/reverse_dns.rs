@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 

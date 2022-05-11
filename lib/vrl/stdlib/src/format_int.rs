@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn format_int(value: Value, base: Option<Value>) -> Resolved {

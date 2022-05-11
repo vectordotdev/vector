@@ -8,16 +8,17 @@ mod character_delimited;
 mod length_delimited;
 mod newline_delimited;
 
-pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
+use std::fmt::Debug;
+
 pub use character_delimited::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions,
 };
+use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedEncoder, LengthDelimitedEncoderConfig};
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
-
-use dyn_clone::DynClone;
-use std::fmt::Debug;
 use tokio_util::codec::LinesCodecError;
+
+pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
 
 /// An error that occurred while framing bytes.
 pub trait FramingError: std::error::Error + Send + Sync {}

@@ -1,5 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;

@@ -1,6 +1,7 @@
+use indoc::indoc;
+
 use super::*;
 use crate::config::ConfigBuilder;
-use indoc::indoc;
 
 #[tokio::test]
 async fn parse_no_input() {

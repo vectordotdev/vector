@@ -1,3 +1,4 @@
+use ::value::Value;
 use tracing::{debug, error, info, trace, warn};
 use vrl::prelude::*;
 
@@ -192,8 +193,9 @@ impl Expression for LogFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tracing_test::traced_test;
+
+    use super::*;
 
     test_function![
         log => Log;

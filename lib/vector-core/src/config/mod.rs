@@ -1,6 +1,7 @@
+use std::{fmt, num::NonZeroUsize};
+
 use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
-use std::{fmt, num::NonZeroUsize};
 
 mod global_options;
 mod id;

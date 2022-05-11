@@ -36,6 +36,14 @@ impl Inner {
     fn invalidate(&self) {
         self.size_cache.store(None);
     }
+
+    fn as_value(&self) -> &Value {
+        &self.fields
+    }
+
+    fn as_value_mut(&mut self) -> &mut Value {
+        &mut self.fields
+    }
 }
 
 impl ByteSizeOf for Inner {
@@ -113,6 +121,14 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    pub fn value(&self) -> &Value {
+        self.inner.as_ref().as_value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        Arc::make_mut(&mut self.inner).as_value_mut()
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         &self.metadata
     }

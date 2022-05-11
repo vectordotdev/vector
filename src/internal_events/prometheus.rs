@@ -1,12 +1,13 @@
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use hyper::StatusCode;
 use metrics::counter;
 #[cfg(feature = "sources-prometheus")]
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, http_error_code};
 
 #[derive(Debug)]
 pub struct PrometheusEventsReceived {

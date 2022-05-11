@@ -1,19 +1,19 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use crate::internal_events::prelude::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
-    use super::*;
-    use crate::sources::aws_s3::sqs::ProcessingError;
     use aws_sdk_sqs::model::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
     };
+
+    use super::*;
+    use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
     pub struct SqsMessageReceiveError<'a, E> {

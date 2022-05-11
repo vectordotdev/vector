@@ -1,7 +1,8 @@
-use aws_sdk_firehose::error::PutRecordBatchError;
-use aws_sdk_firehose::types::SdkError;
 use std::task::{Context, Poll};
 
+use aws_sdk_firehose::error::PutRecordBatchError;
+use aws_sdk_firehose::types::SdkError;
+use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use tracing::Instrument;
@@ -11,7 +12,6 @@ use crate::{
     event::EventStatus, internal_events::AwsBytesSent,
     sinks::aws_kinesis_firehose::request_builder::KinesisRequest,
 };
-use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
 
 #[derive(Clone)]
 pub struct KinesisService {

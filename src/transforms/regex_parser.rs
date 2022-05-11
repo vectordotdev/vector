@@ -284,13 +284,14 @@ impl FunctionTransform for RegexParser {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::RegexParserConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {

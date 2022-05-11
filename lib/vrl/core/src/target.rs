@@ -94,9 +94,10 @@ impl Target for Value {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
+    use lookup::{FieldBuf, SegmentBuf};
+
     use super::*;
     use crate::value;
-    use lookup::{FieldBuf, SegmentBuf};
 
     #[test]
     fn target_get() {

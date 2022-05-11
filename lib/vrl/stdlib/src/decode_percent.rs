@@ -1,3 +1,4 @@
+use ::value::Value;
 use percent_encoding::percent_decode;
 use vrl::prelude::*;
 

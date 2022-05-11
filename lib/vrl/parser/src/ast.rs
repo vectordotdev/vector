@@ -1,8 +1,3 @@
-#[cfg(feature = "fuzz")]
-use arbitrary::Arbitrary;
-use diagnostic::Span;
-use lookup::LookupBuf;
-use ordered_float::NotNan;
 use std::{
     collections::BTreeMap,
     fmt,
@@ -11,6 +6,12 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
+
+#[cfg(feature = "fuzz")]
+use arbitrary::Arbitrary;
+use diagnostic::Span;
+use lookup::LookupBuf;
+use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
 

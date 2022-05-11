@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{
@@ -37,7 +38,6 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use async_stream::stream;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
