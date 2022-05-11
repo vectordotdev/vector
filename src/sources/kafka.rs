@@ -188,8 +188,7 @@ async fn kafka_source(
         })
     });
     let mut stream = consumer.stream().take_until(shutdown);
-    let schema = log_schema();
-    let keys = Keys::from(&schema, &config);
+    let keys = Keys::from(log_schema(), &config);
 
     while let Some(message) = stream.next().await {
         match message {
@@ -265,7 +264,7 @@ fn parse_stream<'a>(
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::new(payload, decoder.clone());
+    let mut stream = FramedRead::new(payload, decoder);
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
