@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::{
     codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -92,7 +91,7 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {

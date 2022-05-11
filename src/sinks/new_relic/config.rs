@@ -1,3 +1,10 @@
+use std::{fmt::Debug, sync::Arc};
+
+use futures::FutureExt;
+use http::Uri;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
+
 use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
@@ -10,11 +17,6 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use futures::FutureExt;
-use http::Uri;
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc};
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]

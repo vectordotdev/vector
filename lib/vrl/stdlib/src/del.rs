@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {

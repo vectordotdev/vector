@@ -1,3 +1,4 @@
+use ::value::Value;
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 

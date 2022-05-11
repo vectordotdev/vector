@@ -9,9 +9,9 @@ use std::{
     sync::Arc,
 };
 
-use atomig::{Atomic, Ordering};
 use bytes::Bytes;
 use chrono::Utc;
+use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
@@ -29,19 +29,27 @@ struct Inner {
     fields: Value,
 
     #[serde(skip)]
-    size_cache: Atomic<Option<NonZeroUsize>>,
+    size_cache: AtomicCell<Option<NonZeroUsize>>,
 }
 
 impl Inner {
     fn invalidate(&self) {
-        self.size_cache.store(None, Ordering::Relaxed);
+        self.size_cache.store(None);
+    }
+
+    fn as_value(&self) -> &Value {
+        &self.fields
+    }
+
+    fn as_value_mut(&mut self) -> &mut Value {
+        &mut self.fields
     }
 }
 
 impl ByteSizeOf for Inner {
     fn size_of(&self) -> usize {
         self.size_cache
-            .load(Ordering::Relaxed)
+            .load()
             .unwrap_or_else(|| {
                 let size = size_of::<Self>() + self.allocated_bytes();
                 // The size of self will always be non-zero, and
@@ -49,7 +57,7 @@ impl ByteSizeOf for Inner {
                 // since `usize` has a range the same as pointer
                 // space. Hence, the expect below cannot fail.
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
-                self.size_cache.store(Some(size), Ordering::Relaxed);
+                self.size_cache.store(Some(size));
                 size
             })
             .into()
@@ -77,7 +85,7 @@ impl Default for Inner {
         Self {
             // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
             fields: Value::Object(Default::default()),
-            size_cache: None.into(),
+            size_cache: Default::default(),
         }
     }
 }
@@ -86,7 +94,7 @@ impl From<BTreeMap<String, Value>> for Inner {
     fn from(fields: BTreeMap<String, Value>) -> Self {
         Self {
             fields: Value::Object(fields),
-            size_cache: None.into(),
+            size_cache: Default::default(),
         }
     }
 }
@@ -113,6 +121,14 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    pub fn value(&self) -> &Value {
+        self.inner.as_ref().as_value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        Arc::make_mut(&mut self.inner).as_value_mut()
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         &self.metadata
     }
@@ -196,6 +212,10 @@ impl LogEvent {
 
     pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
         self.inner.fields.get_by_path(path)
+    }
+
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.fields_mut().get_by_path_mut(path)
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {

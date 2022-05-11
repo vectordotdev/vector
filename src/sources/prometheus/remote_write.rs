@@ -135,7 +135,10 @@ mod test {
     use crate::{
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
-        test_util::{self, components},
+        test_util::{
+            self,
+            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+        },
         tls::MaybeTlsSettings,
         SourceSender,
     };
@@ -156,52 +159,53 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
-        components::init_test();
-        let address = test_util::next_addr();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let address = test_util::next_addr();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let proto = MaybeTlsSettings::from_config(&tls, true)
-            .unwrap()
-            .http_protocol_name();
-        let source = PrometheusRemoteWriteConfig {
-            address,
-            auth: None,
-            tls: tls.clone(),
-            acknowledgements: AcknowledgementsConfig::default(),
-        };
-        let source = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(source);
+            let proto = MaybeTlsSettings::from_config(&tls, true)
+                .unwrap()
+                .http_protocol_name();
+            let source = PrometheusRemoteWriteConfig {
+                address,
+                auth: None,
+                tls: tls.clone(),
+                acknowledgements: AcknowledgementsConfig::default(),
+            };
+            let source = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(source);
 
-        let sink = RemoteWriteConfig {
-            endpoint: format!("{}://localhost:{}/", proto, address.port()),
-            tls: tls.map(|tls| tls.options),
-            ..Default::default()
-        };
-        let (sink, _) = sink
-            .build(SinkContext::new_test())
-            .await
-            .expect("Error building config.");
+            let sink = RemoteWriteConfig {
+                endpoint: format!("{}://localhost:{}/", proto, address.port()),
+                tls: tls.map(|tls| tls.options),
+                ..Default::default()
+            };
+            let (sink, _) = sink
+                .build(SinkContext::new_test())
+                .await
+                .expect("Error building config.");
 
-        let events = make_events();
-        let events_copy = events.clone();
-        let mut output = test_util::spawn_collect_ready(
-            async move {
-                sink.run_events(events_copy).await.unwrap();
-            },
-            rx,
-            1,
-        )
+            let events = make_events();
+            let events_copy = events.clone();
+            let mut output = test_util::spawn_collect_ready(
+                async move {
+                    sink.run_events(events_copy).await.unwrap();
+                },
+                rx,
+                1,
+            )
+            .await;
+
+            // The MetricBuffer used by the sink may reorder the metrics, so
+            // put them back into order before comparing.
+            output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
+
+            vector_common::assert_event_data_eq!(events, output);
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
-
-        // The MetricBuffer used by the sink may reorder the metrics, so
-        // put them back into order before comparing.
-        output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
-
-        vector_common::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -249,12 +253,10 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use futures_util::StreamExt;
     use tokio::time::Duration;
-    use vector_core::event::into_event_stream;
 
     use super::*;
-    use crate::{test_util, test_util::components, SourceSender};
+    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
 
     fn source_receive_address() -> String {
         std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
@@ -269,7 +271,6 @@ mod integration_tests {
         //
         // It could be nice to split up the Prometheus integration tests in the future, or
         // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
-        components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: source_receive_address().parse().unwrap(),
             auth: None,
@@ -277,19 +278,12 @@ mod integration_tests {
             acknowledgements: AcknowledgementsConfig::default(),
         };
 
-        let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(source);
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let rx = rx.into_stream().flat_map(into_event_stream);
-        let events = test_util::collect_ready(rx).await;
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(5),
+            &HTTP_PUSH_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
-
-        components::SOURCE_TESTS.assert(&["http_path"]);
     }
 }

@@ -3,7 +3,6 @@
 
 use aws_sdk_kinesis::model::{Record, ShardIteratorType};
 use aws_sdk_kinesis::types::DateTime;
-
 use tokio::time::{sleep, Duration};
 
 use super::*;

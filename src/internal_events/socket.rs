@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants
@@ -17,6 +18,26 @@ impl SocketMode {
             Self::Udp => "udp",
             Self::Unix => "unix",
         }
+    }
+}
+#[derive(Debug)]
+pub struct SocketBytesReceived {
+    pub mode: SocketMode,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for SocketBytesReceived {
+    fn emit(self) {
+        let protocol = self.mode.as_str().to_string();
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = protocol.as_str(),
+        );
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => protocol,
+        );
     }
 }
 

@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -62,29 +62,6 @@ impl<'a> InternalEvent for FileIoError<'a> {
             "component_errors_total", 1,
             "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::SENDING,
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct FileExpiringError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
-    fn emit(self) {
-        error!(
-            message = "Failed expiring a file.",
-            error = %self.error,
-            error_code = "expiring",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "expiring",
-            "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
     }

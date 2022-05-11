@@ -31,8 +31,6 @@ mod common;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
-#[cfg(feature = "sinks-console")]
-mod console;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -86,7 +84,7 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
-#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
+#[cfg(feature = "sinks-nats")]
 mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
@@ -129,7 +127,6 @@ mod splunk_hec;
 mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
-mod stdin;
 #[cfg(feature = "sources-syslog")]
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
@@ -151,8 +148,6 @@ mod websocket;
 ))]
 mod file;
 mod windows;
-
-pub mod kubernetes;
 
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
@@ -224,7 +219,6 @@ pub(crate) use self::geoip::*;
     feature = "sources-utils-http-encoding",
     feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
-    feature = "sources-aws_ecs_metrics",
 ))]
 pub(crate) use self::http::*;
 #[cfg(feature = "sources-internal_logs")]
@@ -249,7 +243,7 @@ pub(crate) use self::loki::*;
 pub(crate) use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
-#[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
+#[cfg(feature = "sinks-nats")]
 pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
@@ -292,8 +286,6 @@ pub(crate) use self::splunk_hec::*;
 pub(crate) use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-stdin")]
-pub(crate) use self::stdin::*;
 #[cfg(feature = "sources-syslog")]
 pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]

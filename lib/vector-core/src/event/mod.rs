@@ -5,14 +5,9 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use vector_buffers::EventCount;
-use vector_common::EventDataEq;
-
-use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
+use bytes::Bytes;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -21,12 +16,16 @@ pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
+use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
+use vector_buffers::EventCount;
+use vector_common::EventDataEq;
+#[cfg(feature = "vrl")]
+pub use vrl_target::VrlImmutableTarget;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
-#[cfg(feature = "vrl")]
-pub use vrl_target::VrlImmutableTarget;
+use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;

@@ -54,7 +54,10 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
-                        encoding: sinks::file::Encoding::Text.into(),
+                        encoding: sinks::util::encoding::EncodingConfig::from(
+                            sinks::file::Encoding::Text,
+                        )
+                        .into(),
                         compression: sinks::file::Compression::None,
                         acknowledgements: Default::default(),
                     },
@@ -68,8 +71,6 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                     options.create(true).write(true);
 
                     let input = options.open(input).await.unwrap();
-                    let input = FramedWrite::new(input, BytesCodec::new())
-                        .sink_map_err(|e| panic!("{:?}", e));
 
                     (topology, input)
                 });
@@ -77,11 +78,15 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
             },
             |(rt, topology, input)| {
                 rt.block_on(async move {
-                    let lines = random_lines(line_size).take(num_lines).map(|mut line| {
+                    let mut sink = FramedWrite::new(input, BytesCodec::new());
+                    let raw_lines = random_lines(line_size).take(num_lines).map(|mut line| {
                         line.push('\n');
-                        Ok(Bytes::from(line))
+                        Bytes::from(line)
                     });
-                    let _ = stream::iter(lines).forward(input).await.unwrap();
+                    let mut lines = stream::iter(raw_lines);
+                    while let Some(line) = lines.next().await {
+                        sink.send(line).await.unwrap();
+                    }
 
                     topology.stop().await;
                 });

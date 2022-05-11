@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use uaparser::UserAgentParser as UAParser;
 use vrl::{function::Error, prelude::*};

@@ -1,14 +1,17 @@
-use crate::expression::assignment::Target;
 use lookup::LookupBuf;
+
+#[cfg(feature = "expr-assignment")]
+use crate::expression::assignment::Target;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
-    Internal(crate::parser::Ident, Option<lookup::LookupBuf>),
-    External(lookup::LookupBuf),
-    Stack(lookup::LookupBuf),
+    Internal(crate::parser::Ident, Option<LookupBuf>),
+    External(LookupBuf),
+    Stack(LookupBuf),
     None,
 }
 
+#[cfg(feature = "expr-assignment")]
 impl From<&Target> for Variable {
     fn from(target: &Target) -> Self {
         match target {

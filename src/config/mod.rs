@@ -871,6 +871,56 @@ mod tests {
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn enterprise_tags_ignored_sha256_hashes() {
+        let config1: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                tag = "value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        let config2: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                another_tag = "another value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
 }
 
 #[cfg(all(

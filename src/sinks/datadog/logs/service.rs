@@ -13,6 +13,7 @@ use hyper::Body;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -55,6 +56,7 @@ pub struct LogApiRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
+    pub uncompressed_size: usize,
 }
 
 impl Ackable for LogApiRequest {
@@ -88,6 +90,8 @@ pub struct LogApiResponse {
     event_status: EventStatus,
     count: usize,
     events_byte_size: usize,
+    raw_byte_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for LogApiResponse {
@@ -101,6 +105,13 @@ impl DriverResponse for LogApiResponse {
             byte_size: self.events_byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.raw_byte_size,
+            protocol: &self.protocol,
+        })
     }
 }
 
@@ -156,13 +167,16 @@ impl Service<LogApiRequest> for LogApiService {
             http_request
         };
 
+        let count = request.batch_size;
+        let events_byte_size = request.events_byte_size;
+        let raw_byte_size = request.uncompressed_size;
+        let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
+
         let http_request = http_request
             .header(CONTENT_LENGTH, request.body.len())
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 
-        let count = request.batch_size;
-        let events_byte_size = request.events_byte_size;
         Box::pin(async move {
             match client.call(http_request).in_current_span().await {
                 Ok(response) => {
@@ -185,6 +199,8 @@ impl Service<LogApiRequest> for LogApiService {
                             event_status: EventStatus::Delivered,
                             count,
                             events_byte_size,
+                            raw_byte_size,
+                            protocol,
                         }),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),

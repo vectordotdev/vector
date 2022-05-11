@@ -2,17 +2,19 @@ use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
+use value::Value;
 
 use crate::{
-    expression::{Expr, Literal, Resolved},
+    expression::{Expr, Noop, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
     },
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     value::kind::DefaultValue,
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -58,10 +60,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
 
@@ -112,10 +111,7 @@ impl Assignment {
                 let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 ok.insert_type_def(local, external, type_def, value);
 
@@ -140,10 +136,28 @@ impl Assignment {
 
     pub(crate) fn noop() -> Self {
         let target = Target::Noop;
-        let expr = Box::new(Expr::Literal(Literal::Null));
+        let expr = Box::new(Expr::Noop(Noop));
         let variant = Variant::Single { target, expr };
 
         Self { variant }
+    }
+
+    /// Get a list of targets for this assignment.
+    ///
+    /// For regular assignments, this contains a single target, for infallible
+    /// assignments, it'll contain both the `ok` and `err` target.
+    pub(crate) fn targets(&self) -> Vec<Target> {
+        let mut targets = Vec::with_capacity(2);
+
+        match &self.variant {
+            Variant::Single { target, .. } => targets.push(target.clone()),
+            Variant::Infallible { ok, err, .. } => {
+                targets.push(ok.clone());
+                targets.push(err.clone());
+            }
+        }
+
+        targets
     }
 }
 
@@ -474,14 +488,6 @@ where
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Details {
-    pub(crate) type_def: TypeDef,
-    pub(crate) value: Option<Value>,
 }
 
 // -----------------------------------------------------------------------------

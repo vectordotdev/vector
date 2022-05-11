@@ -1,6 +1,8 @@
 // We allow dead code because some of the things we're testing are meant to ensure that the macros do the right thing
 // for codegen i.e. not doing codegen for fields that `serde` is going to skip, etc.
 #![allow(dead_code)]
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
 
 use std::{
     collections::HashMap,

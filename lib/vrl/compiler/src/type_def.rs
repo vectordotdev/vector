@@ -35,7 +35,7 @@ use value::{
         nest::{CoalescedPath, Strategy},
         Collection, Field, Index,
     },
-    Kind,
+    Kind, Value,
 };
 
 /// Properties for a given expression that express the expected outcome of the
@@ -392,4 +392,10 @@ impl From<TypeDef> for Kind {
     fn from(type_def: TypeDef) -> Self {
         type_def.kind
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Details {
+    pub(crate) type_def: TypeDef,
+    pub(crate) value: Option<Value>,
 }

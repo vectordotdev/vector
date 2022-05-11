@@ -1,5 +1,6 @@
-use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::collections::BTreeMap;
+
+use lookup::lookup_v2::{BorrowedSegment, Path};
 
 use super::Value;
 

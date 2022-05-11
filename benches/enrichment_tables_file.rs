@@ -3,8 +3,8 @@ use std::{collections::BTreeMap, time::SystemTime};
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use enrichment::Case;
+use value::Value;
 use vector::enrichment_tables::{file::File, Condition, Table};
-use vrl::Value;
 
 criterion_group!(
     name = benches;

@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{
@@ -30,7 +31,7 @@ use crate::{
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{
-        BytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
     },
     kafka,
@@ -38,7 +39,6 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use async_stream::stream;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -207,9 +207,11 @@ async fn kafka_source(
                 emit!(KafkaReadError { error });
             }
             Ok(msg) => {
-                emit!(BytesReceived {
+                emit!(KafkaBytesReceived {
                     byte_size: msg.payload_len(),
                     protocol: "tcp",
+                    topic: msg.topic(),
+                    partition: msg.partition(),
                 });
 
                 let payload = match msg.payload() {
@@ -241,7 +243,7 @@ async fn kafka_source(
                     }
                 }
 
-                let msg_topic = Bytes::copy_from_slice(msg.topic().as_bytes());
+                let msg_topic = msg.topic().to_string();
                 let msg_partition = msg.partition();
                 let msg_offset = msg.offset();
 
@@ -262,6 +264,8 @@ async fn kafka_source(
                                 emit!(KafkaEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
+                                    topic: msg_topic.as_str(),
+                                    partition: msg_partition,
                                 });
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
@@ -478,7 +482,7 @@ mod integration_test {
     use crate::{
         event::{EventArray, EventContainer},
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string},
+        test_util::{collect_n, components::assert_source_compliance, random_string},
         SourceSender,
     };
 
@@ -540,11 +544,28 @@ mod integration_test {
 
         let now = send_events(topic.clone(), 10).await;
 
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
-        let events = collect_n(rx, 10).await;
-        drop(trigger_shutdown);
-        shutdown_done.await;
+        send_events(
+            topic.clone(),
+            10,
+            "my key",
+            "my message",
+            now.timestamp_millis(),
+            "my header",
+            "my header value",
+        )
+        .await;
+
+        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let consumer = create_consumer(&config).unwrap();
+            let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
+            let events = collect_n(rx, 10).await;
+            drop(trigger_shutdown);
+            shutdown_done.await;
+
+            events
+        })
+        .await;
 
         let offset = fetch_tpl_offset(&group_id, &topic, 0);
         assert_eq!(offset, Offset::from_raw(10));

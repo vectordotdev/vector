@@ -32,12 +32,12 @@ macro_rules! test_type_def {
 #[macro_export]
 macro_rules! func_args {
     () => (
-        ::std::collections::HashMap::<&'static str, $crate::Value>::default()
+        ::std::collections::HashMap::<&'static str, ::value::Value>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$((stringify!($k), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::HashMap<&'static str, $crate::Value>>()
+            .collect::<::std::collections::HashMap<&'static str, ::value::Value>>()
     };
 }
 
@@ -52,10 +52,10 @@ macro_rules! bench_function {
                     let mut local = $crate::state::LocalEnv::default();
                     let mut external = $crate::state::ExternalEnv::default();
 
-                    let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let expression = expression.unwrap();
                     let mut runtime_state = $crate::state::Runtime::default();
-                    let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                    let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
                     let tz = vector_common::TimeZone::Named(chrono_tz::Tz::UTC);
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
@@ -93,11 +93,11 @@ macro_rules! test_function {
                 let mut local = $crate::state::LocalEnv::default();
                 let mut external = $crate::state::ExternalEnv::default();
 
-                let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                        let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
@@ -114,7 +114,7 @@ macro_rules! test_function {
                         assert_eq!(err
                                    // We have to map to a value just to make sure the types match even though
                                    // it will never be used.
-                                   .map(|_| Value::Null)
+                                   .map(|_| ::value::Value::Null)
                                    .map_err(|e| format!("{:#}", e.message())), want);
                     }
                 }
@@ -126,7 +126,7 @@ macro_rules! test_function {
                     Ok(mut anys) => {
                         let mut args = $crate::vm::compile_arguments(&$func, &mut args, &anys);
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                        let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
                         let got_value_vm = $func.call_by_vm(&mut ctx, &mut args)
@@ -143,7 +143,7 @@ macro_rules! test_function {
                         assert_eq!(err
                                    // We have to map to a value just to make sure the types match even though
                                    // it will never be used.
-                                   .map(|_| Value::Null)
+                                   .map(|_| ::value::Value::Null)
                                    .map_err(|e| format!("{:#}", e.message())), want);
                     }
                 }

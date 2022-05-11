@@ -1,5 +1,6 @@
-use diagnostic::Span;
 use std::fmt;
+
+use diagnostic::Span;
 
 use crate::ast::{Expr, Ident, Literal::RawString, Node, Op, Opcode};
 

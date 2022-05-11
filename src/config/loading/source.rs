@@ -1,7 +1,9 @@
-use super::{ComponentHint, Loader, Process};
-use serde_toml_merge::merge_into_table;
 use std::io::Read;
+
+use serde_toml_merge::merge_into_table;
 use toml::{map::Map, value::Table};
+
+use super::{ComponentHint, Loader, Process};
 
 pub struct SourceLoader {
     table: Table,

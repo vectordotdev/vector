@@ -10,11 +10,11 @@ RUN apt-get update \
   && apt-get remove --autoremove -y apt-utils apt-transport-https lsb-release ca-certificates curl wget \
   && rm -rf /var/list/apt/lists/*
 
-COPY named.conf.local /etc/bind/
+COPY named.conf.local named.conf.options.template /etc/bind/
 COPY db.example.com /var/lib/bind/
 COPY nsupdate.txt /bind3/etc/bind/
-COPY named.conf.options.template /etc/bind/
-COPY configure_bind.sh /etc/bind/
-RUN chmod +x /etc/bind/configure_bind.sh
+COPY configure_bind.sh run_bind.sh /etc/bind/
+RUN chmod +x /etc/bind/configure_bind.sh /etc/bind/run_bind.sh
+RUN /etc/bind/configure_bind.sh
 
-CMD ["/etc/bind/configure_bind.sh"]
+CMD ["/etc/bind/run_bind.sh"]

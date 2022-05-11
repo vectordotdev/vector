@@ -1,7 +1,7 @@
-use aws_sdk_firehose::model::Record;
-use aws_sdk_firehose::types::Blob;
 use std::io;
 
+use aws_sdk_firehose::model::Record;
+use aws_sdk_firehose::types::Blob;
 use bytes::Bytes;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 

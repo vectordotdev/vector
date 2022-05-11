@@ -13,7 +13,8 @@ use crate::Test;
 ///
 /// This mostly consists of functions that have a non-deterministic result.
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
-    "encrypt", // uses random_bytes for the IV
+    "type_def", // Not supported on VM runtime
+    "encrypt",  // uses random_bytes for the IV
     "random_bytes",
     "uuid_v4",
     "strip_ansi_escape_codes",
@@ -121,7 +122,7 @@ fn examples_to_tests(
 
 impl Test {
     fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
-        use vrl::Value;
+        use ::value::Value;
 
         let Example {
             title,

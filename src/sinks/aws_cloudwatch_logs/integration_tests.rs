@@ -4,11 +4,17 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use chrono::Duration;
 use futures::StreamExt;
+use http::Uri;
 use pretty_assertions::assert_eq;
 
 use super::*;
+use crate::aws::create_client;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
     event::{Event, Value},
@@ -19,13 +25,6 @@ use crate::{
     template::Template,
     test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
 };
-
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use http::Uri;
 
 const GROUP_NAME: &str = "vector-cw";
 
@@ -454,7 +453,7 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Region::new("localstack");
+    let region = Some(Region::new("localstack"));
     let watchlogs_address = watchlogs_address();
     let endpoint = Some(Endpoint::immutable(
         Uri::from_str(&watchlogs_address).unwrap(),
