@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::{
@@ -113,7 +114,8 @@ impl Function for FindEnrichmentTableRecords {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {

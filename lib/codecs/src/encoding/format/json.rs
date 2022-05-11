@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use vector_core::{event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema};
 
 /// Config used to build a `JsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -16,6 +16,11 @@ impl JsonSerializerConfig {
     /// Build the `JsonSerializer` from this configuration.
     pub const fn build(&self) -> JsonSerializer {
         JsonSerializer
+    }
+
+    /// The data type of events that are accepted by `JsonSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema required by the serializer.
@@ -53,10 +58,11 @@ impl Encoder<Event> for JsonSerializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::BytesMut;
     use vector_common::btreemap;
     use vector_core::event::Value;
+
+    use super::*;
 
     #[test]
     fn serialize_json() {

@@ -1,15 +1,22 @@
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use std::sync::Arc;
-use tower::ServiceBuilder;
 
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
+use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
+use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
-use vector_core::config::log_schema;
+use tower::ServiceBuilder;
 
 use crate::{
     aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
@@ -26,10 +33,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
 
 pub struct CloudwatchLogsClientBuilder;
 
@@ -59,6 +62,13 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
         sleep_impl: Arc<dyn AsyncSleep>,
     ) -> Self::ConfigBuilder {
         builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(
@@ -146,7 +156,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

@@ -2,14 +2,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::time::Duration;
-
-use crate::config::SinkOuter;
-
-use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
-use crate::{config::Config, test_util::start_topology};
-
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
+
+use crate::config::SinkOuter;
+use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
+use crate::{config::Config, test_util::start_topology};
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
@@ -204,14 +202,15 @@ async fn wait_until_expected(source_counter: impl AsRef<AtomicUsize>, expected: 
 }
 
 mod test_sink {
-    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
-    use crate::event::Event;
-    use crate::sinks::util::StreamSink;
-    use crate::sinks::{Healthcheck, VectorSink};
     use async_trait::async_trait;
     use futures::stream::BoxStream;
     use futures::{FutureExt, StreamExt};
     use serde::{Deserialize, Serialize};
+
+    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
+    use crate::event::Event;
+    use crate::sinks::util::StreamSink;
+    use crate::sinks::{Healthcheck, VectorSink};
 
     #[derive(Debug)]
     struct TestBackpressureSink {
@@ -259,14 +258,16 @@ mod test_sink {
 }
 
 mod test_source {
-    use crate::config::{DataType, Output, SourceConfig, SourceContext};
-    use crate::event::Event;
-    use crate::sources::Source;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
     use async_trait::async_trait;
     use futures::FutureExt;
     use serde::{Deserialize, Serialize};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
+
+    use crate::config::{DataType, Output, SourceConfig, SourceContext};
+    use crate::event::Event;
+    use crate::sources::Source;
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct TestBackpressureSourceConfig {

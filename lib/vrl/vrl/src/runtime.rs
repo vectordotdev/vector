@@ -1,13 +1,15 @@
+use std::{error::Error, fmt, sync::Arc};
+
 use compiler::{
     state::{ExternalEnv, LocalEnv},
     vm::{OpCode, Vm},
     ExpressionError, Function,
 };
 use lookup::LookupBuf;
-use std::{error::Error, fmt, sync::Arc};
+use value::Value;
 use vector_common::TimeZone;
 
-use crate::{state, Context, Program, Target, Value};
+use crate::{state, Context, Program, Target};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
@@ -75,7 +77,7 @@ impl Runtime {
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
         match target.target_get(&self.root_lookup) {
-            Ok(Some(Value::Object(_))) => {}
+            Ok(Some(&Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(
                     format!(
@@ -98,19 +100,13 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state, timezone);
+        let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        let mut values = program
-            .iter()
-            .map(|expr| {
-                expr.resolve(&mut context).map_err(|err| match err {
-                    ExpressionError::Abort { .. } => Terminate::Abort(err),
-                    err @ ExpressionError::Error { .. } => Terminate::Error(err),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(values.pop().unwrap_or(Value::Null))
+        program.resolve(&mut ctx).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
+            ExpressionError::Abort { .. } => Terminate::Abort(err),
+            err @ ExpressionError::Error { .. } => Terminate::Error(err),
+        })
     }
 
     pub fn compile(
@@ -122,9 +118,7 @@ impl Runtime {
         let mut local = LocalEnv::default();
         let mut vm = Vm::new(Arc::new(fns));
 
-        for expr in program.iter() {
-            expr.compile_to_vm(&mut vm, (&mut local, external))?;
-        }
+        program.compile_to_vm(&mut vm, (&mut local, external))?;
 
         vm.write_opcode(OpCode::Return);
 
@@ -140,6 +134,7 @@ impl Runtime {
     ) -> Result<Value, Terminate> {
         let mut context = Context::new(target, &mut self.state, timezone);
         vm.interpret(&mut context).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),
         })

@@ -1,21 +1,25 @@
 pub mod auth;
 pub mod region;
 
-use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use std::sync::Arc;
+use std::time::Duration;
+
 pub use auth::AwsAuthentication;
+use aws_config::meta::region::ProvideRegion;
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::erase::DynConnector;
 use aws_smithy_client::SdkError;
 use aws_smithy_http::endpoint::Endpoint;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
-use std::sync::Arc;
-use std::time::Duration;
+
+use crate::config::ProxyConfig;
+use crate::http::{build_proxy_connector, build_tls_connector};
+use crate::tls::{MaybeTlsSettings, TlsConfig};
 
 static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
 
@@ -78,17 +82,32 @@ pub trait ClientBuilder {
         sleep_impl: Arc<dyn AsyncSleep>,
     ) -> Self::ConfigBuilder;
 
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder;
+
     fn client_from_conf_conn(builder: Self::ConfigBuilder, connector: DynConnector)
         -> Self::Client;
 }
 
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
-    region: Region,
+    region: Option<Region>,
     endpoint: Option<Endpoint>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<T::Client> {
+    // The default credentials chains will look for a region if not given but we'd like to
+    // error up front if later SDK calls will fail due to lack of region configuration
+    let region = match region {
+        Some(region) => Ok(region),
+        None => aws_config::default_provider::region::default_provider()
+            .region()
+            .await
+            .ok_or("Could not determine region from Vector configuration or default providers"),
+    }?;
+
     let mut config_builder =
         T::create_config_builder(auth.credentials_provider(region.clone()).await?);
 
@@ -111,6 +130,8 @@ pub async fn create_client<T: ClientBuilder>(
     };
 
     config_builder = T::with_sleep_impl(config_builder, Arc::new(TokioSleep));
+    // we disable retries because we have our own retry layer wired together with ARC to backoff
+    config_builder = T::with_retry_config(config_builder, RetryConfig::disabled());
 
     Ok(T::client_from_conf_conn(config_builder, connector))
 }

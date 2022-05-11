@@ -6,12 +6,13 @@ use codecs::{
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{VectorEventReceived, VectorProtoDecodeError},
+    internal_events::{BytesReceived, VectorEventReceived, VectorProtoDecodeError},
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
@@ -98,9 +99,16 @@ struct VectorDeserializer;
 impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "tcp",
+        });
+
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(VectorEventReceived { byte_size });
+                emit!(VectorEventReceived {
+                    byte_size: event.size_of()
+                });
                 Ok(smallvec![event])
             }
             Err(error) => {
@@ -161,7 +169,11 @@ mod test {
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, trace_init, wait_for_tcp,
+        },
         tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
@@ -210,37 +222,43 @@ mod test {
 
     #[tokio::test]
     async fn it_works_with_vector_sink() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            VectorConfig::from_address(addr.into()),
-            SinkConfig::from_address(format!("localhost:{}", addr.port())),
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                VectorConfig::from_address(addr.into()),
+                SinkConfig::from_address(format!("localhost:{}", addr.port())),
+            )
+            .await;
+        })
         .await;
     }
 
     #[tokio::test]
     async fn it_works_with_vector_sink_tls() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            {
-                let mut config = VectorConfig::from_address(addr.into());
-                config.set_tls(Some(TlsEnableableConfig::test_config()));
-                config
-            },
-            {
-                let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
-                config.set_tls(Some(TlsEnableableConfig {
-                    enabled: Some(true),
-                    options: TlsConfig {
-                        verify_certificate: Some(false),
-                        ..Default::default()
-                    },
-                }));
-                config
-            },
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                {
+                    let mut config = VectorConfig::from_address(addr.into());
+                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config
+                },
+                {
+                    let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
+                    config.set_tls(Some(TlsEnableableConfig {
+                        enabled: Some(true),
+                        options: TlsConfig {
+                            verify_certificate: Some(false),
+                            ..Default::default()
+                        },
+                    }));
+                    config
+                },
+            )
+            .await;
+        })
         .await;
     }
 

@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn ip_aton(value: Value) -> Resolved {

@@ -14,7 +14,10 @@ use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
-    test_util::random_string,
+    test_util::{
+        components::{assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        random_string,
+    },
     SourceSender,
 };
 
@@ -66,56 +69,59 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 
 #[tokio::test]
 pub(crate) async fn test() {
-    let sqs_client = get_sqs_client().await;
-    let queue_name = gen_queue_name();
-    let queue_url = ensure_queue(&queue_name, &sqs_client)
-        .await
-        .queue_url
-        .expect("Create queue should return the url");
-
-    let num_events = 3;
-    send_test_events(num_events, &queue_url, &sqs_client).await;
-
-    let config = AwsSqsConfig {
-        region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
-        auth: AwsAuthentication::test_auth(),
-        queue_url: queue_url.clone(),
-        ..Default::default()
-    };
-
-    let (tx, rx) = SourceSender::new_test();
-    tokio::spawn(async move {
-        config
-            .build(SourceContext::new_test(tx, None))
+    assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
+        let sqs_client = get_sqs_client().await;
+        let queue_name = gen_queue_name();
+        let queue_url = ensure_queue(&queue_name, &sqs_client)
             .await
-            .unwrap()
-            .await
-            .unwrap()
-    });
+            .queue_url
+            .expect("Create queue should return the url");
 
-    let mut expected_messages = HashSet::new();
-    for i in 0..num_events {
-        expected_messages.insert(calculate_message(i));
-    }
+        let num_events = 3;
+        send_test_events(num_events, &queue_url, &sqs_client).await;
 
-    let events: Vec<Event> = timeout(
-        Duration::from_secs(10),
-        rx.take(num_events as usize).collect(),
-    )
-    .await
-    .unwrap();
+        let config = AwsSqsConfig {
+            region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
+            auth: AwsAuthentication::test_auth(),
+            queue_url: queue_url.clone(),
+            ..Default::default()
+        };
 
-    for event in events {
-        let message = event
-            .as_log()
-            .get(log_schema().message_key())
-            .unwrap()
-            .to_string_lossy();
-        if !expected_messages.remove(&message) {
-            panic!("Received unexpected message: {:?}", message);
+        let (tx, rx) = SourceSender::new_test();
+        tokio::spawn(async move {
+            config
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+        });
+
+        let mut expected_messages = HashSet::new();
+        for i in 0..num_events {
+            expected_messages.insert(calculate_message(i));
         }
-    }
-    assert!(expected_messages.is_empty());
+
+        let events: Vec<Event> = timeout(
+            Duration::from_secs(10),
+            rx.take(num_events as usize).collect(),
+        )
+        .await
+        .unwrap();
+
+        for event in events {
+            let message = event
+                .as_log()
+                .get(log_schema().message_key())
+                .unwrap()
+                .to_string_lossy();
+            if !expected_messages.remove(&message) {
+                panic!("Received unexpected message: {:?}", message);
+            }
+        }
+        assert!(expected_messages.is_empty());
+    })
+    .await;
 }
 
 fn calculate_message(index: u32) -> String {

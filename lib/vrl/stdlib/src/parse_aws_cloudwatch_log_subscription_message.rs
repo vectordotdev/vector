@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 

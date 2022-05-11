@@ -1,3 +1,15 @@
+use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::stream::{BoxStream, StreamExt};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    event::{EventFinalizers, Finalizable},
+    stream::{BatcherSettings, DriverResponse},
+};
+
 use super::{
     Encoding, EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
     NewRelicApiRequest, NewRelicCredentials,
@@ -8,16 +20,6 @@ use crate::{
         builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
         StreamSink,
     },
-};
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::stream::{BoxStream, StreamExt};
-use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
-use tower::Service;
-use vector_core::{
-    buffers::Acker,
-    event::{EventFinalizers, Finalizable},
-    stream::{BatcherSettings, DriverResponse},
 };
 
 #[derive(Debug)]

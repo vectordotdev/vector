@@ -230,7 +230,7 @@ async fn healthcheck(
     }
 
     let response = client.send(request).await?;
-    healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
+    healthcheck_response(response, creds, HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]

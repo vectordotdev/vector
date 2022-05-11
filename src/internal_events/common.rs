@@ -1,29 +1,30 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
+
 #[derive(Debug)]
-pub struct BytesReceived {
+pub struct BytesReceived<'a> {
     pub byte_size: usize,
-    pub protocol: &'static str,
+    pub protocol: &'a str,
 }
 
-impl InternalEvent for BytesReceived {
+impl<'a> InternalEvent for BytesReceived<'a> {
     fn emit(self) {
         trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol.to_string());
     }
 }
 
 #[derive(Debug)]
-pub struct HttpClientBytesReceived<'a> {
+pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
     pub endpoint: &'a str,
 }
 
-impl InternalEvent for HttpClientBytesReceived<'_> {
+impl InternalEvent for EndpointBytesReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Bytes received.",
@@ -65,19 +66,23 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
 #[cfg(feature = "aws-core")]
 pub struct AwsBytesSent {
     pub byte_size: usize,
-    pub region: aws_types::region::Region,
+    pub region: Option<aws_types::region::Region>,
 }
 
 #[cfg(feature = "aws-core")]
 impl InternalEvent for AwsBytesSent {
     fn emit(self) {
+        let region = self
+            .region
+            .as_ref()
+            .map(|r| r.as_ref().to_string())
+            .unwrap_or_default();
         trace!(
             message = "Bytes sent.",
             protocol = "https",
             byte_size = %self.byte_size,
             region = ?self.region,
         );
-        let region = self.region.to_string();
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",

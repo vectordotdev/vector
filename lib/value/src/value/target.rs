@@ -1,7 +1,9 @@
-use crate::Value;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 use std::iter::Peekable;
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use crate::Value;
 
 impl Value {
     /// Get a reference to a value from a given path.
@@ -130,8 +132,8 @@ impl Value {
     /// If the `compact` argument is set to `true`, then any `Array` or `Object`
     /// that had one of its elements removed and is now empty, is removed as
     /// well.
-    pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) {
-        self.remove_by_segments(path.as_segments().iter().peekable(), compact);
+    pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) -> Option<Self> {
+        self.remove_by_segments(path.as_segments().iter().peekable(), compact)
     }
 
     fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Self>
@@ -205,7 +207,11 @@ impl Value {
         }
     }
 
-    fn remove_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, compact: bool)
+    fn remove_by_segments<'a, T>(
+        &mut self,
+        mut segments: Peekable<T>,
+        compact: bool,
+    ) -> Option<Self>
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
@@ -213,9 +219,18 @@ impl Value {
             Some(segments) => segments,
             None => {
                 return match self {
-                    Value::Object(v) => v.clear(),
-                    Value::Array(v) => v.clear(),
-                    _ => *self = Self::Null,
+                    Value::Object(v) => {
+                        let v = std::mem::take(v);
+                        Some(Self::Object(v))
+                    }
+                    Value::Array(v) => {
+                        let v = std::mem::take(v);
+                        Some(Self::Array(v))
+                    }
+                    _ => {
+                        let v = std::mem::replace(self, Self::Null);
+                        Some(v)
+                    }
                 }
             }
         };
@@ -225,17 +240,21 @@ impl Value {
         }
 
         if let Some(value) = self.get_by_segment_mut(segment) {
-            value.remove_by_segments(segments, compact);
+            let removed_value = value.remove_by_segments(segments, compact);
 
             match value {
                 Value::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
                 Value::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
-                _ => {}
-            }
+                _ => None,
+            };
+
+            return removed_value;
         }
+
+        None
     }
 
-    fn remove_by_segment(&mut self, segment: &SegmentBuf) {
+    fn remove_by_segment(&mut self, segment: &SegmentBuf) -> Option<Self> {
         match segment {
             SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
@@ -262,7 +281,7 @@ impl Value {
                     .checked_rem_euclid(len)
                     .map(|i| array.remove(i as usize))
             }),
-        };
+        }
     }
 
     fn insert_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Self)

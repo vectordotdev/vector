@@ -4,13 +4,12 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use pretty_assertions::assert_eq;
-use tokio_util::codec::Encoder;
-
 use codecs::{
     decoding::format::Deserializer, NativeDeserializerConfig, NativeJsonDeserializerConfig,
     NativeJsonSerializerConfig, NativeSerializerConfig,
 };
+use pretty_assertions::assert_eq;
+use tokio_util::codec::Encoder;
 
 #[test]
 fn roundtrip_native_fixtures() {

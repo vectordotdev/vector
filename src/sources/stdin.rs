@@ -117,10 +117,6 @@ where
 
             stdin.consume(len);
 
-            emit!(BytesReceived {
-                byte_size: len,
-                protocol: "none"
-            });
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
                 break;
@@ -134,7 +130,9 @@ where
         let mut stream = stream! {
             while let Some(result) = stream.next().await {
                 match result {
-                    Ok((events, _byte_size)) => {
+                    Ok((events, byte_size)) => {
+                        emit!(BytesReceived { byte_size, protocol: "none" });
+
                         emit!(StdinEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
@@ -186,7 +184,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::{test_util::trace_init, SourceSender};
+    use crate::{test_util::components::assert_source_compliance, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -195,32 +193,33 @@ mod tests {
 
     #[tokio::test]
     async fn stdin_decodes_line() {
-        trace_init();
+        assert_source_compliance(&["protocol"], async {
+            let (tx, rx) = SourceSender::new_test();
+            let config = StdinConfig::default();
+            let buf = Cursor::new("hello world\nhello world again");
 
-        let (tx, rx) = SourceSender::new_test();
-        let config = StdinConfig::default();
-        let buf = Cursor::new("hello world\nhello world again");
+            stdin_source(buf, config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .await
+                .unwrap();
 
-        stdin_source(buf, config, ShutdownSignal::noop(), tx)
-            .unwrap()
-            .await
-            .unwrap();
+            let mut stream = rx;
 
-        let mut stream = rx;
+            let event = stream.next().await;
+            assert_eq!(
+                Some("hello world".into()),
+                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            );
 
-        let event = stream.next().await;
-        assert_eq!(
-            Some("hello world".into()),
-            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-        );
+            let event = stream.next().await;
+            assert_eq!(
+                Some("hello world again".into()),
+                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            );
 
-        let event = stream.next().await;
-        assert_eq!(
-            Some("hello world again".into()),
-            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-        );
-
-        let event = stream.next().await;
-        assert!(event.is_none());
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
     }
 }

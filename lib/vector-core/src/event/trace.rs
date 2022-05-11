@@ -1,7 +1,7 @@
-use lookup::LookupBuf;
-use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
+use lookup::LookupBuf;
+use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
@@ -56,6 +56,10 @@ impl TraceEvent {
 
     pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
         self.0.lookup(path)
+    }
+
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.0.lookup_mut(path)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {

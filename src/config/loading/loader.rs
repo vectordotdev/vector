@@ -1,10 +1,12 @@
-use super::{component_name, open_file, read_dir, Format};
-use crate::config::format;
-use serde_toml_merge::merge_into_table;
 use std::path::{Path, PathBuf};
+
+use serde_toml_merge::merge_into_table;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use toml::value::{Table, Value};
+
+use super::{component_name, open_file, read_dir, Format};
+use crate::config::format;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -44,8 +46,9 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use super::*;
     use std::io::Read;
+
+    use super::*;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why

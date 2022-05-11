@@ -1,6 +1,8 @@
-use crate::Value;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use crate::Value;
 
 impl Value {
     /// Insert the current value into a given path.
@@ -41,9 +43,11 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use crate::Value;
-    use lookup::{parser, LookupBuf};
     use std::collections::BTreeMap;
+
+    use lookup::{parser, LookupBuf};
+
+    use crate::Value;
 
     #[test]
     fn test_object() {
