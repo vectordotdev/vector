@@ -23,6 +23,7 @@ use vector_core::{
         BufferType, WhenFull,
     },
     internal_event::EventsSent,
+    schema::Definition,
     ByteSizeOf,
 };
 
@@ -35,7 +36,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext,
+        TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -298,14 +299,7 @@ pub async fn build_pieces(
             merged_schema_definition: merged_definition.clone(),
         };
 
-        let node = TransformNode {
-            key: key.clone(),
-            typetag: transform.inner.transform_type(),
-            inputs: transform.inputs.clone(),
-            input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(&merged_definition),
-            enable_concurrency: transform.inner.enable_concurrency(),
-        };
+        let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);
 
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
@@ -514,6 +508,23 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
+}
+
+impl TransformNode {
+    pub fn from_parts(
+        key: ComponentKey,
+        transform: &TransformOuter<OutputId>,
+        schema_definition: &Definition,
+    ) -> Self {
+        Self {
+            key,
+            typetag: transform.inner.transform_type(),
+            inputs: transform.inputs.clone(),
+            input_details: transform.inner.input(),
+            outputs: transform.inner.outputs(schema_definition),
+            enable_concurrency: transform.inner.enable_concurrency(),
+        }
+    }
 }
 
 fn build_transform(
