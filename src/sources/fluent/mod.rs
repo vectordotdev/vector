@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
+use lookup::path;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -442,7 +443,7 @@ impl From<FluentEvent> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert_flat(key, value);
+            log.insert(path!(&key), value);
         }
         log
     }

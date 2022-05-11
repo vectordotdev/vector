@@ -12,6 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
+use lookup::path;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
@@ -227,57 +228,69 @@ impl LogEvent {
         util::log::insert(self.as_map_mut(), path, value.into())
     }
 
+    // deprecated - using this means the schema is unknown
     pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }
     }
 
-    /// Rename a key in place without reference to pathing
+    // /// Rename a key in place without reference to pathing
+    // ///
+    // /// The function will rename a key in place without reference to any path
+    // /// information in the key, much as if you were to call [`remove`] and then
+    // /// [`insert_flat`].
+    // ///
+    // /// This function is a no-op if `from_key` and `to_key` are identical. If
+    // /// `to_key` already exists in the structure its value will be overwritten
+    // /// silently.
+    // #[inline]
+    // #[deprecated]
+    // #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
+    // pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
+    // where
+    //     K: AsRef<str> + Into<String> + PartialEq + Display,
+    // {
+    //     if from_key != to_key {
+    //         if let Some(val) = self
+    //             .fields_mut()
+    //             .as_object_mut_unwrap()
+    //             .remove(from_key.as_ref())
+    //         {
+    //             self.insert_flat(to_key, val);
+    //         }
+    //     }
+    // }
+
+    /// Rename a key
     ///
-    /// The function will rename a key in place without reference to any path
-    /// information in the key, much as if you were to call [`remove`] and then
-    /// [`insert_flat`].
-    ///
-    /// This function is a no-op if `from_key` and `to_key` are identical. If
-    /// `to_key` already exists in the structure its value will be overwritten
-    /// silently.
-    #[inline]
-    #[allow(clippy::needless_pass_by_value)] // will be fixed by #11570
-    pub fn rename_key_flat<K>(&mut self, from_key: K, to_key: K)
-    where
-        K: AsRef<str> + Into<String> + PartialEq + Display,
-    {
-        if from_key != to_key {
-            if let Some(val) = self
-                .fields_mut()
-                .as_object_mut_unwrap()
-                .remove(from_key.as_ref())
-            {
-                self.insert_flat(to_key, val);
-            }
+    /// If `to_key` already exists in the structure its value will be overwritten.
+    pub fn rename_key<'a>(&mut self, from: impl Path<'a>, to: impl Path<'a>) {
+        if let Some(val) = self.remove(from) {
+            self.insert(to, val);
         }
     }
 
-    /// Insert a key in place without reference to pathing
-    ///
-    /// This function will insert a key in place without reference to any
-    /// pathing information in the key. It will insert over the top of any value
-    /// that exists in the map already.
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    where
-        K: Into<String> + Display,
-        V: Into<Value> + Debug,
-    {
-        self.as_map_mut().insert(key.into(), value.into())
-    }
+    // /// Insert a key in place without reference to pathing
+    // ///
+    // /// This function will insert a key in place without reference to any
+    // /// pathing information in the key. It will insert over the top of any value
+    // /// that exists in the map already.
+    // pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
+    // where
+    //     K: Into<String> + Display,
+    //     V: Into<Value> + Debug,
+    // {
+    //     self.as_map_mut().insert(key.into(), value.into())
+    // }
 
-    pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.as_map().contains_key(key) {
-            self.insert_flat(key, value);
-        }
-    }
+    // deprecated - using this means the schema is unknown
+    // pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+    //     let key = key.as_ref();
+    //     if !self.as_map().contains_key(key) {
+    //         self.insert(path!(key), value);
+    //     }
+    // }
 
     pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
         self.remove_prune(path, false)
@@ -537,7 +550,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key_flat("one", "one");
+        base.rename_key(path!("one"), path!("one"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -550,7 +563,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key_flat("three", "three");
+        base.rename_key(path!("three"), path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -565,7 +578,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key_flat("three", "four");
+        base.rename_key(path!("three"), path!("four"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -584,7 +597,7 @@ mod test {
         expected_value.insert("three", val).unwrap();
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key_flat("one", "three");
+        base.rename_key(path!("one"), path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_fields);
@@ -604,7 +617,7 @@ mod test {
         expected_value.insert("two".to_string(), val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key_flat("one", "two");
+        base.rename_key(path!("one"), path!("two"));
         let (actual_value, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_value);
@@ -675,7 +688,7 @@ mod test {
     fn try_insert_flat() {
         let mut log = LogEvent::default();
 
-        log.try_insert_flat("foo", "foo");
+        log.try_insert(path!("foo"), "foo");
 
         assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
     }
@@ -683,9 +696,9 @@ mod test {
     #[test]
     fn try_insert_flat_existing() {
         let mut log = LogEvent::default();
-        log.insert_flat("foo", "foo");
+        log.insert(path!("foo"), "foo");
 
-        log.try_insert_flat("foo", "bar");
+        log.try_insert(path!("foo"), "bar");
 
         assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
     }
@@ -694,7 +707,7 @@ mod test {
     fn try_insert_flat_dotted() {
         let mut log = LogEvent::default();
 
-        log.try_insert_flat("foo.bar", "foo");
+        log.try_insert(path!("foo.bar"), "foo");
 
         assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
@@ -703,9 +716,9 @@ mod test {
     #[test]
     fn try_insert_flat_existing_dotted() {
         let mut log = LogEvent::default();
-        log.insert_flat("foo.bar", "foo");
+        log.insert(path!("foo.bar"), "foo");
 
-        log.try_insert_flat("foo.bar", "bar");
+        log.try_insert(path!("foo.bar"), "bar");
 
         assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_common::TimeZone;
@@ -92,7 +93,7 @@ impl MetricToLog {
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
 
                     let timestamp = log

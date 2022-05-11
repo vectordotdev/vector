@@ -228,6 +228,12 @@ impl<'a> From<&'a str> for BorrowedSegment<'a> {
     }
 }
 
+impl<'a> From<&'a String> for BorrowedSegment<'a> {
+    fn from(field: &'a String) -> Self {
+        BorrowedSegment::field(field.as_str())
+    }
+}
+
 impl From<usize> for BorrowedSegment<'_> {
     fn from(index: usize) -> Self {
         BorrowedSegment::index(index)

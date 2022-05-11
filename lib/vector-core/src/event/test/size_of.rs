@@ -121,7 +121,7 @@ fn log_operation_maintains_size() {
                     if !log_event.contains(key.as_str()) {
                         current_size += key.size_of();
                     }
-                    log_event.insert_flat(&key, value);
+                    log_event.insert(path!(&key), value);
                     current_size -= old_value_sz;
                     current_size += new_value_sz;
                 }

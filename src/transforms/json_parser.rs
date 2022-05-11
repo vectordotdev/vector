@@ -11,6 +11,7 @@ use crate::{
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -127,7 +128,7 @@ impl FunctionTransform for JsonParser {
                     }
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
                 }
             }

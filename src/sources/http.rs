@@ -8,6 +8,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use http::StatusCode;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder as _;
 use warp::http::{HeaderMap, HeaderValue};
@@ -222,8 +223,8 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
         for event in events.iter_mut() {
-            event.as_mut_log().try_insert_flat(
-                header_name as &str,
+            event.as_mut_log().try_insert(
+                path!(header_name),
                 Value::from(value.map(Bytes::copy_from_slice)),
             );
         }
