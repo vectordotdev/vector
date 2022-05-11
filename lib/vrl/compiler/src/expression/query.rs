@@ -3,7 +3,7 @@ use std::fmt;
 use lookup::LookupBuf;
 use value::{
     kind::{remove, Collection},
-    Kind,
+    Kind, Value,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     vm::{self, OpCode},
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -232,9 +232,8 @@ impl fmt::Debug for Target {
 
 #[cfg(test)]
 mod tests {
-    use crate::state;
-
     use super::*;
+    use crate::state;
 
     #[test]
     fn test_type_def() {

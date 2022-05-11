@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use value::Value;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, Value, Vm, VrlRuntime};
+use vrl::{diagnostic::Formatter, Program, Runtime, Vm, VrlRuntime};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},

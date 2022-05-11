@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, convert::TryFrom};
+
 use super::BulkAction;
 use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
@@ -11,7 +13,6 @@ use crate::{
     },
     template::Template,
 };
-use std::{collections::BTreeMap, convert::TryFrom};
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {

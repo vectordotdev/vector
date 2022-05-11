@@ -10,8 +10,8 @@ use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
+use value::Value;
 use vector_common::{conversion::Conversion, datetime::TimeZone};
-use vrl::Value;
 
 use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 

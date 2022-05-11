@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn join(array: Value, separator: Option<Value>) -> Resolved {

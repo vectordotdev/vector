@@ -1,6 +1,7 @@
+use std::collections::HashSet;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use vector_core::transform::{InnerTopology, InnerTopologyTransform};
 
 use crate::{

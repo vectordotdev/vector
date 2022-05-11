@@ -234,7 +234,6 @@ mod integration_tests {
 
     use bollard::exec::{CreateExecOptions, StartExecOptions};
     use bollard::Docker;
-
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;

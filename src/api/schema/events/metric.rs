@@ -1,6 +1,6 @@
-use async_graphql::{Enum, Object};
 use std::collections::BTreeMap;
 
+use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use vector_common::encode_logfmt;

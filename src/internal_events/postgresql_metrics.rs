@@ -1,8 +1,9 @@
 use std::time::Instant;
 
-use super::prelude::{error_stage, error_type};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectCompleted {

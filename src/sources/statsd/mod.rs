@@ -1,6 +1,10 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
 use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -24,10 +28,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
-};
-use codecs::{
-    decoding::{self, Deserializer, Framer},
-    NewlineDelimitedDecoder,
 };
 
 pub mod parser;

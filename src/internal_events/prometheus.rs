@@ -2,12 +2,13 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, http_error_code};
 
 #[derive(Debug)]
 pub struct PrometheusEventsReceived {

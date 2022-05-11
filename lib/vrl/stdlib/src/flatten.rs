@@ -1,5 +1,6 @@
 use std::collections::btree_map;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn flatten(value: Value) -> Resolved {

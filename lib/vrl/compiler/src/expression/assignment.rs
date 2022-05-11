@@ -2,6 +2,7 @@ use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
+use value::Value;
 
 use crate::{
     expression::{Expr, Noop, Resolved},
@@ -13,7 +14,7 @@ use crate::{
     type_def::Details,
     value::kind::DefaultValue,
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]

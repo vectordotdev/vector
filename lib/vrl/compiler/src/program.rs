@@ -1,29 +1,28 @@
-use std::{iter::IntoIterator, ops::Deref};
-
 use lookup::LookupBuf;
 
-use crate::{state::LocalEnv, Expression};
+use crate::{
+    expression::{Block, Resolved},
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression,
+};
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub(crate) expressions: Vec<Box<dyn Expression>>,
+    pub(crate) expressions: Block,
     pub(crate) info: ProgramInfo,
+}
 
-    /// A copy of the local environment at program compilation.
+impl Program {
+    /// Get a reference to the final local environment of the compiler that
+    /// compiled the current program.
     ///
     /// Can be used to instantiate a new program with the same local state as
     /// the previous program.
     ///
     /// Specifically, this is used by the VRL REPL to incrementally compile
     /// a program as each line is compiled.
-    pub(crate) local_env: LocalEnv,
-}
-
-impl Program {
-    /// Get a reference to the final local environment of the compiler that
-    /// compiled the current program.
     pub fn local_env(&self) -> &LocalEnv {
-        &self.local_env
+        &self.expressions.local_env
     }
 
     /// Get detailed information about the program, as collected by the VRL
@@ -31,22 +30,19 @@ impl Program {
     pub fn info(&self) -> &ProgramInfo {
         &self.info
     }
-}
 
-impl IntoIterator for Program {
-    type Item = Box<dyn Expression>;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.expressions.into_iter()
+    /// Resolve the program to its final [`Value`].
+    pub fn resolve(&self, ctx: &mut Context) -> Resolved {
+        self.expressions.resolve(ctx)
     }
-}
 
-impl Deref for Program {
-    type Target = [Box<dyn Expression>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.expressions
+    /// Compile the program down to the [`Vm`] runtime.
+    pub fn compile_to_vm(
+        &self,
+        vm: &mut crate::vm::Vm,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+    ) -> Result<(), String> {
+        self.expressions.compile_to_vm(vm, state)
     }
 }
 

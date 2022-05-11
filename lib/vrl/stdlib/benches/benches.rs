@@ -1,3 +1,4 @@
+use ::value::Value;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;

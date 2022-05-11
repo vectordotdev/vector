@@ -1,5 +1,6 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
+use ::value::Value;
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -16,7 +17,7 @@ use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     state::{self, ExternalEnv},
-    value, Runtime, Target, Value, VrlRuntime,
+    value, Runtime, Target, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup

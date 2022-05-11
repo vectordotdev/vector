@@ -1,13 +1,12 @@
+use bytes::{BufMut, BytesMut};
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder;
+use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     schema,
 };
-
-use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
-use tokio_util::codec::Encoder;
-use value::Kind;
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -71,8 +70,9 @@ impl Encoder<Event> for RawMessageSerializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::{Bytes, BytesMut};
+
+    use super::*;
 
     #[test]
     fn serialize_bytes() {

@@ -1,5 +1,4 @@
 use bytes::Bytes;
-
 use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
@@ -29,9 +28,8 @@ pub(crate) struct SqsRequestBuilder {
 
 impl SqsRequestBuilder {
     pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
-        let encoding = config.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

@@ -3,13 +3,12 @@ use std::{io, mem, task::Poll};
 use futures::{future::BoxFuture, Future, FutureExt};
 use tokio_test::task::{spawn, Spawn};
 
-use crate::{Acker, EventCount};
-
 use super::{
     action::Action,
     common::{ReaderResult, TestReader, TestWriter, WriterResult},
     record::Record,
 };
+use crate::{Acker, EventCount};
 
 /// A wrapper that can track whether or not a future has already been polled.
 ///

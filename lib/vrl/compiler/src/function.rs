@@ -8,7 +8,7 @@ use std::{
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note};
 use parser::ast::Ident;
-use value::kind::Collection;
+use value::{kind::Collection, Value};
 
 use crate::{
     expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
@@ -16,7 +16,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
     vm::VmArgumentList,
-    Context, ExpressionError, Span, Value,
+    Context, ExpressionError, Span,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
