@@ -1,0 +1,227 @@
+---
+date: "2022-05-12"
+title: "Vector Config Subcommand"
+description: "A new subcommand to output configuration(s) as a standard JSON object"
+authors: ["001wwang"]
+pr_numbers: []
+release: "0.22.0"
+hide_on_release_notes: false
+---
+
+We've added a new subcommand `vector config` to help format and standardize your
+configurations. This can be useful when checking configurations into version
+control.
+
+For example, with the following configuration,
+
+```toml
+[api]
+enabled = true
+
+[sources.in]
+type = "demo_logs"
+format = "syslog"
+interval = 1.0
+
+[sources.file]
+type = "file"
+include = ["some/file/here", "a/file/there", "another/one/somewhere"]
+
+[sinks.out]
+type = "blackhole"
+inputs = ["in", "file"]
+```
+
+running `vector config -c {path to configuration}` will output the following
+JSON.
+
+```jsonc
+{
+  "api": {
+    "enabled": true
+  },
+  "sinks": {
+    "out": {
+      "inputs": [
+        "file",
+        "in"
+      ],
+      "type": "blackhole"
+    }
+  },
+  "sources": {
+    "file": {
+      "include": [
+        "a/file/there",
+        "another/one/somewhere",
+        "some/file/here"
+      ],
+      "type": "file"
+    },
+    "in": {
+      "format": "syslog",
+      "interval": 1.0,
+      "type": "demo_logs"
+    }
+  }
+}
+```
+
+If, on a whim, you decide to change the original configuration's organization
+like so,
+
+```toml
+[sources.file]
+type = "file"
+include = ["a/file/there", "another/one/somewhere", "some/file/here"] # shuffled
+
+[sources.in]
+type = "demo_logs"
+format = "syslog"
+interval = 1.0
+
+[api]
+enabled = true
+
+[sinks.out]
+type = "blackhole"
+inputs = ["file", "in"] # shuffled
+```
+
+`vector config` will continue to provide the same output.
+
+```jsonc
+{
+  "api": {
+    "enabled": true
+  },
+  "sinks": {
+    "out": {
+      "inputs": [
+        "file",
+        "in"
+      ],
+      "type": "blackhole"
+    }
+  },
+  "sources": {
+    "file": {
+      "include": [
+        "a/file/there",
+        "another/one/somewhere",
+        "some/file/here"
+      ],
+      "type": "file"
+    },
+    "in": {
+      "format": "syslog",
+      "interval": 1.0,
+      "type": "demo_logs"
+    }
+  }
+}
+```
+
+Notice that even the ordering of array fields like `inputs` and `include` are
+kept the same. In general, using `vector config` to process a configuration
+allows you to to ignore stylistic changes that don't affect the configuration's
+actual semantics.
+
+The `--include-defaults` flag is also useful for documenting configuration
+values provided as defaults when not explicitly configured. For the above
+configuration, running `vector config -c {path to configuration}
+--include-defaults` will output the following.
+
+```jsonc
+{
+  "data_dir": "/var/lib/vector/",
+  "api": {
+    "enabled": true,
+    "address": "127.0.0.1:8686",
+    "playground": true
+  },
+  "schema": {
+    "enabled": false
+  },
+  "enterprise": null,
+  "healthchecks": {
+    "enabled": true,
+    "require_healthy": false
+  },
+  "enrichment_tables": {},
+  "sources": {
+    "file": {
+      "type": "file",
+      "include": [
+        "a/file/there",
+        "another/one/somewhere",
+        "some/file/here"
+      ],
+      "exclude": [],
+      "file_key": "file",
+      "start_at_beginning": null,
+      "ignore_checkpoints": null,
+      "read_from": null,
+      "ignore_older_secs": null,
+      "max_line_bytes": 102400,
+      "host_key": null,
+      "data_dir": null,
+      "glob_minimum_cooldown_ms": 1000,
+      "fingerprint": {
+        "strategy": "checksum",
+        "bytes": null,
+        "ignored_header_bytes": 0,
+        "lines": 1
+      },
+      "ignore_not_found": false,
+      "message_start_indicator": null,
+      "multi_line_timeout": 1000,
+      "multiline": null,
+      "max_read_bytes": 2048,
+      "oldest_first": false,
+      "remove_after_secs": null,
+      "line_delimiter": "\n",
+      "encoding": null,
+      "acknowledgements": {
+        "enabled": null
+      }
+    },
+    "in": {
+      "type": "demo_logs",
+      "interval": 1.0,
+      "count": 9223372036854775807,
+      "format": "syslog",
+      "framing": {
+        "method": "bytes"
+      },
+      "decoding": {
+        "codec": "bytes"
+      }
+    }
+  },
+  "sinks": {
+    "out": {
+      "inputs": [
+        "file",
+        "in"
+      ],
+      "healthcheck_uri": null,
+      "healthcheck": {
+        "enabled": true,
+        "uri": null
+      },
+      "buffer": {
+        "type": "memory",
+        "max_events": 500,
+        "when_full": "block"
+      },
+      "type": "blackhole",
+      "print_interval_secs": 1,
+      "rate": null
+    }
+  },
+  "transforms": {},
+  "tests": [],
+  "provider": null
+}
+```
