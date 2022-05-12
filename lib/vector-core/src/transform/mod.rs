@@ -358,7 +358,7 @@ impl TransformOutputsBuf {
         self.primary_buffer
             .as_mut()
             .expect("no default output")
-            .extend(events)
+            .extend(events);
     }
 
     pub fn take_primary(&mut self) -> OutputBuffer {
