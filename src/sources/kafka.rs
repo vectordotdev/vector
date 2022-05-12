@@ -179,24 +179,13 @@ async fn kafka_source(
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
-    let mut failed_topics: HashSet<String> = Default::default();
+    let mut topics = Topics::new(&config);
 
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                if !failed_topics.contains(&entry.topic) {
-                    if status == BatchStatus::Delivered {
-                        if let Err(error) =
-                            consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                        {
-                            emit!(KafkaOffsetUpdateError { error });
-                        }
-                    } else {
-                        // Don't update the offset after a failed ack
-                        failed_topics.insert(entry.topic);
-                    }
-                }
+                handle_ack(&mut topics, status, entry,&consumer);
             },
             message = stream.next() => match message {
                 None => break,  // WHY?
@@ -209,13 +198,51 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, &decoder, keys, &finalizer, &mut out, &consumer, &failed_topics).await;
+                    parse_message(msg, &decoder, keys, &finalizer, &mut out, &consumer, &topics).await;
                 }
             },
         }
     }
 
     Ok(())
+}
+
+struct Topics {
+    subscribed: HashSet<String>,
+    failed: HashSet<String>,
+}
+
+impl Topics {
+    fn new(config: &KafkaSourceConfig) -> Self {
+        Self {
+            subscribed: config.topics.iter().cloned().collect(),
+            failed: Default::default(),
+        }
+    }
+}
+
+fn handle_ack(
+    topics: &mut Topics,
+    status: BatchStatus,
+    entry: FinalizerEntry,
+    consumer: &StreamConsumer<KafkaStatisticsContext>,
+) {
+    if !topics.failed.contains(&entry.topic) {
+        if status == BatchStatus::Delivered {
+            if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                emit!(KafkaOffsetUpdateError { error });
+            }
+        } else {
+            // Try to unsubscribe from the named topic
+            if topics.subscribed.remove(&entry.topic) {
+                let topics: Vec<&str> = topics.subscribed.iter().map(|s| s.as_str()).collect();
+                // Ignore error, as we ignore output from the topic below anyways
+                let _ = consumer.subscribe(&topics);
+            }
+            // Don't update the offset after a failed ack
+            topics.failed.insert(entry.topic);
+        }
+    }
 }
 
 async fn parse_message(
@@ -225,9 +252,9 @@ async fn parse_message(
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<KafkaStatisticsContext>>,
-    failed_topics: &HashSet<String>,
+    topics: &Topics,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, failed_topics) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, topics) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -265,13 +292,13 @@ fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
     decoder: &Decoder,
     keys: Keys<'a>,
-    failed_topics: &HashSet<String>,
+    topics: &Topics,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
 
-    if failed_topics.contains(&rmsg.topic) {
+    if topics.failed.contains(&rmsg.topic) {
         return None;
     }
 
