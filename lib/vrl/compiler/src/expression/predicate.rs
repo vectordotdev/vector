@@ -66,7 +66,10 @@ impl Predicate {
 }
 
 impl Expression for Predicate {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         todo!()
     }
 

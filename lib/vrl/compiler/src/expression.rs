@@ -77,7 +77,10 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// This method is executed at runtime.
     ///
     /// An expression is allowed to fail, which aborts the running program.
-    fn resolve(&self, ctx: &mut Context) -> Resolved;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value>;
 
     /// Compile the expression to bytecode that can be interpreted by the VM.
     fn compile_to_vm(
@@ -236,7 +239,10 @@ impl Expr {
 }
 
 impl Expression for Expr {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         use Expr::*;
 
         match self {

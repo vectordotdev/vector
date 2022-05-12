@@ -32,7 +32,10 @@ impl Program {
     }
 
     /// Resolve the program to its final [`Value`].
-    pub fn resolve(&self, ctx: &mut Context) -> Resolved {
+    pub fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         self.expressions.resolve(ctx)
     }
 

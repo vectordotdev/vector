@@ -59,7 +59,10 @@ impl Abort {
 }
 
 impl Expression for Abort {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let message = self
             .message
             .as_ref()

@@ -1,4 +1,4 @@
-use std::{error::Error, fmt, sync::Arc};
+use std::{borrow::Cow, error::Error, fmt, sync::Arc};
 
 use compiler::{
     state::{ExternalEnv, LocalEnv},
@@ -107,11 +107,14 @@ impl Runtime {
 
         let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        program.resolve(&mut ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => Terminate::Abort(err),
-            err @ ExpressionError::Error { .. } => Terminate::Error(err),
-        })
+        program
+            .resolve(&mut ctx)
+            .map(Cow::into_owned)
+            .map_err(|err| match err {
+                #[cfg(feature = "expr-abort")]
+                ExpressionError::Abort { .. } => Terminate::Abort(err),
+                err @ ExpressionError::Error { .. } => Terminate::Error(err),
+            })
     }
 
     pub fn compile(

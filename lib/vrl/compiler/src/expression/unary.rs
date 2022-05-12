@@ -24,7 +24,11 @@ pub enum Variant {
 }
 
 impl Expression for Unary {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    #[inline(always)]
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         use Variant::*;
 
         match &self.variant {

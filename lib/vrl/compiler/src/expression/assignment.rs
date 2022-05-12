@@ -162,14 +162,20 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    #[inline(always)]
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         self.variant.resolve(ctx)
     }
 
+    #[inline(always)]
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.variant.type_def(state)
     }
 
+    #[inline(always)]
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
@@ -272,6 +278,8 @@ impl Target {
         }
     }
 
+    // FIXME(Jean): Have this take `Cow`, and store the cow for variables, but
+    // owned value for external targets.
     fn insert(&self, value: Value, ctx: &mut Context) {
         use Target::*;
 
@@ -390,13 +398,16 @@ impl<U> Expression for Variant<Target, U>
 where
     U: Expression + Clone,
 {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         use Variant::*;
 
         let value = match self {
             Single { target, expr } => {
-                let value = expr.resolve(ctx)?;
-                target.insert(value.clone().into_owned(), ctx);
+                let value = expr.resolve(ctx)?.into_owned();
+                target.insert(value.clone(), ctx);
                 value
             }
             Infallible {
@@ -404,9 +415,9 @@ where
                 err,
                 expr,
                 default,
-            } => match expr.resolve(ctx) {
+            } => match expr.resolve(ctx).map(Cow::into_owned) {
                 Ok(value) => {
-                    ok.insert(value.clone().into_owned(), ctx);
+                    ok.insert(value.clone(), ctx);
                     err.insert(Value::Null, ctx);
                     value
                 }
@@ -414,12 +425,12 @@ where
                     ok.insert(default.clone(), ctx);
                     let value = Value::from(error.to_string());
                     err.insert(value.clone(), ctx);
-                    Cow::Owned(value)
+                    value
                 }
             },
         };
 
-        Ok(value)
+        Ok(Cow::Owned(value))
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

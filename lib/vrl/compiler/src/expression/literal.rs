@@ -48,7 +48,10 @@ impl Literal {
 }
 
 impl Expression for Literal {
-    fn resolve(&self, _: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
         use Literal::*;
 
         Ok(match self {

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use value::Value;
 
@@ -32,7 +32,10 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         // NOTE:
         //
         // Technically, this invalidates the scoping invariant of variables

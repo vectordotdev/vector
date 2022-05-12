@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
@@ -90,27 +91,40 @@ impl Op {
 }
 
 impl Expression for Op {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         use ast::Opcode::*;
         use value::Value::*;
 
         if let Err = self.opcode {
-            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+            return self
+                .lhs
+                .resolve(ctx)
+                .map(Cow::into_owned)
+                .map(Cow::Owned)
+                .or_else(|_| self.rhs.resolve(ctx));
         } else if let Or = self.opcode {
             return self
                 .lhs
                 .resolve(ctx)?
-                .try_or(|| self.rhs.resolve(ctx))
+                .into_owned()
+                .try_or(|| self.rhs.resolve(ctx).map(Cow::into_owned))
+                .map(Into::into)
                 .map_err(Into::into);
         } else if let And = self.opcode {
-            return match self.lhs.resolve(ctx)? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+            return match self.lhs.resolve(ctx)?.into_owned() {
+                Null | Boolean(false) => Ok(Value::from(false).into()),
+                v => v
+                    .try_and(self.rhs.resolve(ctx)?.into_owned())
+                    .map(Into::into)
+                    .map_err(Into::into),
             };
         };
 
-        let lhs = self.lhs.resolve(ctx)?;
-        let rhs = self.rhs.resolve(ctx)?;
+        let lhs = self.lhs.resolve(ctx)?.into_owned();
+        let rhs = self.rhs.resolve(ctx)?.into_owned();
 
         match self.opcode {
             Mul => lhs.try_mul(rhs),
@@ -127,6 +141,7 @@ impl Expression for Op {
             Merge => lhs.try_merge(rhs),
             And | Or | Err => unreachable!(),
         }
+        .map(Into::into)
         .map_err(Into::into)
     }
 

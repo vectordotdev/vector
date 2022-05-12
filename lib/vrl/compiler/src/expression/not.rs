@@ -46,7 +46,10 @@ impl Not {
 }
 
 impl Expression for Not {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         Ok(Value::from(!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 

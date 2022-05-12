@@ -29,7 +29,7 @@ impl Deref for Array {
 }
 
 impl Expression for Array {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'a, 'b: 'a, 'c: 'b>(&'b self, ctx: &'a mut Context) -> Resolved<'c> {
         self.inner
             .iter()
             .map(|expr| expr.resolve(ctx).map(Cow::into_owned))

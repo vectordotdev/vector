@@ -29,7 +29,7 @@ impl Deref for Object {
 }
 
 impl Expression for Object {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'a, 'b: 'a, 'c: 'b>(&'b self, ctx: &'a mut Context) -> Resolved<'c> {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v.into_owned())))
