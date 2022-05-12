@@ -11,8 +11,7 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, BytesReceived,
-        StreamClosedError,
+        AwsEcsMetricsResponseError, BytesReceived, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -143,7 +142,7 @@ async fn aws_ecs_metrics(
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(AwsEcsMetricsRequestCompleted {
+                        emit!(RequestCompleted {
                             start,
                             end: Instant::now()
                         });

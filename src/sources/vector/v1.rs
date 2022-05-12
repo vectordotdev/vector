@@ -12,7 +12,7 @@ use crate::{
     codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{BytesReceived, VectorEventReceived, VectorProtoDecodeError},
+    internal_events::{BytesReceived, OldEventsReceived, VectorProtoDecodeError},
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
@@ -106,7 +106,8 @@ impl decoding::format::Deserializer for VectorDeserializer {
 
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(VectorEventReceived {
+                emit!(OldEventsReceived {
+                    count: 1,
                     byte_size: event.size_of()
                 });
                 Ok(smallvec![event])

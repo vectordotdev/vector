@@ -1,6 +1,4 @@
-use std::time::Instant;
-
-use metrics::{counter, histogram};
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
@@ -34,20 +32,6 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
             "events_in_total", self.count as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct NginxMetricsCollectCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for NginxMetricsCollectCompleted {
-    fn emit(self) {
-        debug!(message = "Collection completed.");
-        counter!("collect_completed_total", 1);
-        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
 

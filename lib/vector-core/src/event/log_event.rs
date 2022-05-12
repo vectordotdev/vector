@@ -99,6 +99,15 @@ impl From<BTreeMap<String, Value>> for Inner {
     }
 }
 
+impl From<Value> for Inner {
+    fn from(fields: Value) -> Self {
+        Self {
+            fields,
+            size_cache: Default::default(),
+        }
+    }
+}
+
 impl PartialEq for Inner {
     fn eq(&self, other: &Self) -> bool {
         self.fields.eq(&other.fields)
@@ -159,9 +168,15 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` into a tuple of its components
+    ///  Create a `LogEvent` from a tuple of its components.
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(map));
+        Self { inner, metadata }
+    }
+
+    ///  Create a `LogEvent` from a tuple of its components.
+    pub fn from_value(value: Value, metadata: EventMetadata) -> Self {
+        let inner = Arc::new(Inner::from(value));
         Self { inner, metadata }
     }
 
