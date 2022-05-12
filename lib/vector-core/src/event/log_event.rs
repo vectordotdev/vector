@@ -40,10 +40,6 @@ impl Inner {
     fn as_value(&self) -> &Value {
         &self.fields
     }
-
-    fn as_value_mut(&mut self) -> &mut Value {
-        &mut self.fields
-    }
 }
 
 impl ByteSizeOf for Inner {
@@ -94,6 +90,15 @@ impl From<BTreeMap<String, Value>> for Inner {
     fn from(fields: BTreeMap<String, Value>) -> Self {
         Self {
             fields: Value::Object(fields),
+            size_cache: Default::default(),
+        }
+    }
+}
+
+impl From<Value> for Inner {
+    fn from(fields: Value) -> Self {
+        Self {
+            fields,
             size_cache: Default::default(),
         }
     }
@@ -163,9 +168,15 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` into a tuple of its components
+    ///  Create a `LogEvent` from a tuple of its components.
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(map));
+        Self { inner, metadata }
+    }
+
+    ///  Create a `LogEvent` from a tuple of its components.
+    pub fn from_value(value: Value, metadata: EventMetadata) -> Self {
+        let inner = Arc::new(Inner::from(value));
         Self { inner, metadata }
     }
 
