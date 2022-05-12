@@ -599,6 +599,7 @@ sinks-logs = [
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
+  "sinks-chronicle",
   "sinks-clickhouse",
   "sinks-console",
   "sinks-datadog_archives",
@@ -651,6 +652,7 @@ sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
 sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
+sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
