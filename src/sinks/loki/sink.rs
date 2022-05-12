@@ -227,7 +227,7 @@ impl EventEncoder {
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
 
-            Encoding::Logfmt => encode_logfmt::to_string(log.as_map_deprecated())
+            Encoding::Logfmt => encode_logfmt::encode_value(log.value())
                 .expect("Logfmt encoding should never fail."),
         };
 

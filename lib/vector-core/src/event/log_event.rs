@@ -293,13 +293,13 @@ impl LogEvent {
         }
     }
 
-    #[deprecated]
-    pub fn as_map_deprecated(&self) -> &BTreeMap<String, Value> {
-        match &self.inner.fields {
-            Value::Object(map) => map,
-            _ => unreachable!(),
-        }
-    }
+    // #[deprecated]
+    // pub fn as_map_deprecated(&self) -> &BTreeMap<String, Value> {
+    //     match &self.inner.fields {
+    //         Value::Object(map) => map,
+    //         _ => unreachable!(),
+    //     }
+    // }
 
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
         match &self.inner.fields {
