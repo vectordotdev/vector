@@ -15,6 +15,7 @@ mod config;
 mod request_builder;
 mod service;
 mod sink;
+mod stats;
 
 use crate::{config::SinkDescription, sinks::datadog::traces::config::DatadogTracesConfig};
 

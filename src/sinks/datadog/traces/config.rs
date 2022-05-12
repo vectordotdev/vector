@@ -98,7 +98,6 @@ pub enum DatadogTracesEndpoint {
 /// Store traces & APM stats endpoints actual URIs.
 pub struct DatadogTracesEndpointConfiguration {
     traces_endpoint: Uri,
-    // Unused so far
     stats_endpoint: Uri,
 }
 
