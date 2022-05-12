@@ -7,6 +7,8 @@ use std::{
 use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
+#[cfg(test)]
+use rand::{prelude::SliceRandom, thread_rng};
 use serde::Serialize;
 use toml::{map::Map, Value};
 use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
@@ -92,7 +94,7 @@ pub(crate) enum TransformInputsStrategy {
     Auto,
     /// Used for property testing `vector config`.
     ///
-    /// All transforms use `inputs = ["*"]`.
+    /// All transforms use a shuffled list of all sources as inputs.
     #[cfg(test)]
     All,
 }
@@ -205,7 +207,10 @@ pub(crate) fn generate_example(
                 }
                 #[cfg(test)]
                 TransformInputsStrategy::All => {
-                    vec!["*".to_string()]
+                    let mut rng = thread_rng();
+                    let mut sources = source_names.clone();
+                    sources.shuffle(&mut rng);
+                    sources
                 }
             };
 
