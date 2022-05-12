@@ -868,6 +868,7 @@ impl RunningTopology {
         self.shutdown_coordinator
             .takeover_source(key, &mut new_pieces.shutdown_coordinator);
 
+        // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
         self.source_tasks
