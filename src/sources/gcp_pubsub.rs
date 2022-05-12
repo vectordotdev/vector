@@ -19,7 +19,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
-    event::{BatchNotifier, Event, MaybeAsLogMut, Value},
+    event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     internal_events::{
         BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
@@ -274,8 +274,10 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 _ = &mut self.shutdown => return false,
-                receipts = ack_stream.next() => if let Some(receipts) = receipts {
-                    self.ack_ids.lock().await.extend(receipts);
+                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
+                    if status == BatchStatus::Delivered {
+                        self.ack_ids.lock().await.extend(receipts);
+                    }
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,

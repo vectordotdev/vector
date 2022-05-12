@@ -10,7 +10,7 @@ use tokio::{pin, select, time::Duration};
 
 use crate::{
     codecs::Decoder,
-    event::BatchNotifier,
+    event::{BatchNotifier, BatchStatus},
     internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::{self, finalizer::UnorderedFinalizer},
@@ -42,8 +42,10 @@ impl SqsSource {
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
             tokio::spawn(async move {
-                while let Some(receipts_to_ack) = ack_stream.next().await {
-                    delete_messages(client.clone(), receipts_to_ack, queue_url.clone()).await;
+                while let Some((status, receipts)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        delete_messages(client.clone(), receipts, queue_url.clone()).await;
+                    }
                 }
             });
             Arc::new(finalizer)

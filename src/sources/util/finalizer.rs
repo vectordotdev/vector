@@ -53,7 +53,7 @@ where
     /// received acknowledged batch identifiers.
     pub(crate) fn new(
         shutdown: ShutdownSignal,
-    ) -> (Self, impl Stream<Item = T> + Send + Unpin + 'static) {
+    ) -> (Self, UnboundedReceiverStream<(BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         let (done_tx, done_rx) = mpsc::unbounded_channel();
         tokio::spawn(run_finalizer(shutdown, todo_rx, done_tx, S::default()));
@@ -76,7 +76,7 @@ where
         shutdown: ShutdownSignal,
     ) -> (
         Option<Self>,
-        Pin<Box<dyn Stream<Item = T> + Send + 'static>>,
+        Pin<Box<dyn Stream<Item = (BatchStatus, T)> + Send + 'static>>,
     ) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
@@ -98,7 +98,7 @@ where
 async fn run_finalizer<T>(
     shutdown: ShutdownSignal,
     mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
-    done_entries: UnboundedSender<T>,
+    done_entries: UnboundedSender<(BatchStatus, T)>,
     mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,
 ) {
     loop {
@@ -124,7 +124,7 @@ async fn run_finalizer<T>(
                 None => break,
             },
             finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                Some((status, entry)) => if status == BatchStatus::Delivered && done_entries.send(entry).is_err() {
+                Some((status, entry)) => if done_entries.send((status,entry)).is_err() {
                     // The receiver went away before shutdown, so
                     // just close up shop as there is nothing more
                     // we can do here.
@@ -139,7 +139,7 @@ async fn run_finalizer<T>(
     // closed. Wait for the last statuses to come in before indicating
     // we are done.
     while let Some((status, entry)) = status_receivers.next().await {
-        if status == BatchStatus::Delivered && done_entries.send(entry).is_err() {
+        if done_entries.send((status, entry)).is_err() {
             break;
         }
     }

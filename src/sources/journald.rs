@@ -36,7 +36,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{BytesReceived, JournaldInvalidRecordError, OldEventsReceived},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -625,8 +625,10 @@ impl Finalizer {
         if acknowledgements {
             let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
             tokio::spawn(async move {
-                while let Some(cursor) = ack_stream.next().await {
-                    checkpointer.lock().await.set(cursor).await;
+                while let Some((status, cursor)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        checkpointer.lock().await.set(cursor).await;
+                    }
                 }
             });
             Self::Async(finalizer)

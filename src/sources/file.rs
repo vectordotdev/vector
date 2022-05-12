@@ -23,7 +23,7 @@ use crate::{
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, LogEvent},
+    event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },
@@ -330,8 +330,10 @@ pub fn file_source(
         let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
         let checkpoints = checkpointer.view();
         tokio::spawn(async move {
-            while let Some(entry) = ack_stream.next().await {
-                checkpoints.update(entry.file_id, entry.offset);
+            while let Some((status, entry)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    checkpoints.update(entry.file_id, entry.offset);
+                }
             }
         });
         finalizer

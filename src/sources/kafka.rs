@@ -29,7 +29,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, Event, Value},
+    event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
@@ -182,11 +182,13 @@ async fn kafka_source(
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
-            entry = ack_stream.next() => if let Some(entry) = entry {
-                if let Err(error) =
-                    consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                {
-                    emit!(KafkaOffsetUpdateError { error });
+            entry = ack_stream.next() => if let Some((status, entry)) = entry {
+                if status == BatchStatus::Delivered {
+                    if let Err(error) =
+                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                    {
+                        emit!(KafkaOffsetUpdateError { error });
+                    }
                 }
             },
             message = stream.next() => match message {

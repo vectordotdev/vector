@@ -17,7 +17,7 @@ use warp::Rejection;
 
 use super::ApiError;
 use crate::{
-    config::AcknowledgementsConfig, shutdown::ShutdownSignal,
+    config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal,
     sources::util::finalizer::UnorderedFinalizer,
 };
 
@@ -173,19 +173,21 @@ impl Channel {
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
         let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
         tokio::spawn(async move {
-            while let Some(ack_id) = ack_stream.next().await {
-                let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
-                ack_ids_status.insert(ack_id);
-                if ack_ids_status.len() > max_pending_acks_per_channel {
-                    match ack_ids_status.min() {
-                        Some(min) => ack_ids_status.remove(min),
-                        // max pending acks per channel is guaranteed to be >= 1,
-                        // thus there must be at least one ack id available to remove
-                        None => unreachable!(
-                            "Indexer acknowledgements channel must allow at least one pending ack"
-                        ),
-                    };
-                };
+            while let Some((status, ack_id)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
+                    ack_ids_status.insert(ack_id);
+                    if ack_ids_status.len() > max_pending_acks_per_channel {
+                        match ack_ids_status.min() {
+                            Some(min) => ack_ids_status.remove(min),
+                            // max pending acks per channel is guaranteed to be >= 1,
+                            // thus there must be at least one ack id available to remove
+                            None => unreachable!(
+                                "Indexer acknowledgements channel must allow at least one pending ack"
+                            ),
+                        };
+                    }
+                }
             }
         });
 
