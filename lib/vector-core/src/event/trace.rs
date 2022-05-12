@@ -98,7 +98,7 @@ impl TraceEvent {
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.0.as_map_mut(), key.as_ref(), value.into())
+        self.0.insert(key.as_ref(), value.into())
     }
 }
 

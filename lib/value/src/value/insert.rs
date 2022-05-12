@@ -1,21 +1,21 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
-use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::lookup_v2::BorrowedSegment;
 
 use super::Value;
 
-/// Inserts field value using a path specified using `a.b[1].c` notation.
-#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
-pub fn insert<'a>(
-    fields: &mut BTreeMap<String, Value>,
-    path: impl Path<'a>,
-    value: Value,
-) -> Option<Value> {
-    let path_iter = path.segment_iter().peekable();
-    map_insert(fields, path_iter, value)
-}
+// /// Inserts field value using a path specified using `a.b[1].c` notation.
+// #[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
+// pub fn insert<'a>(
+//     fields: &mut BTreeMap<String, Value>,
+//     path: impl Path<'a>,
+//     value: Value,
+// ) -> Option<Value> {
+//     let path_iter = path.segment_iter().peekable();
+//     map_insert(fields, path_iter, value)
+// }
 
-fn map_insert<'a>(
+pub fn map_insert<'a>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
@@ -44,7 +44,7 @@ fn map_insert<'a>(
     }
 }
 
-fn array_insert<'a>(
+pub fn array_insert<'a>(
     values: &mut Vec<Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,

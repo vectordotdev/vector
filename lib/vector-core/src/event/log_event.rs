@@ -225,7 +225,7 @@ impl LogEvent {
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
-        self.inner.fields.get_by_path_v2(path).is_some()
+        self.value().get_by_path_v2(path).is_some()
     }
 
     pub fn insert<'a>(
@@ -233,7 +233,7 @@ impl LogEvent {
         path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.as_map_mut(), path, value.into())
+        self.value_mut().insert_by_path_v2(path, value.into())
     }
 
     // deprecated - using this means the schema is unknown
@@ -293,25 +293,17 @@ impl LogEvent {
         }
     }
 
-    // #[deprecated]
-    // pub fn as_map_deprecated(&self) -> &BTreeMap<String, Value> {
-    //     match &self.inner.fields {
-    //         Value::Object(map) => map,
-    //         _ => unreachable!(),
-    //     }
-    // }
-
     pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
-        match &self.inner.fields {
+        match self.value() {
             Value::Object(map) => Some(map),
             _ => None,
         }
     }
 
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn as_map_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
         match self.value_mut() {
-            Value::Object(ref mut map) => map,
-            _ => unreachable!(),
+            Value::Object(map) => Some(map),
+            _ => None,
         }
     }
 

@@ -3,6 +3,7 @@
 mod convert;
 mod display;
 mod error;
+mod insert;
 mod iter;
 mod path;
 mod regex;
@@ -436,6 +437,44 @@ impl Value {
         }
     }
 
+    /// Returns a reference to a field value specified by a path iter.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn insert_by_path_v2<'a>(
+        &mut self,
+        path: impl Path<'a>,
+        insert_value: impl Into<Self>,
+    ) -> Option<Self> {
+        let insert_value = insert_value.into();
+        let mut path_iter = path.segment_iter().peekable();
+
+        match path_iter.peek() {
+            None => {
+                return Some(std::mem::replace(self, insert_value));
+            }
+            Some(BorrowedSegment::Field(field)) => {
+                if let Value::Object(map) = self {
+                    insert::map_insert(map, path_iter, insert_value)
+                } else {
+                    let mut map = BTreeMap::new();
+                    let prev_value = insert::map_insert(&mut map, path_iter, insert_value);
+                    *self = Value::Object(map);
+                    prev_value
+                }
+            }
+            Some(BorrowedSegment::Index(index)) => {
+                if let Value::Array(array) = self {
+                    insert::array_insert(array, path_iter, insert_value)
+                } else {
+                    let mut array = vec![];
+                    let prev_value = insert::array_insert(&mut array, path_iter, insert_value);
+                    *self = Value::Array(array);
+                    prev_value
+                }
+            }
+            Some(BorrowedSegment::Invalid) => None,
+        }
+    }
+
     /// Insert a value at a given lookup.
     ///
     /// ```rust
@@ -453,6 +492,7 @@ impl Value {
     /// assert!(map.contains("bar"));
     /// assert!(map.contains(Lookup::from_str("star.baz").unwrap()));
     /// ```
+    // This function is deprecated. `insert_by_path_v2` should be used instead when possible
     #[allow(clippy::missing_errors_doc)]
     pub fn insert(
         &mut self,
