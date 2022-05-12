@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use value::Value;
@@ -70,7 +70,11 @@ impl Expression for Predicate {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        todo!()
+        self.inner
+            .iter()
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned).map(Cow::Owned))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map(|mut v| v.pop().unwrap_or_else(|| Value::Boolean(false).into()))
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
