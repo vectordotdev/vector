@@ -56,10 +56,9 @@ impl Clone for PipelineConfig {
 #[typetag::serde(name = "pipeline")]
 impl TransformConfig for PipelineConfig {
     async fn build(&self, ctx: &TransformContext) -> crate::Result<Transform> {
-        let condition = if let Some(config) = &self.filter {
-            Some(config.build(&ctx.enrichment_tables)?)
-        } else {
-            None
+        let condition = match &self.filter {
+            Some(config) => Some(config.build(&ctx.enrichment_tables)?),
+            None => None,
         };
 
         // Setup the interior transform chain in this pipeline.
@@ -184,19 +183,17 @@ impl SyncTransform for Pipeline {
         // Here our queue is the TransformOutputsBuf. In the next chunk of code
         // that follows we do the aforementioned filtering and push into
         // `self.buf_out`.
-        {
-            let ev_container = events.into_events();
-            if let Some(condition) = &self.condition {
-                for event in ev_container {
-                    if condition.check(&event) {
-                        self.buf_out.push(event);
-                    } else {
-                        output.push(event);
-                    }
+        let ev_container = events.into_events();
+        if let Some(condition) = &self.condition {
+            for event in ev_container {
+                if condition.check(&event) {
+                    self.buf_out.push(event);
+                } else {
+                    output.push(event);
                 }
-            } else {
-                self.buf_out.extend(ev_container);
             }
+        } else {
+            self.buf_out.extend(ev_container);
         }
 
         // `buf_out` is now primed with Events. Note that the struct also has a
@@ -206,15 +203,13 @@ impl SyncTransform for Pipeline {
         // emptied. Once all the transforms are run, the Events in `buf_out` are
         // emitted to `output`. When this function runs again `buf_out` is
         // empty, `buf_in` is empty and the process is ready to begin again.
-        {
-            for transform in &mut self.transforms {
-                std::mem::swap(&mut self.buf_out, &mut self.buf_in);
-                for event in self.buf_in.drain() {
-                    transform.transform(event, &mut self.buf_out);
-                }
+        for transform in &mut self.transforms {
+            std::mem::swap(&mut self.buf_out, &mut self.buf_in);
+            for event in self.buf_in.drain() {
+                transform.transform(event, &mut self.buf_out);
             }
-            output.extend(self.buf_out.drain());
         }
+        output.extend(self.buf_out.drain());
     }
 }
 
