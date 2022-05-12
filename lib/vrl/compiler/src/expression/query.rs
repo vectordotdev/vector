@@ -153,7 +153,7 @@ impl Expression for Query {
             }
             Target::Internal(variable) => {
                 vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
+                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
             }
             Target::FunctionCall(call) => {
                 // Write the code to call the function.

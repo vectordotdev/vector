@@ -436,10 +436,7 @@ impl<'a> Compiler<'a> {
         // potential external optimizations.
         for target in assignment.targets() {
             if let assignment::Target::External(path) = target {
-                match path {
-                    Some(path) => self.external_assignments.push(path),
-                    None => self.external_assignments.push(LookupBuf::root()),
-                }
+                self.external_assignments.push(path);
             }
         }
 

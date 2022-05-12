@@ -1,6 +1,7 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label};
+use lookup::LookupBuf;
 use value::Value;
 
 use crate::{
@@ -72,7 +73,7 @@ impl Expression for Variable {
         vm.write_opcode(OpCode::GetPath);
 
         // Store the required path in the targets list, write its index to the vm.
-        let variable = vm::Variable::Internal(self.ident().clone(), None);
+        let variable = vm::Variable::Internal(self.ident().clone(), LookupBuf::root());
         let target = vm.get_target(&variable);
         vm.write_primitive(target);
 
