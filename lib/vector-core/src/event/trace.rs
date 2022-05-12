@@ -10,6 +10,7 @@ use super::{
     Value,
 };
 use crate::ByteSizeOf;
+use lookup::path;
 
 /// Traces are a newtype of `LogEvent`
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -22,9 +23,7 @@ impl TraceEvent {
     /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         let (value, metadata) = self.0.into_parts();
-        let map = value
-            .into_object()
-            .unwrap_or_else(|| unreachable!("inner fields must be a map"));
+        let map = value.into_object().expect("inner value must be a map");
         (map, metadata)
     }
 
@@ -62,8 +61,12 @@ impl TraceEvent {
         Self(self.0.with_batch_notifier_option(batch))
     }
 
+    /// Convert a `TraceEvent` into a BTreeMap of it's fields
+    /// # Panics
+    ///
+    /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        self.0.as_map_deprecated()
+        self.0.as_map().expect("inner value must be a map")
     }
 
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
@@ -79,7 +82,7 @@ impl TraceEvent {
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.as_map_deprecated().get(key.as_ref())
+        self.0.get(path!(key.as_ref()))
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {

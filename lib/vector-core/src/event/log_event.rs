@@ -12,7 +12,6 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
-use itertools::Either;
 use lookup::path;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
@@ -227,7 +226,6 @@ impl LogEvent {
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
         self.inner.fields.get_by_path_v2(path).is_some()
-        // util::log::contains(self.as_map_deprecated(), path)
     }
 
     pub fn insert<'a>(
@@ -287,8 +285,12 @@ impl LogEvent {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.as_map_deprecated().is_empty()
+    pub fn is_empty_object(&self) -> bool {
+        if let Some(map) = self.as_map() {
+            map.is_empty()
+        } else {
+            false
+        }
     }
 
     #[deprecated]
@@ -451,7 +453,7 @@ impl Serialize for LogEvent {
     where
         S: Serializer,
     {
-        serializer.collect_map(self.as_map_deprecated().iter())
+        self.value().serialize(serializer)
     }
 }
 

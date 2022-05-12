@@ -8912,7 +8912,6 @@ dependencies = [
  "http",
  "hyper-proxy",
  "indexmap",
- "itertools",
  "lookup",
  "metrics",
  "metrics-tracing-context",
