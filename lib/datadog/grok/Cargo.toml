@@ -34,7 +34,7 @@ criterion = { version = "0.3.5" }
 tracing-test = { version = "0.2", default-features = false }
 
 [build-dependencies]
-lalrpop = { version = "0.19.7", default-features = false }
+lalrpop = { version = "0.19.8", default-features = false }
 
 [[bench]]
 name = "filters"

@@ -3,6 +3,7 @@ use std::{fmt, sync::Arc};
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use super::Block;
 use crate::{
     expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
@@ -16,8 +17,6 @@ use crate::{
     vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
-
-use super::Block;
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
@@ -1191,9 +1190,8 @@ impl DiagnosticMessage for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::{state::ExternalEnv, value::kind};
-
     use super::*;
+    use crate::{state::ExternalEnv, value::kind};
 
     #[derive(Clone, Debug)]
     struct Fn;

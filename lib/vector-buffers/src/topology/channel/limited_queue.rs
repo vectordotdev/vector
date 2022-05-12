@@ -1,6 +1,3 @@
-use async_stream::stream;
-use crossbeam_queue::ArrayQueue;
-use futures::Stream;
 use std::{
     cmp, fmt,
     pin::Pin,
@@ -9,6 +6,10 @@ use std::{
         Arc,
     },
 };
+
+use async_stream::stream;
+use crossbeam_queue::ArrayQueue;
+use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use crate::Bufferable;
@@ -252,9 +253,8 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
 mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
 
-    use crate::{test::common::MultiEventRecord, topology::channel::limited_queue::SendError};
-
     use super::limited;
+    use crate::{test::common::MultiEventRecord, topology::channel::limited_queue::SendError};
 
     #[tokio::test]
     async fn send_receive() {

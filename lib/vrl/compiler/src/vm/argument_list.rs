@@ -1,15 +1,16 @@
+use std::{any::Any, collections::BTreeMap};
+
 use diagnostic::DiagnosticMessage;
 use parser::ast::Ident;
+use value::Value;
 
+use super::Vm;
 use crate::{
     expression::{Expr, FunctionArgument},
     function::FunctionCompileContext,
     value::Kind,
-    ExpressionError, Function, Parameter, Value,
+    ExpressionError, Function, Parameter,
 };
-use std::{any::Any, collections::BTreeMap};
-
-use super::Vm;
 
 pub enum VmArgument<'a> {
     Value(Value),

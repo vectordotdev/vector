@@ -24,3 +24,29 @@ impl InternalEvent for EventsReceived {
         );
     }
 }
+
+// This should have a better name, but this event is deprecated.
+// Use `EventsReceived` once the deprecated counter below is removed.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
+pub struct OldEventsReceived {
+    pub byte_size: usize,
+    pub count: usize,
+}
+
+impl InternalEvent for OldEventsReceived {
+    fn emit(self) {
+        trace!(
+            message = "Events received.",
+            count = self.count,
+            byte_size = self.byte_size,
+        );
+        counter!("component_received_events_total", self.count as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64
+        );
+        // deprecated
+        counter!("events_in_total", self.count as u64);
+    }
+}

@@ -1,3 +1,13 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+};
+
+use lookup::LookupBuf;
+use once_cell::sync::Lazy;
+use tracing::error;
+use value::Value;
+
 use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
@@ -5,14 +15,6 @@ use crate::{
     matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
-use lookup::LookupBuf;
-use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-};
-use tracing::error;
-use value::Value;
 
 static GROK_PATTERN_RE: Lazy<onig::Regex> =
     Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());

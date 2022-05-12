@@ -113,7 +113,7 @@ lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
-value = { path = "lib/value", optional = true }
+value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
@@ -125,7 +125,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.53", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.18.1", default-features = false, features = ["full"] }
+tokio = { version = "1.18.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -219,7 +219,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
-clap = { version = "3.1.16", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.1.18", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -241,7 +241,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.1", default-features = false, features = ["serde"] }
 infer = { version = "0.7.0", default-features = false, optional = true}
-indoc = { version = "1.0.4", default-features = false }
+indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
 kube = { version = "0.71.0", default-features = false, features = ["client", "rustls-tls", "runtime"], optional = true }
@@ -251,7 +251,7 @@ lru = { version = "0.7.5", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.2.1", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.19.1", default-features = false, optional = true }
+nats = { version = "0.20.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
@@ -283,10 +283,10 @@ strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = {version = "0.15.0", default-features = false, features = ["connect"], optional = true}
+tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
-tonic = { version = "0.7.1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
-trust-dns-proto = { version = "0.21", default-features = false, features = ["dnssec"], optional = true }
+tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
+trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
@@ -311,7 +311,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.24.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.10.1", default-features = false, optional = true }
+prost-build = { version = "0.10.3", default-features = false, optional = true }
 tonic-build = { version = "0.7", default-features = false, features = ["transport", "prost", "compression"], optional = true }
 
 [dev-dependencies]
@@ -328,7 +328,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.18.1", features = ["test-util"] }
+tokio = { version = "1.18.2", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
@@ -465,7 +465,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls"]
 sources-aws_s3 = ["aws-core", "aws-sdk-sqs", "aws-sdk-s3", "semver", "async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build", "value"]
+sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["fakedata"]
 sources-dnstap = ["base64", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
@@ -577,7 +577,7 @@ transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
 transforms-regex_parser = []
-transforms-remap = ["value"]
+transforms-remap = []
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []

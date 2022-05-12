@@ -1,9 +1,9 @@
-use anymap::AnyMap;
 use std::collections::{hash_map::Entry, HashMap};
 
-use value::Kind;
+use anymap::AnyMap;
+use value::{Kind, Value};
 
-use crate::{parser::ast::Ident, type_def::Details, Value};
+use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]

@@ -1,7 +1,7 @@
-use bytes::Bytes;
-use lookup::lookup_v2::OwnedSegment;
 use std::{io, sync::Arc};
 
+use bytes::Bytes;
+use lookup::lookup_v2::OwnedSegment;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{

@@ -58,10 +58,11 @@ impl Encoder<Event> for JsonSerializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::BytesMut;
     use vector_common::btreemap;
     use vector_core::event::Value;
+
+    use super::*;
 
     #[test]
     fn serialize_json() {

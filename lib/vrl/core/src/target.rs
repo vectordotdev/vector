@@ -86,10 +86,7 @@ impl Target for Value {
     }
 
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        let value = self.target_get(path)?.cloned();
-        self.remove_by_path(path, compact);
-
-        Ok(value)
+        Ok(self.remove_by_path(path, compact))
     }
 }
 
@@ -97,9 +94,10 @@ impl Target for Value {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
+    use lookup::{FieldBuf, SegmentBuf};
+
     use super::*;
     use crate::value;
-    use lookup::{FieldBuf, SegmentBuf};
 
     #[test]
     fn target_get() {

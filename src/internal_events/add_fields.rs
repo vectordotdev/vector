@@ -1,17 +1,6 @@
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AddFieldsFieldOverwritten<'a> {
-    pub(crate) field: &'a str,
-}
-
-impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
-    fn emit(self) {
-        debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
-    }
-}
-
-#[derive(Debug)]
 pub struct AddFieldsFieldNotOverwritten<'a> {
     pub field: &'a str,
 }

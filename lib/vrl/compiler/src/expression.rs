@@ -2,10 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
+use value::Value;
 
 use crate::{
     state::{ExternalEnv, LocalEnv},
-    vm, Context, Span, TypeDef, Value,
+    vm, Context, Span, TypeDef,
 };
 
 #[cfg(feature = "expr-abort")]
@@ -39,6 +40,8 @@ pub(crate) mod predicate;
 #[cfg(feature = "expr-query")]
 pub(crate) mod query;
 
+pub use core::{ExpressionError, Resolved};
+
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -46,7 +49,6 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
-pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
@@ -452,7 +454,8 @@ impl From<Abort> for Expr {
 impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use std::collections::BTreeMap;
-        use Value::*;
+
+        use value::Value::*;
 
         match value {
             Bytes(v) => Literal::from(v).into(),

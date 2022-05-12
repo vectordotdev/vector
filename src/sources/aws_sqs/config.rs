@@ -1,3 +1,8 @@
+use std::cmp;
+
+use codecs::decoding::{DeserializerConfig, FramingConfig};
+use serde::{Deserialize, Serialize};
+
 use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
 use crate::common::sqs::SqsClientBuilder;
@@ -8,10 +13,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
 };
-
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use serde::{Deserialize, Serialize};
-use std::cmp;
 
 #[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
 #[derivative(Default)]

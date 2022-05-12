@@ -1,7 +1,3 @@
-use crate::{
-    event::Event,
-    internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
-};
 use bytes::{Bytes, BytesMut};
 use codecs::decoding::{
     format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer,
@@ -9,6 +5,11 @@ use codecs::decoding::{
 };
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+
+use crate::{
+    event::Event,
+    internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
+};
 
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.

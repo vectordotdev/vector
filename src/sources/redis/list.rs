@@ -1,10 +1,13 @@
-use super::{handle_line, Method};
-use crate::{
-    codecs, internal_events::RedisReceiveEventError, shutdown::ShutdownSignal, sources::Source,
-    SourceSender,
-};
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 use snafu::{ResultExt, Snafu};
+
+use super::{handle_line, Method};
+use crate::{
+    codecs,
+    config::SourceContext,
+    internal_events::RedisReceiveEventError,
+    sources::{redis::ConnectionInfo, Source},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -14,21 +17,21 @@ enum BuildError {
 
 pub async fn watch(
     client: redis::Client,
+    connection_info: ConnectionInfo,
     key: String,
     redis_key: Option<String>,
     method: Method,
     decoder: codecs::Decoder,
-    mut shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    cx: SourceContext,
 ) -> crate::Result<Source> {
-    trace!(message = "Get redis connection manager.");
     let mut conn = client
         .get_tokio_connection_manager()
         .await
         .context(ConnectionSnafu {})?;
-    trace!(message = "Got redis connection manager.");
 
-    let fut = async move {
+    Ok(Box::pin(async move {
+        let mut shutdown = cx.shutdown;
+        let mut tx = cx.out;
         loop {
             let res = match method {
                 Method::Rpop => tokio::select! {
@@ -44,9 +47,15 @@ pub async fn watch(
             match res {
                 Err(error) => emit!(RedisReceiveEventError::from(error)),
                 Ok(line) => {
-                    if let Err(()) =
-                        handle_line(line, &key, redis_key.as_deref(), decoder.clone(), &mut out)
-                            .await
+                    if let Err(()) = handle_line(
+                        &connection_info,
+                        line,
+                        &key,
+                        redis_key.as_deref(),
+                        decoder.clone(),
+                        &mut tx,
+                    )
+                    .await
                     {
                         break;
                     }
@@ -54,8 +63,7 @@ pub async fn watch(
             }
         }
         Ok(())
-    };
-    Ok(Box::pin(fut))
+    }))
 }
 
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<String> {

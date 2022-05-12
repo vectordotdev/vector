@@ -825,7 +825,9 @@ mod integration_tests {
         docker::Container,
         sources::fluent::FluentConfig,
         test_util::{
-            collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
+            collect_ready,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, next_addr_for_ip, random_string, wait_for_tcp,
         },
         SourceSender,
     };
@@ -853,15 +855,14 @@ mod integration_tests {
     }
 
     async fn test_fluentbit(status: EventStatus) {
-        trace_init();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let test_address = next_addr();
+            let (out, source_address) = source(status).await;
 
-        let test_address = next_addr();
-        let (out, source_address) = source(status).await;
-
-        let dir = make_file(
-            "fluent-bit.conf",
-            &format!(
-                r#"
+            let dir = make_file(
+                "fluent-bit.conf",
+                &format!(
+                    r#"
 [SERVICE]
     Grace      0
     Flush      1
@@ -878,39 +879,41 @@ mod integration_tests {
     Host          host.docker.internal
     Port          {send_port}
     Require_ack_response true
-"#,
-                listen_host = test_address.ip(),
-                listen_port = test_address.port(),
-                send_port = source_address.port(),
-            ),
-        );
+    "#,
+                    listen_host = test_address.ip(),
+                    listen_port = test_address.port(),
+                    send_port = source_address.port(),
+                ),
+            );
 
-        let msg = random_string(64);
-        let body = serde_json::json!({ "message": msg });
+            let msg = random_string(64);
+            let body = serde_json::json!({ "message": msg });
 
-        let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
-            .bind(dir.path().display(), "/fluent-bit/etc")
-            .run(async move {
-                wait_for_tcp(test_address).await;
-                reqwest::Client::new()
-                    .post(&format!("http://{}/", test_address))
-                    .header("content-type", "application/json")
-                    .body(body.to_string())
-                    .send()
-                    .await
-                    .unwrap();
-                sleep(Duration::from_secs(2)).await;
-                let result = collect_ready(out).await;
-                result
-            })
-            .await;
+            let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
+                .bind(dir.path().display(), "/fluent-bit/etc")
+                .run(async move {
+                    wait_for_tcp(test_address).await;
+                    reqwest::Client::new()
+                        .post(&format!("http://{}/", test_address))
+                        .header("content-type", "application/json")
+                        .body(body.to_string())
+                        .send()
+                        .await
+                        .unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                    let result = collect_ready(out).await;
+                    result
+                })
+                .await;
 
-        assert_eq!(events.len(), 1);
-        let log = events[0].as_log();
-        assert_eq!(log["tag"], "http.0".into());
-        assert_eq!(log["message"], msg.into());
-        assert!(log.get("timestamp").is_some());
-        assert!(log.get("host").is_some());
+            assert_eq!(events.len(), 1);
+            let log = events[0].as_log();
+            assert_eq!(log["tag"], "http.0".into());
+            assert_eq!(log["message"], msg.into());
+            assert!(log.get("timestamp").is_some());
+            assert!(log.get("host").is_some());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -929,13 +932,12 @@ mod integration_tests {
     }
 
     async fn test_fluentd(status: EventStatus, options: &str) {
-        trace_init();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let test_address = next_addr();
+            let (out, source_address) = source(status).await;
 
-        let test_address = next_addr();
-        let (out, source_address) = source(status).await;
-
-        let config = format!(
-            r#"
+            let config = format!(
+                r#"
 <source>
   @type http
   bind {http_host}
@@ -957,38 +959,40 @@ mod integration_tests {
   {options}
 </match>
 "#,
-            http_host = test_address.ip(),
-            http_port = test_address.port(),
-            port = source_address.port(),
-            options = options
-        );
+                http_host = test_address.ip(),
+                http_port = test_address.port(),
+                port = source_address.port(),
+                options = options
+            );
 
-        let dir = make_file("fluent.conf", &config);
+            let dir = make_file("fluent.conf", &config);
 
-        let msg = random_string(64);
-        let body = serde_json::json!({ "message": msg });
+            let msg = random_string(64);
+            let body = serde_json::json!({ "message": msg });
 
-        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
-            .bind(dir.path().display(), "/fluentd/etc")
-            .run(async move {
-                wait_for_tcp(test_address).await;
-                reqwest::Client::new()
-                    .post(&format!("http://{}/", test_address))
-                    .header("content-type", "application/json")
-                    .body(body.to_string())
-                    .send()
-                    .await
-                    .unwrap();
-                sleep(Duration::from_secs(2)).await;
-                collect_ready(out).await
-            })
-            .await;
+            let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+                .bind(dir.path().display(), "/fluentd/etc")
+                .run(async move {
+                    wait_for_tcp(test_address).await;
+                    reqwest::Client::new()
+                        .post(&format!("http://{}/", test_address))
+                        .header("content-type", "application/json")
+                        .body(body.to_string())
+                        .send()
+                        .await
+                        .unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                    collect_ready(out).await
+                })
+                .await;
 
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].as_log()["tag"], "".into());
-        assert_eq!(events[0].as_log()["message"], msg.into());
-        assert!(events[0].as_log().get("timestamp").is_some());
-        assert!(events[0].as_log().get("host").is_some());
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].as_log()["tag"], "".into());
+            assert_eq!(events[0].as_log()["message"], msg.into());
+            assert!(events[0].as_log().get("timestamp").is_some());
+            assert!(events[0].as_log().get("host").is_some());
+        })
+        .await;
     }
 
     async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {

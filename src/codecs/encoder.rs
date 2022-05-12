@@ -1,13 +1,14 @@
-use crate::{
-    event::Event,
-    internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
-};
 use bytes::BytesMut;
 use codecs::{
     encoding::{Error, Framer, Serializer},
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, RawMessageSerializer,
 };
 use tokio_util::codec::Encoder as _;
+
+use crate::{
+    event::Event,
+    internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
+};
 
 #[derive(Debug, Clone)]
 /// An encoder that can encode structured events into byte frames.
@@ -174,11 +175,12 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::BufMut;
     use codecs::{encoding::BoxedFramingError, RawMessageSerializer};
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
+
+    use super::*;
 
     #[derive(Debug, Clone)]
     struct ParenEncoder;

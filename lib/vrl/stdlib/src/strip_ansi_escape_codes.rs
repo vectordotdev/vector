@@ -1,3 +1,4 @@
+use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
 
