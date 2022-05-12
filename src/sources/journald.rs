@@ -12,7 +12,9 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use futures::{
+    future, future::BoxFuture, poll, stream::BoxStream, task::Poll, FutureExt, StreamExt,
+};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -25,7 +27,7 @@ use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::{Child, Command},
-    sync::{Mutex, MutexGuard},
+    sync::{oneshot, Mutex, MutexGuard},
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
@@ -236,7 +238,7 @@ impl JournaldSource {
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);
-        let finalizer = Finalizer::new(
+        let (finalizer, shutdown) = Finalizer::new(
             self.acknowledgements,
             checkpointer.clone(),
             shutdown.clone(),
@@ -251,7 +253,7 @@ impl JournaldSource {
         mut self,
         checkpointer: SharedCheckpointer,
         finalizer: Finalizer,
-        mut shutdown: ShutdownSignal,
+        mut shutdown: BoxFuture<'static, ()>,
     ) {
         loop {
             if matches!(poll!(&mut shutdown), Poll::Ready(_)) {
@@ -262,7 +264,7 @@ impl JournaldSource {
             let cursor = checkpointer.lock().await.cursor.clone();
             match self.starter.start(cursor.as_deref()) {
                 Ok((stream, running)) => {
-                    if !self.run_stream(stream, &finalizer, shutdown.clone()).await {
+                    if !self.run_stream(stream, &finalizer, &mut shutdown).await {
                         return;
                     }
                     // Explicit drop to ensure it isn't dropped earlier.
@@ -288,7 +290,7 @@ impl JournaldSource {
         &'a mut self,
         mut stream: JournalStream,
         finalizer: &'a Finalizer,
-        mut shutdown: ShutdownSignal,
+        shutdown: &'a mut BoxFuture<'static, ()>,
     ) -> bool {
         let batch_size = self.batch_size;
         loop {
@@ -298,7 +300,7 @@ impl JournaldSource {
             // valid and non-filtered event.
             while batch.events.is_empty() {
                 let item = tokio::select! {
-                    _ = &mut shutdown => return false,
+                    _ = &mut *shutdown => return false,
                     item = stream.next() => item,
                 };
                 if !batch.handle_next(item) {
@@ -643,19 +645,24 @@ impl Finalizer {
         acknowledgements: bool,
         checkpointer: SharedCheckpointer,
         shutdown: ShutdownSignal,
-    ) -> Self {
+    ) -> (Self, BoxFuture<'static, ()>) {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown.clone());
+            let (trigger, tripwire) = oneshot::channel();
+            let mut trigger = Some(trigger);
             tokio::spawn(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
-                    if status == BatchStatus::Delivered {
+                    if trigger.is_some() && status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
+                    } else if let Some(trigger) = trigger.take() {
+                        let _ = trigger.send(());
                     }
                 }
             });
-            Self::Async(finalizer)
+            let shutdown = future::select(shutdown, tripwire).map(|_| ()).boxed();
+            (Self::Async(finalizer), shutdown)
         } else {
-            Self::Sync(checkpointer)
+            (Self::Sync(checkpointer), shutdown.map(|_| ()).boxed())
         }
     }
 
@@ -798,6 +805,7 @@ mod checkpointer_tests {
 mod tests {
     use std::{fs, path::Path};
 
+    use pretty_assertions::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
 
@@ -1014,7 +1022,25 @@ mod tests {
 
     #[tokio::test]
     async fn handles_acknowledgements() {
-        let (tx, mut rx) = SourceSender::new_test();
+        let (count, checkpoint) = run_acknowledgements(usize::MAX).await;
+
+        assert_eq!(count, 8);
+        assert_eq!(checkpoint.as_deref(), Some("8"));
+    }
+
+    #[tokio::test]
+    async fn handles_negative_acknowledgements() {
+        let (count, checkpoint) = run_acknowledgements(2).await;
+
+        assert_eq!(checkpoint.as_deref(), Some("2"));
+        // The acknowledgements for the events are delivered after the
+        // events are delivered to the pipeline, so this test would
+        // fail to show that deliveries have stopped.
+        // assert_eq!(count, 2);
+    }
+
+    async fn run_acknowledgements(error_after: usize) -> (usize, Option<String>) {
+        let (tx, mut rx) = SourceSender::new_test_error_after(error_after);
 
         let tempdir = tempdir().unwrap();
         let tempdir = tempdir.path().to_path_buf();
@@ -1032,6 +1058,7 @@ mod tests {
             data_dir: Some(tempdir),
             remap_priority: true,
             acknowledgements: true.into(),
+            batch_size: Some(1),
             ..Default::default()
         };
         let (cx, _shutdown) = SourceContext::new_shutdown(&ComponentKey::from(TEST_COMPONENT), tx);
@@ -1045,16 +1072,13 @@ mod tests {
 
         // Acknowledge all the received events.
         let mut count = 0;
-        while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            // The checkpointer shouldn't set the cursor until the end of the batch.
-            assert_eq!(checkpointer.get().await.unwrap(), None);
-            event.metadata().update_status(EventStatus::Delivered);
+        while let Poll::Ready(Some(_)) = futures::poll!(rx.next()) {
             count += 1;
         }
-        assert_eq!(count, 8);
 
         tokio::time::sleep(Duration::from_millis(100)).await;
-        assert_eq!(checkpointer.get().await.unwrap().as_deref(), Some("8"));
+        let checkpoint = checkpointer.get().await.unwrap();
+        (count, checkpoint)
     }
 
     #[test]
