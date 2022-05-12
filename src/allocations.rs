@@ -45,8 +45,10 @@ use tracking_allocator::{
 };
 use vector_core::metrics::{Controller, Handle};
 
-static ALLOCATION_LUT: ArcSwapOption<Vec<Option<AllocationGroupEntry>>> =
+static ALLOCATION_LUT: ArcSwapOption<Vec<Option<Arc<AllocationGroupEntry>>>> =
     ArcSwapOption::const_empty();
+
+/*
 static REGISTRATION_EVENTS: OnceCell<RegistrationEvents> = OnceCell::new();
 
 struct RegistrationEvents {
@@ -81,22 +83,22 @@ struct RegistrationEvent {
     group_entry: AllocationGroupEntry,
     tags: Vec<(String, String)>,
 }
+*/
 
-#[derive(Clone)]
 struct AllocationGroupEntry {
-    allocated_bytes: Arc<AtomicU64>,
-    deallocated_bytes: Arc<AtomicU64>,
-    allocations: Arc<AtomicU64>,
-    deallocations: Arc<AtomicU64>,
+    allocated_bytes: AtomicU64,
+    deallocated_bytes: AtomicU64,
+    allocations: AtomicU64,
+    deallocations: AtomicU64,
 }
 
 impl AllocationGroupEntry {
     fn new() -> Self {
         Self {
-            allocated_bytes: Arc::new(AtomicU64::new(0)),
-            deallocated_bytes: Arc::new(AtomicU64::new(0)),
-            allocations: Arc::new(AtomicU64::new(0)),
-            deallocations: Arc::new(AtomicU64::new(0)),
+            allocated_bytes: AtomicU64::new(0),
+            deallocated_bytes: AtomicU64::new(0),
+            allocations: AtomicU64::new(0),
+            deallocations: AtomicU64::new(0),
         }
     }
 
@@ -108,22 +110,6 @@ impl AllocationGroupEntry {
     fn track_deallocation(&self, bytes: u64) {
         self.deallocated_bytes.fetch_add(bytes, Ordering::Relaxed);
         self.deallocations.fetch_add(1, Ordering::Relaxed);
-    }
-
-    const fn allocated_bytes(&self) -> &Arc<AtomicU64> {
-        &self.allocated_bytes
-    }
-
-    const fn deallocated_bytes(&self) -> &Arc<AtomicU64> {
-        &self.deallocated_bytes
-    }
-
-    const fn allocations(&self) -> &Arc<AtomicU64> {
-        &self.allocations
-    }
-
-    const fn deallocations(&self) -> &Arc<AtomicU64> {
-        &self.deallocations
     }
 }
 
@@ -156,7 +142,7 @@ pub fn init_allocation_tracking() {
     let _ = AllocationRegistry::set_global_tracker(Tracker {})
         .expect("no other global tracker should be set yet");
 
-    thread::spawn(process_registration_events);
+    //thread::spawn(process_registration_events);
 
     AllocationRegistry::enable_tracking();
 }
@@ -180,20 +166,20 @@ pub fn acquire_allocation_group_token(tags: Vec<(String, String)>) -> Allocation
     let group_id = token.id();
 
     // Register the atomic counters, etc, for this group token.
-    let group_entry = register_allocation_group_token_entry(&group_id);
+    //let group_entry = register_allocation_group_token_entry(&group_id);
+    register_allocation_group_token_entry(&group_id);
 
     // Send the group ID and entry to our late registration thread so that it can correctly wire up any allocation
     // groups to our metrics backend once it's been initialized.
-    let registration_events = get_registration_events();
-    registration_events.push(RegistrationEvent { group_entry, tags });
+    //let registration_events = get_registration_events();
+    //registration_events.push(RegistrationEvent { group_entry, tags });
 
     token
 }
 
-fn register_allocation_group_token_entry(group_id: &AllocationGroupId) -> AllocationGroupEntry {
+fn register_allocation_group_token_entry(group_id: &AllocationGroupId) {
     AllocationRegistry::untracked(|| {
         let group_id = group_id.as_usize().get();
-        let group_entry = AllocationGroupEntry::new();
 
         // Create our allocated/deallocated counters and store them at their respective index in the global lookup
         // table. This requires us to (potentially) resize the vector and fill it with empty values if we're racing
@@ -201,7 +187,7 @@ fn register_allocation_group_token_entry(group_id: &AllocationGroupId) -> Alloca
         ALLOCATION_LUT.rcu(|lut| {
             let mut lut = lut.as_ref()
                 .map(|a| a.as_ref().clone())
-                .unwrap_or_default();
+                .unwrap_or_else(|| Vec::new());
 
             // Make sure the vector is long enough that we can directly index our group ID.
             let minimum_len = group_id + 1;
@@ -215,16 +201,15 @@ fn register_allocation_group_token_entry(group_id: &AllocationGroupId) -> Alloca
                     panic!("allocation LUT entry was already populated for newly acquired allocation group token!");
                 }
 
-                *entry = Some(group_entry.clone());
+                *entry = Some(Arc::new(AllocationGroupEntry::new()));
             }
 
             Some(Arc::new(lut))
         });
-
-        group_entry
     })
 }
 
+#[inline(always)]
 fn with_allocation_group_entry<F>(group_id: AllocationGroupId, f: F) -> bool
 where
     F: FnOnce(&AllocationGroupEntry),
@@ -242,6 +227,7 @@ where
     }
 }
 
+/*
 fn get_registration_events() -> &'static RegistrationEvents {
     REGISTRATION_EVENTS.get_or_init(|| {
         static CHANNEL: StaticChannel<Option<RegistrationEvent>, 128> = StaticChannel::new();
@@ -307,3 +293,4 @@ fn register_allocation_group_counter<F>(
     let handle = Handle::Counter(Arc::clone(get_handle(&event.group_entry)).into());
     controller.register_handle(&key, handle);
 }
+*/

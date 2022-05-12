@@ -287,7 +287,7 @@ tokio-postgres = { version = "0.7.6", default-features = false, features = ["run
 tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
-tracking-allocator = { version = "0.3.0", default-features = false, features = ["tracing-compat"], optional = true }
+tracking-allocator = { path = "../tracking-allocator", default-features = false, features = ["tracing-compat"], optional = true }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
