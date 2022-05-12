@@ -80,7 +80,7 @@ impl Function for SetSemanticMeaning {
         Ok(Box::new(SetSemanticMeaningFn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         Ok(Value::Null)
     }
 }
@@ -89,8 +89,11 @@ impl Function for SetSemanticMeaning {
 struct SetSemanticMeaningFn;
 
 impl Expression for SetSemanticMeaningFn {
-    fn resolve(&self, _ctx: &mut Context) -> Resolved {
-        Ok(Value::Null)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        Ok(Value::Null.into())
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

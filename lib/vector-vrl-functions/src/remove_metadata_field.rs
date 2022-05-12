@@ -1,10 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn remove_metadata_field(
-    ctx: &mut Context,
-    key: &str,
-) -> std::result::Result<Value, ExpressionError> {
+fn remove_metadata_field(ctx: &mut Context, key: &str) -> Result<Value> {
     ctx.target_mut().remove_metadata(key)?;
     Ok(Value::Null)
 }
@@ -68,7 +65,7 @@ impl Function for RemoveMetadataField {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let key = args.required_any("key").downcast_ref::<String>().unwrap();
         remove_metadata_field(ctx, key)
     }
@@ -80,10 +77,13 @@ struct RemoveMetadataFieldFn {
 }
 
 impl Expression for RemoveMetadataFieldFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let key = &self.key;
 
-        remove_metadata_field(ctx, key)
+        remove_metadata_field(ctx, key).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

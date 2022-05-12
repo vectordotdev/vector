@@ -19,14 +19,14 @@ use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
-fn get_enrichment_table_record(
+fn get_enrichment_table_record<'a>(
     select: Option<Value>,
-    enrichment_tables: &TableSearch,
-    table: &str,
+    enrichment_tables: &'a TableSearch,
+    table: &'a str,
     case_sensitive: Case,
-    condition: &[Condition],
+    condition: &'a [Condition],
     index: Option<IndexHandle>,
-) -> Resolved {
+) -> Resolved<'a> {
     let select = select
         .map(|array| match array {
             Value::Array(arr) => arr
@@ -179,7 +179,7 @@ impl Function for GetEnrichmentTableRecord {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let condition = args.required("condition");
         let condition = condition
             .into_object()
@@ -217,7 +217,10 @@ pub struct GetEnrichmentTableRecordFn {
 }
 
 impl Expression for GetEnrichmentTableRecordFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let condition = self
             .condition
             .iter()

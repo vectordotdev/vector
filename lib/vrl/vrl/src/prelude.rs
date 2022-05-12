@@ -11,6 +11,7 @@ pub use compiler::{
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 
+pub use std::borrow::Cow;
 pub use std::collections::BTreeMap;
 pub use std::fmt;
 
