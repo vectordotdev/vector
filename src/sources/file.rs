@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{collections::HashSet, convert::TryInto, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -334,10 +334,16 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
+        let mut failed_files: HashSet<FileFingerprint> = Default::default();
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
-                if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset);
+                // Don't update the checkpointer on file streams after failed acks
+                if !failed_files.contains(&entry.file_id) {
+                    if status == BatchStatus::Delivered {
+                        checkpoints.update(entry.file_id, entry.offset);
+                    } else {
+                        failed_files.insert(entry.file_id);
+                    }
                 }
             }
             send_shutdown.send(())
@@ -509,12 +515,13 @@ mod tests {
         collections::HashSet,
         fs::{self, File},
         future::Future,
-        io::{Seek, Write},
+        io::{Read, Seek, Write},
+        path::Path,
     };
 
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
     use tokio::time::{sleep, timeout, Duration};
 
     use super::*;
@@ -531,7 +538,7 @@ mod tests {
         crate::test_util::test_generate_config::<FileConfig>();
     }
 
-    fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
+    fn test_default_file_config(dir: &TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
@@ -908,16 +915,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key_acknowledged() {
-        file_file_key(Acks).await
+    async fn file_key_acknowledged() {
+        file_key(Acks).await
     }
 
     #[tokio::test]
-    async fn file_file_key_nonacknowledged() {
-        file_file_key(NoAcks).await
+    async fn file_key_nonacknowledged() {
+        file_key(NoAcks).await
     }
 
-    async fn file_file_key(acks: AckingMode) {
+    async fn file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();
@@ -1103,6 +1110,62 @@ mod tests {
         let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_negative_acknowledgement() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
+        let line_len = orig[0].len();
+
+        // First time server runs it picks up existing lines.
+        let received =
+            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100)).await;
+        let lines = extract_messages_string(received);
+        let checkpoints = read_checkpoints(&dir);
+        assert_eq!(checkpoints.len(), 1);
+        assert_eq!(checkpoints[0].position, line_len as u64 * 2 + 2);
+        assert_eq!(&lines, &orig);
+    }
+
+    async fn slow_write(filename: &Path, lines: &[String], millis: u64) {
+        let mut file = File::create(filename).unwrap();
+        let duration = Duration::from_millis(millis);
+        for line in lines {
+            sleep(duration).await;
+            writeln!(&mut file, "{}", line).unwrap();
+        }
+        sleep_500_millis().await;
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Checkpoint {
+        // fingerprint: JsonValue,
+        // modified: String,
+        position: u64,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Checkpoints {
+        version: String,
+        checkpoints: Vec<Checkpoint>,
+    }
+
+    fn read_checkpoints(dir: &TempDir) -> Vec<Checkpoint> {
+        let mut filename = dir.path().to_path_buf();
+        filename.push(file_source::CHECKPOINT_FILE_NAME);
+        let mut file = File::open(filename).unwrap();
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).unwrap();
+        let checkpoints: Checkpoints = serde_json::from_str(&buf).unwrap();
+        assert_eq!(&checkpoints.version, "1");
+        checkpoints.checkpoints
     }
 
     #[tokio::test]
@@ -1658,6 +1721,7 @@ mod tests {
         NoAcks,      // No acknowledgement handling and no finalization
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
+        Nack(usize), // Error acknowledgement after N events
     }
     use AckingMode::*;
 
@@ -1668,12 +1732,19 @@ mod tests {
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         assert_source_compliance(&FILE_SOURCE_TAGS, async move {
-            let (tx, rx) = if acking_mode == Acks {
-                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-                (tx, rx.boxed())
-            } else {
-                let (tx, rx) = SourceSender::new_test();
-                (tx, rx.boxed())
+            let (tx, rx) = match acking_mode {
+                Acks => {
+                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                    (tx, rx.boxed())
+                }
+                NoAcks | Unfinalized => {
+                    let (tx, rx) = SourceSender::new_test();
+                    (tx, rx.boxed())
+                }
+                Nack(after) => {
+                    let (tx, rx) = SourceSender::new_test_error_after(after);
+                    (tx, rx.boxed())
+                }
             };
 
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
