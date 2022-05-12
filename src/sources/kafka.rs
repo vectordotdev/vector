@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Cursor,
     sync::Arc,
 };
@@ -179,15 +179,22 @@ async fn kafka_source(
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
+    let mut failed_topics: HashSet<String> = Default::default();
+
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                if status == BatchStatus::Delivered {
-                    if let Err(error) =
-                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                    {
-                        emit!(KafkaOffsetUpdateError { error });
+                if !failed_topics.contains(&entry.topic) {
+                    if status == BatchStatus::Delivered {
+                        if let Err(error) =
+                            consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                        {
+                            emit!(KafkaOffsetUpdateError { error });
+                        }
+                    } else {
+                        // Don't update the offset after a failed ack
+                        failed_topics.insert(entry.topic);
                     }
                 }
             },
@@ -501,7 +508,6 @@ mod integration_test {
         util::Timeout,
         Offset, TopicPartitionList,
     };
-    use vector_core::event::EventStatus;
 
     use super::{test::*, *};
     use crate::{
@@ -523,7 +529,7 @@ mod integration_test {
     }
 
     async fn send_events(
-        topic: String,
+        topic: &str,
         count: usize,
         key: &str,
         text: &str,
@@ -535,7 +541,7 @@ mod integration_test {
 
         for i in 0..count {
             let text = format!("{} {}", text, i);
-            let record = FutureRecord::to(&topic)
+            let record = FutureRecord::to(topic)
                 .payload(&text)
                 .key(key)
                 .timestamp(timestamp)
@@ -549,15 +555,22 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        consume_event(true).await;
+        send_receive(true, 10).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        consume_event(false).await;
+        send_receive(false, 10).await;
     }
 
-    async fn consume_event(acknowledgements: bool) {
+    #[tokio::test]
+    async fn handles_negative_acknowledgements() {
+        send_receive(true, 2).await;
+    }
+
+    async fn send_receive(acknowledgements: bool, receive_count: usize) {
+        const SEND_COUNT: usize = 10;
+
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
         let now = Utc::now();
@@ -565,8 +578,8 @@ mod integration_test {
         let config = make_config(&topic, &group_id);
 
         send_events(
-            topic.clone(),
-            10,
+            &topic,
+            SEND_COUNT,
             "my key",
             "my message",
             now.timestamp_millis(),
@@ -577,7 +590,7 @@ mod integration_test {
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let (tx, rx) = SourceSender::new_test_error_after(receive_count);
             let consumer = create_consumer(&config).unwrap();
             tokio::spawn(kafka_source(
                 config,
@@ -587,7 +600,7 @@ mod integration_test {
                 tx,
                 acknowledgements,
             ));
-            let events = collect_n(rx, 10).await;
+            let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
             tokio::task::yield_now().await;
@@ -610,10 +623,10 @@ mod integration_test {
             tpl.find_partition(&topic, 0)
                 .expect("TPL is missing topic")
                 .offset(),
-            Offset::from_raw(10)
+            Offset::from_raw(receive_count as i64)
         );
 
-        assert_eq!(events.len(), 10);
+        assert_eq!(events.len(), SEND_COUNT);
         for (i, event) in events.into_iter().enumerate() {
             assert_eq!(
                 event.as_log()[log_schema().message_key()],
