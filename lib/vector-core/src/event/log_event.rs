@@ -42,10 +42,6 @@ impl Inner {
     fn as_value(&self) -> &Value {
         &self.fields
     }
-
-    fn as_value_mut(&mut self) -> &mut Value {
-        &mut self.fields
-    }
 }
 
 impl ByteSizeOf for Inner {
@@ -93,9 +89,9 @@ impl Default for Inner {
 }
 
 impl From<Value> for Inner {
-    fn from(value: Value) -> Self {
+    fn from(fields: Value) -> Self {
         Self {
-            fields: value,
+            fields,
             size_cache: Default::default(),
         }
     }
@@ -128,7 +124,11 @@ impl LogEvent {
     }
 
     pub fn value_mut(&mut self) -> &mut Value {
-        Arc::make_mut(&mut self.inner).as_value_mut()
+        let result = Arc::make_mut(&mut self.inner);
+        // We MUST invalidate the inner size cache when making a
+        // mutable copy, since the _next_ action will modify the data.
+        result.invalidate();
+        &mut result.fields
     }
 
     pub fn metadata(&self) -> &EventMetadata {
