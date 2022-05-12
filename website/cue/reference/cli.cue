@@ -169,7 +169,7 @@ cli: {
 	commands: {
 		"config": {
 			description: """
-				(experimental) Output a provided Vector configuration file/directory as a single JSON object. Useful for checking configurations into version control.
+				Output a provided Vector configuration file/directory as a single JSON object. Useful for checking configurations into version control.
 				"""
 			flags: _default_flags & {
 				"pretty": {
