@@ -70,7 +70,8 @@ where
     /// stream of acknowledged identifiers. In the case the finalizer
     /// is not to be used, a special empty stream is returned that is
     /// always pending and so never wakes.
-    pub fn maybe_new(
+    #[cfg(any(feature = "sources-gcp_pubsub", feature = "sources-kafka"))]
+    pub(crate) fn maybe_new(
         maybe: bool,
         shutdown: ShutdownSignal,
     ) -> (
