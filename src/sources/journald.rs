@@ -623,12 +623,13 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
-                let checkpointer = checkpointer.clone();
-                async move {
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            tokio::spawn(async move {
+                while let Some(cursor) = ack_stream.next().await {
                     checkpointer.lock().await.set(cursor).await;
                 }
-            }))
+            });
+            Self::Async(finalizer)
         } else {
             Self::Sync(checkpointer)
         }

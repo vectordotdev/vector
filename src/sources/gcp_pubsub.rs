@@ -268,17 +268,15 @@ impl PubsubSource {
             credentials.spawn_regenerate_token();
         }
 
-        let finalizer = self.acknowledgements.then(|| {
-            let ack_ids = Arc::clone(&self.ack_ids);
-            Finalizer::new(self.shutdown.clone(), move |receipts| {
-                let ack_ids = Arc::clone(&ack_ids);
-                async move { ack_ids.lock().await.extend(receipts) }
-            })
-        });
+        let (finalizer, mut ack_stream) =
+            Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
 
         loop {
             tokio::select! {
                 _ = &mut self.shutdown => return false,
+                receipts = ack_stream.next() => if let Some(receipts) = receipts {
+                    self.ack_ids.lock().await.extend(receipts);
+                },
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
                     Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),

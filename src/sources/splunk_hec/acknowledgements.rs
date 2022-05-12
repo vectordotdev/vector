@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
@@ -170,9 +171,9 @@ impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let ack_event_finalizer = UnorderedFinalizer::new(shutdown, move |ack_id: u64| {
-            let finalizer_ack_ids_status = Arc::clone(&finalizer_ack_ids_status);
-            async move {
+        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
+        tokio::spawn(async move {
+            while let Some(ack_id) = ack_stream.next().await {
                 let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
                 ack_ids_status.insert(ack_id);
                 if ack_ids_status.len() > max_pending_acks_per_channel {

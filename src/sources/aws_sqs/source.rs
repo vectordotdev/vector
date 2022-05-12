@@ -5,7 +5,7 @@ use aws_sdk_sqs::{
     Client as SqsClient,
 };
 use chrono::{DateTime, TimeZone, Utc};
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use tokio::{pin, select, time::Duration};
 
 use crate::{
@@ -38,11 +38,15 @@ impl SqsSource {
     pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
+            let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
-            Arc::new(Finalizer::new(shutdown.clone(), move |receipts_to_ack| {
-                delete_messages(client.clone(), receipts_to_ack, queue_url.clone())
-            }))
+            tokio::spawn(async move {
+                while let Some(receipts_to_ack) = ack_stream.next().await {
+                    delete_messages(client.clone(), receipts_to_ack, queue_url.clone()).await;
+                }
+            });
+            Arc::new(finalizer)
         });
 
         for _ in 0..self.concurrency {
@@ -51,11 +55,12 @@ impl SqsSource {
             let mut out = out.clone();
             let finalizer = finalizer.clone();
             task_handles.push(tokio::spawn(async move {
+                let finalizer = finalizer.as_ref();
                 pin!(shutdown);
                 loop {
                     select! {
                         _ = &mut shutdown => break,
-                        _ = source.run_once(&mut out, finalizer.clone()) => {},
+                        _ = source.run_once(&mut out, finalizer) => {},
                     }
                 }
             }));
@@ -73,7 +78,7 @@ impl SqsSource {
         Ok(())
     }
 
-    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<Arc<Finalizer>>) {
+    async fn run_once(&self, out: &mut SourceSender, finalizer: Option<&Arc<Finalizer>>) {
         let result = self
             .client
             .receive_message()

@@ -169,42 +169,40 @@ async fn kafka_source(
     config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaStatisticsContext>,
     decoder: Decoder,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let finalizer = acknowledgements.then(|| {
-        let consumer = Arc::clone(&consumer);
-        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            let consumer = Arc::clone(&consumer);
-            async move {
+    let (finalizer, mut ack_stream) =
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+    let mut stream = consumer.stream();
+    let keys = Keys::from(log_schema(), &config);
+
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => break,
+            entry = ack_stream.next() => if let Some(entry) = entry {
                 if let Err(error) =
                     consumer.store_offset(&entry.topic, entry.partition, entry.offset)
                 {
                     emit!(KafkaOffsetUpdateError { error });
                 }
-            }
-        })
-    });
-    let mut stream = consumer.stream().take_until(shutdown);
-    let keys = Keys::from(log_schema(), &config);
+            },
+            message = stream.next() => match message {
+                None => break,  // WHY?
+                Some(Err(error)) => emit!(KafkaReadError { error }),
+                Some(Ok(msg)) => {
+                    emit!(KafkaBytesReceived {
+                        byte_size: msg.payload_len(),
+                        protocol: "tcp",
+                        topic: msg.topic(),
+                        partition: msg.partition(),
+                    });
 
-    while let Some(message) = stream.next().await {
-        match message {
-            Err(error) => {
-                emit!(KafkaReadError { error });
-            }
-            Ok(msg) => {
-                emit!(KafkaBytesReceived {
-                    byte_size: msg.payload_len(),
-                    protocol: "tcp",
-                    topic: msg.topic(),
-                    partition: msg.partition(),
-                });
-
-                parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
-            }
+                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                }
+            },
         }
     }
 

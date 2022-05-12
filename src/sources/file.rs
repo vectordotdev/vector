@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -325,15 +325,19 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    let checkpoints = checkpointer.view();
+
     let finalizer = acknowledgements.then(|| {
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
         let checkpoints = checkpointer.view();
-        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            let checkpoints = Arc::clone(&checkpoints);
-            async move { checkpoints.update(entry.file_id, entry.offset) }
-        })
+        tokio::spawn(async move {
+            while let Some(entry) = ack_stream.next().await {
+                checkpoints.update(entry.file_id, entry.offset);
+            }
+        });
+        finalizer
     });
 
+    let checkpoints = checkpointer.view();
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
