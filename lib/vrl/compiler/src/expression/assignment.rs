@@ -396,7 +396,7 @@ where
         let value = match self {
             Single { target, expr } => {
                 let value = expr.resolve(ctx)?;
-                target.insert(value.into_owned(), ctx);
+                target.insert(value.clone().into_owned(), ctx);
                 value
             }
             Infallible {
@@ -406,7 +406,7 @@ where
                 default,
             } => match expr.resolve(ctx) {
                 Ok(value) => {
-                    ok.insert(value.into_owned(), ctx);
+                    ok.insert(value.clone().into_owned(), ctx);
                     err.insert(Value::Null, ctx);
                     value
                 }
