@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use datadog_filter::{
     build_matcher,
@@ -7,7 +9,6 @@ use datadog_filter::{
 use datadog_search_syntax::parse;
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use vector_core::event::{Event, LogEvent, Value};
 
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
@@ -316,13 +317,13 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use crate::log_event;
     use datadog_filter::{build_matcher, Filter, Resolver};
     use datadog_search_syntax::parse;
     use serde_json::json;
     use vector_core::event::Event;
+
+    use super::*;
+    use crate::log_event;
 
     /// Returns the following: Datadog Search Syntax source (to be parsed), an `Event` that
     /// should pass when matched against the compiled source, and an `Event` that should fail.

@@ -1,12 +1,14 @@
+use std::io::Read;
+
+use indexmap::IndexMap;
+use toml::value::Table;
+
 use super::{deserialize_table, loader, prepare_input};
 use super::{ComponentHint, Process};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
 };
-use indexmap::IndexMap;
-use std::io::Read;
-use toml::value::Table;
 
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,

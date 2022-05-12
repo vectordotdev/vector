@@ -1,12 +1,14 @@
 #![deny(missing_docs)]
 
-use super::{validate_fields, EncodingConfiguration, TimestampFormat};
-use crate::{event::Event, serde::skip_serializing_if_default};
-use codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig};
 use core::fmt::Debug;
+use std::marker::PhantomData;
+
+use codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig};
 use lookup::lookup_v2::OwnedPath;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::marker::PhantomData;
+
+use super::{validate_fields, EncodingConfiguration, TimestampFormat};
+use crate::{event::Event, serde::skip_serializing_if_default};
 
 /// Trait used to migrate from a sink-specific `Codec` enum to the new
 /// `SerializerConfig` encoding configuration.
@@ -418,9 +420,10 @@ struct TransformerInner {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use codecs::encoding::CharacterDelimitedEncoderOptions;
     use lookup::lookup_v2::parse_path;
+
+    use super::*;
 
     #[test]
     fn deserialize_encoding_with_transformation() {

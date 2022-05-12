@@ -241,16 +241,14 @@ mod test {
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
+    use codecs::NewlineDelimitedDecoderConfig;
+    #[cfg(unix)]
+    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
     use futures::{stream, StreamExt};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-
-    use codecs::NewlineDelimitedDecoderConfig;
-    #[cfg(unix)]
-    use codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig};
-
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {

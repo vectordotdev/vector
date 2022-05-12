@@ -1,6 +1,7 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
+use value::Value;
 
 use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
@@ -8,7 +9,7 @@ use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -91,7 +92,7 @@ impl Op {
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use ast::Opcode::*;
-        use Value::*;
+        use value::Value::*;
 
         if let Err = self.opcode {
             return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
@@ -490,15 +491,17 @@ impl DiagnosticMessage for Error {
 
 #[cfg(all(test, feature = "expressions"))]
 mod tests {
+    use std::convert::TryInto;
+
+    use ast::Ident;
+    use ast::Opcode::*;
+    use ordered_float::NotNan;
+
     use super::*;
     use crate::{
         expression::{Block, IfStatement, Literal, Predicate, Variable},
         test_type_def,
     };
-    use ast::Ident;
-    use ast::Opcode::*;
-    use ordered_float::NotNan;
-    use std::convert::TryInto;
 
     fn op(
         opcode: ast::Opcode,

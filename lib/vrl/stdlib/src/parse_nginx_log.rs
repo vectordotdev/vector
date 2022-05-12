@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use regex::Regex;
 use vrl::prelude::*;
 

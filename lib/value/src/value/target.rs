@@ -1,7 +1,9 @@
-use crate::Value;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 use std::iter::Peekable;
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use crate::Value;
 
 impl Value {
     /// Get a reference to a value from a given path.

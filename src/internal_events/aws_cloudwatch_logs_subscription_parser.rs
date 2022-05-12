@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type, io_error_code};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, io_error_code};
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParserError {

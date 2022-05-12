@@ -5,9 +5,8 @@ use float_eq::FloatEq;
 use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use crate::metrics::AgentDDSketch;
-
 use super::{samples_to_buckets, write_list, write_word};
+use crate::metrics::AgentDDSketch;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -475,7 +474,7 @@ impl From<AgentDDSketch> for MetricValue {
 
 // Currently, VRL can only read the type of the value and doesn't consider any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for vrl_lib::Value {
+impl From<MetricValue> for ::value::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -528,7 +527,7 @@ impl ByteSizeOf for MetricSketch {
 
 // Currently, VRL can only read the type of the value and doesn't consider ny actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for vrl_lib::Value {
+impl From<MetricSketch> for ::value::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }

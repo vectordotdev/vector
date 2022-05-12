@@ -1,10 +1,11 @@
 use std::time::Duration;
 
+use ::value::Value;
 use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
 use vector_common::TimeZone;
-use vrl::{Runtime, Value};
+use vrl::Runtime;
 
 struct Source {
     name: &'static str,

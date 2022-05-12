@@ -35,6 +35,7 @@ lookup = { path = "../../lookup" }
 ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser" }
 vector_common = { path = "../../vector-common", default-features = false }
+value = { path = "../../value", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"

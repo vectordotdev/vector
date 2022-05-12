@@ -1,6 +1,7 @@
+use lookup::LookupBuf;
+
 #[cfg(feature = "expr-assignment")]
 use crate::expression::assignment::Target;
-use lookup::LookupBuf;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {

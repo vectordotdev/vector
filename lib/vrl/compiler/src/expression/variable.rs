@@ -1,13 +1,14 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label};
+use value::Value;
 
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     vm::{self, OpCode, Vm},
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]

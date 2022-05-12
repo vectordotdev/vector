@@ -1,10 +1,12 @@
 mod jit;
 
-use crate::lookup_v2::jit::{JitLookup, JitPath};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use self::jit::{JitLookup, JitPath};
 
 /// Syntactic sugar for creating a pre-parsed path.
 ///

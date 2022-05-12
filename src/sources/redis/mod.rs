@@ -1,11 +1,3 @@
-use crate::{
-    codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
-    serde::{default_decoding, default_framing_message_based},
-    SourceSender,
-};
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
@@ -17,6 +9,15 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    serde::{default_decoding, default_framing_message_based},
+    SourceSender,
+};
 
 mod channel;
 mod list;
@@ -225,6 +226,8 @@ mod test {
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
+    use redis::AsyncCommands;
+
     use super::*;
     use crate::config::log_schema;
     use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
@@ -232,7 +235,6 @@ mod integration_test {
         test_util::{collect_n, random_string},
         SourceSender,
     };
-    use redis::AsyncCommands;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 
