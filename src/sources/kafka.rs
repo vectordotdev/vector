@@ -209,7 +209,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                    parse_message(msg, &decoder, keys, &finalizer, &mut out, &consumer, &failed_topics).await;
                 }
             },
         }
@@ -220,13 +220,14 @@ async fn kafka_source(
 
 async fn parse_message(
     msg: BorrowedMessage<'_>,
-    decoder: Decoder,
+    decoder: &Decoder,
     keys: Keys<'_>,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<KafkaStatisticsContext>>,
+    failed_topics: &HashSet<String>,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, failed_topics) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -262,16 +263,21 @@ async fn parse_message(
 // Turn the received message into a stream of parsed events.
 fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
-    decoder: Decoder,
+    decoder: &Decoder,
     keys: Keys<'a>,
+    failed_topics: &HashSet<String>,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
 
+    if failed_topics.contains(&rmsg.topic) {
+        return None;
+    }
+
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = FramedRead::new(payload, decoder.clone());
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
