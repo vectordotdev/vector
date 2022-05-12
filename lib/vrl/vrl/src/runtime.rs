@@ -52,6 +52,11 @@ impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
         Self {
             state,
+
+            // `LookupBuf` uses a `VecDeque` internally, which always allocates, even
+            // when it's empty (for `LookupBuf::root()`), so we do the
+            // allocation on initialization of the runtime, instead of on every
+            // `resolve` run.
             root_lookup: LookupBuf::root(),
         }
     }
