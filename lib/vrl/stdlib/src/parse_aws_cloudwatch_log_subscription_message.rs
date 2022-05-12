@@ -8,19 +8,36 @@ fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
         .map_err(|e| format!("unable to parse: {}", e))?;
-    Ok(map![
-        "owner": message.owner,
-        "message_type": message.message_type.as_str(),
-        "log_group": message.log_group,
-        "log_stream": message.log_stream,
-        "subscription_filters": message.subscription_filters,
-        "log_events": message.log_events.into_iter().map(|event| map![
-            "id": event.id,
-            "timestamp": event.timestamp,
-            "message": event.message,
-        ]).collect::<Vec<_>>(),
-    ]
-    .into())
+    let map = Value::from(BTreeMap::from([
+        (String::from("owner"), Value::from(message.owner)),
+        (
+            String::from("message_type"),
+            Value::from(message.message_type.as_str()),
+        ),
+        (String::from("log_group"), Value::from(message.log_group)),
+        (String::from("log_stream"), Value::from(message.log_stream)),
+        (
+            String::from("subscription_filters"),
+            Value::from(message.subscription_filters),
+        ),
+        (
+            String::from("log_events"),
+            Value::Array(
+                message
+                    .log_events
+                    .into_iter()
+                    .map(|event| {
+                        Value::from(BTreeMap::from([
+                            (String::from("id"), Value::from(event.id)),
+                            (String::from("timestamp"), Value::from(event.timestamp)),
+                            (String::from("message"), Value::from(event.message)),
+                        ]))
+                    })
+                    .collect::<Vec<Value>>(),
+            ),
+        ),
+    ]));
+    Ok(map)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -111,25 +128,28 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {
-    map! {
-        "owner": Kind::bytes(),
-        "message_type": Kind::bytes(),
-        "log_group": Kind::bytes(),
-        "log_stream": Kind::bytes(),
-        "subscription_filters": Kind::array({
-            let mut v = Collection::any();
-            v.set_unknown(Kind::bytes());
-            v
-        }),
-        "log_events": Kind::object(BTreeMap::from([
-            ("id".into(), Kind::bytes()),
-            ("timestamp".into(), Kind::timestamp()),
-            ("message".into(), Kind::bytes()),
-        ])),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("owner"), Kind::bytes()),
+        (Field::from("message_type"), Kind::bytes()),
+        (Field::from("log_group"), Kind::bytes()),
+        (Field::from("log_stream"), Kind::bytes()),
+        (
+            Field::from("subscription_filters"),
+            Kind::array({
+                let mut v = Collection::any();
+                v.set_unknown(Kind::bytes());
+                v
+            }),
+        ),
+        (
+            Field::from("log_events"),
+            Kind::object(BTreeMap::from([
+                (Field::from("id"), Kind::bytes()),
+                (Field::from("timestamp"), Kind::timestamp()),
+                (Field::from("message"), Kind::bytes()),
+            ])),
+        ),
+    ])
 }
 
 #[cfg(test)]
