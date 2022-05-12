@@ -79,12 +79,15 @@ impl TransformConfig for PipelineConfig {
         // For now, considering that most everything is log to log with regard
         // to pipelines we avoid adding duplicate validation here in favor of
         // future work.
+        if self.transforms.is_empty() {
+            return Err(format!("empty pipeline: {}", self.name).into());
+        }
         let mut transforms = Vec::with_capacity(self.transforms.len());
         for config in &self.transforms {
             let transform = match config.build(ctx).await? {
                 Transform::Function(transform) => Box::new(transform),
                 Transform::Synchronous(transform) => transform,
-                _ => panic!("non-sync transform in pipeline: {:?}", config),
+                _ => return Err(format!("non-sync transform in pipeline: {:?}", config).into()),
             };
             transforms.push(transform);
         }
@@ -103,17 +106,19 @@ impl TransformConfig for PipelineConfig {
     }
 
     fn input(&self) -> Input {
-        self.transforms
-            .first()
-            .expect("pipelines must have transforms")
-            .input()
+        if let Some(transform) = self.transforms.first() {
+            transform.input()
+        } else {
+            panic!("pipeline {} does not have transforms", self.name)
+        }
     }
 
     fn outputs(&self, schema: &schema::Definition) -> Vec<Output> {
-        self.transforms
-            .last()
-            .expect("pipeline must have transforms")
-            .outputs(schema)
+        if let Some(transform) = self.transforms.last() {
+            transform.outputs(schema)
+        } else {
+            panic!("pipeline {} does not have transforms", self.name)
+        }
     }
 
     fn transform_type(&self) -> &'static str {
