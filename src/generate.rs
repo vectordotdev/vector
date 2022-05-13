@@ -96,6 +96,7 @@ pub(crate) enum TransformInputsStrategy {
     ///
     /// All transforms use a shuffled list of all sources as inputs.
     #[cfg(test)]
+    #[allow(dead_code)]
     All,
 }
 
