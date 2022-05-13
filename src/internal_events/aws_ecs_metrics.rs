@@ -1,6 +1,6 @@
-use std::{borrow::Cow, time::Instant};
+use std::borrow::Cow;
 
-use metrics::{counter, histogram};
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type, http_error_code, hyper_error_code};
@@ -31,20 +31,6 @@ impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
         );
         // deprecated
         counter!("events_in_total", self.count as u64);
-    }
-}
-
-#[derive(Debug)]
-pub struct AwsEcsMetricsRequestCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for AwsEcsMetricsRequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

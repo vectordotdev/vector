@@ -21,7 +21,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsRequestCompleted, ApacheMetricsResponseError, EndpointBytesReceived,
+        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -180,7 +180,7 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(ApacheMetricsRequestCompleted {
+                                emit!(RequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });

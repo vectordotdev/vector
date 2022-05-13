@@ -1,6 +1,5 @@
-use std::time::Instant;
+use metrics::counter;
 
-use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type, http_error_code};
@@ -28,20 +27,6 @@ impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
             "events_in_total", self.count as u64,
             "uri" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct ApacheMetricsRequestCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for ApacheMetricsRequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

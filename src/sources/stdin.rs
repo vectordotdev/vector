@@ -15,7 +15,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -133,7 +133,7 @@ where
                     Ok((events, byte_size)) => {
                         emit!(BytesReceived { byte_size, protocol: "none" });
 
-                        emit!(StdinEventsReceived {
+                        emit!(OldEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
                         });
