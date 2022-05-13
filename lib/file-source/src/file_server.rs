@@ -212,34 +212,32 @@ where
                                     message = "Continue watching file.",
                                     path = ?path,
                                 );
-                            } else {
+                            } else if !was_found_this_cycle {
                                 // matches a file with a different path
-                                if !was_found_this_cycle {
-                                    info!(
-                                        message = "Watched file has been renamed.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
-                                } else {
-                                    info!(
-                                        message = "More than one file has the same fingerprint.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    let (old_path, new_path) = (&watcher.path, &path);
-                                    if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                        fs::metadata(&old_path).and_then(|m| m.modified()),
-                                        fs::metadata(&new_path).and_then(|m| m.modified()),
-                                    ) {
-                                        if old_modified_time < new_modified_time {
-                                            info!(
-                                                message = "Switching to watch most recently modified file.",
-                                                new_modified_time = ?new_modified_time,
-                                                old_modified_time = ?old_modified_time,
-                                            );
-                                            watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
-                                        }
+                                info!(
+                                    message = "Watched file has been renamed.",
+                                    path = ?path,
+                                    old_path = ?watcher.path
+                                );
+                                watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                            } else {
+                                info!(
+                                    message = "More than one file has the same fingerprint.",
+                                    path = ?path,
+                                    old_path = ?watcher.path
+                                );
+                                let (old_path, new_path) = (&watcher.path, &path);
+                                if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                    fs::metadata(&old_path).and_then(|m| m.modified()),
+                                    fs::metadata(&new_path).and_then(|m| m.modified()),
+                                ) {
+                                    if old_modified_time < new_modified_time {
+                                        info!(
+                                            message = "Switching to watch most recently modified file.",
+                                            new_modified_time = ?new_modified_time,
+                                            old_modified_time = ?old_modified_time,
+                                        );
+                                        watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                     }
                                 }
                             }
