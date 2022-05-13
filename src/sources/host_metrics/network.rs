@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::Utc;
 use futures::{stream, StreamExt};
 #[cfg(target_os = "linux")]
@@ -6,7 +8,6 @@ use heim::net::os::linux::IoCountersExt;
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use serde::{Deserialize, Serialize};
-use vector_common::btreemap;
 
 use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
@@ -45,45 +46,66 @@ impl HostMetrics {
                                     "network_receive_bytes_total",
                                     timestamp,
                                     counter.bytes_recv().get::<byte>() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 self.counter(
                                     "network_receive_errs_total",
                                     timestamp,
                                     counter.errors_recv() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.packets_recv() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 self.counter(
                                     "network_transmit_bytes_total",
                                     timestamp,
                                     counter.bytes_sent().get::<byte>() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 self.counter(
                                     "network_transmit_errs_total",
                                     timestamp,
                                     counter.errors_sent() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_drop_total",
                                     timestamp,
                                     counter.drop_sent() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,
                                     counter.packets_sent() as f64,
-                                    btreemap! { "device" => interface },
+                                    BTreeMap::from([(
+                                        String::from("device"),
+                                        interface.to_string(),
+                                    )]),
                                 ),
                             ]
                             .into_iter(),
