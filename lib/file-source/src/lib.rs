@@ -14,7 +14,7 @@ pub mod paths_provider;
 
 pub use self::{
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    file_server::{FileServer, Line, Shutdown as FileServerShutdown},
+    file_server::{Event, FileServer, Line, Shutdown as FileServerShutdown},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
 };

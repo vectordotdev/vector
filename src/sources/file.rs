@@ -1,10 +1,13 @@
-use std::{collections::HashSet, convert::TryInto, path::PathBuf, time::Duration};
+use std::{
+    collections::HashSet, convert::TryInto, path::PathBuf, sync::Arc, sync::Mutex, time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
+    Checkpointer, Event as FileEvent, FileFingerprint, FileServer, FingerprintStrategy,
+    Fingerprinter, Line, ReadFrom,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
@@ -323,6 +326,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
+    let failed_files: Arc<Mutex<HashSet<FileFingerprint>>> = Default::default();
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
@@ -334,10 +338,13 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        let mut failed_files: HashSet<FileFingerprint> = Default::default();
+        let failed_files = Arc::clone(&failed_files);
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 // Don't update the checkpointer on file streams after failed acks
+                let mut failed_files = failed_files
+                    .lock()
+                    .expect("Poisoned lock on failed files set");
                 if !failed_files.contains(&entry.file_id) {
                     if status == BatchStatus::Delivered {
                         checkpoints.update(entry.file_id, entry.offset);
@@ -362,22 +369,33 @@ pub fn file_source(
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
-        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<FileEvent>>(2);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
-            .map(move |mut line| {
-                emit!(FileBytesReceived {
-                    byte_size: line.text.len(),
-                    file: &line.filename,
-                });
-                // transcode each line from the file's encoding charset to utf8
-                line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
-                    None => line.text,
-                };
-                line
-            });
+            .map(move |event| match event {
+                FileEvent::Line(mut line) => {
+                    emit!(FileBytesReceived {
+                        byte_size: line.text.len(),
+                        file: &line.filename,
+                    });
+                    // transcode each line from the file's encoding charset to utf8
+                    line.text = match encoding_decoder.as_mut() {
+                        Some(d) => d.decode_to_utf8(line.text),
+                        None => line.text,
+                    };
+                    Some(line)
+                }
+                FileEvent::Open(file_id) | FileEvent::Close(file_id) => {
+                    failed_files
+                        .lock()
+                        .expect("Poisoned lock on failed files set")
+                        .remove(&file_id);
+                    None
+                }
+            })
+            .map(futures::stream::iter)
+            .flatten();
 
         let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {

@@ -1,8 +1,8 @@
 use std::{error::Error, future::Future, time::Duration};
 
 use file_source::{
-    paths_provider::PathsProvider, Checkpointer, FileServer, FileServerShutdown,
-    FileSourceInternalEvents, Line,
+    paths_provider::PathsProvider, Checkpointer, Event as FileEvent, FileServer,
+    FileServerShutdown, FileSourceInternalEvents,
 };
 use futures::{
     future::{select, Either},
@@ -21,8 +21,8 @@ pub async fn run_file_server<PP, E, C, S>(
 where
     PP: PathsProvider + Send + 'static,
     E: FileSourceInternalEvents,
-    C: Sink<Vec<Line>> + Unpin + Send + 'static,
-    <C as Sink<Vec<Line>>>::Error: Error + Send,
+    C: Sink<Vec<FileEvent>> + Unpin + Send + 'static,
+    <C as Sink<Vec<FileEvent>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
 {

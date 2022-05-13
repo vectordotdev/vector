@@ -10,8 +10,8 @@ use std::{convert::TryInto, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
-    Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
-    ReadFrom,
+    Checkpointer, Event as FileEvent, FileServer, FileServerShutdown, FingerprintStrategy,
+    Fingerprinter, ReadFrom,
 };
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
@@ -467,14 +467,22 @@ impl Source {
             handle: tokio::runtime::Handle::current(),
         };
 
-        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
+        let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<FileEvent>>(2);
 
         let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();
-        let events = file_source_rx.map(futures::stream::iter);
-        let events = events.flatten();
+        let events = file_source_rx.flat_map(futures::stream::iter);
+        let events = events.flat_map(|event| {
+            futures::stream::iter({
+                if let FileEvent::Line(line) = event {
+                    Some(line)
+                } else {
+                    None
+                }
+            })
+        });
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             emit!(BytesReceived {

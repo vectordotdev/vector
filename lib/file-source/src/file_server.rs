@@ -83,10 +83,10 @@ where
         mut shutdown_data: S1,
         shutdown_checkpointer: S2,
         mut checkpointer: Checkpointer,
-    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
+    ) -> Result<Shutdown, <C as Sink<Vec<Event>>>::Error>
     where
-        C: Sink<Vec<Line>> + Unpin,
-        <C as Sink<Vec<Line>>>::Error: std::error::Error,
+        C: Sink<Vec<Event>> + Unpin,
+        <C as Sink<Vec<Event>>>::Error: std::error::Error,
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
@@ -95,7 +95,7 @@ where
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
-        let mut lines = Vec::new();
+        let mut events = Vec::new();
 
         checkpointer.read_checkpoints(self.ignore_before);
 
@@ -250,12 +250,12 @@ where
 
                     bytes_read += sz;
 
-                    lines.push(Line {
+                    events.push(Event::Line(Line {
                         text: line,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
                         file_id,
                         offset: watcher.get_file_position(),
-                    });
+                    }));
 
                     if bytes_read > self.max_read_bytes {
                         maxed_out_reading_single_file = true;
@@ -305,7 +305,7 @@ where
             self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
-            let to_send = std::mem::take(&mut lines);
+            let to_send = std::mem::take(&mut events);
             let result = self.handle.block_on(chans.send(to_send));
             match result {
                 Ok(()) => {}
@@ -508,6 +508,12 @@ impl Default for TimingStats {
             bytes: Default::default(),
         }
     }
+}
+
+pub enum Event {
+    Line(Line),
+    Open(FileFingerprint),
+    Close(FileFingerprint),
 }
 
 #[derive(Debug)]
