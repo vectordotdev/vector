@@ -264,13 +264,13 @@ impl Value {
     ///
     /// A special case worth mentioning: if there is a nested array and an item is removed
     /// from the middle of this array, then it is just replaced by `Value::Null`.
-    pub fn remove_by_path_v2<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+    pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
         remove::remove(self, path, prune)
     }
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get_by_path_v2<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
+    pub fn get<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();
         loop {
@@ -299,7 +299,7 @@ impl Value {
 
     /// Get a mutable borrow of the value by path
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get_mut_by_path_v2<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
+    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
         let mut value = self;
         let mut path_iter = path.segment_iter();
         loop {
@@ -327,8 +327,8 @@ impl Value {
     }
 
     /// Determine if the lookup is contained within the value.
-    pub fn contains_by_path_v2<'a>(&self, path: impl Path<'a>) -> bool {
-        self.get_by_path_v2(path).is_some()
+    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+        self.get(path).is_some()
     }
 
     /// Produce an iterator over all 'nodes' in the graph of this value.
@@ -605,9 +605,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             assert_eq!(value.as_object().unwrap()[key], marker);
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -620,9 +620,9 @@ mod test {
                 value.as_object().unwrap()["root"].as_object().unwrap()["doot"],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -637,9 +637,9 @@ mod test {
                     .unwrap()["toot"],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -649,9 +649,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             assert_eq!(value.as_array_unwrap()[0], marker);
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -661,9 +661,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             assert_eq!(value.as_array_unwrap()[0].as_array_unwrap()[0], marker);
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -676,9 +676,9 @@ mod test {
                 value.as_object().unwrap()["root"].as_array_unwrap()[0],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -691,9 +691,9 @@ mod test {
                 value.as_array_unwrap()[0].as_object().unwrap()["boot"],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -708,9 +708,9 @@ mod test {
                     .unwrap()["boot"],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
         #[test]
         fn field_with_nested_index_field() {
@@ -724,9 +724,9 @@ mod test {
                     .unwrap()["boot"],
                 marker
             );
-            assert_eq!(value.get_by_path_v2(key), Some(&marker));
-            assert_eq!(value.get_mut_by_path_v2(key), Some(&mut marker));
-            assert_eq!(value.remove_by_path_v2(key, false), Some(marker));
+            assert_eq!(value.get(key), Some(&marker));
+            assert_eq!(value.get_mut(key), Some(&mut marker));
+            assert_eq!(value.remove(key, false), Some(marker));
         }
 
         #[test]
@@ -769,8 +769,8 @@ mod test {
             let marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
-            assert_eq!(value.remove_by_path_v2(key, true), Some(marker));
-            assert!(!value.contains_by_path_v2("foo"));
+            assert_eq!(value.remove(key, true), Some(marker));
+            assert!(!value.contains("foo"));
         }
 
         #[test]
@@ -780,8 +780,8 @@ mod test {
             let marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
-            assert_eq!(value.remove_by_path_v2(key, true), Some(marker));
-            assert!(!value.contains_by_path_v2("foo"));
+            assert_eq!(value.remove(key, true), Some(marker));
+            assert!(!value.contains("foo"));
         }
 
         #[test]
@@ -791,8 +791,8 @@ mod test {
             let marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
-            assert_eq!(value.remove_by_path_v2(key, true), Some(marker));
-            assert!(!value.contains_by_path_v2(path!(0)));
+            assert_eq!(value.remove(key, true), Some(marker));
+            assert!(!value.contains(path!(0)));
         }
 
         #[test]
@@ -802,8 +802,8 @@ mod test {
             let marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
-            assert_eq!(value.remove_by_path_v2(key, true), Some(marker));
-            assert!(!value.contains_by_path_v2(path!(0)));
+            assert_eq!(value.remove(key, true), Some(marker));
+            assert!(!value.contains(path!(0)));
         }
     }
 
@@ -821,22 +821,14 @@ mod test {
                 None,
                 "inserting value"
             );
+            assert_eq!(value.get(&path), Some(&marker), "retrieving value");
             assert_eq!(
-                value.get_by_path_v2(&path),
-                Some(&marker),
-                "retrieving value"
-            );
-            assert_eq!(
-                value.get_mut_by_path_v2(&path),
+                value.get_mut(&path),
                 Some(&mut marker),
                 "retrieving mutable value"
             );
 
-            assert_eq!(
-                value.remove_by_path_v2(&path, true),
-                Some(marker),
-                "removing value"
-            );
+            assert_eq!(value.remove(&path, true), Some(marker), "removing value");
 
             TestResult::passed()
         }

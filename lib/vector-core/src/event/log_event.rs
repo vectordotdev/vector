@@ -202,7 +202,7 @@ impl LogEvent {
     }
 
     pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.inner.fields.get_by_path_v2(key)
+        self.inner.fields.get(key)
     }
 
     pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
@@ -221,11 +221,11 @@ impl LogEvent {
     }
 
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
-        self.value_mut().get_mut_by_path_v2(path)
+        self.value_mut().get_mut(path)
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
-        self.value().get_by_path_v2(path).is_some()
+        self.value().get(path).is_some()
     }
 
     pub fn insert<'a>(
@@ -571,10 +571,7 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value
-            .remove_by_path_v2("one", true)
-            .unwrap()
-            .unwrap();
+        let val = expected_value.remove("one", true).unwrap().unwrap();
         expected_value.insert("three", val).unwrap();
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
@@ -594,10 +591,7 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value
-            .remove_by_path_v2("one", true)
-            .unwrap()
-            .unwrap();
+        let val = expected_value.remove("one", true).unwrap().unwrap();
         expected_value.insert("two".to_string(), val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
