@@ -283,7 +283,7 @@ mod tests {
 
         registry.finish_load();
 
-        let got = func.resolve(&mut ctx);
+        let got = func.resolve(&mut ctx).map(Cow::into_owned);
 
         assert_eq!(Ok(value![vec![value!({ "field": "result" })]]), got);
     }
