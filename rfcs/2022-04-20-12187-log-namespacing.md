@@ -94,6 +94,7 @@ When these are used in the "Vector" source, the behavior will not change, and ev
 ### Metadata
 
 There are 3 sources of information that will be stored in Metadata.
+
 1. Vector "internal" metadata such as `datadog_api_key`, so it can be read/set by users. This data already exists, but will
 be moved to its own "secret" metadata.
 2. Vector metadata such as `ingest_timestamp`, and `source_type` which are set for every source. These will be nested under `vector'
@@ -162,6 +163,7 @@ metadata
 ```
 
 secrets (this will look similar for all sources, so it is emitted on the remaining examples)
+
 ```json
 {
   "datadog_api_key": "2o86gyhufa2ugyf4",
