@@ -1,6 +1,4 @@
 mod jit;
-
-use quickcheck::{Arbitrary, Gen};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -314,12 +312,11 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl Arbitrary for BorrowedSegment<'static> {
-    fn arbitrary(g: &mut Gen) -> Self {
-        match usize::arbitrary(g) % 3 {
+impl quickcheck::Arbitrary for BorrowedSegment<'static> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        match usize::arbitrary(g) % 2 {
             0 => BorrowedSegment::Index(usize::arbitrary(g) % 20),
             _ => BorrowedSegment::Field(String::arbitrary(g).into()),
-            // _ => BorrowedSegment::Invalid,
         }
     }
 

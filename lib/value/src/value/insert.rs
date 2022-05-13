@@ -78,38 +78,57 @@ fn set_array_index(values: &mut Vec<Value>, index: usize, insert_value: Value) -
 mod test {
     use std::collections::BTreeMap;
 
+    use lookup::lookup_v2::Path;
     use serde_json::json;
 
     use super::*;
 
-    // #[test]
-    // fn test_insert_nested() {
-    //     let mut fields = BTreeMap::new();
-    //     insert(&mut fields, "a.b.c", Value::Integer(3));
-    //
-    //     let expected = fields_from_json(json!({
-    //         "a": {
-    //             "b":{
-    //                 "c": 3
-    //             }
-    //         }
-    //     }));
-    //     assert_eq!(fields, expected);
-    // }
+    #[test]
+    fn test_insert_nested() {
+        let mut fields = BTreeMap::new();
+        map_insert(
+            &mut fields,
+            "a.b.c".segment_iter().peekable(),
+            Value::Integer(3),
+        );
 
-    // #[test]
-    // fn test_insert_array() {
-    //     let mut fields = BTreeMap::new();
-    //     insert(&mut fields, "a.b[0].c[2]", Value::Integer(10));
-    //     insert(&mut fields, "a.b[0].c[0]", Value::Integer(5));
-    //
-    //     let expected = fields_from_json(json!({
-    //         "a": {
-    //             "b": [{
-    //                 "c": [5, null, 10]
-    //             }]
-    //         }
-    //     }));
-    //     assert_eq!(fields, expected);
-    // }
+        let expected = Value::from(json!({
+            "a": {
+                "b":{
+                    "c": 3
+                }
+            }
+        }))
+        .as_object()
+        .unwrap()
+        .clone();
+        assert_eq!(fields, expected);
+    }
+
+    #[test]
+    fn test_insert_array() {
+        let mut fields = BTreeMap::new();
+        map_insert(
+            &mut fields,
+            "a.b[0].c[2]".segment_iter().peekable(),
+            Value::Integer(10),
+        );
+        map_insert(
+            &mut fields,
+            "a.b[0].c[0]".segment_iter().peekable(),
+            Value::Integer(5),
+        );
+
+        let expected = Value::from(json!({
+            "a": {
+                "b": [{
+                    "c": [5, null, 10]
+                }]
+            }
+        }))
+        .as_object()
+        .unwrap()
+        .clone();
+        assert_eq!(fields, expected);
+    }
 }
