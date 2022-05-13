@@ -81,6 +81,21 @@ impl TransformConfig for PipelineConfig {
         if self.transforms.is_empty() {
             return Err(format!("empty pipeline: {}", self.name).into());
         }
+        // Today we make the assumption that to be a valid pipeline transform
+        // the transform CANNOT have named outputs. This assumption might break
+        // in the future so, to avoid panics, we instead make building a
+        // pipeline with such transforms an error.
+        for transform in &self.transforms {
+            if transform.outputs(&ctx.merged_schema_definition).len() > 1 {
+                return Err(format!(
+                    "pipeline {} has transform of type {} with a named output, unsupported",
+                    self.name,
+                    transform.transform_type()
+                )
+                .into());
+            }
+        }
+
         let mut transforms = Vec::with_capacity(self.transforms.len());
         for config in &self.transforms {
             let transform = match config.build(ctx).await? {
