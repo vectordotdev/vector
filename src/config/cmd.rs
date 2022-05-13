@@ -194,7 +194,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 mod tests {
     use std::collections::HashMap;
 
-    use proptest::{prelude::*, sample};
+    use proptest::{num, prelude::*, sample};
     use rand::{
         prelude::{SliceRandom, StdRng},
         SeedableRng,
@@ -339,15 +339,12 @@ mod tests {
     proptest! {
         #[test]
         /// Output should be the same regardless of input config ordering
-        fn output_has_consistent_ordering(mut sources in arb_sources(), mut transforms in arb_transforms(), mut sinks in arb_sinks()) {
+        fn output_has_consistent_ordering(mut sources in arb_sources(), mut transforms in arb_transforms(), mut sinks in arb_sinks(), seed in num::u64::ANY) {
             let config_source = create_config_source(sources.as_ref(), transforms.as_ref(), sinks.as_ref());
 
             // Shuffle the ordering of components which shuffles the order in
             // which items appear in the TOML config
-            let mut rng = StdRng::from_seed([
-                    3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3,
-                    8, 3, 2, 7, 9, 5,
-                ]);
+            let mut rng = StdRng::seed_from_u64(seed);
             sources.shuffle(&mut rng);
             transforms.shuffle(&mut rng);
             sinks.shuffle(&mut rng);
