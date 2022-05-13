@@ -114,7 +114,7 @@ where
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
         if !*this.is_shutdown {
-            if let Poll::Ready(_) = this.shutdown.poll_unpin(ctx) {
+            if this.shutdown.poll_unpin(ctx).is_ready() {
                 *this.is_shutdown = true
             }
             // Only poll for new entries until shutdown is flagged.
