@@ -164,7 +164,6 @@ impl PipelineConfig {
                 inner: Box::new(self.clone()),
             },
         );
-        // TODO: actually call outputs fn
         result
             .outputs
             .push((name.clone(), vec![Output::default(DataType::all())]));
