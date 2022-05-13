@@ -16,9 +16,9 @@ use crate::{
     config::{ComponentKey, DataType, Output, TransformConfig},
 };
 
-// 32 is a lowish number and arbitrarily chosen: there is no magic to this magic
+// 64 is a lowish number and arbitrarily chosen: there is no magic to this magic
 // constant.
-const INTERIOR_BUFFER_SIZE: usize = 32;
+const INTERIOR_BUFFER_SIZE: usize = 64;
 
 //------------------------------------------------------------------------------
 
