@@ -337,8 +337,9 @@ mod test {
             ),
             (
                 vec![
-                    1.into(),
+                    Value::from(1),
                     Value::Object(BTreeMap::from([(String::from("field2"), Value::from(2))])),
+                    Value::from(2),
                 ],
                 vec![
                     1.into(),
