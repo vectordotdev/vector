@@ -266,7 +266,7 @@ impl<'a> VrlValueConvert for Cow<'a, Value> {
 
     fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
         match self.as_ref() {
-            Value::Timestamp(v) => Ok(v.clone()),
+            Value::Timestamp(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::timestamp(),

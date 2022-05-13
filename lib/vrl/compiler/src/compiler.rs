@@ -162,11 +162,11 @@ impl<'a> Compiler<'a> {
             Boolean(v) => Ok(Literal::from(v)),
             Regex(v) => regex::Regex::new(&v)
                 .map_err(|err| literal::Error::from((span, err)))
-                .map(|r| Literal::from(r)),
+                .map(Literal::from),
             // TODO: support more formats (similar to Vector's `Convert` logic)
             Timestamp(v) => v
                 .parse::<DateTime<Utc>>()
-                .map(|v| Literal::from(v))
+                .map(Literal::from)
                 .map_err(|err| literal::Error::from((span, err))),
             Null => Ok(Literal::Null),
         };

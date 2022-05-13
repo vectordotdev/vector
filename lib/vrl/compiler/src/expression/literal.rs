@@ -60,8 +60,8 @@ impl Expression for Literal {
             | Float(v, _)
             | Boolean(v, _)
             | Regex(v, _)
-            | Timestamp(v, _) => v.into(),
-            Null => Value::Null.into(),
+            | Timestamp(v, _) => Cow::Borrowed(v),
+            Null => Cow::Owned(Value::Null),
         })
     }
 
@@ -266,7 +266,7 @@ impl<T: Into<Literal>> From<Option<T>> for Literal {
 
 impl From<DateTime<Utc>> for Literal {
     fn from(dt: DateTime<Utc>) -> Self {
-        Literal::Timestamp(dt.clone().into(), dt)
+        Literal::Timestamp(dt.into(), dt)
     }
 }
 
