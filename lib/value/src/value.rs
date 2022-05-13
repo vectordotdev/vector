@@ -268,99 +268,99 @@ impl Value {
         remove::remove(self, path, prune)
     }
 
-    /// Get an immutable borrow of the value by lookup.
-    ///
-    /// ```rust
-    /// use value::Value;
-    /// use lookup::Lookup;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let mut inner_map = Value::from(BTreeMap::default());
-    /// inner_map.insert("baz", 1);
-    ///
-    /// let mut map = Value::from(BTreeMap::default());
-    /// map.insert("bar", inner_map.clone());
-    ///
-    /// assert_eq!(map.get("bar").unwrap(), Some(&Value::from(inner_map)));
-    ///
-    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
-    /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
-    /// ```
-    #[allow(clippy::missing_errors_doc)]
-    pub fn get<'a>(
-        &self,
-        lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&Self>, ValueError> {
-        let mut working_lookup = lookup.into();
-        let span = trace_span!("get", lookup = %working_lookup);
-        let _guard = span.enter();
-
-        let this_segment = working_lookup.pop_front();
-        match (this_segment, self) {
-            // We've met an end and found our value.
-            (None, item) => Ok(Some(item)),
-            // Descend into a coalesce
-            (Some(Segment::Coalesce(sub_segments)), value) => {
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = Lookup::from(sub_segment);
-                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
-                    if value.contains(lookup.clone()) {
-                        needle = Some(lookup);
-                        break;
-                    }
-                }
-                match needle {
-                    Some(needle) => value.get(needle),
-                    None => Ok(None),
-                }
-            }
-            // Descend into a map
-            (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => match map.get(name) {
-                Some(inner) => inner.get(working_lookup.clone()),
-                None => Ok(None),
-            },
-            (Some(Segment::Index(_)), Value::Object(_)) => Ok(None),
-            // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => {
-                let index = if i.is_negative() {
-                    if i.abs() > array.len() as isize {
-                        // The index is before the start of the array.
-                        return Ok(None);
-                    }
-                    (array.len() as isize + i) as usize
-                } else {
-                    i as usize
-                };
-
-                match array.get(index) {
-                    Some(inner) => inner.get(working_lookup.clone()),
-                    None => Ok(None),
-                }
-            }
-            (Some(Segment::Field(Field { .. })), Value::Array(_)) => {
-                trace!("Mismatched field trying to access array.");
-                Ok(None)
-            }
-            // This is just not allowed!
-            (
-                Some(_s),
-                Value::Boolean(_)
-                | Value::Bytes(_)
-                | Value::Regex(_)
-                | Value::Timestamp(_)
-                | Value::Float(_)
-                | Value::Integer(_)
-                | Value::Null,
-            ) => {
-                trace!("Mismatched primitive field while trying to use segment.");
-                Ok(None)
-            }
-        }
-    }
+    // /// Get an immutable borrow of the value by lookup.
+    // ///
+    // /// ```rust
+    // /// use value::Value;
+    // /// use lookup::Lookup;
+    // /// use std::collections::BTreeMap;
+    // ///
+    // /// let mut inner_map = Value::from(BTreeMap::default());
+    // /// inner_map.insert("baz", 1);
+    // ///
+    // /// let mut map = Value::from(BTreeMap::default());
+    // /// map.insert("bar", inner_map.clone());
+    // ///
+    // /// assert_eq!(map.get("bar").unwrap(), Some(&Value::from(inner_map)));
+    // ///
+    // /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    // /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
+    // /// ```
+    // #[allow(clippy::missing_errors_doc)]
+    // pub fn get<'a>(
+    //     &self,
+    //     lookup: impl Into<Lookup<'a>> + Debug,
+    // ) -> StdResult<Option<&Self>, ValueError> {
+    //     let mut working_lookup = lookup.into();
+    //     let span = trace_span!("get", lookup = %working_lookup);
+    //     let _guard = span.enter();
+    //
+    //     let this_segment = working_lookup.pop_front();
+    //     match (this_segment, self) {
+    //         // We've met an end and found our value.
+    //         (None, item) => Ok(Some(item)),
+    //         // Descend into a coalesce
+    //         (Some(Segment::Coalesce(sub_segments)), value) => {
+    //             // Creating a needle with a back out of the loop is very important.
+    //             let mut needle = None;
+    //             for sub_segment in sub_segments {
+    //                 let mut lookup = Lookup::from(sub_segment);
+    //                 // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+    //                 // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+    //                 lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
+    //                 if value.contains(lookup.clone()) {
+    //                     needle = Some(lookup);
+    //                     break;
+    //                 }
+    //             }
+    //             match needle {
+    //                 Some(needle) => value.get(needle),
+    //                 None => Ok(None),
+    //             }
+    //         }
+    //         // Descend into a map
+    //         (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => match map.get(name) {
+    //             Some(inner) => inner.get(working_lookup.clone()),
+    //             None => Ok(None),
+    //         },
+    //         (Some(Segment::Index(_)), Value::Object(_)) => Ok(None),
+    //         // Descend into an array
+    //         (Some(Segment::Index(i)), Value::Array(array)) => {
+    //             let index = if i.is_negative() {
+    //                 if i.abs() > array.len() as isize {
+    //                     // The index is before the start of the array.
+    //                     return Ok(None);
+    //                 }
+    //                 (array.len() as isize + i) as usize
+    //             } else {
+    //                 i as usize
+    //             };
+    //
+    //             match array.get(index) {
+    //                 Some(inner) => inner.get(working_lookup.clone()),
+    //                 None => Ok(None),
+    //             }
+    //         }
+    //         (Some(Segment::Field(Field { .. })), Value::Array(_)) => {
+    //             trace!("Mismatched field trying to access array.");
+    //             Ok(None)
+    //         }
+    //         // This is just not allowed!
+    //         (
+    //             Some(_s),
+    //             Value::Boolean(_)
+    //             | Value::Bytes(_)
+    //             | Value::Regex(_)
+    //             | Value::Timestamp(_)
+    //             | Value::Float(_)
+    //             | Value::Integer(_)
+    //             | Value::Null,
+    //         ) => {
+    //             trace!("Mismatched primitive field while trying to use segment.");
+    //             Ok(None)
+    //         }
+    //     }
+    // }
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
@@ -391,100 +391,100 @@ impl Value {
         }
     }
 
-    /// Get a mutable borrow of the value by lookup.
-    ///
-    /// ```rust
-    /// use value::Value;
-    /// use lookup::Lookup;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let mut inner_map = Value::from(BTreeMap::default());
-    /// inner_map.insert("baz", 1);
-    ///
-    /// let mut map = Value::from(BTreeMap::default());
-    /// map.insert("bar", inner_map.clone());
-    ///
-    /// assert_eq!(map.get_mut("bar").unwrap(), Some(&mut Value::from(inner_map)));
-    ///
-    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
-    /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function may panic if an invariant is violated, indicating a
-    /// serious bug.
-    #[allow(clippy::missing_errors_doc)]
-    pub fn get_mut<'a>(
-        &mut self,
-        lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> StdResult<Option<&mut Self>, ValueError> {
-        let mut working_lookup = lookup.into();
-        let span = trace_span!("get_mut", lookup = %working_lookup);
-        let _guard = span.enter();
-
-        let this_segment = working_lookup.pop_front();
-        match (this_segment, self) {
-            // We've met an end and found our value.
-            (None, item) => Ok(Some(item)),
-            // This is just not allowed!
-            (
-                _,
-                Value::Boolean(_)
-                | Value::Bytes(_)
-                | Value::Regex(_)
-                | Value::Timestamp(_)
-                | Value::Float(_)
-                | Value::Integer(_)
-                | Value::Null,
-            ) => unimplemented!(),
-            // Descend into a coalesce
-            (Some(Segment::Coalesce(sub_segments)), value) => {
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = Lookup::from(sub_segment);
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
-                                                           // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                                                           // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    if value.contains(lookup.clone()) {
-                        needle = Some(lookup);
-                        break;
-                    }
-                }
-                match needle {
-                    Some(needle) => value.get_mut(needle),
-                    None => Ok(None),
-                }
-            }
-            // Descend into a map
-            (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => {
-                match map.get_mut(name) {
-                    Some(inner) => inner.get_mut(working_lookup.clone()),
-                    None => Ok(None),
-                }
-            }
-            (Some(Segment::Index(_)), Value::Object(_))
-            | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
-            // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => {
-                let index = if i.is_negative() {
-                    if i.abs() > array.len() as isize {
-                        // The index is before the start of the array.
-                        return Ok(None);
-                    }
-                    (array.len() as isize + i) as usize
-                } else {
-                    i as usize
-                };
-
-                match array.get_mut(index) {
-                    Some(inner) => inner.get_mut(working_lookup.clone()),
-                    None => Ok(None),
-                }
-            }
-        }
-    }
+    // /// Get a mutable borrow of the value by lookup.
+    // ///
+    // /// ```rust
+    // /// use value::Value;
+    // /// use lookup::Lookup;
+    // /// use std::collections::BTreeMap;
+    // ///
+    // /// let mut inner_map = Value::from(BTreeMap::default());
+    // /// inner_map.insert("baz", 1);
+    // ///
+    // /// let mut map = Value::from(BTreeMap::default());
+    // /// map.insert("bar", inner_map.clone());
+    // ///
+    // /// assert_eq!(map.get_mut("bar").unwrap(), Some(&mut Value::from(inner_map)));
+    // ///
+    // /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    // /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
+    // /// ```
+    // ///
+    // /// # Panics
+    // ///
+    // /// This function may panic if an invariant is violated, indicating a
+    // /// serious bug.
+    // #[allow(clippy::missing_errors_doc)]
+    // pub fn get_mut<'a>(
+    //     &mut self,
+    //     lookup: impl Into<Lookup<'a>> + Debug,
+    // ) -> StdResult<Option<&mut Self>, ValueError> {
+    //     let mut working_lookup = lookup.into();
+    //     let span = trace_span!("get_mut", lookup = %working_lookup);
+    //     let _guard = span.enter();
+    //
+    //     let this_segment = working_lookup.pop_front();
+    //     match (this_segment, self) {
+    //         // We've met an end and found our value.
+    //         (None, item) => Ok(Some(item)),
+    //         // This is just not allowed!
+    //         (
+    //             _,
+    //             Value::Boolean(_)
+    //             | Value::Bytes(_)
+    //             | Value::Regex(_)
+    //             | Value::Timestamp(_)
+    //             | Value::Float(_)
+    //             | Value::Integer(_)
+    //             | Value::Null,
+    //         ) => unimplemented!(),
+    //         // Descend into a coalesce
+    //         (Some(Segment::Coalesce(sub_segments)), value) => {
+    //             // Creating a needle with a back out of the loop is very important.
+    //             let mut needle = None;
+    //             for sub_segment in sub_segments {
+    //                 let mut lookup = Lookup::from(sub_segment);
+    //                 lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
+    //                                                        // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+    //                                                        // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+    //                 if value.contains(lookup.clone()) {
+    //                     needle = Some(lookup);
+    //                     break;
+    //                 }
+    //             }
+    //             match needle {
+    //                 Some(needle) => value.get_mut(needle),
+    //                 None => Ok(None),
+    //             }
+    //         }
+    //         // Descend into a map
+    //         (Some(Segment::Field(Field { name, .. })), Value::Object(map)) => {
+    //             match map.get_mut(name) {
+    //                 Some(inner) => inner.get_mut(working_lookup.clone()),
+    //                 None => Ok(None),
+    //             }
+    //         }
+    //         (Some(Segment::Index(_)), Value::Object(_))
+    //         | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
+    //         // Descend into an array
+    //         (Some(Segment::Index(i)), Value::Array(array)) => {
+    //             let index = if i.is_negative() {
+    //                 if i.abs() > array.len() as isize {
+    //                     // The index is before the start of the array.
+    //                     return Ok(None);
+    //                 }
+    //                 (array.len() as isize + i) as usize
+    //             } else {
+    //                 i as usize
+    //             };
+    //
+    //             match array.get_mut(index) {
+    //                 Some(inner) => inner.get_mut(working_lookup.clone()),
+    //                 None => Ok(None),
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Get a mutable borrow of the value by path
     #[allow(clippy::needless_pass_by_value)]
@@ -520,28 +520,28 @@ impl Value {
         self.get_by_path_v2(path).is_some()
     }
 
-    /// Determine if the lookup is contained within the value.
-    ///
-    /// ```rust
-    /// use value::Value;
-    /// use lookup::Lookup;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let mut inner_map = Value::from(BTreeMap::default());
-    /// inner_map.insert("baz", 1);
-    ///
-    /// let mut map = Value::from(BTreeMap::default());
-    /// map.insert("bar", inner_map.clone());
-    ///
-    /// assert!(map.contains("bar"));
-    ///
-    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
-    /// assert!(map.contains(lookup_key));
-    /// ```
-    #[instrument(level = "trace", skip(self))]
-    pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
-        self.get(lookup.into()).unwrap_or(None).is_some()
-    }
+    // /// Determine if the lookup is contained within the value.
+    // ///
+    // /// ```rust
+    // /// use value::Value;
+    // /// use lookup::Lookup;
+    // /// use std::collections::BTreeMap;
+    // ///
+    // /// let mut inner_map = Value::from(BTreeMap::default());
+    // /// inner_map.insert("baz", 1);
+    // ///
+    // /// let mut map = Value::from(BTreeMap::default());
+    // /// map.insert("bar", inner_map.clone());
+    // ///
+    // /// assert!(map.contains("bar"));
+    // ///
+    // /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    // /// assert!(map.contains(lookup_key));
+    // /// ```
+    // #[instrument(level = "trace", skip(self))]
+    // pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
+    //     self.get(lookup.into()).unwrap_or(None).is_some()
+    // }
 
     /// Produce an iterator over all 'nodes' in the graph of this value.
     ///
