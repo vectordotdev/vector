@@ -6,14 +6,11 @@ use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
-use futures::{
-    future::TryFutureExt,
-    stream::{Stream, StreamExt},
-};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::task::spawn_blocking;
+use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
@@ -326,8 +323,9 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
-    let finalizer = acknowledgements.then(|| {
+    let (finalizer, shutdown_checkpointer) = if acknowledgements {
         let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
+        let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
@@ -335,9 +333,12 @@ pub fn file_source(
                     checkpoints.update(entry.file_id, entry.offset);
                 }
             }
+            send_shutdown.send(())
         });
-        finalizer
-    });
+        (Some(finalizer), shutdown2.map(|_| ()).boxed())
+    } else {
+        (None, shutdown.clone().map(|_| ()).boxed())
+    };
 
     let checkpoints = checkpointer.view();
     Box::pin(async move {
@@ -410,7 +411,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown, checkpointer);
+            let result = file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer);
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
@@ -532,18 +533,6 @@ mod tests {
             glob_minimum_cooldown_ms: 100, // millis
             ..Default::default()
         }
-    }
-
-    async fn wait_with_timeout<F, R>(future: F) -> R
-    where
-        F: Future<Output = R> + Send,
-        R: Send,
-    {
-        timeout(Duration::from_secs(5), future)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Unclosed channel: may indicate file-server could not shutdown gracefully.")
-            })
     }
 
     async fn sleep_500_millis() {
@@ -1688,7 +1677,17 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let result = if acking_mode == Unfinalized {
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>()
+                    .await
+            } else {
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                    .await
+                    .expect(
+                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                    )
+            };
             if wait_shutdown {
                 shutdown_done.await;
             }

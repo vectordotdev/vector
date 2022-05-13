@@ -1,10 +1,9 @@
 use std::marker::{PhantomData, Unpin};
-use std::{future::Future, pin::Pin, task::Context, task::Poll};
+use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
 
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::event::{BatchStatus, BatchStatusReceiver};
 use crate::shutdown::ShutdownSignal;
@@ -46,23 +45,24 @@ pub(crate) struct FinalizerSet<T, S> {
 
 impl<T, S> FinalizerSet<T, S>
 where
-    T: Send + 'static,
+    T: Send + Debug + 'static,
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
     /// Produce a finalizer set along with the output stream of
     /// received acknowledged batch identifiers.
-    pub(crate) fn new(
-        shutdown: ShutdownSignal,
-    ) -> (Self, UnboundedReceiverStream<(BatchStatus, T)>) {
+    pub(crate) fn new(shutdown: ShutdownSignal) -> (Self, impl Stream<Item = (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
-        let (done_tx, done_rx) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown, todo_rx, done_tx, S::default()));
         (
             Self {
                 sender: Some(todo_tx),
                 _phantom: Default::default(),
             },
-            UnboundedReceiverStream::new(done_rx),
+            FinalizerStream {
+                shutdown,
+                new_entries: todo_rx,
+                status_receivers: S::default(),
+                is_shutdown: false,
+            },
         )
     }
 
@@ -95,52 +95,54 @@ where
     }
 }
 
-async fn run_finalizer<T>(
+#[pin_project::pin_project]
+#[derive(Debug)]
+struct FinalizerStream<T, S> {
     shutdown: ShutdownSignal,
-    mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
-    done_entries: UnboundedSender<(BatchStatus, T)>,
-    mut status_receivers: impl FuturesSet<FinalizerFuture<T>> + Unpin,
-) {
-    loop {
-        tokio::select! {
-            _ = shutdown.clone() => break,
-            // We could eliminate this `new_entries` channel by just
-            // pushing new entries directly into the
-            // `status_receivers` except for two problems: 1. The
-            // `status_receivers` needs to be `mut` for both pushing
-            // entries in and polling the stream, and the locking
-            // required to solve that could cause long lock pauses,
-            // and 2. The `OrderedFutures`/`UnorderedFutures` types
-            // produce an unending stream of `None` when they are
-            // empty, and there is no async way to wait for them to
-            // not be empty.
-            new_entry = new_entries.recv() => match new_entry {
-                Some((receiver, entry)) => {
-                    status_receivers.push(FinalizerFuture {
-                        receiver,
-                        entry: Some(entry),
-                    });
+    new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
+    status_receivers: S,
+    is_shutdown: bool,
+}
+
+impl<T, S> Stream for FinalizerStream<T, S>
+where
+    S: FuturesSet<FinalizerFuture<T>> + Unpin,
+    T: Debug,
+{
+    type Item = (BatchStatus, T);
+
+    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        if !*this.is_shutdown {
+            if let Poll::Ready(_) = this.shutdown.poll_unpin(ctx) {
+                *this.is_shutdown = true
+            }
+            // Only poll for new entries until shutdown is flagged.
+            match this.new_entries.poll_recv(ctx) {
+                Poll::Pending => (),
+                Poll::Ready(Some((receiver, entry))) => {
+                    let entry = Some(entry);
+                    this.status_receivers
+                        .push(FinalizerFuture { receiver, entry });
                 }
-                None => break,
-            },
-            finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
-                Some((status, entry)) => if done_entries.send((status,entry)).is_err() {
-                    // The receiver went away before shutdown, so
-                    // just close up shop as there is nothing more
-                    // we can do here.
-                    return;
-                }
-                // The is_empty guard above prevents this from being reachable.
-                None => unreachable!(),
-            },
+                // The sender went away before shutdown, count it as a shutdown too.
+                Poll::Ready(None) => *this.is_shutdown = true,
+            }
         }
-    }
-    // We've either seen a shutdown signal or the new entry sender was
-    // closed. Wait for the last statuses to come in before indicating
-    // we are done.
-    while let Some((status, entry)) = status_receivers.next().await {
-        if done_entries.send((status, entry)).is_err() {
-            break;
+
+        match this.status_receivers.poll_next_unpin(ctx) {
+            Poll::Pending => Poll::Pending,
+            // The futures set report `None` ready when there are no
+            // entries present, but we want it to report pending
+            // instead.
+            Poll::Ready(None) => {
+                if *this.is_shutdown {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Pending
+                }
+            }
+            Poll::Ready(Some((status, entry))) => Poll::Ready(Some((status, entry))),
         }
     }
 }
