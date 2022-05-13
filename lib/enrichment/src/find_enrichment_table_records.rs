@@ -177,7 +177,7 @@ impl Function for FindEnrichmentTableRecords {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let condition = args.required("condition");
         let condition = condition
             .into_object()

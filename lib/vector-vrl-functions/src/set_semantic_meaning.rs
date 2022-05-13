@@ -80,7 +80,7 @@ impl Function for SetSemanticMeaning {
         Ok(Box::new(SetSemanticMeaningFn))
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _: &mut Context, _: &mut VmArgumentList) -> Result<Value> {
         Ok(Value::Null)
     }
 }
