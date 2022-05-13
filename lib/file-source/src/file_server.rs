@@ -72,6 +72,11 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
+    // The first `shutdown_data` signal here is to stop this file
+    // server from outputting new data; the second
+    // `shutdown_checkpointer` is for finishing the background
+    // checkpoint writer task, which has to wait for all
+    // acknowledgements to be completed.
     pub fn run<C, S1, S2>(
         self,
         mut chans: C,
@@ -83,9 +88,7 @@ where
         C: Sink<Vec<Line>> + Unpin,
         <C as Sink<Vec<Line>>>::Error: std::error::Error,
         S1: Future + Unpin + Send + 'static,
-        <S1 as Future>::Output: Clone + Send + Sync,
         S2: Future + Unpin + Send + 'static,
-        <S2 as Future>::Output: Clone + Send + Sync,
     {
         let mut fingerprint_buffer = Vec::new();
 
