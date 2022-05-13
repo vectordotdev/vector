@@ -1,22 +1,31 @@
 use std::collections::HashMap;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
+use tokio_util::codec::Encoder as _;
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    codecs::Encoder,
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings,
+                StandardEncodingsMigrator, Transformer,
+            },
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -33,31 +42,25 @@ enum HealthcheckError {
     NotFound,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
     pub log_id: Template,
-
     pub resource: StackdriverResource,
+    #[serde(default)]
     pub severity_key: Option<String>,
-
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
-
+    #[serde(flatten)]
+    encoding: EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-
+    #[serde(default)]
     pub tls: Option<TlsConfig>,
-
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -68,25 +71,20 @@ pub struct StackdriverConfig {
 
 #[derive(Clone, Debug)]
 struct StackdriverSink {
-    config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    log_name: StackdriverLogName,
+    log_id: Template,
+    resource: StackdriverResource,
     severity_key: Option<String>,
+    creds: Option<GcpCredentials>,
     uri: Uri,
+    transformer: Transformer,
+    encoder: Encoder<()>,
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
-
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
 pub enum StackdriverLogName {
     #[serde(rename = "billing_account_id")]
     BillingAccount(String),
@@ -94,15 +92,13 @@ pub enum StackdriverLogName {
     Folder(String),
     #[serde(rename = "organization_id")]
     Organization(String),
-    #[derivative(Default)]
     #[serde(rename = "project_id")]
     Project(String),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct StackdriverResource {
-    #[serde(rename = "type")]
-    pub type_: String,
+    pub r#type: String,
     #[serde(flatten)]
     pub labels: HashMap<String, Template>,
 }
@@ -111,7 +107,17 @@ inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
-impl_generate_config_from_default!(StackdriverConfig);
+impl GenerateConfig for StackdriverConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(indoc! {r#"
+            project_id = "my-project"
+            log_id = "vector-logs"
+            resource.type = "global"
+            encoding.codec = "json"
+        "#})
+        .unwrap()
+    }
+}
 
 const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
 
@@ -134,11 +140,19 @@ impl SinkConfig for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding();
+        let encoder = Encoder::<()>::new(serializer);
+
         let sink = StackdriverSink {
-            config: self.clone(),
-            creds,
+            log_name: self.log_name.clone(),
+            log_id: self.log_id.clone(),
+            resource: self.resource.clone(),
             severity_key: self.severity_key.clone(),
+            creds,
             uri: ENDPOINT_URI.parse().unwrap(),
+            transformer,
+            encoder,
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -170,14 +184,33 @@ impl SinkConfig for StackdriverConfig {
 }
 
 struct StackdriverEventEncoder {
-    config: StackdriverConfig,
+    log_name: StackdriverLogName,
+    log_id: Template,
+    resource: StackdriverResource,
     severity_key: Option<String>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
+}
+
+impl StackdriverEventEncoder {
+    fn log_name(&self, event: &Event) -> Result<String, TemplateRenderingError> {
+        use StackdriverLogName::*;
+
+        let log_id = self.log_id.render_string(event)?;
+
+        Ok(match &self.log_name {
+            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
+            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
+            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
+            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+        })
+    }
 }
 
 impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
     fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
-        for (key, template) in &self.config.resource.labels {
+        let mut labels = HashMap::with_capacity(self.resource.labels.len());
+        for (key, template) in &self.resource.labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
@@ -191,7 +224,6 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             labels.insert(key.clone(), value);
         }
         let log_name = self
-            .config
             .log_name(&event)
             .map_err(|error| {
                 emit!(crate::internal_events::TemplateRenderingError {
@@ -211,18 +243,27 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
-
-        let log = event.into_log();
+        self.transformer.transform(&mut event);
 
         let mut entry = map::Map::with_capacity(5);
         entry.insert("logName".into(), json!(log_name));
-        entry.insert("jsonPayload".into(), json!(log));
+        let serializer = self.encoder.serializer();
+        if serializer.supports_json() {
+            // Errors are handled by `Encoder`.
+            let json = serializer.encode_json(event).ok()?;
+            entry.insert("jsonPayload".into(), json);
+        } else {
+            let mut bytes = BytesMut::new();
+            // Errors are handled by `Encoder`.
+            self.encoder.encode(event, &mut bytes).ok()?;
+            let text = String::from_utf8_lossy(&bytes);
+            entry.insert("textPayload".into(), json!(text));
+        }
         entry.insert("severity".into(), json!(severity));
         entry.insert(
             "resource".into(),
             json!({
-                "type": self.config.resource.type_,
+                "type": self.resource.r#type,
                 "labels": labels,
             }),
         );
@@ -244,8 +285,12 @@ impl HttpSink for StackdriverSink {
 
     fn build_encoder(&self) -> Self::Encoder {
         StackdriverEventEncoder {
-            config: self.config.clone(),
+            log_name: self.log_name.clone(),
+            log_id: self.log_id.clone(),
+            resource: self.resource.clone(),
             severity_key: self.severity_key.clone(),
+            transformer: self.transformer.clone(),
+            encoder: self.encoder.clone(),
         }
     }
 
@@ -314,24 +359,10 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
 }
 
-impl StackdriverConfig {
-    fn log_name(&self, event: &Event) -> Result<String, TemplateRenderingError> {
-        use StackdriverLogName::*;
-
-        let log_id = self.log_id.render_string(event)?;
-
-        Ok(match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, log_id),
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use codecs::JsonSerializer;
     use indoc::indoc;
     use serde_json::value::RawValue;
 
@@ -351,15 +382,27 @@ mod tests {
             resource.type = "generic_node"
             resource.namespace = "office"
             resource.node_id = "{{ node_id }}"
-            encoding.except_fields = ["anumber", "node_id", "log_id"]
         "#})
         .unwrap();
 
         let sink = StackdriverSink {
-            config,
-            creds: None,
+            log_name: config.log_name,
+            log_id: config.log_id,
+            resource: config.resource,
             severity_key: Some("anumber".into()),
+            creds: None,
             uri: ENDPOINT_URI.parse().unwrap(),
+            transformer: Transformer::new(
+                None,
+                Some(vec![
+                    "anumber".to_owned(),
+                    "node_id".to_owned(),
+                    "log_id".to_owned(),
+                ]),
+                None,
+            )
+            .unwrap(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
         };
         let mut encoder = sink.build_encoder();
 
@@ -398,10 +441,14 @@ mod tests {
         .unwrap();
 
         let sink = StackdriverSink {
-            config,
-            creds: None,
+            log_name: config.log_name,
+            log_id: config.log_id,
+            resource: config.resource,
             severity_key: Some("anumber".into()),
+            creds: None,
             uri: ENDPOINT_URI.parse().unwrap(),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
         };
         let mut encoder = sink.build_encoder();
 
@@ -467,10 +514,14 @@ mod tests {
         .unwrap();
 
         let sink = StackdriverSink {
-            config,
-            creds: None,
+            log_name: config.log_name,
+            log_id: config.log_id,
+            resource: config.resource,
             severity_key: None,
+            creds: None,
             uri: ENDPOINT_URI.parse().unwrap(),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
         };
         let mut encoder = sink.build_encoder();
 
