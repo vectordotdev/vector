@@ -191,22 +191,22 @@ mod tests {
          ]
      }
      "#],
-            want: Ok(map![
-                "owner": "071959437513",
-                "message_type": "DATA_MESSAGE",
-                "log_group": "/jesse/test",
-                "log_stream": "test",
-                "subscription_filters": vec!["Destination"],
-                "log_events": vec![map![
-                    "id": "35683658089614582423604394983260738922885519999578275840",
-                    "timestamp": Utc.timestamp(1600110569, 39000000),
-                    "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}",
-                ], map![
-                    "id": "35683658089659183914001456229543810359430816722590236673",
-                    "timestamp": Utc.timestamp(1600110569, 41000000),
-                    "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
-                ]],
-            ]),
+            want: Ok(Value::from(BTreeMap::from([
+                (String::from("owner"), Value::from("071959437513")),
+                (String::from("message_type"), Value::from("DATA_MESSAGE")),
+                (String::from("log_group"), Value::from("/jesse/test")),
+                (String::from("log_stream"), Value::from("test")),
+                (String::from("subscription_filters"), Value::from(vec![Value::from("Destination")])),
+                (String::from("log_events"), Value::from(vec![Value::from(BTreeMap::from([
+                    (String::from("id"), Value::from( "35683658089614582423604394983260738922885519999578275840")),
+                    (String::from("timestamp"), Value::from(Utc.timestamp(1600110569, 39000000))),
+                    (String::from("message"), Value::from("{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}")),
+                ])), Value::from(BTreeMap::from([
+                    (String::from("id"), Value::from("35683658089659183914001456229543810359430816722590236673")),
+                    (String::from("timestamp"), Value::from(Utc.timestamp(1600110569, 41000000))),
+                    (String::from("message"), Value::from("{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}")),
+                ]))])),
+                ]))),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
