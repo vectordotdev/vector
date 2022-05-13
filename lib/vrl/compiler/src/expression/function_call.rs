@@ -1200,7 +1200,10 @@ mod tests {
     struct Fn;
 
     impl Expression for Fn {
-        fn resolve(&self, _ctx: &mut Context) -> Resolved {
+        fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+            &'rt self,
+            _ctx: &'ctx mut Context,
+        ) -> Resolved<'value> {
             todo!()
         }
 
@@ -1270,7 +1273,7 @@ mod tests {
 
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
-            create_node(Expr::Literal(Literal::Integer(value))),
+            create_node(Expr::Literal(Literal::Integer(value.into(), value))),
         )
     }
 

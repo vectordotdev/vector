@@ -60,7 +60,7 @@ macro_rules! bench_function {
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                     b.iter(|| {
-                        let got = expression.resolve(&mut ctx).map_err(|e| e.to_string());
+                        let got = expression.resolve(&mut ctx).map_err(|e| e.to_string()).map(std::borrow::Cow::into_owned);
                         debug_assert_eq!(got, want);
                         got
                     })
@@ -102,6 +102,7 @@ macro_rules! test_function {
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                         let got_value = expression.resolve(&mut ctx)
+                            .map(std::borrow::Cow::into_owned)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
                         assert_eq!(got_value, want);

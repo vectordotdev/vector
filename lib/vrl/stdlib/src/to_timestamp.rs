@@ -328,7 +328,7 @@ mod tests {
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
-            value: Box::new(Literal::Integer(9999999999999)),
+            value: Box::new(Literal::from(9999999999999)),
             unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
@@ -342,7 +342,7 @@ mod tests {
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
-            value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
+            value: Box::new(Literal::from(NotNan::new(9999999999999.9).unwrap())),
             unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();

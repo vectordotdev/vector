@@ -71,7 +71,7 @@ mod tests {
         let mut object: Value = map![].into();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
-        let value = UuidV4Fn.resolve(&mut ctx).unwrap();
+        let value = UuidV4Fn.resolve(&mut ctx).unwrap().into_owned();
 
         assert!(matches!(&value, Value::Bytes(_)));
 

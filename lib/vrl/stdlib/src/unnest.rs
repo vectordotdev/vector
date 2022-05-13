@@ -246,6 +246,8 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use vector_common::{btreemap, TimeZone};
 
     use super::*;
@@ -575,6 +577,7 @@ mod tests {
 
             let got = func
                 .resolve(&mut ctx)
+                .map(Cow::into_owned)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, expected);

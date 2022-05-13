@@ -204,6 +204,8 @@ impl fmt::Display for DelFn {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use vector_common::{btreemap, TimeZone};
 
     use super::*;
@@ -261,6 +263,7 @@ mod tests {
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
             let got = func
                 .resolve(&mut ctx)
+                .map(Cow::into_owned)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
             assert_eq!(got, exp);
         }
