@@ -571,7 +571,10 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value.remove("one", true).unwrap().unwrap();
+        let val = expected_value
+            .remove_by_path_v2("one", true)
+            .unwrap()
+            .unwrap();
         expected_value.insert("three", val).unwrap();
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
@@ -591,7 +594,10 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value.remove("one", true).unwrap().unwrap();
+        let val = expected_value
+            .remove_by_path_v2("one", true)
+            .unwrap()
+            .unwrap();
         expected_value.insert("two".to_string(), val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
