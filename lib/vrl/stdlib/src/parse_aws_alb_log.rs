@@ -82,42 +82,57 @@ impl Expression for ParseAwsAlbLogFn {
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {
-    map! {
-        "actions_executed": Kind::bytes() | Kind::null(),
-        "chosen_cert_arn": Kind::bytes() | Kind::null(),
-        "classification_reason": Kind::bytes() | Kind::null(),
-        "classification": Kind::bytes() | Kind::null(),
-        "client_host": Kind::bytes(),
-        "domain_name": Kind::bytes() | Kind::null(),
-        "elb_status_code": Kind::bytes(),
-        "elb": Kind::bytes(),
-        "error_reason": Kind::bytes() | Kind::null(),
-        "matched_rule_priority": Kind::bytes() | Kind::null(),
-        "received_bytes": Kind::integer(),
-        "redirect_url": Kind::bytes() | Kind::null(),
-        "request_creation_time": Kind::bytes(),
-        "request_method": Kind::bytes(),
-        "request_processing_time": Kind::float(),
-        "request_protocol": Kind::bytes(),
-        "request_url": Kind::bytes(),
-        "response_processing_time": Kind::float(),
-        "sent_bytes": Kind::integer(),
-        "ssl_cipher": Kind::bytes() | Kind::null(),
-        "ssl_protocol": Kind::bytes() | Kind::null(),
-        "target_group_arn": Kind::bytes(),
-        "target_host": Kind::bytes() | Kind::null(),
-        "target_port_list": Kind::bytes() | Kind::null(),
-        "target_processing_time": Kind::float(),
-        "target_status_code_list": Kind::bytes() | Kind::null(),
-        "target_status_code": Kind::bytes() | Kind::null(),
-        "timestamp": Kind::bytes(),
-        "trace_id": Kind::bytes(),
-        "type": Kind::bytes(),
-        "user_agent": Kind::bytes(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (
+            Field::from("actions_executed"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("chosen_cert_arn"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("classification_reason"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("classification"), Kind::bytes() | Kind::null()),
+        (Field::from("client_host"), Kind::bytes()),
+        (Field::from("domain_name"), Kind::bytes() | Kind::null()),
+        (Field::from("elb_status_code"), Kind::bytes()),
+        (Field::from("elb"), Kind::bytes()),
+        (Field::from("error_reason"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("matched_rule_priority"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("received_bytes"), Kind::integer()),
+        (Field::from("redirect_url"), Kind::bytes() | Kind::null()),
+        (Field::from("request_creation_time"), Kind::bytes()),
+        (Field::from("request_method"), Kind::bytes()),
+        (Field::from("request_processing_time"), Kind::float()),
+        (Field::from("request_protocol"), Kind::bytes()),
+        (Field::from("request_url"), Kind::bytes()),
+        (Field::from("response_processing_time"), Kind::float()),
+        (Field::from("sent_bytes"), Kind::integer()),
+        (Field::from("ssl_cipher"), Kind::bytes() | Kind::null()),
+        (Field::from("ssl_protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("target_group_arn"), Kind::bytes()),
+        (Field::from("target_host"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("target_port_list"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("target_processing_time"), Kind::float()),
+        (
+            Field::from("target_status_code_list"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (
+            Field::from("target_status_code"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("timestamp"), Kind::bytes()),
+        (Field::from("trace_id"), Kind::bytes()),
+        (Field::from("type"), Kind::bytes()),
+        (Field::from("user_agent"), Kind::bytes()),
+    ])
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {

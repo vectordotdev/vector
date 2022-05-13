@@ -101,7 +101,7 @@ mod tests {
         }
 
         map {
-            args: func_args![value: map!["field": "value"]],
+            args: func_args![value: Value::from(BTreeMap::from([(String::from("field"), Value::from("value"))]))],
             want: Ok(r#"{"field":"value"}"#),
             tdef: TypeDef::bytes().infallible(),
         }

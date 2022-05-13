@@ -30,7 +30,7 @@ pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};
 pub use compiler::{
     bench_function, expr,
     expression::FunctionArgument,
-    func_args, map, test_function, test_type_def, type_def, value,
+    func_args, test_function, test_type_def, type_def, value,
     vm::{VmArgumentList, VmFunctionClosure},
 };
 pub use diagnostic::DiagnosticMessage;

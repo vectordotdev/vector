@@ -125,36 +125,36 @@ impl Expression for ParseAwsVpcFlowLogFn {
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {
-    map! {
-        "account_id": Kind::integer() | Kind::null(),
-        "action": Kind::bytes() | Kind::null(),
-        "az_id": Kind::bytes() | Kind::null(),
-        "bytes": Kind::integer() | Kind::null(),
-        "dstaddr": Kind::bytes() | Kind::null(),
-        "dstport": Kind::integer() | Kind::null(),
-        "end": Kind::integer() | Kind::null(),
-        "instance_id": Kind::bytes() | Kind::null(),
-        "interface_id": Kind::bytes() | Kind::null(),
-        "log_status": Kind::bytes() | Kind::null(),
-        "packets": Kind::integer() | Kind::null(),
-        "pkt_dstaddr": Kind::bytes() | Kind::null(),
-        "pkt_srcaddr": Kind::bytes() | Kind::null(),
-        "protocol": Kind::integer() | Kind::null(),
-        "region": Kind::bytes() | Kind::null(),
-        "srcaddr": Kind::bytes() | Kind::null(),
-        "srcport": Kind::integer() | Kind::null(),
-        "start": Kind::integer() | Kind::null(),
-        "sublocation_id": Kind::bytes() | Kind::null(),
-        "sublocation_type": Kind::bytes() | Kind::null(),
-        "subnet_id": Kind::bytes() | Kind::null(),
-        "tcp_flags": Kind::integer() | Kind::null(),
-        "type": Kind::bytes() | Kind::null(),
-        "version": Kind::integer() | Kind::null(),
-        "vpc_id": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("account_id"), Kind::integer() | Kind::null()),
+        (Field::from("action"), Kind::bytes() | Kind::null()),
+        (Field::from("az_id"), Kind::bytes() | Kind::null()),
+        (Field::from("bytes"), Kind::integer() | Kind::null()),
+        (Field::from("dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("dstport"), Kind::integer() | Kind::null()),
+        (Field::from("end"), Kind::integer() | Kind::null()),
+        (Field::from("instance_id"), Kind::bytes() | Kind::null()),
+        (Field::from("interface_id"), Kind::bytes() | Kind::null()),
+        (Field::from("log_status"), Kind::bytes() | Kind::null()),
+        (Field::from("packets"), Kind::integer() | Kind::null()),
+        (Field::from("pkt_dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("pkt_srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::integer() | Kind::null()),
+        (Field::from("region"), Kind::bytes() | Kind::null()),
+        (Field::from("srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("srcport"), Kind::integer() | Kind::null()),
+        (Field::from("start"), Kind::integer() | Kind::null()),
+        (Field::from("sublocation_id"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("sublocation_type"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("subnet_id"), Kind::bytes() | Kind::null()),
+        (Field::from("tcp_flags"), Kind::integer() | Kind::null()),
+        (Field::from("type"), Kind::bytes() | Kind::null()),
+        (Field::from("version"), Kind::integer() | Kind::null()),
+        (Field::from("vpc_id"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
