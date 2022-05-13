@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 
 use lookup::lookup_v2::{BorrowedSegment, Path};
 
-use super::Value;
+use crate::Value;
 
 /// Removes field value specified by the given path and return its value.
 ///
@@ -37,9 +37,15 @@ fn remove_array<'a>(
     match path_iter.next()? {
         BorrowedSegment::Index(index) => match path_iter.peek() {
             None => array_remove(array, index as usize).map(|v| (v, array.is_empty())),
-            Some(_) => array
-                .get_mut(index as usize)
-                .and_then(|value| remove_rec(value, path_iter, prune)),
+            Some(_) => {
+                let (result, empty) = array
+                    .get_mut(index as usize)
+                    .and_then(|value| remove_rec(value, path_iter, prune))?;
+                if prune && empty {
+                    array_remove(array, index as usize);
+                }
+                Some((result, array.is_empty()))
+            }
         },
         _ => None,
     }
@@ -80,6 +86,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
+    use crate::Value;
 
     #[test]
     fn array_remove_from_middle() {

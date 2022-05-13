@@ -1,5 +1,6 @@
 mod jit;
 
+use quickcheck::{Arbitrary, Gen};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -308,6 +309,32 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl Arbitrary for BorrowedSegment<'static> {
+    fn arbitrary(g: &mut Gen) -> Self {
+        match usize::arbitrary(g) % 3 {
+            0 => BorrowedSegment::Index(usize::arbitrary(g) % 20),
+            _ => BorrowedSegment::Field(String::arbitrary(g).into()),
+            // _ => BorrowedSegment::Invalid,
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            BorrowedSegment::Invalid => Box::new(std::iter::empty()),
+            BorrowedSegment::Index(index) => {
+                Box::new(index.shrink().map(|i| BorrowedSegment::Index(i)))
+            }
+            BorrowedSegment::Field(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
         }
     }
 }
